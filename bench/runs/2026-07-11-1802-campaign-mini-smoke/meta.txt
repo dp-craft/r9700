@@ -1,0 +1,11 @@
+date=2026-07-11T18:05:15+02:00
+model=/home/dev/models/gguf/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf
+matrix: BACKENDS=vulkan MTPS=1 KVS=q8_0
+base: UB=2048 B=8192 FA=on CTX=32768 NGL=99
+partA: DEPTHS=8000 MAX_TOKENS=256 THINK_MAX_TOKENS=1024
+partB: CONC_LIST=1 2 CONC_NP=2 REPS=1
+gpu_vendor=amd
+gpu_name=AMD Radeon AI PRO R9700
+gpu_driver=rocm-smi-lib 7.8.0
+vram_total_mib=32624
+hsa_override=

@@ -1,0 +1,11 @@
+Think carefully and show your reasoning inside a <think>...</think> block before giving the final answer.
+
+Problem: You are designing a rate limiter for a distributed API gateway running on N nodes that do
+not share memory and communicate only via a shared Redis instance with ~2 ms round-trip latency.
+Requirements: (a) global limit of R requests/second across all nodes, (b) burst tolerance of B,
+(c) no single Redis round-trip on the hot path for the common (not-rate-limited) case, (d) graceful
+degradation if Redis is briefly unreachable.
+
+Derive an algorithm that satisfies all four requirements. Analyze its worst-case behavior when a
+node's local clock drifts by up to 50 ms, and quantify how far the global rate can overshoot R.
+Then give the pseudocode. Reason through the tradeoffs before committing to a design.

@@ -1,15 +1,26 @@
 # large binaries & transient artifacts — keep scripts + results.jsonl + docs tracked
 llamacpp/
 *.zip
-harness/log_*.log
-harness/guard_*.log
-harness/ollama_serve*.log
-harness/Modelfile_*
-harness/_hf_probe.py
-harness/results.jsonl
+legacy/harness/log_*.log
+legacy/harness/guard_*.log
+legacy/harness/ollama_serve*.log
+legacy/harness/Modelfile_*
+legacy/harness/_hf_probe.py
+legacy/harness/results.jsonl
 llamacpp-vulkan/
 llamacpp-rocm-b9950/
 dl/
-harness/log_ub*.log
-harness/guard_ub*.log
-harness/.last_tuning_results
+legacy/harness/log_ub*.log
+legacy/harness/guard_ub*.log
+legacy/harness/.last_tuning_results
+# two-track outputs: keep results.jsonl/llama-bench.json + meta, drop logs & generated prompts
+workloads/generated/
+runs/*/*.err
+runs/*/*.log
+runs/*/invocations/*.err
+# generated visualization — regenerate anytime with lib/report.py <run-dir>
+runs/*/report.html
+# engine-bench server runtime state (pids/logs of serve_llamacpp.sh)
+.servers/
+__pycache__/
+*.pyc

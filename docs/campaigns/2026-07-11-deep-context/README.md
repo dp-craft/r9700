@@ -1,0 +1,125 @@
+# Deep-context campaign — max depth + parallel at the ceiling (R9700, 2026-07-11)
+
+A self-contained run plan you execute **manually**, top to bottom. Built from the conventions in
+`docs/RUNBOOK.md` (unchanged). ✅ = command uses verified repo tooling · ⚠️ = watch point.
+
+**Why this campaign.** The starter campaign capped at 64K and hit a `cr64000` context overflow.
+Direct VRAM measurement then showed the real picture: **f16 KV ≈ 21 KiB/token** (not the textbook
+82 KiB), so the native **262 144** context fits in **~27 GB** (measured) — VRAM is *not* the binding
+limit, the model's RoPE cap is. This campaign measures how deep we can actually go and how the card
+behaves at the ceiling, single-stream and in parallel.
+
+## Decisions locked (2026-07-11)
+- **Backend:** Vulkan/RADV only (the decode winner) · **tuning:** `-ub 2048 -b 4096 -fa on` (sweep optimum).
+- **KV:** **f16 everywhere**, plus **one q8_0 confirmatory point** at the deepest single run
+  (to document, with numbers, that q8_0 is *not* needed here).
+- **Single-thread max depth:** **~200 000** (safety margin under the 262 144 native cap; shorter prefill).
+- **Parallel:** server `-c 262144`, `-np ∈ {2,4}` (each slot = `262144/np`). **No VRAM fallback** —
+  if a server won't start / a probe stops, we fix and re-run that point (per your call).
+- **MTP:** **on** for single-stream (decode +30–40 %), **off** for parallel (it reverses to −8…−15 %
+  under load — measured in the starter campaign).
+
+## Fixed parameters
+- Model `Qwen3.6-35B-A3B-UD-Q4_K_M.gguf` (embedded MTP layer) · llama.cpp build b9950 (record if different).
+- Repo root `$ROOT`; GPU/vendor env auto via `bench/lib/gpu_env.sh`. Vulkan server on **:8081**
+  (matches `run.sh`'s `llamacpp-vulkan` engine URL).
+
+```bash
+export ROOT=/home/dev/work/dp-craft/amd
+cd "$ROOT/bench/engine-bench"
+# Only probe the Vulkan server we start (silences the not-running rocm/ollama engines):
+export ENGINES_LIST="llamacpp-vulkan|http://localhost:8081/v1|local"
+export MODEL=/home/dev/models/gguf/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf
+export GEN=$ROOT/bench/workloads/generated
+```
+
+## Phase 1 — build the deep fixtures ✅ (~2 min)
+```bash
+cd "$ROOT/bench/workloads" && mkdir -p generated
+# single-thread depth curve (corpus ~565K tok is big enough):
+for T in 8000 128000 200000; do
+  python3 build_prompt.py --task tasks/codereview-large.task.md \
+    --src corpus/ts-agentic-code-runner --src corpus/py-rich \
+    --target-tokens $T --out generated/codereview-${T}.txt
+done
+python3 build_prompt.py --task tasks/thinking-hard.prompt.txt --target-tokens 0 \
+  --out generated/thinking-hard.txt
+# parallel agent streams: 4 variants at 32K each (fills the np=4 slot = 65536 with gen headroom):
+python3 build_prompt.py --task tasks/agentic-implement.task.md \
+  --src corpus/ts-agentic-code-runner --src corpus/py-rich \
+  --target-tokens 32000 --variants 4 --out generated/agentic-32000.txt
+```
+Expected: 6 files (`codereview-{8000,128000,200000}.txt`, `thinking-hard.txt`,
+`agentic-32000-v1..v4.txt`); the builder **errors out** if any target can't be filled ≥97 %.
+
+## Phase 2 — deep single-thread, MTP off then on ✅ (~40–70 min)
+`-c 262144 -np 1` (native max, measured ~27 GB). Depth curve + thinking per MTP setting.
+```bash
+cd "$ROOT/bench/engine-bench"
+for M in 0 1; do
+  BACKEND=vulkan CTX=262144 NP=1 KV=f16 MTP=$M UB=2048 B=4096 PORT=8081 ./serve_llamacpp.sh start
+  for T in 8000 128000 200000; do
+    PROMPT_FILE=$GEN/codereview-${T}.txt SLUG=deep-mtp${M}-cr${T} \
+      MAX_TOKENS=256 REPS=2 PREFIX_MODE=unique ./run.sh
+  done
+  PROMPT_FILE=$GEN/thinking-hard.txt SLUG=deep-mtp${M}-think \
+    MAX_TOKENS=1024 REPS=2 API=chat PREFIX_MODE=unique ./run.sh
+  PORT=8081 ./serve_llamacpp.sh stop
+done
+```
+⚠️ 200K prefill ≈ 1.5–2.5 min/request (×2 reps). ⚠️ MTP at deep ctx: if a run stops with an MTP
+batch error (known upstream issue at short ctx), re-run that point with `MTP=0` and note it.
+
+## Phase 3 — deepest single, q8_0 confirmatory point ✅ (~10 min)
+One server, one probe — proves q8_0 buys nothing here (A/B vs the f16 `deep-mtp1-cr200000` above).
+```bash
+BACKEND=vulkan CTX=262144 NP=1 KV=q8_0 MTP=1 UB=2048 B=4096 PORT=8081 ./serve_llamacpp.sh start
+PROMPT_FILE=$GEN/codereview-200000.txt SLUG=deep-mtp1q8-cr200000 \
+  MAX_TOKENS=256 REPS=2 PREFIX_MODE=unique ./run.sh
+PORT=8081 ./serve_llamacpp.sh stop
+```
+
+## Phase 4 — parallel at the ceiling, MTP off ✅ (~30–50 min)
+`-c 262144` split across slots; concurrency = `-np`. **No fallback** — if a server OOMs on start,
+lower `CTX` for that point and record it.
+```bash
+for NP in 2 4; do
+  BACKEND=vulkan CTX=262144 NP=$NP KV=f16 MTP=0 UB=2048 B=4096 PORT=8081 ./serve_llamacpp.sh start
+  FILES=""; for v in $(seq 1 $NP); do FILES="$FILES $GEN/agentic-32000-v${v}.txt"; done
+  PROMPT_FILE="$FILES" SLUG=deep-par-np${NP} \
+    MAX_TOKENS=256 CONCURRENCY=$NP REPS=2 PREFIX_MODE=unique ./run.sh
+  PORT=8081 ./serve_llamacpp.sh stop
+done
+```
+Each `run.sh` writes `bench/runs/<stamp>-engine-deep-*/results.jsonl` (+ per-engine `/props`,
+copied prompts). Server cmdline/props/log live under `bench/.servers/8081.*` per launch.
+
+## Phase 5 — write it up (/benchmark skill)
+`docs/analysis/<stamp>-deep-context-35b.md` — depth curve to 200K (prefill+decode collapse),
+MTP on/off at depth, q8_0-vs-f16 confirmatory row, parallel decode/stream + aggregate + TTFT p95
+at np 2/4. Update the README TL;DR max-context line (provenance: these runs).
+
+## Phase 6 — generate charts (LAST STEP) ✅
+Self-contained HTML (Chart.js inlined; no network), glob across all deep run dirs:
+```bash
+python3 "$ROOT/bench/lib/make_charts.py" \
+  "$ROOT/bench/runs/deep-context-charts.html" \
+  "$ROOT"/bench/runs/*-engine-deep-*/results.jsonl
+# → decode-vs-depth, prefill-vs-depth, decode-vs-concurrency, aggregate-vs-concurrency
+xdg-open "$ROOT/bench/runs/deep-context-charts.html"   # or open in a browser
+```
+
+## Run matrix (tick as you go)
+- [ ] 1: fixtures built (6 files)
+- [ ] 2: single MTP=0 → cr{8k,128k,200k} + thinking
+- [ ] 2: single MTP=1 → cr{8k,128k,200k} + thinking
+- [ ] 3: q8_0 confirm @200k (MTP=1)
+- [ ] 4: parallel np=2 (agentic-32k ×2)
+- [ ] 4: parallel np=4 (agentic-32k ×4)
+- [ ] 5: analysis doc + INDEX + README max-ctx refresh
+- [ ] 6: charts.html generated
+
+## Out of scope (deliberately)
+- **ROCm backend** (Vulkan wins decode; add later if needed) · **full q8_0 matrix** (one confirm
+  point only — KV is 21 KiB/tok, f16 fits to 262K) · **>262 144 context** (needs YaRN/RoPE scaling
+  — a separate quality-vs-length study) · **27B model** (no MTP layer).

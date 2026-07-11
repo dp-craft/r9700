@@ -1,0 +1,365 @@
+# Agentic Code Runner
+
+Standalone agentic loop (feature 044) that drives a local/cloud LLM through tools to implement a single speckit task (`{S}` or non-UI `{M}`), runs a TDD/impl gate pipeline, and escalates across a model ladder on repeated failure.
+
+- Workspace root (no own `package.json`); type-checked via `tsconfig.scripts.json`
+- Tested via the Tooling vitest config (`npm run runner:test` / `npm run test:tools`)
+- Integrated into `speckit.implement` Step-8 behind `RUNNER_DELEGATION`
+
+---
+
+## Quick Start
+
+```bash
+npm run runner -- \
+  --agent code-logic-writer \
+  --nav specs/<branch>/task-dag/nav/<T###>.json \
+  --mode tdd \
+  [--profile local-default] \
+  [--rules path/to/rules.md]
+```
+
+The nav bundle (`--nav`) is **mandatory** — the runner reads target files, spec excerpts, and hover signatures from it. Prints `AgentRunResult` JSON to stdout.
+
+`--rules <path>` (optional): a custom rules `.md` (e.g. a Claude agent definition) overrides the built-in digest; `@`-imports are expanded recursively and YAML frontmatter is stripped.
+
+**Exit codes:** `0` = completed, `1` = failed, `2` = bad usage.
+
+---
+
+## Orchestrator Contract
+
+The orchestrator MUST treat this as the source of truth and MUST NOT grep the runner's TypeScript source or probe the filesystem to learn its behaviour.
+
+- **No build step.** The runner runs via `tsx` — there is **no `dist/`**. MUST NOT probe `tools/agentic-code-runner/dist/`. (Contrast: `task-dag` IS compiled — `npm run taskdag:build` — do not conflate them.)
+- **Discover capabilities, don't reverse-engineer them:** `npm run runner -- --capabilities` prints a `runner-capabilities/v1` JSON contract (exit 0) projected live from the runtime constants — agent types, modes, `maxTargetFiles`, gates per mode, complexity cap, escalation ladder, profiles, env vars. It cannot drift from real behaviour.
+- **Outcome routing — read the booleans, not the error string.** The `--out` JSON carries `fallbackSanctioned` and `backend`:
+  - `status:'completed'` → done.
+  - `fallbackSanctioned:true` → the runner genuinely tried and a Claude fallback is sanctioned (record it loud).
+  - `status!=='completed'` **and** `fallbackSanctioned:false` → infra/config **hard-stop** (`failureClass` = `auth` = expired/invalid API key · `connectivity` = provider down · `fatal`/`interrupted`): surface `error` and fix the cause; MUST NOT silently fall back to (billable) Claude.
+  - `backend` is the provider that actually ran (e.g. `openrouter`) even when `finalRung` still reads `ollama`.
+
+---
+
+## Architecture
+
+All source lives in `tools/agentic-code-runner/src/`.
+
+| File | Role |
+|---|---|
+| `cli.ts` | CLI entry. Parses `--agent --nav --mode [--profile]`, calls `runTask`, prints result JSON. |
+| `runTask.ts` | Reads the nav bundle, extracts target files from `specExcerpts` source paths + gate targets, asserts footprint, calls `runAgentLoop`. Applies `RUNNER_MODEL_ID`/`RUNNER_BASE_URL` env overrides. |
+| `runner.ts` | Orchestration seam (`runAgentLoop`). Resolves profile, projects rules into the system prompt, runs `runEscalation` (drives `repeatUntilExhausted`), builds a fresh model per attempt per rung, records telemetry. Hosts `defaultRunTests` (shells to vitest; spawn `ENOENT` → fatal, non-zero exit → test fail). |
+| `pipeline.ts` | Stage machine. Stages: `red`, `impl`, `green`, `lint`, `tsc`, `test`, `decomposition`, `functional-style`. Two named pipelines: `tdd=[red,impl,green,lint,tsc,decomposition,functional-style]`, `impl=[impl,lint,tsc,test,decomposition,functional-style]`. `STAGE_NAME` maps each stage to its contract name (projected by `--capabilities`). `runPipeline` reduces stages; `repeatUntilExhausted` re-runs the attempt until pass / aborted / ladder exhausted / no-progress. |
+| `escalation.ts` | Model ladder `['ollama','openrouter','claude']`, `FAILS_PER_RUNG=3`. `recordFailure` advances the rung; `claude` rung is terminal (status `local-exhausted` — review handoff, not a Claude bill). |
+| `profiles.ts` | Built-in model profiles + `resolveProfile` / `profileForRung`. Env vars override the resolved profile. |
+| `connector.ts` | AI SDK boundary. `createModel` per backend; `generate` via Vercel AI SDK `generateText` with `stepCountIs(maxSteps)`. |
+| `tools/index.ts` | Tool registry + AI SDK tool schemas: `read`, `write`, `edit`, `bash`, `grep`, `verify_edit`, `lsp`. Enforces cwd-jail (paths cannot escape the working dir) and footprint guard (mutating tools reject paths outside declared targets). `bash` uses `execFile` — no shell, metacharacters are not interpreted. |
+| `tools/lsp.ts` | LSP lookup over the nav bundle. |
+| `tools/verifyEdit.ts` | Anchored-edit apply + verify. |
+| `retryClassifier.ts` | `classifyAttempt(signal, cfg)` → `retry` \| `abort`. Idle-stall detection via tool-activity count + idle timeout. |
+| `telemetry.ts` | SQLite telemetry. Writes one `task_runs` row per run (status, final_rung, attempts, duration_ms, red/green observed). |
+| `rulesProjection.ts` | Composes the per-agent system-prompt digest from `claude-artifacts/agentic-runner-rules/roles/<agent>.md` (expands its `@io` + `@atoms` imports, strips HTML comments). |
+| `executor.ts` | `TaskSpec` + `assertFootprint`. |
+| `gates.ts` | Gate helpers consumed by the stage machine. |
+| `aimd.ts` | Adaptive concurrency (designed-in, switched OFF per spec I-14). |
+
+---
+
+## Configuration (runner.config.json)
+
+`runner.config.json` at the project root is the **single source of truth** for model selection, sampling, and run-behavior caps. `loadRunnerConfig()` reads it on startup and seeds `RUNNER_*` env vars authoritatively — overwriting any prior env values — so settings survive the tmux→orchestrator→Bash chain.
+
+### Files
+
+| File | Purpose |
+|---|---|
+| `runner.config.json` | Active config; committed; edit by hand |
+| `runner.config.example.json` | Full-surface reference showing all fields |
+
+Validate: `npm run runner:config -- --check` (exits non-zero on schema error). Generate/update: `runner:config -- generate` (idempotent — preserves an existing `profiles` catalog, no clobber).
+
+### Top-level fields
+
+| Field | Type | Purpose |
+|---|---|---|
+| `delegation` | `"runner" \| "claude"` | Speckit routing mode (see §Integration) |
+| `activeProfile` | string | Fallback profile when no role mapping applies |
+| `roleProfiles` | `Record<agentType, profileName>` | Maps agent type → profile; applied per-task over `activeProfile` |
+| `run` | object | Model-agnostic cap defaults for all profiles |
+| `profiles` | `Record<name, Profile>` | Profile catalog |
+
+#### `run` block — cap defaults
+
+| Field | Default | Purpose |
+|---|---|---|
+| `generateTimeoutMs` | `1200000` | Per-step abort timer (ms) |
+| `maxSteps` | `32` | Tool-loop step cap per drive |
+| `maxToolOutputChars` | `16000` | Per-tool-result truncation cap |
+| `largeFileLines` | — | File-size threshold for compaction |
+
+### Profile shape
+
+Each entry in `profiles` has:
+
+| Field | Required | Notes |
+|---|---|---|
+| `backend` | yes | `"ollama"` / `"openrouter"` / `"openai-compatible"` |
+| `modelId` | yes | Model identifier sent to the backend |
+| `baseUrl` | for `openai-compatible`; optional for ollama | Base URL override |
+| `ollama` | no | Sampling block; ignored for other backends |
+| `openrouter` | no | Sampling block; ignored for other backends |
+| `generateTimeoutMs` / `maxSteps` / `maxToolOutputChars` / `largeFileLines` | no | Per-profile cap overrides — take precedence over `run` block |
+
+#### Ollama sampling (`ollama`)
+
+| Field | Notes |
+|---|---|
+| `numCtx` | Context window (tokens) |
+| `temperature` / `topP` / `topK` / `repeatPenalty` | Standard sampling |
+| `numPredict` | Max output tokens |
+| `think` | Enable thinking mode (boolean) |
+| `idleTimeoutMs` | Ollama model idle-unload timeout |
+
+#### OpenRouter sampling (`openrouter`)
+
+| Field | Notes |
+|---|---|
+| `temperature` / `topP` / `topK` / `minP` / `repetitionPenalty` | Standard sampling |
+| `reasoningMaxTokens` / `reasoningEffort` | Reasoning budget (model-dependent) |
+| `cacheControl` | Ephemeral prompt caching (Anthropic-routed models only) |
+| `allowFallbacks` / `provider` / `quantization` | Provider routing |
+
+### Role-based model selection
+
+`--agent <type>` (e.g. `code-logic-writer`) is the only selector the orchestrator passes. The runner looks up `roleProfiles[agentType]` and applies that profile over the `activeProfile` baseline. This means:
+
+- The same physical model can have two profiles with different sampling (e.g. `a3b-code` at `temperature: 0.6` for impl, `a3b-test` at `temperature: 0.4` for tests).
+- `--profile <name>` is a manual override for ad-hoc testing only; the orchestrator never passes it.
+
+A profile's `backend` maps to a builtin escalation base (`ollama` → `local-default`, `openrouter` → `openrouter-default`, `openai-compatible` → `vllm-qwen-coder`), which seeds `RUNNER_PROFILE` for the connector and escalation ladder.
+
+### How to configure
+
+1. Add a profile to `runner.config.json`:
+
+```json
+"profiles": {
+  "my-model": {
+    "backend": "ollama",
+    "modelId": "my-model:latest",
+    "baseUrl": "http://192.168.1.10:11434",
+    "ollama": { "numCtx": 32768, "temperature": 0.6 }
+  }
+}
+```
+
+2. Map a role to it:
+
+```json
+"roleProfiles": { "code-logic-writer": "my-model" }
+```
+
+3. Validate: `npm run runner:config -- --check`
+
+### Precedence
+
+`runner.config.json` (authoritative — seeds env on load) → `RUNNER_*` env override (for fields absent from the file, or `--profile` manual flag) → code `DEFAULT_*` constants.
+
+**Secrets**: `RUNNER_OPENROUTER_API_KEY` is env-only — never put API keys in the committed config.
+
+### Builtin profiles (escalation ladder base)
+
+The escalation ladder (`ollama → openrouter → claude`) falls back to these builtin profiles when no catalog entry is active:
+
+| Profile | Backend | Model | Notes |
+|---|---|---|---|
+| `local-default` *(default)* | ollama | qwen2.5-coder:7b | — |
+| `local-fallback` | ollama | Devstral-24B | — |
+| `openrouter-default` | openrouter | qwen/qwen3.6-35b-a3b | requires `RUNNER_OPENROUTER_API_KEY` |
+| `vllm-qwen-coder` | openai-compatible | Qwen3-Coder-30B-A3B | `http://127.0.0.1:8000/v1` |
+| `unsloth-devstral` | openai-compatible | Devstral-24B | `http://127.0.0.1:8001/v1` |
+
+### Notes & limitations
+
+| Limitation | Detail |
+|---|---|
+| `openai-compatible` sampling under the `openrouter` block | A profile with `backend: openai-compatible` (vLLM/Unsloth) declares its OpenAI-style sampling under the `openrouter` block — both are OpenAI-style chat APIs sharing one param shape. The builder forwards it into every request via `transformRequestBody`. |
+| `openrouter.allowFallbacks` needs `provider` | `allow_fallbacks` is emitted only inside a `provider` routing block, so `allowFallbacks` on its own is inert. `false` (no fallbacks) is the default behaviour regardless. |
+| Profiles should be self-complete | A profile's omitted param keys are NOT reset — a previously-applied profile's value (or the model default) carries over. The shipped `a3b-code` / `a3b-test` are symmetric, so this is latent today. |
+
+---
+
+## Types
+
+```
+AgentType:   code-logic-writer | ts-test-writer | ui-writer
+RunMode:     impl | tdd
+RungName:    ollama | openrouter | claude
+RunStatus:   completed | failed | local-exhausted
+```
+
+`local-exhausted` is the terminal local-ladder outcome: every local rung is spent and the task is handed off for orchestrator/human review (NOT a billable Claude fallback). The legacy alias `escalate-to-claude` is still accepted on read (historical telemetry rows + older runner builds).
+
+`AgentRunResult` (printed as JSON on exit):
+
+| Field | Type | Meaning |
+|---|---|---|
+| `status` | `RunStatus` | Final outcome |
+| `agentType` | `AgentType` | Agent that ran |
+| `touchedFiles` | `string[]` | Files the runner mutated |
+| `finalRung` | `RungName` | Last escalation-**ladder** rung reached — the ladder position, **not** the backend (read `backend`). Can stay `ollama` while an openrouter model ran, because no-progress halts before the ladder advances. |
+| `backend?` | `BackendKind` | Actual backend the final attempt ran on (from the resolved profile). Absent only when no model ran (fatal / interrupt). |
+| `escalated` | `boolean` | The ladder advanced past its first rung. |
+| `failureClass?` | `FailureClass` | Why a non-`completed` run failed: `auth` / `connectivity` / `fatal` / `interrupted` (infra/config **hard stops**) or `no-progress` / `idle-stall` / `gate-fail` (model genuinely tried). Absent on completed runs; drives `fallbackSanctioned`. |
+| `fallbackSanctioned` | `boolean` | A Claude fallback is the **sanctioned** next step (`failureClass` ∈ no-progress / idle-stall / gate-fail). `false` for an infra/config hard stop (`auth` / `connectivity` / `fatal` / `interrupted` — surface it, do **not** bill Claude) and for completed runs. |
+| `attempts` | `number` | Total pipeline attempts |
+| `redObserved` | `boolean` | TDD red phase confirmed |
+| `greenObserved` | `boolean` | Green gate passed at least once |
+| `modelId` | `string` | Model id of the final attempt (`unknown` when no model ran) |
+| `error?` | `string` | Present on failure |
+
+---
+
+## Environment Variables
+
+Most run-behavior settings are owned by `runner.config.json` (see §Configuration). `loadRunnerConfig()` seeds the `RUNNER_*` env vars listed below on startup, overwriting any prior values. Set env vars directly only to override individual fields that are absent from the config file, or for one-off manual runs.
+
+| Variable | Purpose | Config equivalent |
+|---|---|---|
+| `RUNNER_DELEGATION` | `runner` or `claude` — speckit routing | `delegation` |
+| `RUNNER_PROFILE` | Active builtin profile name | `activeProfile` / `roleProfiles` |
+| `RUNNER_MODEL_ID` | Override model id | profile `modelId` |
+| `RUNNER_BASE_URL` | Override backend base URL | profile `baseUrl` |
+| `RUNNER_GENERATE_TIMEOUT_MS` | Per-step abort timer (ms) | `run.generateTimeoutMs` |
+| `RUNNER_MAX_STEPS` | Tool-loop step cap per drive | `run.maxSteps` |
+| `RUNNER_MAX_TOOL_OUTPUT_CHARS` | Per-tool-result truncation cap | `run.maxToolOutputChars` |
+| `RUNNER_LARGE_FILE_LINES` | File-size threshold for compaction | `run.largeFileLines` |
+| `RUNNER_OLLAMA_NUM_CTX` | Ollama context window | profile `ollama.numCtx` |
+| `RUNNER_OLLAMA_TEMPERATURE` | Ollama temperature | profile `ollama.temperature` |
+| `RUNNER_OLLAMA_THINK` | Ollama thinking mode (`"true"`/`"false"`) | profile `ollama.think` |
+| `RUNNER_OLLAMA_IDLE_TIMEOUT_MS` | Ollama idle-unload timeout | profile `ollama.idleTimeoutMs` |
+| `RUNNER_OPENROUTER_TEMPERATURE` | OpenRouter temperature | profile `openrouter.temperature` |
+| `RUNNER_OPENROUTER_CACHE_CONTROL` | Ephemeral prompt caching (Anthropic-routed models only) | profile `openrouter.cacheControl` |
+| `RUNNER_OPENROUTER_REASONING_EFFORT` | Reasoning budget hint | profile `openrouter.reasoningEffort` |
+| `RUNNER_OPENROUTER_ALLOW_FALLBACKS` | OpenRouter model fallbacks | profile `openrouter.allowFallbacks` |
+| `RUNNER_OPENROUTER_API_KEY` | OpenRouter API key — **env-only, never put in config** | — |
+| `RUNNER_COMPACTION_WINDOW` | Large tool-results kept verbatim before compaction; `0` disables | — |
+| `RUNNER_TELEMETRY_DB` | SQLite telemetry file path | — |
+| `RUNNER_RULES_PATH` | Custom rules `.md` path (`@`-imports expanded, frontmatter stripped); same effect as `--rules` | — |
+
+---
+
+## Integration with speckit.implement
+
+Controlled by `RUNNER_DELEGATION` (`.claude/commands/speckit.implement.md` §Runner delegation):
+
+| Value | Behavior |
+|---|---|
+| `runner` *(default)* | `{S}` + non-UI `{M}` tasks dispatch to the runner via `npm run runner`. Outcome routing is two-tier (see §Orchestrator Contract): `fallbackSanctioned:true` → re-delegate the task to Claude; a connectivity failure (`fallbackSanctioned:false`, non-`completed`) → **hard-stop**, never silently fall back. |
+| `claude` | Bypass the runner entirely; all tasks use Claude subagents. |
+
+`{M:UI}`, `{L}`, and `{L:UI}` tasks **always** use the Claude subagent pipeline regardless of `RUNNER_DELEGATION`.
+
+The old-vs-new comparison harness is descoped. To compare behavior, run a task twice with the flag flipped.
+
+---
+
+## Rule Projection & System Prompt
+
+The model's system prompt is assembled in `runner.ts` (`buildSystemPrompt`):
+
+```
+Agent <type>. Nav bundle: <path>. Targets: <files>.
+
+Rules:
+<digest>
+```
+
+**Default (no `--rules` / `RUNNER_RULES_PATH`):** the `<digest>` block comes from `rulesProjection.ts` → `projectRules(agentType)` → `composeRole`, which reads `claude-artifacts/agentic-runner-rules/roles/<agent>.md` and expands its `@io/*` + `@atoms/*` `@`-imports (HTML comments stripped). Each role yields a shared Tool Catalog + per-agent Output Format + per-agent Rules Digest (~400 tokens). This is not the repo's `CLAUDE.md` / `LEARNED-RULES.md` / principles files — the fragments are a deliberately compressed rule surface for small local models. Only the wired agent types (`code-logic-writer`, `ts-test-writer`, `ui-writer`) are projected by default; the other role files are reachable only via `--rules`.
+
+**Override:** set `--rules <path>` (CLI flag) or `RUNNER_RULES_PATH=<path>` (env var). The CLI flag sets the env var via `runTask` `applyOverride`; `projectRules` then loads the file through `rulesLoader.ts` → `loadMarkdownWithImports` + `stripFrontmatter`.
+
+`@`-import expansion works for files loaded this way: a line that is exactly `@<path>` (leading indentation allowed) is replaced by that file's contents, recursively. Resolution is **root-relative** (resolved against repo-root / cwd), not relative to the importing file — use repo-root paths such as `@claude-artifacts/principles/COMMON.md`. Guards: cycle detection (throws), depth cap (default 8, throws), missing import (throws). YAML frontmatter is stripped from the top-level file so an agent `.md` is used body-as-is.
+
+| Goal | How |
+|---|---|
+| Use a custom rules file | `--rules path/to/rules.md` (or `RUNNER_RULES_PATH=…`) |
+| Feed the local model the same rules as the Claude subagent | `--rules .claude/agents/<agent>.md` — its `@claude-artifacts/principles/*` imports expand (≈35 K chars for code-logic-writer) |
+| Edit the built-in default digest | Edit the agent's `roles/<agent>.md` or the shared `atoms/*` it imports (under `claude-artifacts/agentic-runner-rules/`) |
+
+> **Note:** a very large expanded rule file can dilute small local models — empirically the full agent file did not always beat the compact digest on a 35B model; see `docs/plans/2026-06-18-runner-rules-flexible-templates.md`.
+
+---
+
+## Testing
+
+| Command | Scope |
+|---|---|
+| `npm run runner:test` | Runner package only (Tooling vitest config) |
+| `npm run test:tools` | Entire Tooling suite (includes runner) |
+
+**Smoke test** (`runner.smoke.test.ts`) has two paths selected at runtime:
+
+- **LIVE path** — runs when ollama is reachable at `http://127.0.0.1:11434/api/tags` AND the resolved model (`RUNNER_MODEL_ID` ?? `qwen2.5-coder:7b`) appears in `/api/tags`.
+- **FIXTURE path** — runs otherwise (stubbed connector). Tests pass with or without a live model.
+
+`runner.contract.json` + `runner.contract.test.ts` hold a recorded real-model interaction (runtime-exec proof, not grandfathered).
+
+---
+
+## Telemetry / Metrics
+
+Engine: SQLite via `better-sqlite3` (`telemetry.ts`). Location: env `RUNNER_TELEMETRY_DB`, default `.agentic-runner/telemetry.sqlite` (relative to cwd).
+
+Table `task_runs` is append-only (`CREATE TABLE IF NOT EXISTS` + idempotent additive `ALTER TABLE … ADD COLUMN` migration on open), no dedup key. One row is written per `runAgentLoop` call after the run finishes (success or fatal). The write is wrapped in try/catch — a telemetry failure logs to stderr and never fails the run.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `trace_id` / `span_id` | TEXT | Per-run UUIDs (OTel-named; no OTel exporter — plain local sink) |
+| `agent_type` | TEXT | `code-logic-writer` / `ts-test-writer` / `ui-writer`; historical rows may carry `lint-fix-loop` (legacy, mode removed) |
+| `status` | TEXT | `completed` / `failed` / `local-exhausted` (legacy rows: `escalate-to-claude`) |
+| `final_rung` | TEXT | Escalation-ladder position reached: `ollama` / `openrouter` / `claude` |
+| `backend` | TEXT | Actual backend that ran (`ollama` / `openrouter` / `openai-compatible`; `unknown` when no model ran) |
+| `model_id` | TEXT | Actual model id that ran (`unknown` when no model ran) |
+| `failure_class` | TEXT | Why it failed: `auth`/`connectivity`/`fatal`/`interrupted`/`dirty-tree` (hard stop) or `no-progress`/`idle-stall`/`gate-fail` (sanctioned); `''` when completed. `dirty-tree` = a target file had uncommitted changes; the runner refused to start (it reverts to the pre-run snapshot) |
+| `attempts` | INTEGER | Total pipeline attempts across escalation |
+| `duration_ms` | INTEGER | Wall time of the run |
+| `red_observed` / `green_observed` | INTEGER | 0/1 — TDD phases confirmed |
+| `escalated` | INTEGER | 0/1 — the ladder advanced past its first rung |
+| `fallback_sanctioned` | INTEGER | 0/1 — a Claude fallback was the sanctioned next step (non-connectivity failure) |
+| `touched_file_count` | INTEGER | Number of files the runner ACTUALLY mutated (honest; reverted on a non-`completed` run) |
+| `target_file_count` | INTEGER | Number of target files the run was scoped to. `0` on a `fatal` empty-footprint run (extraction found no targets in the nav bundle) |
+| `failed_stage` | TEXT | Pipeline stage that failed (`red`/`impl`/`green`/`lint`/`tsc`/`test`/`decomposition`/`functional-style`); `''` when none failed |
+| `started_at` | TEXT | ISO timestamp |
+| `input_tokens` / `output_tokens` / `total_tokens` | INTEGER | Tokens summed across EVERY model drive in the run (red + green + each gate-retry attempt across the ladder); `0` when no model ran or the provider reported no usage |
+
+> Additive schema migration: `openTelemetry` reads `PRAGMA table_info(task_runs)` on open and runs `ALTER TABLE task_runs ADD COLUMN …` for any missing column, so a pre-existing DB gains new columns (e.g. `target_file_count`, `failed_stage`, `input_tokens`/`output_tokens`/`total_tokens`) without losing rows. Only a column RENAME / type change still requires deleting `.agentic-runner/telemetry.sqlite`.
+
+```bash
+sqlite3 .agentic-runner/telemetry.sqlite \
+  "SELECT started_at, agent_type, status, backend, model_id, input_tokens, output_tokens, attempts FROM task_runs ORDER BY started_at DESC LIMIT 20;"
+```
+
+Tests override the path via `RUNNER_TELEMETRY_DB` (e.g. a temp file) so the smoke/telemetry tests assert exactly one row per run.
+
+---
+
+## Pre-commit Gate
+
+`tools/scripts/precommit-gate.sh` type-checks (`tsc -p tsconfig.scripts.json`) and lints (`eslint --config eslint.config.gate.mjs`) the package whenever a runner `.ts` file is staged. Formatting, import-sort and no-var/prefer-const ERROR-block; the FP/complexity atoms are warn-tier (pre-existing debt) — see `eslint.config.mjs` runner block.
+
+---
+
+## Extending the Runner
+
+| Goal | Where |
+|---|---|
+| Run a task end-to-end | CLI form above against a local ollama model |
+| Add a model profile | Add an entry to `profiles` in `runner.config.json`; optionally map a role in `roleProfiles` (see §Configuration). Extend `BUILTIN_PROFILES` in `profiles.ts` only for new escalation-ladder bases |
+| Add a tool | Add handler + zod schema in `tools/index.ts`; register in `createToolRegistry` + `buildSdkTools`; add a test |
+| Tune escalation | `FAILS_PER_RUNG` / `LADDER` in `escalation.ts` |
+| Inspect past runs | Query `task_runs` table in the SQLite telemetry DB |
+| Re-enable AIMD concurrency | `aimd.ts` (currently OFF per spec I-14) |
+
+TDD discipline applies (Tooling suite). Per R-030: any new seam/collaborator MUST have a test asserting invocation, not only the returned shape.

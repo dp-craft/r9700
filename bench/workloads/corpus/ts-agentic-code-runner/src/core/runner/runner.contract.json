@@ -1,0 +1,7 @@
+{
+  "recordedReply": {
+    "text": "export const add = (a: number, b: number): number => a + b;",
+    "toolCallCount": 0
+  },
+  "modelId": "hf.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF:latest"
+}

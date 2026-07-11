@@ -1,0 +1,10 @@
+date=2026-07-11T17:38:00.930502
+host=bipubi 6.17.0-35-generic
+gpu_vendor=amd
+gpu_name=AMD Radeon AI PRO R9700
+gpu_driver=rocm-smi-lib 7.8.0
+vram_total_mib=32624
+hsa_override=12.0.1
+llama_bench=/home/dev/work/dp-craft/amd/bench/llamacpp/llama-bench
+model=/home/dev/models/gguf/Qwen3.6-27B-Q4_K_S.gguf
+sweep_args={'model': '/home/dev/models/gguf/Qwen3.6-27B-Q4_K_S.gguf', 'llama_bench': '/home/dev/work/dp-craft/amd/bench/llamacpp/llama-bench', 'slug': '27b-micro', 'pp': 512, 'tg': 32, 'depth': 0, 'ngl': 99, 'reps': 1, 'metric': 'pp', 'ub_grid': '1024,2048', 'batch_grid': '2048', 'no_fa_check': False, 'no_kv_check': False, 'kv_depth': 1024, 'kv_max_loss_pct': 5.0, 'noise_pct': 3.0, 'invocation_timeout': 3600, 'dry_run': False}

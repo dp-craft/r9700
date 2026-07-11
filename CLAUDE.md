@@ -1,0 +1,81 @@
+# CLAUDE.md — R9700 benchmarking repo
+
+Map + rules for this repo. Keep this file lean; heavy procedures live in the two skills.
+**New reports are written in English.** (Older HU/mixed docs are left as-is.)
+
+## What this repo is
+
+A knowledge base of **benchmarks and tuning experience for the AMD Radeon AI PRO R9700**
+(RDNA4) running local coding LLMs. Two products: reproducible measurements (`docs/analysis/`)
+and sourced research (`docs/research/`), backed by two benchmark tracks (`bench/model-bench/`, `bench/engine-bench/`).
+
+## Hardware / software fixpoints (cite these, don't re-derive)
+
+- **GPU:** AMD Radeon AI PRO R9700 — RDNA4, **gfx1201**, 32 GB (~31.86 GiB usable)
+- **Override:** `HSA_OVERRIDE_GFX_VERSION=12.0.1` · ROCm 7.x · Ubuntu 24.04 · kernel 6.17 · Ryzen 5 3600, 31 GB RAM, no swap
+- **Runtimes:** llama.cpp (ROCm/HIP + Vulkan/RADV builds), ollama, vLLM, transformers/HF
+- **Models under test:** `Qwen3.6-35B-A3B` (MoE, ~3B active) · `Qwen3.6-27B` · GGUF Q4 / AWQ
+- **Native support:** FP8 (E4M3) yes, FP4 no WMMA. 32 GB is memory-bound at long context → Q4_K_M is optimal, not a compromise.
+
+## Repo map — what goes where
+
+```
+CLAUDE.md            ← you are here: map + iron rules
+README.md            ← human landing page (links into docs/)
+install.sh           ← ROCm stack install (amdgpu-install + render/video groups)
+docs/
+  INDEX.md           ← register of every report, newest first (1 line each)
+  research/          ← EXTERNAL synthesis: what the world knows, sourced   (dated)
+  analysis/          ← OUR measurements: what WE measured on this box       (dated)
+  campaigns/         ← self-contained run plans (starter-baseline = the standard campaign)
+bench/                 ← two tracks (see bench/README.md); how-to in docs/RUNBOOK.md
+  model-bench/       ← tuning microscope: run.sh (manual grid) + sweep.py (ADAPTIVE optimum
+                       search: grid expands until peak bracketed; KV f16-vs-q8_0 ≤5% rule)
+  engine-bench/      ← cross-engine + serving combos: openai_probe.py (concurrency/thinking),
+                       serve_llamacpp.sh (BACKEND/MTP/KV/NP launcher), campaign.sh
+                       (MTP×KV×depth×parallel matrix, resumable), llama-benchy (dl/benchy-venv)
+  workloads/         ← build_prompt.py + tasks/ + corpus/ (tracked TS+Python source, ~565K tok);
+                       generated/ ignored
+  lib/               ← gpu_env.sh (AMD/NVIDIA vendor abstraction) + vram_sampler.py +
+                       report.py (run dir → self-contained report.html, vendored Chart.js)
+  runs/              ← dated campaign outputs YYYY-MM-DD-HHMM-<slug>/ (results.jsonl/llama-bench.json)
+  legacy/            ← ⚠️ FROZEN original harness (harness/ + old *.sh + *_results.jsonl); hardcodes
+                       old path /home/dev/work/dippe/amd, does NOT run here; superseded. Reference only.
+.claude/skills/
+  research/          ← reproducible, sourced, hallucination-resistant web research
+  benchmark/         ← run a benchmark AND document it to a fixed spec
+```
+
+**Never read (gitignored binaries / generated):** `bench/llamacpp*/`, `bench/dl/`,
+`unsloth_compiled_cache/`, `bench/**/*.log`, `bench/runs/*/*.err`, `bench/lib/vendor/`
+(vendored Chart.js), `bench/runs/*/report.html`. They are 3 GB of build artifacts — reading
+them wastes tokens and tells you nothing. Structure/results live in the files above.
+
+## Iron rules
+
+1. **Data provenance — never blend.** Tag every number: `MEASURED` (from our `results_*.jsonl`,
+   cite the row `label`), `CLAIMED` (external, cite a source), or `INFERRED` (reasoned, say so).
+   A number with no provenance does not go in a doc.
+2. **Reproducibility or it didn't happen.** Every run records full parameterization + versions
+   (ROCm / llama.cpp build / Mesa / model / quant / ctx / `-ub` / `-b` / `-fa` / KV type). An
+   unversioned number is noise — RDNA4 perf swings hard across builds (see the b1295/b9950 gaps).
+3. **Sources are Tier-1 first.** External claims cite the whitelist in the research skill
+   (llama.cpp/ollama/ROCm/vLLM/Mesa repos, official model cards, Phoronix). Prefer primary
+   sources (GitHub issues/PRs, vendor docs) over blog aggregation. Corroborate Tier-2.
+4. **Token policy (this repo burns tokens).** Fan out file reading / web search to **haiku**
+   subagents and ask for compact structured summaries — don't slurp files into the main context.
+   Reserve the expensive model for synthesis and judgement. Keep bulk data in JSONL, not prose.
+5. **Documentation is uniform.** Reports → `docs/{research,analysis}/YYYY-MM-DD-HHMM-<slug>.md`,
+   English, **summary + table first**, full detail below. Register every new file in `docs/INDEX.md`.
+6. **Use the skills, don't improvise.** `/benchmark` to run+document a measurement; `/research`
+   to gather external knowledge. They encode the deterministic output contract.
+
+## Where to find things (quick answers)
+
+- *"What's the fastest config?"* → `docs/analysis/` newest file, top table. (Currently: llama.cpp
+  Vulkan + MTP, `-ub 2048 -b 8192 -fa on`.)
+- *"How do I run a benchmark?"* → `docs/RUNBOOK.md` (step-by-step, offline). Tracks: `bench/model-bench/`
+  (llama-bench tuning) and `bench/engine-bench/` (cross-engine on real workloads).
+- *"Build vs adopt a harness?"* → decided: adopt. `docs/research/2026-07-11-0918-benchmark-harness-build-vs-adopt.md`.
+- *"What did we already research?"* → `docs/INDEX.md`.
+- *"What are the raw numbers?"* → `bench/runs/<stamp>-*/` (new) or `bench/legacy/harness/results_*.jsonl` (legacy).

@@ -1,0 +1,13 @@
+date=2026-07-11T17:34:38+02:00
+host=Linux bipubi 6.17.0-35-generic #35~24.04.1-Ubuntu SMP PREEMPT_DYNAMIC Tue May 26 19:30:42 UTC 2 x86_64 x86_64 x86_64 GNU/Linux
+gpu_vendor=amd
+gpu_name=AMD Radeon AI PRO R9700
+gpu_driver=rocm-smi-lib 7.8.0
+vram_total_mib=32624
+hsa_override=12.0.1
+llama_bench=/home/dev/work/dp-craft/amd/bench/llamacpp/llama-bench
+model=/home/dev/models/gguf/Qwen3.6-27B-Q4_K_S.gguf
+knobs: PP=32 TG=16 DEPTH=0 NGL=99 FA=on UB=512 BATCH=2048 CTK=f16 CTV=f16 REPS=1
+build_commit=049326a
+build_number=1
+backends=ROCm

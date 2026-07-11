@@ -1,0 +1,1 @@
+/home/dev/work/dp-craft/amd/bench/llamacpp-vulkan/llama-server -m /home/dev/models/gguf/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf -c 65536 -np 1 -ngl 99 -fa on -ub 2048 -b 8192 -ctk f16 -ctv f16 --host 127.0.0.1 --port 8090

@@ -1,0 +1,3 @@
+starting on :8090 (pid 88895) — log: /home/dev/work/dp-craft/amd/bench/.servers/8090.log
+up after 10s — build: b1-049326a
+cmdline: /home/dev/work/dp-craft/amd/bench/llamacpp/llama-server -m /home/dev/models/gguf/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf -c 65536 -np 1 -ngl 99 -fa on -ub 2048 -b 8192 -ctk f16 -ctv f16 --host 127.0.0.1 --port 8090 --spec-type draft-mtp

@@ -1,0 +1,7 @@
+{"ub": 1024, "batch": 2048, "fa": "on", "kv": "f16", "depth": 0, "failed": false, "vram_peak_mib": 16838, "secs": 10.3, "pp_ts": 701.523448, "pp_stddev": 0.0, "build_commit": "049326a", "tg_ts": 23.783805, "tg_stddev": 0.0}
+{"ub": 2048, "batch": 2048, "fa": "on", "kv": "f16", "depth": 0, "failed": false, "vram_peak_mib": 16838, "secs": 10.3, "pp_ts": 870.526143, "pp_stddev": 0.0, "build_commit": "049326a", "tg_ts": 26.078012, "tg_stddev": 0.0}
+{"ub": 4096, "batch": 4096, "fa": "on", "kv": "f16", "depth": 0, "failed": false, "vram_peak_mib": 16805, "secs": 8.1, "pp_ts": 723.545282, "pp_stddev": 0.0, "build_commit": "049326a", "tg_ts": 23.830408, "tg_stddev": 0.0}
+{"ub": 2048, "batch": 4096, "fa": "on", "kv": "f16", "depth": 0, "failed": false, "vram_peak_mib": 16805, "secs": 8.0, "pp_ts": 725.228081, "pp_stddev": 0.0, "build_commit": "049326a", "tg_ts": 24.116027, "tg_stddev": 0.0}
+{"ub": 2048, "batch": 2048, "fa": "off", "kv": "f16", "depth": 0, "failed": false, "vram_peak_mib": 16874, "secs": 9.0, "pp_ts": 662.587381, "pp_stddev": 0.0, "build_commit": "049326a", "tg_ts": 23.494271, "tg_stddev": 0.0}
+{"ub": 2048, "batch": 2048, "fa": "on", "kv": "f16", "depth": 1024, "failed": false, "vram_peak_mib": 17905, "secs": 8.9, "pp_ts": 1036.075921, "pp_stddev": 0.0, "build_commit": "049326a", "tg_ts": 24.598211, "tg_stddev": 0.0}
+{"ub": 2048, "batch": 2048, "fa": "on", "kv": "q8_0", "depth": 1024, "failed": false, "vram_peak_mib": 17861, "secs": 8.7, "pp_ts": 1115.263342, "pp_stddev": 0.0, "build_commit": "049326a", "tg_ts": 24.981577, "tg_stddev": 0.0}
