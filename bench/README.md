@@ -63,11 +63,22 @@ against any llama.cpp build you point it at (ROCm, Vulkan, CUDA, Metal…).
 | `model-bench/` | **Model / tuning microscope** — one engine | `run.sh` (manual grid) + `sweep.py` (**adaptive optimum search**, KV ≤5% rule) over `llama-bench` | "Which `-ub`/`-b`/`-fa`/KV is fastest — with the peak bracketed on both sides?" |
 | `engine-bench/` | **Cross-engine + serving combos** | `openai_probe.py` (concurrency, thinking, prefix modes) + `serve_llamacpp.sh` + `campaign.sh` (MTP×KV×depth×parallel) + `llama-benchy` (`dl/benchy-venv`) | "Which engine/combo is fastest on my real task, single-stream and under N parallel agents?" |
 | `workloads/` | Prompt fixtures | `build_prompt.py` + tracked `corpus/` (TS+Python, ~565K tok) | shared stimulus for both tracks |
-| `lib/` | Shared plumbing | `gpu_env.sh` (AMD/NVIDIA vendor abstraction), `vram_sampler.py`, `report.py` (run dir → self-contained HTML charts) | vendor-neutral meta + VRAM/power/throttle capture + visualization |
+| `lib/` | Shared plumbing | `gpu_env.sh` (AMD/NVIDIA vendor abstraction), `vram_sampler.py`, `report.py` (run dir → self-contained HTML report) | vendor-neutral meta + VRAM/power/throttle capture + visualization |
 | `runs/` | Dated campaign outputs `YYYY-MM-DD-HHMM-<slug>/` | — | raw results + per-run meta |
 
-**How to run everything (offline, solo): [`docs/RUNBOOK.md`](../docs/RUNBOOK.md).**
-**The standard campaign plan: [`docs/campaigns/2026-07-11-starter-baseline/`](../docs/campaigns/2026-07-11-starter-baseline/README.md).**
+**Scaffolding & bookkeeping (repo-level):**
+- **`bench/gen_campaign.py`** — deterministic campaign scaffolder: a JSON `spec.json` → a resumable
+  `run.sh` (per-probe `done/` markers) + README skeleton under `docs/campaigns/<date>-<slug>/`.
+  Also `gen_campaign.py vram-ctx …` = the VRAM-budget → max-context calculator. `--help` for both.
+- **`/new-campaign` skill** — the *judgement* layer over `gen_campaign.py`: works out the VRAM
+  budget, the MTP/KV/depth/concurrency matrix, and the gaps (fixtures, ctx headroom) **before** you
+  spend GPU hours, then emits the spec + driver. Use it to start a new campaign.
+- **`docs/reindex.py`** — regenerates `docs/INDEX.md` from each report's `<!-- meta -->` block
+  (fails if one is missing — the enforcement the old hand-edited index lacked).
+
+**How to run everything (offline, solo): [`docs/GUIDE.md`](../docs/GUIDE.md).**
+**Campaign plans (runbooks): [`starter-baseline`](../docs/campaigns/2026-07-11-starter-baseline/README.md) ·
+[`deep-context`](../docs/campaigns/2026-07-11-deep-context/README.md). New one → `/new-campaign`.**
 
 ## Legacy (frozen)
 `bench/legacy/` holds the original harness (`harness/` + the pre-harness `*.sh` + `*_results.jsonl`).

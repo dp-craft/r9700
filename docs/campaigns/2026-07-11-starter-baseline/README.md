@@ -5,7 +5,7 @@ A self-contained run plan. A fresh session executes it top to bottom without gue
 
 **v2 (2026-07-11 evening):** rewritten for the adaptive harness. v1's flaws — padding source too
 small for ≥32K prompts, MTP missing from every server command, q8_0 baked in as KV baseline —
-are fixed in the harness itself; see `docs/RUNBOOK.md`.
+are fixed in the harness itself; see `docs/GUIDE.md`.
 
 ## Goal
 Answer four questions with MEASURED, bracketed numbers on the **35B-A3B** (the main work model):

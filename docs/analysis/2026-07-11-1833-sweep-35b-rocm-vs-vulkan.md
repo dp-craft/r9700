@@ -1,3 +1,8 @@
+<!-- meta
+date: 2026-07-11 18:33
+takeaway: Adaptive tuning optimum: **ROCm `-ub 4096`, Vulkan `-ub 2048`** (interior peak), `-fa on` +6–9% pf, `-b`=`-ub`. **KV q8_0 REJECTED both** (ROCm −7.5% dec, Vulkan −29.7% pf) → keep f16. Vulkan decode +53%.
+-->
+
 # Benchmark: 35B-A3B tuning optimum — ROCm vs Vulkan — R9700 (gfx1201)
 
 - **Date:** 2026-07-11 18:33 · **Track:** model-bench sweep (`sweep.py`, adaptive optimum + KV rule)

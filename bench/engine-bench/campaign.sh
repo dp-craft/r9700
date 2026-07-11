@@ -36,7 +36,7 @@ WL="$REPO/bench/workloads/generated"
 : "${CONC_NP:=4}"
 : "${REPS:=2}"
 
-# --- workload fixtures must exist (see docs/RUNBOOK.md §2) ---
+# --- workload fixtures must exist (see docs/GUIDE.md §2) ---
 MISSING=0
 for T in $DEPTHS; do [ -f "$WL/codereview-$T.txt" ] || { echo "missing $WL/codereview-$T.txt"; MISSING=1; }; done
 [ -f "$WL/thinking-hard.txt" ] || { echo "missing $WL/thinking-hard.txt"; MISSING=1; }
@@ -45,7 +45,7 @@ for v in 1 2 3 4; do
   [ -f "$WL/agentic-8000-v$v.txt" ] || { echo "missing $WL/agentic-8000-v$v.txt"; MISSING=1; }
   CONC_FILES="$CONC_FILES $WL/agentic-8000-v$v.txt"
 done
-[ "$MISSING" = 1 ] && { echo "build workloads first (docs/RUNBOOK.md §2)" >&2; exit 1; }
+[ "$MISSING" = 1 ] && { echo "build workloads first (docs/GUIDE.md §2)" >&2; exit 1; }
 
 if [ -z "${CAMPAIGN_DIR:-}" ]; then
   STAMP="$(date '+%Y-%m-%d-%H%M')"

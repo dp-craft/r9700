@@ -1,3 +1,8 @@
+<!-- meta
+date: 2026-07-10
+takeaway: Batch/backend tuning: prefill scales with `-ub` up to ~2048 (not 32/64); RADV often beats ROCm on RDNA4; ollama has no ubatch knob (only `num_batch`); rocWMMA FA needs ROCm ≥7.
+-->
+
 # RDNA4 (gfx1201 / R9700) llama.cpp + ollama Backend & Tuning Research
 
 **Date:** 2026-07-10

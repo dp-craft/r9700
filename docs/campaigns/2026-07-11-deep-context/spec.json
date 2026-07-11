@@ -1,0 +1,40 @@
+{
+  "slug": "deep-context",
+  "date": "2026-07-11",
+  "title": "Deep-context campaign — max depth + parallel at the ceiling",
+  "model": "/home/dev/models/gguf/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf",
+  "backend": "vulkan",
+  "port": 8081,
+  "tuning": {"ub": 2048, "b": 4096, "fa": "on"},
+  "servers": [
+    {"name": "single-mtp0", "ctx": 262144, "np": 1, "kv": "f16", "mtp": 0,
+     "probes": [
+       {"slug": "deep-mtp0-cr8000",   "prompts": ["codereview-8000.txt"],   "max_tokens": 256,  "api": "completions"},
+       {"slug": "deep-mtp0-cr128000", "prompts": ["codereview-128000.txt"], "max_tokens": 256,  "api": "completions"},
+       {"slug": "deep-mtp0-cr200000", "prompts": ["codereview-200000.txt"], "max_tokens": 256,  "api": "completions"},
+       {"slug": "deep-mtp0-think",    "prompts": ["thinking-hard.txt"],     "max_tokens": 1024, "api": "chat"}
+     ]},
+    {"name": "single-mtp1", "ctx": 262144, "np": 1, "kv": "f16", "mtp": 1,
+     "probes": [
+       {"slug": "deep-mtp1-cr8000",   "prompts": ["codereview-8000.txt"],   "max_tokens": 256,  "api": "completions"},
+       {"slug": "deep-mtp1-cr128000", "prompts": ["codereview-128000.txt"], "max_tokens": 256,  "api": "completions"},
+       {"slug": "deep-mtp1-cr200000", "prompts": ["codereview-200000.txt"], "max_tokens": 256,  "api": "completions"},
+       {"slug": "deep-mtp1-think",    "prompts": ["thinking-hard.txt"],     "max_tokens": 1024, "api": "chat"}
+     ]},
+    {"name": "single-mtp1-q8", "ctx": 262144, "np": 1, "kv": "q8_0", "mtp": 1,
+     "probes": [
+       {"slug": "deep-mtp1q8-cr200000", "prompts": ["codereview-200000.txt"], "max_tokens": 256, "api": "completions"}
+     ]},
+    {"name": "parallel-np2", "ctx": 262144, "np": 2, "kv": "f16", "mtp": 0,
+     "probes": [
+       {"slug": "deep-par-np2", "prompts": ["agentic-32000-v1.txt", "agentic-32000-v2.txt"],
+        "max_tokens": 256, "api": "completions", "concurrency": 2}
+     ]},
+    {"name": "parallel-np4", "ctx": 262144, "np": 4, "kv": "f16", "mtp": 0,
+     "probes": [
+       {"slug": "deep-par-np4",
+        "prompts": ["agentic-32000-v1.txt", "agentic-32000-v2.txt", "agentic-32000-v3.txt", "agentic-32000-v4.txt"],
+        "max_tokens": 256, "api": "completions", "concurrency": 4}
+     ]}
+  ]
+}

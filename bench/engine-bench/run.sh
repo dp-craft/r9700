@@ -8,7 +8,7 @@
 #   2. llama-benchy    — standardized synthetic pp/tg/depth curves with concurrency
 #      (install: see README). Set USE_BENCHY=1. Complements, does not replace, the probe.
 #
-# You start the engine servers yourself (docs/RUNBOOK.md, or engine-bench/serve_llamacpp.sh);
+# You start the engine servers yourself (docs/GUIDE.md, or engine-bench/serve_llamacpp.sh);
 # this script only drives them. Engine list: edit ENGINES below or set ENGINES_LIST
 # (semicolon-separated "name|base-url-with-/v1|model" entries).
 #

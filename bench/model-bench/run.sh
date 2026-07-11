@@ -32,7 +32,7 @@ gpu_setup_env
 : "${UB:=512,1024,2048}"      # micro-batch (-ub)
 : "${BATCH:=2048}"            # logical batch (-b)
 : "${CTK:=f16}"               # KV key type   — f16 is the BASELINE; q8_0 must earn its place
-: "${CTV:=f16}"               # KV value type   via an explicit A/B (see sweep.py / RUNBOOK)
+: "${CTV:=f16}"               # KV value type   via an explicit A/B (see sweep.py / GUIDE)
 : "${REPS:=3}"                # repetitions (stddev)
 : "${VRAM_SAMPLE:=1}"         # 1 = sample VRAM/power to gpu_samples.csv during the run
 

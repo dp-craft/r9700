@@ -37,7 +37,7 @@ Probe knobs: `--concurrency N --reps R --prefix-mode unique|shared|none --api co
 ## Typical runs
 
 ```bash
-# cross-engine, one workload (start servers first — RUNBOOK §3):
+# cross-engine, one workload (start servers first — GUIDE §3):
 PROMPT_FILE=$PWD/../workloads/generated/codereview-64000.txt SLUG=cr64k \
   MAX_TOKENS=256 PREFIX_MODE=unique ./run.sh
 

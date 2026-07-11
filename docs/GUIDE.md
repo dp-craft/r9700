@@ -1,4 +1,7 @@
-# RUNBOOK — how to run the benchmarks (offline, solo)
+# Benchmark harness guide — how to run everything (offline, solo)
+
+> This is the generic operator guide. Concrete, dated run plans ("runbooks") live in
+> `docs/campaigns/<date>-<slug>/`. Scaffold a new one with the `/new-campaign` skill.
 
 Step-by-step for both tracks. Legend: ✅ = verified working in this repo (2026-07-11 session) ·
 ⚠️ = confirm on your machine first.
@@ -136,6 +139,13 @@ from the tracked JSONL anytime).
 ## 6. Turn a run into a report
 Use the `/benchmark` skill: reads the run dir, computes deltas, writes
 `docs/analysis/<same-stamp>-<slug>.md` (summary + table first), registers it in `docs/INDEX.md`.
+The doc must include (spec + canonical glossary rows live in the skill's output contract):
+- a **Legend** right after the Summary — every knob/label the run used (`-ub`, `-b`, `-fa`,
+  KV f16/q8_0, MTP, crN depth, agentic-cN, TTFT/ttfa, …): definition, effect on this hardware,
+  how it was tested;
+- a **Consequences & root causes** section — relations/interactions, causal explanations, and
+  practical consequences, each tagged MEASURED / INFERRED / CLAIMED; root causes that can't be
+  established from our data get validated via the `/research` skill, unresolved ones marked OPEN.
 
 ---
 

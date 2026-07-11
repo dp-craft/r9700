@@ -1,3 +1,8 @@
+<!-- meta
+date: 2026-07-11 16:30
+takeaway: vLLM's serving bench is now `vllm bench serve`: engine-agnostic HTTP client (TTFT/TPOT/ITL, percentiles, Poisson rates); heavy install. We use llama-benchy + own probe instead.
+-->
+
 # Research: vLLM benchmark_serving.py Tool
 
 - **Date:** 2026-07-11 16:30   · **Question:** What is vLLM's benchmark_serving.py, what does it measure, is it engine-agnostic, what's the AMD/ROCm status, and what are its limitations?

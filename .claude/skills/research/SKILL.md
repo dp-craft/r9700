@@ -67,7 +67,8 @@ context. Do not paste raw pages into the main context.
 2. Derive 2–5 targeted queries from the jargon table.
 3. Fan out to haiku subagents against Tier-1 sources; expand to Tier-2 only for gaps.
 4. Cross-check numbers; record versions; tag provenance; note conflicts and unknowns.
-5. Write the report; register it in `docs/INDEX.md`.
+5. Write the report (with a `<!-- meta -->` block: date + one-line takeaway); register it by
+   running `docs/reindex.py` (regenerates `docs/INDEX.md`; fails if the meta block is missing).
 
 ## Output contract → `docs/research/YYYY-MM-DD-HHMM-<slug>.md`
 
@@ -103,4 +104,5 @@ skill's directory — write with an absolute path. (A past run created a stray
 ```
 
 Filename: date + **HH:MM** + slug (e.g. `2026-07-11-1430-rdna4-vulkan-fa-regression.md`).
-After writing: append a one-line entry to `docs/INDEX.md` and report the path to the user.
+After writing: ensure the `<!-- meta -->` block is present, run `docs/reindex.py` to regenerate
+`docs/INDEX.md`, and report the path to the user.

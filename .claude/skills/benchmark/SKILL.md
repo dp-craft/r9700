@@ -7,7 +7,7 @@ description: Run a benchmark on the R9700 (RDNA4) box AND document it to a fixed
 
 The measured counterpart to the research skill. **Every configuration tested becomes a data row AND
 a documented line in the report.** Output language: **English**. Deterministic shape every time.
-Full how-to for a human: `docs/RUNBOOK.md`. Standard campaign: `docs/campaigns/2026-07-11-starter-baseline/`.
+Full how-to for a human: `docs/GUIDE.md`. Standard campaign: `docs/campaigns/2026-07-11-starter-baseline/`.
 
 ## Route first — which track?
 | If the goal is… | Tool | Dir |
@@ -50,9 +50,15 @@ binaries or `*.err`/`*.log` into the main context — parse the JSON/JSONL
 1. **Route** (table above) and **define the question** — what varies, what's fixed.
 2. **(Optional)** research skill for external baselines.
 3. **Run**; results land in `bench/runs/<stamp>-*/` (campaigns are resumable via `CAMPAIGN_DIR`).
-4. **Analyze** — deltas vs baseline (% prefill / % decode / % aggregate), what moved the needle,
-   noise-band ties, failures.
-5. **Document** to the contract below; register in `docs/INDEX.md`.
+4. **Analyze — ultrathink.** Don't stop at deltas (% prefill / % decode / % aggregate, noise-band
+   ties, failures): hunt for **relations** (MTP × KV interaction, depth-scaling shape, where
+   concurrency saturates, VRAM cliffs), **root causes**, and **consequences for practice** (which
+   config for which workload; what the saved VRAM buys). Every causal claim carries a provenance
+   tag: MEASURED correlation, INFERRED reasoning (spell the logic out), or CLAIMED. If a root
+   cause can't be established from our data, **run the research skill** to find or validate it
+   (known upstream issues, RDNA4/driver facts) instead of guessing; anomalies that survive stay
+   in the doc marked **OPEN**, never papered over.
+5. **Document** to the contract below; register via the `<!-- meta -->` block + `docs/reindex.py`.
 
 ## Output contract → `docs/analysis/YYYY-MM-DD-HHMM-<slug>.md`
 Name the doc with the **same stamp+slug as the `bench/runs/` dir** (1:1 raw data ↔ report).
@@ -67,6 +73,12 @@ Name the doc with the **same stamp+slug as the `bench/runs/` dir** (1:1 raw data
 ## Summary
 <3–5 sentences: winning config, the deltas that mattered, one caveat.>
 
+## Legend — every knob & label used in this run
+<Copy the canonical rows below for every term that appears in this doc (drop unused ones, add
+run-specific ones); tailor the "effect on this box" cell to what THIS run showed, with provenance.>
+| Term | What it is | Effect on this box (R9700 / RDNA4, 32 GB) | How it's tested here |
+|------|------------|-------------------------------------------|----------------------|
+
 ## Results (table first — pick the columns that apply)
 | Config | build | ctx | depth | ub | b | fa | KV | MTP | conc | Prefill tok/s | Decode/stream | Aggregate tok/s | TTFT p50/p95 | ttfa | VRAM peak |
 |--------|-------|----:|------:|---:|--:|:--:|:--:|:---:|-----:|--------------:|--------------:|----------------:|-------------:|-----:|----------:|
@@ -77,6 +89,12 @@ Name the doc with the **same stamp+slug as the `bench/runs/` dir** (1:1 raw data
 
 ## What moved the needle (deltas vs baseline)
 | Change | Prefill Δ | Decode Δ | Aggregate Δ | Note |
+
+## Consequences & root causes (ultrathink)
+<Numbered findings. Each one: observation → explanation → consequence for practice ("therefore
+use X for Y"). Tag every causal claim MEASURED / INFERRED / CLAIMED (with source via the research
+skill). Interactions and anomalies belong here (MTP × KV, depth cliffs, saturation points);
+unexplained ones stay listed as OPEN.>
 
 ## Recommended config
 ```
@@ -91,4 +109,28 @@ Name the doc with the **same stamp+slug as the `bench/runs/` dir** (1:1 raw data
 <CLAIMED numbers with sources — separate from MEASURED rows.>
 ```
 
-After writing: append a one-line entry to `docs/INDEX.md` and report the path to the user.
+After writing: add a `<!-- meta` block (date + one-line takeaway) at the top of the report, then
+run `docs/reindex.py` to regenerate `docs/INDEX.md` (it fails if the meta block is missing). Report
+the path to the user.
+
+## Canonical legend rows (copy into the doc's Legend, trim to what the run used)
+Definitions are stable; the **effect column below is the generic starting point** — overwrite it
+with what THIS run measured (tag it), keep the definition wording as-is.
+
+| Term | What it is | Effect on this box (generic; replace with run-specific) | How it's tested here |
+|------|------------|--------------------------------------------------------|----------------------|
+| `-ub` (n_ubatch) | micro-batch: tokens per forward pass during prefill | bigger = better GPU occupancy until a VRAM/cache cliff; peak is interior, not "max it out" | sweep.py grid, expanded until the peak is bracketed both sides |
+| `-b` (n_batch) | logical batch: max tokens per submission (≥ ub) | usually flat once ≥ ub (plateau within noise) | sweep.py second axis, after ub is fixed |
+| `-fa` (flash attention) | fused attention kernel | on/off A/B; also **required for quantized KV** | sweep.py on/off pair at the winning ub/b |
+| KV `f16` | 16-bit KV-cache entries — the baseline | reference quality & speed; biggest VRAM consumer at long ctx | baseline side of the KV A/B |
+| KV `q8_0` | 8-bit block-quantized KV cache | ~halves KV VRAM (→ more ctx or slots); may cost decode speed | accepted only if pp AND tg lose ≤5% vs f16 at depth 32768 (sweep.py A/B) |
+| MTP | multi-token prediction speculative decoding (`--spec-type draft-mtp`, draft layer embedded in the 35B GGUF) | speeds decode when draft acceptance is high; serving-only (invisible to llama-bench) | campaign.sh on/off axis on live servers |
+| depth / `crN` | code-review workload prompt padded to N tokens (cr8000/cr32000/cr64000) from the tracked corpus | prefill grows ~linearly, decode sags as KV fills; 64K approaches the 32 GB ceiling | openai_probe vs a fresh server, `PREFIX_MODE=unique`, 256-tok decode sample |
+| `thinking` | reasoning fixture via chat API (template applied) | reasoning burns tokens before the first answer token | `ttfa_s` = time to first answer token; null if the think budget ran out |
+| `agentic-cN` | N parallel streams with distinct 8K prompts on `-np 4` slots | per-stream tok/s drops, aggregate usually rises; per-slot ctx = CTX/NP | openai_probe concurrency wave, REPS ≥ 2 |
+| `pp` / `tg` | llama-bench prompt processing / text generation tok/s | synthetic upper bound — no prompts, no MTP, no concurrency | llama-bench, ≥ 3 reps, stddev recorded |
+| TTFT p50/p95 | time to first token, median / 95th pct | p95 is the agent-facing latency number under load | per-request timing in openai_probe |
+| per-stream vs aggregate | one stream's decode rate vs the sum of all streams | the gap quantifies the concurrency payoff | aggregate rows in results.jsonl |
+| `prefix_mode` | `unique` = cold prompt cache, `shared` = warm | shared inflates prefill ~2.4× from request 2 (measured) | probe flag; `unique` is the default for honest numbers |
+| `plateau_within_noise` | difference inside the ±3% run-variance band | a tie — never sold as a win | sweep.py noise gate |
+| `Q4_K_M` (etc.) | GGUF weight quantization of the model itself | at 32 GB memory-bound long-ctx, Q4 is the optimum, not a compromise | fixed per run; recorded in meta.txt |

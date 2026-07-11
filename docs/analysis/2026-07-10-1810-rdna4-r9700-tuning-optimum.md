@@ -1,3 +1,8 @@
+<!-- meta
+date: 2026-07-10 18:10
+takeaway: 64K sweep: **llama.cpp Vulkan + MTP wins** (35B 2993 pf / 135.9 dec). ROCm→Vulkan +67%/+46%; MTP +29–132% decode; `-ub 512→2048` +21% prefill; `dpm=high` −15% (use `auto`). vLLM/HF not competitive.
+-->
+
 # RDNA4 / R9700 — llama.cpp · ollama tuning & backend optimum (64K)
 
 - **Date:** 2026-07-10 18:10

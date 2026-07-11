@@ -31,7 +31,7 @@ NVIDIA works by pointing it at a CUDA llama.cpp build; the cross-engine side is 
 | Path | What |
 |------|------|
 | [`docs/INDEX.md`](docs/INDEX.md) | Register of every report, newest first — **start here** |
-| [`docs/RUNBOOK.md`](docs/RUNBOOK.md) | **How to run the benchmarks yourself, step by step** |
+| [`docs/GUIDE.md`](docs/GUIDE.md) | **How to run the benchmarks yourself, step by step** |
 | `docs/analysis/` | Our measurements on this box (dated) |
 | `docs/research/` | External, sourced research (dated) |
 | `bench/model-bench/` | **Tuning microscope** — `run.sh` (manual) + `sweep.py` (**adaptive optimum search** + KV ≤5% rule) |
@@ -56,7 +56,7 @@ export HSA_OVERRIDE_GFX_VERSION=12.0.1
 
 ## Run a benchmark
 
-Full step-by-step in [`docs/RUNBOOK.md`](docs/RUNBOOK.md). The short version (vendor env is
+Full step-by-step in [`docs/GUIDE.md`](docs/GUIDE.md). The short version (vendor env is
 auto-detected — works on NVIDIA too by pointing `LLAMA_BENCH`/`LLAMA_SERVER` at a CUDA build):
 
 ```bash

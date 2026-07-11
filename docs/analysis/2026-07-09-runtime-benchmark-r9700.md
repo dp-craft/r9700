@@ -1,3 +1,8 @@
+<!-- meta
+date: 2026-07-09
+takeaway: 100K context, ROCm. Qwen3-Coder-30B-A3B Q4_K_M ~90 tok/s decode; ollama prefill ~2× llama.cpp (rocBLAS vs hipBLASLt); MTP +1.29–1.55× decode.
+-->
+
 # Runtime-benchmark — R9700 (gfx1201) kódoló modellek, 100K kontextus
 
 - **Dátum:** 2026-07-09

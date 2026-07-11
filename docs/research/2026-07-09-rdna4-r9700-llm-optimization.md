@@ -1,3 +1,8 @@
+<!-- meta
+date: 2026-07-09
+takeaway: ROCm works on gfx1201 via ollama `rocm_v7_2`; RDNA4 = FP8 native, no FP4 WMMA; 32 GB memory-bound → Q4_K_M optimal; MTP is llama.cpp-only.
+-->
+
 # RDNA4 / Radeon AI PRO R9700 — lokális LLM optimalizáció (kódolásra)
 
 - **Dátum:** 2026-07-09

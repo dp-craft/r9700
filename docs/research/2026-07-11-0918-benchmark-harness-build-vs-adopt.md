@@ -1,3 +1,8 @@
+<!-- meta
+date: 2026-07-11 09:18
+takeaway: **Adopt, two-tool split.** Tuning → `llama-bench` (de-facto RDNA4 standard). Cross-engine → OpenAI-endpoint HTTP bench (llama-benchy/sglang/vllm-bench). Keep thin custom for MTP + unique-prefix long-context. Avoid MLPerf & Phoronix.
+-->
+
 # Research: benchmark harness — build our own vs adopt a mature tool
 
 - **Date:** 2026-07-11 09:18   · **Question:** Should this repo keep building a bespoke bash/python harness, or adopt mature tools for (a) cross-engine comparison and (b) single-engine tuning sweeps on the R9700 / RDNA4?

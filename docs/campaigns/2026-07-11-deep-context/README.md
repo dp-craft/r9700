@@ -1,7 +1,13 @@
 # Deep-context campaign — max depth + parallel at the ceiling (R9700, 2026-07-11)
 
-A self-contained run plan you execute **manually**, top to bottom. Built from the conventions in
-`docs/RUNBOOK.md` (unchanged). ✅ = command uses verified repo tooling · ⚠️ = watch point.
+A self-contained run plan. Built from the conventions in `docs/GUIDE.md`.
+✅ = command uses verified repo tooling · ⚠️ = watch point.
+
+**Two ways to run it.** ① **Automated + resumable:** after Phase 1 (fixtures), just
+`bash docs/campaigns/2026-07-11-deep-context/run.sh` — it loops every server/probe below with
+per-probe `done/` markers (rerun to continue after an interruption), consolidates every probe
+into one `results.jsonl`, and auto-generates `report.html` as the last step. `run.sh` is generated from `spec.json` by `bench/gen_campaign.py`;
+edit the spec and regenerate, or hand-edit. ② **Manual:** run the phase commands below yourself.
 
 **Why this campaign.** The starter campaign capped at 64K and hit a `cr64000` context overflow.
 Direct VRAM measurement then showed the real picture: **f16 KV ≈ 21 KiB/token** (not the textbook
@@ -99,14 +105,15 @@ copied prompts). Server cmdline/props/log live under `bench/.servers/8081.*` per
 MTP on/off at depth, q8_0-vs-f16 confirmatory row, parallel decode/stream + aggregate + TTFT p95
 at np 2/4. Update the README TL;DR max-context line (provenance: these runs).
 
-## Phase 6 — generate charts (LAST STEP) ✅
-Self-contained HTML (Chart.js inlined; no network), glob across all deep run dirs:
+## Phase 6 — generate the report (LAST STEP) ✅
+The automated `run.sh` already does this and writes `report.html` into the campaign dir. If you ran
+the phases manually, consolidate the per-probe run dirs and render (self-contained HTML, Chart.js
+vendored, no network):
 ```bash
-python3 "$ROOT/bench/lib/make_charts.py" \
-  "$ROOT/bench/runs/deep-context-charts.html" \
-  "$ROOT"/bench/runs/*-engine-deep-*/results.jsonl
-# → decode-vs-depth, prefill-vs-depth, decode-vs-concurrency, aggregate-vs-concurrency
-xdg-open "$ROOT/bench/runs/deep-context-charts.html"   # or open in a browser
+CDIR="$ROOT/bench/runs/2026-07-11-deep-context"; mkdir -p "$CDIR"
+cat "$ROOT"/bench/runs/*-engine-deep-*/results.jsonl > "$CDIR/results.jsonl"
+python3 "$ROOT/bench/lib/report.py" "$CDIR"          # → $CDIR/report.html
+xdg-open "$CDIR/report.html"                          # or open in a browser
 ```
 
 ## Run matrix (tick as you go)
@@ -117,7 +124,7 @@ xdg-open "$ROOT/bench/runs/deep-context-charts.html"   # or open in a browser
 - [ ] 4: parallel np=2 (agentic-32k ×2)
 - [ ] 4: parallel np=4 (agentic-32k ×4)
 - [ ] 5: analysis doc + INDEX + README max-ctx refresh
-- [ ] 6: charts.html generated
+- [ ] 6: report.html generated
 
 ## Out of scope (deliberately)
 - **ROCm backend** (Vulkan wins decode; add later if needed) · **full q8_0 matrix** (one confirm
