@@ -1,0 +1,30 @@
+>>> llama.cpp ll_35B_q8_ub32 (kv=q8_0 ub=32 mtp=0)
+{"model": "35B-A3B", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "q8_0", "ub": 32, "batch": 2048, "flash_attn": "on", "ngl": 99, "mtp": false, "runtime": "llamacpp", "label": "ll_35B_q8_ub32", "prefill_tok_s": 529.0, "decode_tok_s": 74.0, "prompt_tokens": 6991, "vram_used_mb": 21899}
+>>> llama.cpp ll_35B_q8_ub64 (kv=q8_0 ub=64 mtp=0)
+{"model": "35B-A3B", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "q8_0", "ub": 64, "batch": 2048, "flash_attn": "on", "ngl": 99, "mtp": false, "runtime": "llamacpp", "label": "ll_35B_q8_ub64", "prefill_tok_s": 681.0, "decode_tok_s": 73.6, "prompt_tokens": 6991, "vram_used_mb": 21907}
+>>> llama.cpp ll_35B_q8_ub512 (kv=q8_0 ub=512 mtp=0)
+{"model": "35B-A3B", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "q8_0", "ub": 512, "batch": 2048, "flash_attn": "on", "ngl": 99, "mtp": false, "runtime": "llamacpp", "label": "ll_35B_q8_ub512", "prefill_tok_s": 1489.1, "decode_tok_s": 75.5, "prompt_tokens": 6989, "vram_used_mb": 22009}
+>>> llama.cpp ll_35B_f16_ub64 (kv=f16 ub=64 mtp=0)
+{"model": "35B-A3B", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "f16", "ub": 64, "batch": 2048, "flash_attn": "on", "ngl": 99, "mtp": false, "runtime": "llamacpp", "label": "ll_35B_f16_ub64", "prefill_tok_s": 682.5, "decode_tok_s": 77.3, "prompt_tokens": 6987, "vram_used_mb": 22395}
+>>> llama.cpp ll_27B_q8_ub32 (kv=q8_0 ub=32 mtp=0)
+{"model": "27B-MTP", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "q8_0", "ub": 32, "batch": 2048, "flash_attn": "on", "ngl": 99, "mtp": false, "runtime": "llamacpp", "label": "ll_27B_q8_ub32", "prefill_tok_s": 320.5, "decode_tok_s": 28.2, "prompt_tokens": 6987, "vram_used_mb": 18643}
+>>> llama.cpp ll_27B_q8_ub64 (kv=q8_0 ub=64 mtp=0)
+{"model": "27B-MTP", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "q8_0", "ub": 64, "batch": 2048, "flash_attn": "on", "ngl": 99, "mtp": false, "runtime": "llamacpp", "label": "ll_27B_q8_ub64", "prefill_tok_s": 434.7, "decode_tok_s": 28.2, "prompt_tokens": 6988, "vram_used_mb": 18656}
+>>> llama.cpp ll_27B_q8_ub512 (kv=q8_0 ub=512 mtp=0)
+{"model": "27B-MTP", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "q8_0", "ub": 512, "batch": 2048, "flash_attn": "on", "ngl": 99, "mtp": false, "runtime": "llamacpp", "label": "ll_27B_q8_ub512", "prefill_tok_s": 846.7, "decode_tok_s": 28.2, "prompt_tokens": 6987, "vram_used_mb": 18782}
+>>> llama.cpp ll_27B_f16_ub64 (kv=f16 ub=64 mtp=0)
+{"model": "27B-MTP", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "f16", "ub": 64, "batch": 2048, "flash_attn": "on", "ngl": 99, "mtp": false, "runtime": "llamacpp", "label": "ll_27B_f16_ub64", "prefill_tok_s": 440.6, "decode_tok_s": 28.9, "prompt_tokens": 6987, "vram_used_mb": 20340}
+>>> llama.cpp ll_27B_q8_mtp (kv=q8_0 ub=64 mtp=1)
+{"model": "27B-MTP", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "q8_0", "ub": 64, "batch": 2048, "flash_attn": "on", "ngl": 99, "mtp": true, "runtime": "llamacpp", "label": "ll_27B_q8_mtp", "prefill_tok_s": 414.9, "decode_tok_s": 50.8, "prompt_tokens": 6989, "vram_used_mb": 20751, "draft": "183/214"}
+=== llama.cpp phase done ===
+ollama models: q27:latest q35:latest 
+>>> ollama oll_35B_q8_0 (kv=q8_0)
+{"model": "35B-A3B", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "q8_0", "flash_attn": "on", "engine": "ollama", "runtime": "ollama", "label": "oll_35B_q8_0", "prefill_tok_s": 2904.6, "decode_tok_s": 62.7, "prompt_tokens": 6998, "vram_used_mb": 21904}
+>>> ollama oll_27B_q8_0 (kv=q8_0)
+{"model": "27B-MTP", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "q8_0", "flash_attn": "on", "engine": "ollama", "runtime": "ollama", "label": "oll_27B_q8_0", "prefill_tok_s": 1035.9, "decode_tok_s": 26.8, "prompt_tokens": 6998, "vram_used_mb": 18328}
+>>> ollama oll_35B_f16 (kv=f16)
+{"model": "35B-A3B", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "f16", "flash_attn": "on", "engine": "ollama", "runtime": "ollama", "label": "oll_35B_f16", "prefill_tok_s": 2975.0, "decode_tok_s": 65.3, "prompt_tokens": 6997, "vram_used_mb": 22410}
+>>> ollama oll_27B_f16 (kv=f16)
+{"model": "27B-MTP", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "f16", "flash_attn": "on", "engine": "ollama", "runtime": "ollama", "label": "oll_27B_f16", "prefill_tok_s": 1041.9, "decode_tok_s": 27.4, "prompt_tokens": 6997, "vram_used_mb": 20031}
+=== ollama phase done ===
+=== NODOCKER PHASES DONE: /home/dev/work/dippe/amd/bench/harness/results_2026-07-10_1548.jsonl ===

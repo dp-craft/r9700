@@ -1,0 +1,4 @@
+{"runtime": "llama.cpp", "case": "baseline_no_mtp", "prefill_tok_s": 14.5, "decode_tok_s": 26.3, "gen_toks": 256, "draft_accept": null, "draft_n": null}
+{"runtime": "llama.cpp", "case": "mtp", "prefill_tok_s": 15.1, "decode_tok_s": 40.8, "gen_toks": 256, "draft_accept": 176, "draft_n": 235}
+{"runtime": "llama.cpp", "case": "Qwen3-Coder-30B-A3B_llamacpp", "decode_tok_s": 80.4, "prefill_tok_s": 15.4, "gen_toks": 256}
+{"runtime": "llama.cpp", "case": "Qwen3.6-35B-A3B_llamacpp", "decode_tok_s": 72.3, "prefill_tok_s": 13.6, "gen_toks": 256}

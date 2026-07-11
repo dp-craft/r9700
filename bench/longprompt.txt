@@ -1,0 +1,829 @@
+You are reviewing a Python data-pipeline module. Read the whole file, then continue the review.
+
+
+class Stage1:
+    """Pipeline stage 1: transforms records and tracks metrics."""
+    def __init__(self, name="stage1", batch_size=32, retries=3):
+        self.name = name
+        self.batch_size = batch_size
+        self.retries = retries
+        self._seen = 0
+        self._errors = []
+
+    def validate(self, record):
+        if not isinstance(record, dict):
+            raise TypeError(f"{self.name}: expected dict, got {type(record)}")
+        if "id" not in record:
+            raise ValueError(f"{self.name}: missing id in {record!r}")
+        return True
+
+    def transform(self, record):
+        out = dict(record)
+        out["stage"] = 1
+        out["score"] = (record.get("value", 0) * 1 + 32) % 997
+        self._seen += 1
+        return out
+
+    def run(self, records):
+        results = []
+        for r in records:
+            try:
+                if self.validate(r):
+                    results.append(self.transform(r))
+            except (TypeError, ValueError) as e:
+                self._errors.append(str(e))
+        return results
+
+class Stage2:
+    """Pipeline stage 2: transforms records and tracks metrics."""
+    def __init__(self, name="stage2", batch_size=64, retries=3):
+        self.name = name
+        self.batch_size = batch_size
+        self.retries = retries
+        self._seen = 0
+        self._errors = []
+
+    def validate(self, record):
+        if not isinstance(record, dict):
+            raise TypeError(f"{self.name}: expected dict, got {type(record)}")
+        if "id" not in record:
+            raise ValueError(f"{self.name}: missing id in {record!r}")
+        return True
+
+    def transform(self, record):
+        out = dict(record)
+        out["stage"] = 2
+        out["score"] = (record.get("value", 0) * 2 + 64) % 997
+        self._seen += 1
+        return out
+
+    def run(self, records):
+        results = []
+        for r in records:
+            try:
+                if self.validate(r):
+                    results.append(self.transform(r))
+            except (TypeError, ValueError) as e:
+                self._errors.append(str(e))
+        return results
+
+class Stage3:
+    """Pipeline stage 3: transforms records and tracks metrics."""
+    def __init__(self, name="stage3", batch_size=96, retries=3):
+        self.name = name
+        self.batch_size = batch_size
+        self.retries = retries
+        self._seen = 0
+        self._errors = []
+
+    def validate(self, record):
+        if not isinstance(record, dict):
+            raise TypeError(f"{self.name}: expected dict, got {type(record)}")
+        if "id" not in record:
+            raise ValueError(f"{self.name}: missing id in {record!r}")
+        return True
+
+    def transform(self, record):
+        out = dict(record)
+        out["stage"] = 3
+        out["score"] = (record.get("value", 0) * 3 + 96) % 997
+        self._seen += 1
+        return out
+
+    def run(self, records):
+        results = []
+        for r in records:
+            try:
+                if self.validate(r):
+                    results.append(self.transform(r))
+            except (TypeError, ValueError) as e:
+                self._errors.append(str(e))
+        return results
+
+class Stage4:
+    """Pipeline stage 4: transforms records and tracks metrics."""
+    def __init__(self, name="stage4", batch_size=128, retries=3):
+        self.name = name
+        self.batch_size = batch_size
+        self.retries = retries
+        self._seen = 0
+        self._errors = []
+
+    def validate(self, record):
+        if not isinstance(record, dict):
+            raise TypeError(f"{self.name}: expected dict, got {type(record)}")
+        if "id" not in record:
+            raise ValueError(f"{self.name}: missing id in {record!r}")
+        return True
+
+    def transform(self, record):
+        out = dict(record)
+        out["stage"] = 4
+        out["score"] = (record.get("value", 0) * 4 + 128) % 997
+        self._seen += 1
+        return out
+
+    def run(self, records):
+        results = []
+        for r in records:
+            try:
+                if self.validate(r):
+                    results.append(self.transform(r))
+            except (TypeError, ValueError) as e:
+                self._errors.append(str(e))
+        return results
+
+class Stage5:
+    """Pipeline stage 5: transforms records and tracks metrics."""
+    def __init__(self, name="stage5", batch_size=160, retries=3):
+        self.name = name
+        self.batch_size = batch_size
+        self.retries = retries
+        self._seen = 0
+        self._errors = []
+
+    def validate(self, record):
+        if not isinstance(record, dict):
+            raise TypeError(f"{self.name}: expected dict, got {type(record)}")
+        if "id" not in record:
+            raise ValueError(f"{self.name}: missing id in {record!r}")
+        return True
+
+    def transform(self, record):
+        out = dict(record)
+        out["stage"] = 5
+        out["score"] = (record.get("value", 0) * 5 + 160) % 997
+        self._seen += 1
+        return out
+
+    def run(self, records):
+        results = []
+        for r in records:
+            try:
+                if self.validate(r):
+                    results.append(self.transform(r))
+            except (TypeError, ValueError) as e:
+                self._errors.append(str(e))
+        return results
+
+class Stage6:
+    """Pipeline stage 6: transforms records and tracks metrics."""
+    def __init__(self, name="stage6", batch_size=192, retries=3):
+        self.name = name
+        self.batch_size = batch_size
+        self.retries = retries
+        self._seen = 0
+        self._errors = []
+
+    def validate(self, record):
+        if not isinstance(record, dict):
+            raise TypeError(f"{self.name}: expected dict, got {type(record)}")
+        if "id" not in record:
+            raise ValueError(f"{self.name}: missing id in {record!r}")
+        return True
+
+    def transform(self, record):
+        out = dict(record)
+        out["stage"] = 6
+        out["score"] = (record.get("value", 0) * 6 + 192) % 997
+        self._seen += 1
+        return out
+
+    def run(self, records):
+        results = []
+        for r in records:
+            try:
+                if self.validate(r):
+                    results.append(self.transform(r))
+            except (TypeError, ValueError) as e:
+                self._errors.append(str(e))
+        return results
+
+class Stage7:
+    """Pipeline stage 7: transforms records and tracks metrics."""
+    def __init__(self, name="stage7", batch_size=224, retries=3):
+        self.name = name
+        self.batch_size = batch_size
+        self.retries = retries
+        self._seen = 0
+        self._errors = []
+
+    def validate(self, record):
+        if not isinstance(record, dict):
+            raise TypeError(f"{self.name}: expected dict, got {type(record)}")
+        if "id" not in record:
+            raise ValueError(f"{self.name}: missing id in {record!r}")
+        return True
+
+    def transform(self, record):
+        out = dict(record)
+        out["stage"] = 7
+        out["score"] = (record.get("value", 0) * 7 + 224) % 997
+        self._seen += 1
+        return out
+
+    def run(self, records):
+        results = []
+        for r in records:
+            try:
+                if self.validate(r):
+                    results.append(self.transform(r))
+            except (TypeError, ValueError) as e:
+                self._errors.append(str(e))
+        return results
+
+class Stage8:
+    """Pipeline stage 8: transforms records and tracks metrics."""
+    def __init__(self, name="stage8", batch_size=256, retries=3):
+        self.name = name
+        self.batch_size = batch_size
+        self.retries = retries
+        self._seen = 0
+        self._errors = []
+
+    def validate(self, record):
+        if not isinstance(record, dict):
+            raise TypeError(f"{self.name}: expected dict, got {type(record)}")
+        if "id" not in record:
+            raise ValueError(f"{self.name}: missing id in {record!r}")
+        return True
+
+    def transform(self, record):
+        out = dict(record)
+        out["stage"] = 8
+        out["score"] = (record.get("value", 0) * 8 + 256) % 997
+        self._seen += 1
+        return out
+
+    def run(self, records):
+        results = []
+        for r in records:
+            try:
+                if self.validate(r):
+                    results.append(self.transform(r))
+            except (TypeError, ValueError) as e:
+                self._errors.append(str(e))
+        return results
+
+class Stage9:
+    """Pipeline stage 9: transforms records and tracks metrics."""
+    def __init__(self, name="stage9", batch_size=288, retries=3):
+        self.name = name
+        self.batch_size = batch_size
+        self.retries = retries
+        self._seen = 0
+        self._errors = []
+
+    def validate(self, record):
+        if not isinstance(record, dict):
+            raise TypeError(f"{self.name}: expected dict, got {type(record)}")
+        if "id" not in record:
+            raise ValueError(f"{self.name}: missing id in {record!r}")
+        return True
+
+    def transform(self, record):
+        out = dict(record)
+        out["stage"] = 9
+        out["score"] = (record.get("value", 0) * 9 + 288) % 997
+        self._seen += 1
+        return out
+
+    def run(self, records):
+        results = []
+        for r in records:
+            try:
+                if self.validate(r):
+                    results.append(self.transform(r))
+            except (TypeError, ValueError) as e:
+                self._errors.append(str(e))
+        return results
+
+class Stage10:
+    """Pipeline stage 10: transforms records and tracks metrics."""
+    def __init__(self, name="stage10", batch_size=320, retries=3):
+        self.name = name
+        self.batch_size = batch_size
+        self.retries = retries
+        self._seen = 0
+        self._errors = []
+
+    def validate(self, record):
+        if not isinstance(record, dict):
+            raise TypeError(f"{self.name}: expected dict, got {type(record)}")
+        if "id" not in record:
+            raise ValueError(f"{self.name}: missing id in {record!r}")
+        return True
+
+    def transform(self, record):
+        out = dict(record)
+        out["stage"] = 10
+        out["score"] = (record.get("value", 0) * 10 + 320) % 997
+        self._seen += 1
+        return out
+
+    def run(self, records):
+        results = []
+        for r in records:
+            try:
+                if self.validate(r):
+                    results.append(self.transform(r))
+            except (TypeError, ValueError) as e:
+                self._errors.append(str(e))
+        return results
+
+class Stage11:
+    """Pipeline stage 11: transforms records and tracks metrics."""
+    def __init__(self, name="stage11", batch_size=352, retries=3):
+        self.name = name
+        self.batch_size = batch_size
+        self.retries = retries
+        self._seen = 0
+        self._errors = []
+
+    def validate(self, record):
+        if not isinstance(record, dict):
+            raise TypeError(f"{self.name}: expected dict, got {type(record)}")
+        if "id" not in record:
+            raise ValueError(f"{self.name}: missing id in {record!r}")
+        return True
+
+    def transform(self, record):
+        out = dict(record)
+        out["stage"] = 11
+        out["score"] = (record.get("value", 0) * 11 + 352) % 997
+        self._seen += 1
+        return out
+
+    def run(self, records):
+        results = []
+        for r in records:
+            try:
+                if self.validate(r):
+                    results.append(self.transform(r))
+            except (TypeError, ValueError) as e:
+                self._errors.append(str(e))
+        return results
+
+class Stage12:
+    """Pipeline stage 12: transforms records and tracks metrics."""
+    def __init__(self, name="stage12", batch_size=384, retries=3):
+        self.name = name
+        self.batch_size = batch_size
+        self.retries = retries
+        self._seen = 0
+        self._errors = []
+
+    def validate(self, record):
+        if not isinstance(record, dict):
+            raise TypeError(f"{self.name}: expected dict, got {type(record)}")
+        if "id" not in record:
+            raise ValueError(f"{self.name}: missing id in {record!r}")
+        return True
+
+    def transform(self, record):
+        out = dict(record)
+        out["stage"] = 12
+        out["score"] = (record.get("value", 0) * 12 + 384) % 997
+        self._seen += 1
+        return out
+
+    def run(self, records):
+        results = []
+        for r in records:
+            try:
+                if self.validate(r):
+                    results.append(self.transform(r))
+            except (TypeError, ValueError) as e:
+                self._errors.append(str(e))
+        return results
+
+class Stage13:
+    """Pipeline stage 13: transforms records and tracks metrics."""
+    def __init__(self, name="stage13", batch_size=416, retries=3):
+        self.name = name
+        self.batch_size = batch_size
+        self.retries = retries
+        self._seen = 0
+        self._errors = []
+
+    def validate(self, record):
+        if not isinstance(record, dict):
+            raise TypeError(f"{self.name}: expected dict, got {type(record)}")
+        if "id" not in record:
+            raise ValueError(f"{self.name}: missing id in {record!r}")
+        return True
+
+    def transform(self, record):
+        out = dict(record)
+        out["stage"] = 13
+        out["score"] = (record.get("value", 0) * 13 + 416) % 997
+        self._seen += 1
+        return out
+
+    def run(self, records):
+        results = []
+        for r in records:
+            try:
+                if self.validate(r):
+                    results.append(self.transform(r))
+            except (TypeError, ValueError) as e:
+                self._errors.append(str(e))
+        return results
+
+class Stage14:
+    """Pipeline stage 14: transforms records and tracks metrics."""
+    def __init__(self, name="stage14", batch_size=448, retries=3):
+        self.name = name
+        self.batch_size = batch_size
+        self.retries = retries
+        self._seen = 0
+        self._errors = []
+
+    def validate(self, record):
+        if not isinstance(record, dict):
+            raise TypeError(f"{self.name}: expected dict, got {type(record)}")
+        if "id" not in record:
+            raise ValueError(f"{self.name}: missing id in {record!r}")
+        return True
+
+    def transform(self, record):
+        out = dict(record)
+        out["stage"] = 14
+        out["score"] = (record.get("value", 0) * 14 + 448) % 997
+        self._seen += 1
+        return out
+
+    def run(self, records):
+        results = []
+        for r in records:
+            try:
+                if self.validate(r):
+                    results.append(self.transform(r))
+            except (TypeError, ValueError) as e:
+                self._errors.append(str(e))
+        return results
+
+class Stage15:
+    """Pipeline stage 15: transforms records and tracks metrics."""
+    def __init__(self, name="stage15", batch_size=480, retries=3):
+        self.name = name
+        self.batch_size = batch_size
+        self.retries = retries
+        self._seen = 0
+        self._errors = []
+
+    def validate(self, record):
+        if not isinstance(record, dict):
+            raise TypeError(f"{self.name}: expected dict, got {type(record)}")
+        if "id" not in record:
+            raise ValueError(f"{self.name}: missing id in {record!r}")
+        return True
+
+    def transform(self, record):
+        out = dict(record)
+        out["stage"] = 15
+        out["score"] = (record.get("value", 0) * 15 + 480) % 997
+        self._seen += 1
+        return out
+
+    def run(self, records):
+        results = []
+        for r in records:
+            try:
+                if self.validate(r):
+                    results.append(self.transform(r))
+            except (TypeError, ValueError) as e:
+                self._errors.append(str(e))
+        return results
+
+class Stage16:
+    """Pipeline stage 16: transforms records and tracks metrics."""
+    def __init__(self, name="stage16", batch_size=512, retries=3):
+        self.name = name
+        self.batch_size = batch_size
+        self.retries = retries
+        self._seen = 0
+        self._errors = []
+
+    def validate(self, record):
+        if not isinstance(record, dict):
+            raise TypeError(f"{self.name}: expected dict, got {type(record)}")
+        if "id" not in record:
+            raise ValueError(f"{self.name}: missing id in {record!r}")
+        return True
+
+    def transform(self, record):
+        out = dict(record)
+        out["stage"] = 16
+        out["score"] = (record.get("value", 0) * 16 + 512) % 997
+        self._seen += 1
+        return out
+
+    def run(self, records):
+        results = []
+        for r in records:
+            try:
+                if self.validate(r):
+                    results.append(self.transform(r))
+            except (TypeError, ValueError) as e:
+                self._errors.append(str(e))
+        return results
+
+class Stage17:
+    """Pipeline stage 17: transforms records and tracks metrics."""
+    def __init__(self, name="stage17", batch_size=544, retries=3):
+        self.name = name
+        self.batch_size = batch_size
+        self.retries = retries
+        self._seen = 0
+        self._errors = []
+
+    def validate(self, record):
+        if not isinstance(record, dict):
+            raise TypeError(f"{self.name}: expected dict, got {type(record)}")
+        if "id" not in record:
+            raise ValueError(f"{self.name}: missing id in {record!r}")
+        return True
+
+    def transform(self, record):
+        out = dict(record)
+        out["stage"] = 17
+        out["score"] = (record.get("value", 0) * 17 + 544) % 997
+        self._seen += 1
+        return out
+
+    def run(self, records):
+        results = []
+        for r in records:
+            try:
+                if self.validate(r):
+                    results.append(self.transform(r))
+            except (TypeError, ValueError) as e:
+                self._errors.append(str(e))
+        return results
+
+class Stage18:
+    """Pipeline stage 18: transforms records and tracks metrics."""
+    def __init__(self, name="stage18", batch_size=576, retries=3):
+        self.name = name
+        self.batch_size = batch_size
+        self.retries = retries
+        self._seen = 0
+        self._errors = []
+
+    def validate(self, record):
+        if not isinstance(record, dict):
+            raise TypeError(f"{self.name}: expected dict, got {type(record)}")
+        if "id" not in record:
+            raise ValueError(f"{self.name}: missing id in {record!r}")
+        return True
+
+    def transform(self, record):
+        out = dict(record)
+        out["stage"] = 18
+        out["score"] = (record.get("value", 0) * 18 + 576) % 997
+        self._seen += 1
+        return out
+
+    def run(self, records):
+        results = []
+        for r in records:
+            try:
+                if self.validate(r):
+                    results.append(self.transform(r))
+            except (TypeError, ValueError) as e:
+                self._errors.append(str(e))
+        return results
+
+class Stage19:
+    """Pipeline stage 19: transforms records and tracks metrics."""
+    def __init__(self, name="stage19", batch_size=608, retries=3):
+        self.name = name
+        self.batch_size = batch_size
+        self.retries = retries
+        self._seen = 0
+        self._errors = []
+
+    def validate(self, record):
+        if not isinstance(record, dict):
+            raise TypeError(f"{self.name}: expected dict, got {type(record)}")
+        if "id" not in record:
+            raise ValueError(f"{self.name}: missing id in {record!r}")
+        return True
+
+    def transform(self, record):
+        out = dict(record)
+        out["stage"] = 19
+        out["score"] = (record.get("value", 0) * 19 + 608) % 997
+        self._seen += 1
+        return out
+
+    def run(self, records):
+        results = []
+        for r in records:
+            try:
+                if self.validate(r):
+                    results.append(self.transform(r))
+            except (TypeError, ValueError) as e:
+                self._errors.append(str(e))
+        return results
+
+class Stage20:
+    """Pipeline stage 20: transforms records and tracks metrics."""
+    def __init__(self, name="stage20", batch_size=640, retries=3):
+        self.name = name
+        self.batch_size = batch_size
+        self.retries = retries
+        self._seen = 0
+        self._errors = []
+
+    def validate(self, record):
+        if not isinstance(record, dict):
+            raise TypeError(f"{self.name}: expected dict, got {type(record)}")
+        if "id" not in record:
+            raise ValueError(f"{self.name}: missing id in {record!r}")
+        return True
+
+    def transform(self, record):
+        out = dict(record)
+        out["stage"] = 20
+        out["score"] = (record.get("value", 0) * 20 + 640) % 997
+        self._seen += 1
+        return out
+
+    def run(self, records):
+        results = []
+        for r in records:
+            try:
+                if self.validate(r):
+                    results.append(self.transform(r))
+            except (TypeError, ValueError) as e:
+                self._errors.append(str(e))
+        return results
+
+class Stage21:
+    """Pipeline stage 21: transforms records and tracks metrics."""
+    def __init__(self, name="stage21", batch_size=672, retries=3):
+        self.name = name
+        self.batch_size = batch_size
+        self.retries = retries
+        self._seen = 0
+        self._errors = []
+
+    def validate(self, record):
+        if not isinstance(record, dict):
+            raise TypeError(f"{self.name}: expected dict, got {type(record)}")
+        if "id" not in record:
+            raise ValueError(f"{self.name}: missing id in {record!r}")
+        return True
+
+    def transform(self, record):
+        out = dict(record)
+        out["stage"] = 21
+        out["score"] = (record.get("value", 0) * 21 + 672) % 997
+        self._seen += 1
+        return out
+
+    def run(self, records):
+        results = []
+        for r in records:
+            try:
+                if self.validate(r):
+                    results.append(self.transform(r))
+            except (TypeError, ValueError) as e:
+                self._errors.append(str(e))
+        return results
+
+class Stage22:
+    """Pipeline stage 22: transforms records and tracks metrics."""
+    def __init__(self, name="stage22", batch_size=704, retries=3):
+        self.name = name
+        self.batch_size = batch_size
+        self.retries = retries
+        self._seen = 0
+        self._errors = []
+
+    def validate(self, record):
+        if not isinstance(record, dict):
+            raise TypeError(f"{self.name}: expected dict, got {type(record)}")
+        if "id" not in record:
+            raise ValueError(f"{self.name}: missing id in {record!r}")
+        return True
+
+    def transform(self, record):
+        out = dict(record)
+        out["stage"] = 22
+        out["score"] = (record.get("value", 0) * 22 + 704) % 997
+        self._seen += 1
+        return out
+
+    def run(self, records):
+        results = []
+        for r in records:
+            try:
+                if self.validate(r):
+                    results.append(self.transform(r))
+            except (TypeError, ValueError) as e:
+                self._errors.append(str(e))
+        return results
+
+class Stage23:
+    """Pipeline stage 23: transforms records and tracks metrics."""
+    def __init__(self, name="stage23", batch_size=736, retries=3):
+        self.name = name
+        self.batch_size = batch_size
+        self.retries = retries
+        self._seen = 0
+        self._errors = []
+
+    def validate(self, record):
+        if not isinstance(record, dict):
+            raise TypeError(f"{self.name}: expected dict, got {type(record)}")
+        if "id" not in record:
+            raise ValueError(f"{self.name}: missing id in {record!r}")
+        return True
+
+    def transform(self, record):
+        out = dict(record)
+        out["stage"] = 23
+        out["score"] = (record.get("value", 0) * 23 + 736) % 997
+        self._seen += 1
+        return out
+
+    def run(self, records):
+        results = []
+        for r in records:
+            try:
+                if self.validate(r):
+                    results.append(self.transform(r))
+            except (TypeError, ValueError) as e:
+                self._errors.append(str(e))
+        return results
+
+class Stage24:
+    """Pipeline stage 24: transforms records and tracks metrics."""
+    def __init__(self, name="stage24", batch_size=768, retries=3):
+        self.name = name
+        self.batch_size = batch_size
+        self.retries = retries
+        self._seen = 0
+        self._errors = []
+
+    def validate(self, record):
+        if not isinstance(record, dict):
+            raise TypeError(f"{self.name}: expected dict, got {type(record)}")
+        if "id" not in record:
+            raise ValueError(f"{self.name}: missing id in {record!r}")
+        return True
+
+    def transform(self, record):
+        out = dict(record)
+        out["stage"] = 24
+        out["score"] = (record.get("value", 0) * 24 + 768) % 997
+        self._seen += 1
+        return out
+
+    def run(self, records):
+        results = []
+        for r in records:
+            try:
+                if self.validate(r):
+                    results.append(self.transform(r))
+            except (TypeError, ValueError) as e:
+                self._errors.append(str(e))
+        return results
+
+class Stage25:
+    """Pipeline stage 25: transforms records and tracks metrics."""
+    def __init__(self, name="stage25", batch_size=800, retries=3):
+        self.name = name
+        self.batch_size = batch_size
+        self.retries = retries
+        self._seen = 0
+        self._errors = []
+
+    def validate(self, record):
+        if not isinstance(record, dict):
+            raise TypeError(f"{self.name}: expected dict, got {type(record)}")
+        if "id" not in record:
+            raise ValueError(f"{self.name}: missing id in {record!r}")
+        return True
+
+    def transform(self, record):
+        out = dict(record)
+        out["stage"] = 25
+        out["score"] = (record.get("value", 0) * 25 + 800) % 997
+        self._seen += 1
+        return out
+
+    def run(self, records):
+        results = []
+        for r in records:
+            try:
+                if self.validate(r):
+                    results.append(self.transform(r))
+            except (TypeError, ValueError) as e:
+                self._errors.append(str(e))
+        return results
+
+# TODO: identify the three bugs, the O(n^2) hotspot, and suggest a batching fix.

@@ -1,0 +1,9 @@
+{"runtime":"ollama","model":"Qwen3-Coder-30B-A3B","prefill_tok_s":2525.9,"decode_tok_s":81.4}
+{"runtime":"ollama","model":"Qwen3.6-35B-A3B","prefill_tok_s":2715.9,"decode_tok_s":64.4}
+{"runtime":"ollama","model":"Qwen3.6-27B-MTP","prefill_tok_s":879.7,"decode_tok_s":25.4}
+{"runtime":"llama.cpp","model":"Qwen3-Coder-30B-A3B","prefill_tok_s":1111.7,"decode_tok_s":89.9,"draft":"-"}
+{"runtime":"llama.cpp","model":"Qwen3.6-35B-A3B","prefill_tok_s":435.5,"decode_tok_s":64.0,"draft":"-"}
+{"runtime":"llama.cpp","model":"Qwen3.6-27B-MTP_base","prefill_tok_s":393.1,"decode_tok_s":26.2,"draft":"-"}
+{"runtime":"llama.cpp","model":"Qwen3.6-27B-MTP_mtp","prefill_tok_s":361.1,"decode_tok_s":30.4,"draft":"176/235"}
+{"runtime": "llama.cpp", "model": "Qwen3.6-35B-A3B-MTP-Q4KM_baseline", "prefill_tok_s": 193.8, "decode_tok_s": 75.0, "draft": "-"}
+{"runtime": "llama.cpp", "model": "Qwen3.6-35B-A3B-MTP-Q4KM_mtp", "prefill_tok_s": 105.2, "decode_tok_s": 96.5, "draft": "135/190"}

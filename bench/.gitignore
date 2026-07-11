@@ -1,0 +1,15 @@
+# large binaries & transient artifacts — keep scripts + results.jsonl + docs tracked
+llamacpp/
+*.zip
+harness/log_*.log
+harness/guard_*.log
+harness/ollama_serve*.log
+harness/Modelfile_*
+harness/_hf_probe.py
+harness/results.jsonl
+llamacpp-vulkan/
+llamacpp-rocm-b9950/
+dl/
+harness/log_ub*.log
+harness/guard_ub*.log
+harness/.last_tuning_results
