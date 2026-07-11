@@ -1,0 +1,3 @@
+date=2026-07-11T23:29:44+02:00
+workload= /home/dev/work/dp-craft/amd/bench/workloads/generated/agentic-32000-v1.txt /home/dev/work/dp-craft/amd/bench/workloads/generated/agentic-32000-v2.txt /home/dev/work/dp-craft/amd/bench/workloads/generated/agentic-32000-v3.txt /home/dev/work/dp-craft/amd/bench/workloads/generated/agentic-32000-v4.txt
+max_tokens=256 concurrency=4 reps=2 warmup=1 prefix_mode=unique

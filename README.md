@@ -2,7 +2,7 @@
 
 Benchmarks, tuning experience, and research for running **coding LLMs on the AMD Radeon AI PRO
 R9700** (RDNA4, gfx1201, 32 GB) under ROCm and Vulkan. Focus: max prefill/decode throughput for
-27B–35B (A3B MoE) models at long context (64K–100K) inside 32 GB VRAM.
+27B–35B (A3B MoE) models at long context (64K–256K) inside 32 GB VRAM.
 
 ## TL;DR — best config (MEASURED 2026-07-11, current harness)
 
@@ -11,10 +11,16 @@ R9700** (RDNA4, gfx1201, 32 GB) under ROCm and Vulkan. Focus: max prefill/decode
 tok/s** (8K) / **117** (32K), prefill ~2.4–2.8K tok/s. MTP is **+30–40 % decode single-stream**.
 **Parallel agent fleet:** same config with **`-np 4` and MTP OFF** (MTP reverses to −8…−15 % under
 concurrency) → **4 agents inside 32 GB**, ~48 tok/s/stream, TTFT p95 ~11 s.
-**KV:** keep **f16** — q8_0 fails the ≤5 % rule at 32K (ROCm −7.5 % decode, Vulkan −29.7 % prefill)
-and saves only ~0.35 GiB; it earns its place only at 64 K+ where f16 nears the ceiling.
+**Deep context:** f16 KV runs the **full native 262144** ctx (~21 KiB/tok → ~27 GB) — **VRAM is
+not the limit, the RoPE cap is**; MEASURED to 200K single-stream. At depth, **MTP flips to a net
+loss** for read-a-lot/answer-short requests (200K: +18 s prefill vs +1 s decode saved) — MTP on only
+when generation dominates prefill.
+**KV:** keep **f16 everywhere** — q8_0 fails the ≤5 % rule and **gets *worse* with depth** (32K
+Vulkan −29.7 % prefill → 200K **−40 % prefill / −22 % decode / TTFT +66 %**); f16 fits 262144 so
+q8_0 never earns its place here.
 Full picture: [sweep](docs/analysis/2026-07-11-1833-sweep-35b-rocm-vs-vulkan.md) ·
-[serving campaign](docs/analysis/2026-07-11-1844-campaign-combo35b.md).
+[serving campaign](docs/analysis/2026-07-11-1844-campaign-combo35b.md) ·
+[deep context to 200K](docs/analysis/2026-07-11-2200-deep-context-35b.md).
 
 ## The harness in one paragraph
 

@@ -117,14 +117,14 @@ xdg-open "$CDIR/report.html"                          # or open in a browser
 ```
 
 ## Run matrix (tick as you go)
-- [ ] 1: fixtures built (6 files)
-- [ ] 2: single MTP=0 → cr{8k,128k,200k} + thinking
-- [ ] 2: single MTP=1 → cr{8k,128k,200k} + thinking
-- [ ] 3: q8_0 confirm @200k (MTP=1)
-- [ ] 4: parallel np=2 (agentic-32k ×2)
-- [ ] 4: parallel np=4 (agentic-32k ×4)
-- [ ] 5: analysis doc + INDEX + README max-ctx refresh
-- [ ] 6: report.html generated
+- [x] 1: fixtures built (6 files)
+- [x] 2: single MTP=0 → cr{8k,128k,200k} + thinking
+- [x] 2: single MTP=1 → cr{8k,128k,200k} + thinking
+- [x] 3: q8_0 confirm @200k (MTP=1) — first attempt (2306) empty, re-run 2310 OK
+- [x] 4: parallel np=2 (agentic-32k ×2)
+- [x] 4: parallel np=4 (agentic-32k ×4)
+- [x] 5: analysis doc + INDEX + README max-ctx refresh → `docs/analysis/2026-07-11-2200-deep-context-35b.md`
+- [x] 6: report.html generated → `bench/runs/2026-07-11-2200-deep-context/report.html`
 
 ## Out of scope (deliberately)
 - **ROCm backend** (Vulkan wins decode; add later if needed) · **full q8_0 matrix** (one confirm

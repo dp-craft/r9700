@@ -1,0 +1,123 @@
+{
+  "model": "/home/dev/models/gguf/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf",
+  "llama_bench": "/home/dev/work/dp-craft/amd/bench/llamacpp-vulkan/llama-bench",
+  "pp": 8192,
+  "tg": 128,
+  "depth": 0,
+  "metric": "pp",
+  "noise_pct": 3.0,
+  "axes": {
+    "ub": {
+      "best": 2048,
+      "plateau_within_noise": false,
+      "curve": [
+        {
+          "value": 512,
+          "pp": 2734.921055,
+          "other": 114.204756,
+          "vram_peak_mib": 24613,
+          "failed": false
+        },
+        {
+          "value": 1024,
+          "pp": 3206.634123,
+          "other": 114.068949,
+          "vram_peak_mib": 24613,
+          "failed": false
+        },
+        {
+          "value": 2048,
+          "pp": 3378.316094,
+          "other": 114.129651,
+          "vram_peak_mib": 24613,
+          "failed": false
+        },
+        {
+          "value": 4096,
+          "pp": 2716.184448,
+          "other": 114.011635,
+          "vram_peak_mib": 26812,
+          "failed": false
+        }
+      ]
+    },
+    "batch": {
+      "best": 16384,
+      "plateau_within_noise": true,
+      "curve": [
+        {
+          "value": 2048,
+          "pp": 3378.316094,
+          "other": 114.129651,
+          "vram_peak_mib": 24613,
+          "failed": false
+        },
+        {
+          "value": 4096,
+          "pp": 3386.159306,
+          "other": 114.424762,
+          "vram_peak_mib": 24544,
+          "failed": false
+        },
+        {
+          "value": 8192,
+          "pp": 3387.324485,
+          "other": 114.5856,
+          "vram_peak_mib": 24548,
+          "failed": false
+        },
+        {
+          "value": 16384,
+          "pp": 3388.489171,
+          "other": 114.598898,
+          "vram_peak_mib": 24558,
+          "failed": false
+        }
+      ]
+    },
+    "fa": {
+      "best": "on",
+      "curve": [
+        {
+          "value": "on",
+          "pp": 3388.489171,
+          "tg": 114.598898,
+          "failed": false
+        },
+        {
+          "value": "off",
+          "pp": 3209.821405,
+          "tg": 114.371481,
+          "failed": false
+        }
+      ]
+    }
+  },
+  "kv_check": {
+    "depth": 32768,
+    "max_loss_pct": 5.0,
+    "f16": {
+      "pp": 2160.939453,
+      "tg": 99.145603,
+      "vram_peak_mib": 25320
+    },
+    "q8_0": {
+      "pp": 1525.671612,
+      "tg": 100.77655,
+      "vram_peak_mib": 24939
+    },
+    "delta_pp_pct": -29.4,
+    "delta_tg_pct": 1.65,
+    "vram_saved_mib": 381,
+    "verdict": "KEEP f16"
+  },
+  "recommended": {
+    "ub": 2048,
+    "batch": 16384,
+    "fa": "on",
+    "kv": "f16",
+    "depth": 0
+  },
+  "recommended_server_cmd": "llama-server -m /home/dev/models/gguf/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf -ngl 99 -fa on -ub 2048 -b 16384 -ctk f16 -ctv f16 -c <ctx> [--spec-type draft-mtp]",
+  "n_invocations": 8
+}

@@ -1,0 +1,4 @@
+  probe FAILED: rocm-mtp0-kvf16/cr64000
+  probe FAILED: rocm-mtp0-kvq8_0/cr64000
+  probe FAILED: rocm-mtp1-kvf16/cr64000
+  probe FAILED: rocm-mtp1-kvq8_0/cr64000
