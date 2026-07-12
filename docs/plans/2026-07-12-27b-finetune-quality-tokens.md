@@ -69,12 +69,28 @@ keeps VRAM identical across configs so the memory column is comparable. MTP via 
 of grader. Deterministic tasks demand a strict answer format (`FINAL: …` or a single ```python
 block) so grading needs no model.
 
-## 4. Metrics captured
+## 4. Metrics captured (everything measurable)
 
-Per config × task × rep (`out/outputs.jsonl`): raw `response`, `prompt_tokens`,
-`completion_tokens`, **`think_tokens`** (headline), `answer_tokens`, `latency_s`, `finish_reason`.
-Per config (`out/vram.jsonl`): `vram_used_mib_at_load`. Derived in Phase C: deterministic **pass%**,
-mean think/total tokens, **quality-per-1k-tokens**, judge rubric scores, MTP on/off decode delta.
+Per config × task × rep (`out/outputs.jsonl`, streamed so latency is real):
+- **Tokens / economy:** `prompt_tokens`, `completion_tokens`, `total_tokens`, `cached_tokens`,
+  **`think_tokens`** (headline), `answer_tokens`.
+- **Throughput** (llama.cpp `timings`): `prefill_tps`, `decode_tps`, `prompt_n/ms`,
+  `predicted_n/ms`, per-token ms (raw `timings` stored too).
+- **Latency:** `ttft_s` (first token), **`ttfa_s`** (first *answer* token, post-`</think>` — what the
+  user waits for), `think_time_s`, `latency_s`.
+- **Health flags:** `finish_reason`, `think_closed`, `has_answer`, **`truncated_thinking`** (hit
+  `max_tokens` mid-`<think>` → no answer; auto-fails grading — a real inefficiency signal).
+- **Provenance:** `sampling` (temp/top_p/top_k/seed), `max_tokens`.
+
+Per config (`out/vram.jsonl` + `out/gpu_<config>.csv` from the sampler): `vram_used_mib_at_load`,
+`peak_vram_used_mib`, **`peak_gtt_used_mib`** (host-RAM spill), `avg_power_w`, `peak_power_w`,
+`peak_temp_c`, `avg/peak_sclk_mhz`, `load_time_s`, `weights_gib`; plus `props_<config>.json`
+(build + effective server settings). Derived in Phase C: deterministic **pass%**, judge scores,
+mean think/total tokens, **quality-per-1k-tokens**, MTP on/off decode delta, truncation rate.
+
+⚠️ **`max_tokens` must be generous (default 8192).** These thinking models burn 1000s of tokens
+reasoning (measured: even "2+2" spent 512 think tokens / 16 s). Too low truncates mid-`<think>`
+(`finish_reason=length`, no answer), which invalidates both the grade and the token-economy number.
 
 ---
 
@@ -141,29 +157,38 @@ anchors:
 - `refactor-fn`: expects `is not None` (not `!= None`), `isinstance`, f-strings/`str()` unification,
   `urllib.parse.urlencode` or clear naming; justification quality matters.
 
-## Phase C — AGGREGATE & WRITE UP (Claude → benchmark-results skill)
+## Phase C — AGGREGATE, CHART & WRITE UP (Claude → benchmark-results skill)
 
-Produce `campaigns/2026-07-12-27b-finetune-quality/analysis.md` (co-located; summary + table first;
-**memory column mandatory**). Headline table, one row per config:
+1. **Generate charts:** `python3 make_charts.py --dir out` → `out/charts/*.svg` + `out/charts/appendix.md`.
+   Self-contained theme-aware SVGs (one fixed color per config across all charts, one axis each,
+   every mark direct-labeled + a data table — validated palette). Chart set: **quality-vs-cost
+   scatter** (headline efficient frontier), deterministic accuracy, judge score, token economy
+   (think vs answer), throughput (decode/prefill), latency (ttft→ttfa dumbbell), memory·power·thermal
+   small-multiples, and a per-task outcome heatmap.
+2. **Write** `campaigns/2026-07-12-27b-finetune-quality/analysis.md` (co-located; summary + table
+   first; **memory column mandatory**). Headline table, one row per config:
 
-| config | mtp | det pass% | mean think tok | mean total tok | quality/1k tok | judge (mean /5) | decode tok/s | VRAM@load |
-|--------|:---:|----------:|---------------:|---------------:|---------------:|----------------:|-------------:|----------:|
+   | config | mtp | det pass% | judge /5 | mean think tok | mean total tok | quality/1k tok | decode tok/s | ttfa s | peak VRAM | peak GTT | avg W |
+   |--------|:---:|----------:|---------:|---------------:|---------------:|---------------:|-------------:|-------:|----------:|---------:|------:|
 
-Then: per-dimension judge breakdown; **token-economy finding** (think-token spread on ★ tasks — who
-reasons efficiently vs who rambles); **MTP on/off** decode-speed delta on the unsloth build (tag
-MEASURED); quality-vs-tokens scatter (efficient frontier). All rows `MEASURED` (cite `out/…`);
-judge scores flagged as `INFERRED` (LLM-judge, rubric saved). Add a `<!-- meta -->` block and run
-`docs/reindex.py`. `report.html` is optional here (custom outputs, not the standard results.jsonl).
+   Then: per-dimension judge breakdown; **token-economy finding** (think-token spread on ★ tasks —
+   who reasons efficiently vs who rambles); **MTP on/off** decode-speed delta on the unsloth build;
+   truncation/runaway rate; efficient-frontier read from the scatter. All rows `MEASURED` (cite
+   `out/…`); judge scores `INFERRED` (LLM-judge, rubric saved).
+3. **Embed the charts** as an **appendix**: paste `out/charts/appendix.md` (the `![](charts/…svg)`
+   references + data table) at the end of `analysis.md`. Add a `<!-- meta -->` block and run
+   `docs/reindex.py`. (`report.html` optional — these are custom outputs, not standard results.jsonl.)
 
 ## File map (campaign dir)
 ```
 tasks/tasks.jsonl              12 tasks + grader specs
-capture.py                     probe one server → outputs.jsonl (+ think/answer token split)
+capture.py                     stream one server → outputs.jsonl (tokens, timings, ttft/ttfa, flags)
 graders/score_deterministic.py objective grading (final_match/pyexec/json_schema/constraints)
-run_capture.sh                 Phase-A driver (serve×config, VRAM sample, resumable)
-out/                           GENERATED: outputs.jsonl, vram.jsonl, scores_deterministic.jsonl,
-                               judge_scores.jsonl (Phase B), failures.txt, done/
-analysis.md                    Phase-C write-up (benchmark-results skill)
+run_capture.sh                 Phase-A driver (serve×config, VRAM/power/thermal sampler, /props, resumable)
+make_charts.py                 Phase-C: outputs → out/charts/*.svg + appendix.md (decision charts)
+out/                           GENERATED: outputs.jsonl, vram.jsonl, gpu_<config>.csv, props_<config>.json,
+                               scores_deterministic.jsonl, judge_scores.jsonl (Phase B), charts/, failures.txt, done/
+analysis.md                    Phase-C write-up (benchmark-results skill) + charts appendix
 ```
 
 ## Risks / notes

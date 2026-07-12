@@ -18,8 +18,14 @@ the run is NOT VRAM-only. Summary appended as a final comment line on SIGTERM/IN
 """
 import argparse, json, shutil, signal, subprocess, sys, time
 
+import re as _re
+
+def _digits(s):
+    m = _re.search(r"\d+(?:\.\d+)?", str(s));  return float(m.group(0)) if m else None
+
 def read_amd():
-    out = subprocess.run(["rocm-smi", "--showmeminfo", "vram", "gtt", "--showpower", "--json"],
+    out = subprocess.run(["rocm-smi", "--showmeminfo", "vram", "gtt", "--showpower",
+                          "--showtemp", "--showclocks", "--json"],
                          capture_output=True, text=True, timeout=10).stdout
     card = next(iter(json.loads(out).values()))
     used = int(card["VRAM Total Used Memory (B)"]) // 2**20
@@ -36,14 +42,25 @@ def read_amd():
             try: power = float(v)
             except ValueError: pass
             break
-    return used, total, gtt, power
+    temp = None                                   # edge temperature (°C)
+    for k, v in card.items():
+        if "Temperature" in k and "edge" in k.lower():
+            temp = _digits(v); break
+    sclk = None                                   # GPU core clock (MHz)
+    for k, v in card.items():
+        if "sclk" in k.lower() and "clock" in k.lower():
+            sclk = _digits(v); break
+    return used, total, gtt, power, temp, sclk
 
 def read_nvidia():
-    out = subprocess.run(["nvidia-smi", "--query-gpu=memory.used,memory.total,power.draw",
+    out = subprocess.run(["nvidia-smi",
+                          "--query-gpu=memory.used,memory.total,power.draw,temperature.gpu,clocks.sm",
                           "--format=csv,noheader,nounits"],
                          capture_output=True, text=True, timeout=10).stdout
-    used, total, power = [x.strip() for x in out.splitlines()[0].split(",")]
-    return int(float(used)), int(float(total)), None, float(power)  # no GTT concept on NVIDIA
+    parts = [x.strip() for x in out.splitlines()[0].split(",")]
+    used, total, power, temp, sclk = parts[0], parts[1], parts[2], parts[3], parts[4]
+    return (int(float(used)), int(float(total)), None, float(power),  # no GTT concept on NVIDIA
+            _digits(temp), _digits(sclk))
 
 def main():
     ap = argparse.ArgumentParser()
@@ -65,15 +82,15 @@ def main():
     signal.signal(signal.SIGTERM, on_sig)
     signal.signal(signal.SIGINT, on_sig)
 
+    def _n(x): return "" if x is None else x
     with open(a.out, "w") as f:
-        f.write("unix_ts,vram_used_mib,vram_total_mib,gtt_used_mib,power_w\n")
+        f.write("unix_ts,vram_used_mib,vram_total_mib,gtt_used_mib,power_w,temp_c,sclk_mhz\n")
         while not stop:
             try:
-                used, total, gtt, power = reader()
-                f.write(f"{time.time():.1f},{used},{total},"
-                        f"{'' if gtt is None else gtt},{'' if power is None else power}\n")
+                used, total, gtt, power, temp, sclk = reader()
+                f.write(f"{time.time():.1f},{used},{total},{_n(gtt)},{_n(power)},{_n(temp)},{_n(sclk)}\n")
                 f.flush()
-                rows.append((used, gtt, power))
+                rows.append((used, gtt, power, temp, sclk))
             except Exception:
                 pass  # transient smi hiccup — keep sampling
             # sleep in small slices so signals interrupt promptly
@@ -81,14 +98,16 @@ def main():
             while not stop and time.time() < t_end:
                 time.sleep(0.1)
         if rows:
-            load = rows[0][0]
-            peak = max(r[0] for r in rows)
-            gtts = [r[1] for r in rows if r[1] is not None]
-            peak_gtt = max(gtts) if gtts else ""
-            powers = [r[2] for r in rows if r[2] is not None]
-            avg_p = f"{sum(powers)/len(powers):.1f}" if powers else "n/a"
-            f.write(f"# load_vram_used_mib={load} peak_vram_used_mib={peak} "
-                    f"peak_gtt_used_mib={peak_gtt} avg_power_w={avg_p} samples={len(rows)}\n")
+            def _peak(i):
+                vals = [r[i] for r in rows if r[i] is not None]
+                return max(vals) if vals else ""
+            def _avg(i):
+                vals = [r[i] for r in rows if r[i] is not None]
+                return f"{sum(vals)/len(vals):.1f}" if vals else "n/a"
+            f.write(f"# load_vram_used_mib={rows[0][0]} peak_vram_used_mib={max(r[0] for r in rows)} "
+                    f"peak_gtt_used_mib={_peak(1)} avg_power_w={_avg(2)} peak_power_w={_peak(2)} "
+                    f"peak_temp_c={_peak(3)} avg_sclk_mhz={_avg(4)} peak_sclk_mhz={_peak(4)} "
+                    f"samples={len(rows)}\n")
 
 if __name__ == "__main__":
     main()
