@@ -3,7 +3,7 @@
 # OpenAI-compatible /v1 endpoint and records prefill/decode/TTFT (+ thinking + concurrency metrics).
 #
 # Two measurement backends:
-#   1. openai_probe.py — ships here, zero install: real prompt files, thinking-mode ttfa,
+#   1. capture_engine.py probe (bench/lib/) — zero install: real prompt files, thinking-mode ttfa,
 #      --concurrency waves, prefix modes (agentic). Default.
 #   2. llama-benchy    — standardized synthetic pp/tg/depth curves with concurrency
 #      (install: see README). Set USE_BENCHY=1. Complements, does not replace, the probe.
@@ -93,7 +93,7 @@ for e in "${ENGINES[@]}"; do
       > "$OUT/benchy_${name}.txt" 2>&1 || echo "  benchy failed for $name (see $OUT/benchy_${name}.txt)"
   else
     PF_ARGS=(); for f in $PROMPT_FILE; do PF_ARGS+=(--prompt-file "$f"); done
-    python3 "$HERE/openai_probe.py" --url "$url" --model "$model" "${PF_ARGS[@]}" \
+    python3 "$REPO/bench/lib/capture_engine.py" probe --url "$url" --model "$model" "${PF_ARGS[@]}" \
       --max-tokens "$MAX_TOKENS" --concurrency "$CONCURRENCY" --reps "$REPS" \
       --warmup "$WARMUP" --prefix-mode "$PREFIX_MODE" --api "$API" \
       --engine "$name" --label "$SLUG" >> "$OUT/results.jsonl" || echo "  probe failed for $name"

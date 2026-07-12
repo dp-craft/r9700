@@ -30,7 +30,7 @@ against any llama.cpp build you point it at (ROCm, Vulkan, CUDA, Metal…).
   restarts handled, per-point failure tolerance, and **resume** after interruption. This is where
   llama-bench optima get validated at the real serving operating point (they don't transfer
   automatically to `-np`>1 + MTP).
-- **Agentic / parallel measurement** (`engine-bench/openai_probe.py`): concurrency waves against
+- **Agentic / parallel measurement** (`bench/lib/capture_engine.py (probe mode)`): concurrency waves against
   any OpenAI-compatible endpoint; per-stream *and* aggregate tok/s, TTFT p50/p95, measured
   `ttfa_s` for thinking models (chat template applied), cold-cache (`unique`) vs shared-prefix
   modes, server-reported token counts. Zero install. For community-comparable synthetic curves,
@@ -62,7 +62,7 @@ against any llama.cpp build you point it at (ROCm, Vulkan, CUDA, Metal…).
 | Dir | Track | Tool | Answers |
 |-----|-------|------|---------|
 | `model-bench/` | **Model / tuning microscope** — one engine | `run.sh` (manual grid) + `sweep.py` (**adaptive optimum search**, KV ≤5% rule) over `llama-bench` | "Which `-ub`/`-b`/`-fa`/KV is fastest — with the peak bracketed on both sides?" |
-| `engine-bench/` | **Cross-engine + serving combos** | `openai_probe.py` (concurrency, thinking, prefix modes) + `serve_llamacpp.sh` + `campaign.sh` (MTP×KV×depth×parallel) + `llama-benchy` (`dl/benchy-venv`) | "Which engine/combo is fastest on my real task, single-stream and under N parallel agents?" |
+| `engine-bench/` | **Cross-engine + serving combos** | `capture_engine.py probe` (concurrency, thinking, prefix modes) + `serve_llamacpp.sh` + `campaign.sh` (MTP×KV×depth×parallel) + `llama-benchy` (`dl/benchy-venv`) | "Which engine/combo is fastest on my real task, single-stream and under N parallel agents?" |
 | `workloads/` | Prompt fixtures | `build_prompt.py` + tracked `corpus/` (TS+Python, ~565K tok) | shared stimulus for both tracks |
 | `lib/` | Shared plumbing | `gpu_env.sh` (AMD/NVIDIA vendor abstraction), `vram_sampler.py`, `report.py` (run dir → self-contained HTML report) | vendor-neutral meta + VRAM/power/throttle capture + visualization |
 | `runs/` | Dated campaign outputs `YYYY-MM-DD-HHMM-<slug>/` | — | raw results + per-run meta |

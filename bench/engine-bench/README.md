@@ -9,7 +9,7 @@ an OpenAI-compatible server endpoint. This is also where the *serving-only* knob
 
 | Script | What |
 |--------|------|
-| `openai_probe.py` | zero-install measurement client: real prompt files, **concurrency waves**, reps, TTFT p50/p95, per-stream + **aggregate tok/s**, thinking `ttfa_s`, prefix modes |
+| `capture_engine.py probe` | zero-install measurement client: real prompt files, **concurrency waves**, reps, TTFT p50/p95, per-stream + **aggregate tok/s**, thinking `ttfa_s`, prefix modes |
 | `run.sh` | drive a set of already-running engines with one workload (probe or benchy) |
 | `serve_llamacpp.sh` | parameterized llama-server launcher: `BACKEND/MTP/KV/CTX/NP/UB/B/FA/PORT`, health-wait, records exact cmdline + `/props` |
 | `campaign.sh` | the **combination matrix**: backend × MTP × KV × depth × concurrency, resumable |

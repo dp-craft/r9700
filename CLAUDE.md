@@ -40,13 +40,15 @@ bench/                 ← two tracks (see bench/README.md); how-to in docs/GUID
                        (authoritative source for the guard; beats online "will it fit" tools)
   model-bench/       ← tuning microscope: run.sh (manual grid) + sweep.py (ADAPTIVE optimum
                        search: grid expands until peak bracketed; KV f16-vs-q8_0 ≤5% rule)
-  engine-bench/      ← cross-engine + serving combos: openai_probe.py (concurrency/thinking),
-                       serve_llamacpp.sh (BACKEND/MTP/KV/NP launcher), campaign.sh
-                       (MTP×KV×depth×parallel matrix, resumable), llama-benchy (dl/benchy-venv)
+  engine-bench/      ← cross-engine + serving combos: serve_llamacpp.sh (BACKEND/MTP/KV/NP launcher),
+                       run.sh + campaign.sh (MTP×KV×depth×parallel matrix, resumable) — all driving
+                       bench/lib/capture_engine.py; llama-benchy (dl/benchy-venv)
   workloads/         ← build_prompt.py + tasks/ + corpus/ (tracked TS+Python source, ~565K tok);
                        generated/ ignored
   lib/               ← gpu_env.sh (AMD/NVIDIA vendor abstraction) + vram_sampler.py +
-                       report.py (run dir → self-contained report.html, vendored Chart.js)
+                       capture_engine.py (THE prober: `probe` throughput/concurrency + `tasks` quality
+                       capture) + report.py (run/campaign dir → theme-aware SVG charts + appendix.md,
+                       embedded in the analysis; kinds: quality|throughput|sweep)
   runs/              ← dated campaign outputs YYYY-MM-DD-HHMM-<slug>/ (results.jsonl/llama-bench.json)
   legacy/            ← ⚠️ FROZEN original harness (harness/ + old *.sh + *_results.jsonl); hardcodes
                        old path /home/dev/work/dippe/amd, does NOT run here; superseded. Reference only.
@@ -57,9 +59,9 @@ bench/                 ← two tracks (see bench/README.md); how-to in docs/GUID
 ```
 
 **Never read (gitignored binaries / generated):** `bench/llamacpp*/`, `bench/dl/`,
-`unsloth_compiled_cache/`, `bench/**/*.log`, `bench/runs/*/*.err`, `bench/lib/vendor/`
-(vendored Chart.js), `bench/runs/*/report.html`. They are 3 GB of build artifacts — reading
-them wastes tokens and tells you nothing. Structure/results live in the files above.
+`unsloth_compiled_cache/`, `bench/**/*.log`, `bench/runs/*/*.err`. They are 3 GB of build
+artifacts — reading them wastes tokens and tells you nothing. Structure/results live in the files
+above. (Charts are now committed SVGs under `<campaign>/charts/`, embedded in `appendix.md`.)
 
 ## Iron rules
 
