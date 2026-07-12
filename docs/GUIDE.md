@@ -124,18 +124,21 @@ USE_BENCHY=1 BENCHY_ARGS="--pp 2048 8192 --tg 128 --concurrency 1 4 --runs 3" SL
 ---
 
 ## 5. Visualize a run (charts, no install) ✅
-`bench/lib/report.py` renders any run dir into a **self-contained HTML report** (Chart.js is
-vendored in `bench/lib/vendor/` — stdlib Python only, works offline, light/dark aware):
+`bench/lib/report.py` renders any run/campaign dir into **theme-aware SVG charts** (`charts/*.svg`)
+plus an `appendix.md` that embeds them — so the charts live INSIDE the Markdown write-up (stdlib
+Python only, works offline, light/dark aware). It auto-detects the run kind:
 ```bash
-# campaign / run.sh dir → depth curves, concurrency scaling, TTFT p95, thinking, failures:
-bench/lib/report.py bench/runs/<stamp>-campaign-combo35b        # → <dir>/report.html
-# one or more sweep dirs → tuning curves + KV verdict; 2+ dirs get a ROCm-vs-Vulkan overlay:
-bench/lib/report.py bench/runs/<stamp>-sweep-35b-rocm bench/runs/<stamp>-sweep-35b-vulkan
-bench/lib/report.py <dir> --out /tmp/report.html                # custom output path
+# throughput (results.jsonl) → depth curves, concurrency scaling, TTFT p95, thinking, memory:
+bench/lib/report.py bench/runs/<stamp>-campaign-combo35b        # → <dir>/charts/ + <dir>/appendix.md
+# quality (outputs.jsonl) → quality-vs-cost, accuracy, judge, token economy, latency, per-task heatmap
+bench/lib/report.py campaigns/<date>-<slug>
+# sweep (sweep-summary.json) → -ub/-b tuning curves + VRAM + KV verdict
+bench/lib/report.py bench/runs/<stamp>-sweep-35b-vulkan
+bench/lib/report.py <dir> --charts DIR --appendix FILE          # custom output paths
 ```
-Failures (`failures.txt`, `n_err>0`) are shown in a red banner, never averaged in; every chart
-has a raw-numbers table behind a `▶ details` toggle. `report.html` is gitignored (regenerate
-from the tracked JSONL anytime).
+Failures (`failures.txt`, `n_err>0`) and errored requests are surfaced in a note, never averaged
+in; every chart set ships a color-independent data table. The SVGs under `charts/` are **committed**
+(embed `appendix.md` into `analysis.md`); the raw JSONL in `out/` is gitignored.
 
 ## 6. Turn a run into a report
 Use the `/benchmark-results` skill: reads the run dir, computes deltas, writes the co-located

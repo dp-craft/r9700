@@ -50,9 +50,10 @@ against any llama.cpp build you point it at (ROCm, Vulkan, CUDA, Metal…).
 - A campaign `results.jsonl` (per-request + aggregate + `gpu` memory rows) that turns into a report
   co-located at `campaigns/<date>-<slug>/analysis.md` via the `/benchmark-results` skill — summary +
   table first (memory column mandatory), raw data linked 1:1.
-- **A one-command visual report**: `lib/report.py <run-dir> [...]` renders any run dir (sweep or
-  campaign) into a self-contained `report.html` — tuning curves, KV verdict, depth/concurrency
-  charts, failure banner, raw-number tables. Stdlib Python + vendored Chart.js; works offline.
+- **A one-command visual report**: `lib/report.py <run-dir> [...]` renders any run dir (quality,
+  throughput or sweep) into theme-aware **SVG charts** (`charts/*.svg`) + an `appendix.md` that
+  embeds them in the Markdown write-up — tuning curves, KV verdict, quality-vs-cost, depth/concurrency,
+  failure notes, color-independent data tables. Stdlib Python only; works offline.
 - Honest numbers: cold prefix cache by default (identical prompts inflate "prefill" 2.4× from the
   second request — measured), chat template where raw completions would silently EOS, failures
   kept in the table instead of averaged away.
@@ -64,7 +65,7 @@ against any llama.cpp build you point it at (ROCm, Vulkan, CUDA, Metal…).
 | `model-bench/` | **Model / tuning microscope** — one engine | `run.sh` (manual grid) + `sweep.py` (**adaptive optimum search**, KV ≤5% rule) over `llama-bench` | "Which `-ub`/`-b`/`-fa`/KV is fastest — with the peak bracketed on both sides?" |
 | `engine-bench/` | **Cross-engine + serving combos** | `capture_engine.py probe` (concurrency, thinking, prefix modes) + `serve_llamacpp.sh` + `campaign.sh` (MTP×KV×depth×parallel) + `llama-benchy` (`dl/benchy-venv`) | "Which engine/combo is fastest on my real task, single-stream and under N parallel agents?" |
 | `workloads/` | Prompt fixtures | `build_prompt.py` + tracked `corpus/` (TS+Python, ~565K tok) | shared stimulus for both tracks |
-| `lib/` | Shared plumbing | `gpu_env.sh` (AMD/NVIDIA vendor abstraction), `vram_sampler.py`, `report.py` (run dir → self-contained HTML report) | vendor-neutral meta + VRAM/power/throttle capture + visualization |
+| `lib/` | Shared plumbing | `gpu_env.sh` (AMD/NVIDIA vendor abstraction), `vram_sampler.py`, `capture_engine.py` (THE prober: probe + tasks), `graders/`, `report.py` (run dir → SVG charts + appendix.md) | vendor-neutral meta + VRAM/power/throttle capture + capture + scoring + visualization |
 | `runs/` | Dated campaign outputs `YYYY-MM-DD-HHMM-<slug>/` | — | raw results + per-run meta |
 
 **Scaffolding & bookkeeping (repo-level):**
@@ -91,5 +92,5 @@ and does not run here. See `bench/legacy/README.md`. Do not add new work there.
 
 ## Not tracked (gitignored)
 `llamacpp/`, `llamacpp-vulkan/`, `llamacpp-rocm-b9950/`, `dl/` (multi-GB binaries + benchy venv),
-`.servers/` (runtime pids/logs), `workloads/generated/`, `*.log`, `runs/*/report.html`
+`.servers/` (runtime pids/logs), `workloads/generated/`, `*.log`, `runs/*/report.html` (legacy), committed `charts/*.svg`
 (regenerate with `lib/report.py`).

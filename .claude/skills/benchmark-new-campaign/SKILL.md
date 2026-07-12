@@ -82,7 +82,7 @@ the generic how-to is `docs/GUIDE.md`.
    → resumable `run.sh` (per-probe `done/` markers) + a README skeleton, under
    `campaigns/<date>-<slug>/`. Flesh out the README prose (goal, decisions, out-of-scope). run.sh
    consolidates every probe into one `results.jsonl` (with VRAM/GTT samples per server) and its
-   **last step auto-generates `report.html`** (`bench/lib/report.py`).
+   **last step auto-generates SVG charts + `appendix.md`** (`bench/lib/report.py`) to embed in the write-up.
 
 7. **Hand off**: remind the user to (a) build fixtures (`build_prompt.py`, see `docs/GUIDE.md` §2),
    (b) run `bash campaigns/<date>-<slug>/run.sh` (resumable — rerun to continue; `ONLY=`/`REPS=` to

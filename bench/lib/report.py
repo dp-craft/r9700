@@ -324,7 +324,9 @@ def render_quality(d):
     vram = load_jsonl(_find(d, "vram.jsonl"))
     if not outs:
         return {}, ["_No successful task outputs to chart._"]
-    configs = list(OrderedDict((r.get("config"), 1) for r in outs))   # stable first-seen order
+    # stable first-seen order over ALL rows: a config that errored on every task still appears
+    # (as an all-"—" table row + grey heatmap line) rather than silently vanishing.
+    configs = list(OrderedDict((r.get("config"), 1) for r in raw if r.get("config")))
     S = slot_map(configs)
 
     def by(key):
