@@ -1,0 +1,4 @@
+date=2026-07-12T00:06:40+02:00
+model=/home/dev/models/gguf/Qwen3.6-27B-Q4_K_S.gguf
+backend=vulkan
+tuning=ub2048 b4096 faon

@@ -1,0 +1,59 @@
+{
+  "slug": "27b-maxctx-v2",
+  "date": "2026-07-12",
+  "title": "27B dense — max context by VRAM-logged sweep (measure-then-calculate)",
+  "model": "/home/dev/models/gguf/Qwen3.6-27B-Q4_K_S.gguf",
+  "backend": "vulkan",
+  "port": 8081,
+  "tuning": {"ub": 2048, "b": 4096, "fa": "on"},
+  "notes": [
+    "*** CORRECTED 2026-07-12 — the original premise of this campaign was WRONG. ***",
+    "Qwen3.6-27B is a HYBRID arch (qwen35): 65 blocks, but only 16 are full-attention; 48 are",
+    "SSM/Gated-DeltaNet linear-attention (fixed state, NO growing KV) + 1 nextn/MTP. Only the 16",
+    "attention layers cache KV. => f16 KV = 16*4*(256+256)*2B = 64 KiB/token; q8_0 ~= 34 KiB/token.",
+    "(The earlier 260/138 numbers wrongly multiplied by all 65 blocks.) So f16 fits to ~240K and",
+    "q8_0 to the full native 262K in 32 GB. MEASURED: 200K f16 loaded in 31s using 29.0 GiB VRAM.",
+    "The old 'max-limit' 200K/230K servers below now FIT and will actually run (not guard-skip).",
+    "This campaign is effectively superseded — see docs/plans/2026-07-12-27b-finetune-quality-tokens.md",
+    "and the corrected bench/gguf_kv.py (hybrid-aware). Kept for the audit trail of the correction."
+  ],
+  "vram": {
+    "weights_gib": 15.01,
+    "kv_kib_per_tok": {"f16": 64, "q8_0": 34},
+    "budget_mib": 32400,
+    "overhead_mib": 2000
+  },
+  "servers": [
+    {"name": "f16-c32k", "ctx": 32768,  "np": 1, "kv": "f16",  "mtp": 0,
+     "probes": [{"slug": "mc-f16-c32k", "prompts": ["codereview-8000.txt"], "max_tokens": 256, "api": "completions", "concurrency": 1, "reps": 2}]},
+    {"name": "f16-c48k", "ctx": 49152,  "np": 1, "kv": "f16",  "mtp": 0,
+     "probes": [{"slug": "mc-f16-c48k", "prompts": ["codereview-8000.txt"], "max_tokens": 256, "api": "completions", "concurrency": 1, "reps": 2}]},
+    {"name": "f16-c56k", "ctx": 57344,  "np": 1, "kv": "f16",  "mtp": 0,
+     "probes": [{"slug": "mc-f16-c56k", "prompts": ["codereview-8000.txt"], "max_tokens": 256, "api": "completions", "concurrency": 1, "reps": 2}]},
+    {"name": "f16-c60k", "ctx": 61440,  "np": 1, "kv": "f16",  "mtp": 0,
+     "probes": [{"slug": "mc-f16-c60k", "prompts": ["codereview-8000.txt"], "max_tokens": 256, "api": "completions", "concurrency": 1, "reps": 2}]},
+
+    {"name": "q8-c64k",  "ctx": 65536,  "np": 1, "kv": "q8_0", "mtp": 0,
+     "probes": [{"slug": "mc-q8-c64k",  "prompts": ["codereview-8000.txt"], "max_tokens": 256, "api": "completions", "concurrency": 1, "reps": 2}]},
+    {"name": "q8-c96k",  "ctx": 98304,  "np": 1, "kv": "q8_0", "mtp": 0,
+     "probes": [{"slug": "mc-q8-c96k",  "prompts": ["codereview-8000.txt"], "max_tokens": 256, "api": "completions", "concurrency": 1, "reps": 2}]},
+    {"name": "q8-c112k", "ctx": 114688, "np": 1, "kv": "q8_0", "mtp": 0,
+     "probes": [{"slug": "mc-q8-c112k", "prompts": ["codereview-8000.txt"], "max_tokens": 256, "api": "completions", "concurrency": 1, "reps": 2}]},
+    {"name": "q8-c116k", "ctx": 118784, "np": 1, "kv": "q8_0", "mtp": 0,
+     "probes": [{"slug": "mc-q8-c116k", "prompts": ["codereview-8000.txt"], "max_tokens": 256, "api": "completions", "concurrency": 1, "reps": 2}]},
+
+    {"name": "f16-c64k-edge", "ctx": 65536,  "np": 1, "kv": "f16",  "mtp": 0,
+     "probes": [{"slug": "mc-f16-c64k", "prompts": ["codereview-8000.txt"], "max_tokens": 256, "api": "completions", "concurrency": 1, "reps": 2}]},
+    {"name": "q8-c120k-edge", "ctx": 122880, "np": 1, "kv": "q8_0", "mtp": 0,
+     "probes": [{"slug": "mc-q8-c120k", "prompts": ["codereview-8000.txt"], "max_tokens": 256, "api": "completions", "concurrency": 1, "reps": 2}]},
+
+    {"name": "f16-c200k-max", "ctx": 204800, "np": 1, "kv": "f16",  "mtp": 0,
+     "probes": [{"slug": "mc-f16-c200k", "prompts": ["codereview-8000.txt"], "max_tokens": 256, "api": "completions", "concurrency": 1, "reps": 2}]},
+    {"name": "f16-c230k-max", "ctx": 235520, "np": 1, "kv": "f16",  "mtp": 0,
+     "probes": [{"slug": "mc-f16-c230k", "prompts": ["codereview-8000.txt"], "max_tokens": 256, "api": "completions", "concurrency": 1, "reps": 2}]},
+    {"name": "q8-c200k-max", "ctx": 204800, "np": 1, "kv": "q8_0", "mtp": 0,
+     "probes": [{"slug": "mc-q8-c200k", "prompts": ["codereview-8000.txt"], "max_tokens": 256, "api": "completions", "concurrency": 1, "reps": 2}]},
+    {"name": "q8-c230k-max", "ctx": 235520, "np": 1, "kv": "q8_0", "mtp": 0,
+     "probes": [{"slug": "mc-q8-c230k", "prompts": ["codereview-8000.txt"], "max_tokens": 256, "api": "completions", "concurrency": 1, "reps": 2}]}
+  ]
+}

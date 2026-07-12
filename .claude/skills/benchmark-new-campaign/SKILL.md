@@ -24,11 +24,15 @@ the generic how-to is `docs/GUIDE.md`.
    failure mode this rule exists to prevent.
 
 2. **VRAM budget → max context** (deterministic) — and this is now the **safety guard**, not just a
-   sizing hint. **Get KV-per-token from the model file, never an online calculator** (they assume
-   standard-shaped models and mis-estimate deep / wide-head archs by 3–4×): run
+   sizing hint. **Get KV-per-token from the model file, never an online calculator** (online tools —
+   and naïve hand-math — get **HYBRID** archs badly wrong): run
    **`bench/gguf_kv.py /path/model.gguf --weights-gib G`** — it prints f16 & q8_0 KiB/tok, the max
-   ctx per budget, AND a paste-ready `vram` block. (Under the hood: layers × head_count_kv ×
-   (key_length+value_length) × 2 B; q8_0 ≈ 0.53× f16. Trust a live measurement over any formula.)
+   ctx per budget, AND a paste-ready `vram` block. (Under the hood: **only full-attention layers
+   cache KV** = `n_attn_layers × head_count_kv × (key_length+value_length) × 2 B`; q8_0 ≈ 0.53× f16.
+   For a hybrid model like Qwen3.6 — SSM/Gated-DeltaNet linear-attn layers keep a *fixed* state, not
+   a per-token cache — `n_attn_layers` ≪ `block_count`; the tool counts `blk.*.attn_k` tensors, so
+   don't multiply by all layers. E.g. Qwen3.6-27B = 16 attn layers of 65 blocks → **64 KiB/tok f16,
+   not 260** → 200K f16 fits in ~29 GiB, MEASURED. Trust the tool over any formula or calculator.)
    For a quick what-if, `bench/gen_campaign.py vram-ctx --weights-gib G --kv-kib-per-tok K --budget-mib M`.
    - The generated `run.sh` carries a **pre-flight guard**: for every server it computes predicted
      VRAM and **skips it before launching** if it exceeds `VRAM_BUDGET_MIB`. This is the hard

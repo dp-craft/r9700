@@ -1,9 +1,20 @@
 <!-- meta
 date: 2026-07-12 00:06
-takeaway: 27B dense (Q4_K_S, 15.01 GiB) max-context on Vulkan. **Both formula ceilings exceeded**: f16 KV loads + serves a 40K prompt at **65536 (64K)**, q8_0 at **122880 (120K)** — the conservative 30–31 GiB budget under-called by ~10% (real usable ≈ 31.2 GiB, compute buffer only ~0.6 GiB). First 27B-dense numbers at 40K depth: **prefill ~742 tok/s f16 / ~635 q8_0 (−14%), decode flat ~28.5 tok/s (dense = weight-bound → KV quant is decode-neutral, even slightly faster)**. TTFT 54s f16 vs 63s q8_0. No upper OOM captured (ceilings pinned from below); no VRAM sampled (inferred from KV math). q8-c104k/c112k not re-run but fit by monotonicity (c120k passed).
+takeaway: ⚠️ CORRECTED — the "64K f16 / 120K q8_0 ceiling" conclusion below is WRONG. Qwen3.6-27B is a HYBRID arch (only 16 of 65 blocks are full-attention; 48 are SSM/linear-attn with no growing KV), so f16 KV is 64 KiB/tok not 260, and the real max is ~240K (f16) / native 262K (q8_0). MEASURED 2026-07-12: 200K f16 loaded in 31s using 29.0 GiB VRAM. The 64K/120K figures were the highest TESTED, never the ceiling. STILL VALID (MEASURED at 40K depth): prefill ~742 tok/s f16 / ~635 q8_0 (−14%), decode flat ~28.5 tok/s, TTFT 54s/63s. Superseded by docs/plans/2026-07-12-27b-finetune-quality-tokens.md + hybrid-aware bench/gguf_kv.py.
 -->
 
 # Benchmark: 27B dense — f16 & q8_0 max-context ceilings + first 40K-depth throughput — R9700 (gfx1201)
+
+> ⚠️ **CORRECTED (2026-07-12) — the max-context conclusion in this report is WRONG.** It calls
+> Qwen3.6-27B "dense" and derives a **260 KiB/tok** f16 KV → "ceilings 64K (f16) / 120K (q8_0)".
+> The model is actually **hybrid**: only **16 of its 65 blocks are full-attention**; the other 48 are
+> SSM/Gated-DeltaNet **linear-attention** (fixed state, **no growing KV**). Correct f16 KV =
+> `16×4×(256+256)×2 B` = **64 KiB/tok** (q8_0 ≈ 34) → real max **≈240K (f16) / native 262K (q8_0)**.
+> **MEASURED:** `Qwen3.6-27B-Q4_K_S` loaded at **200K f16 in 31 s, 29.0 GiB VRAM** — 64K/120K were
+> merely the highest depths *this campaign tested*, never the ceiling (see its own OPEN item #5).
+> **What remains valid** (MEASURED at 40K depth): the throughput/TTFT rows — prefill ~742/635 tok/s,
+> decode ~28.5 tok/s, TTFT 54/63 s. Ignore every KV-size and "ceiling"/"does not fit beyond" claim.
+> Authoritative: hybrid-aware `bench/gguf_kv.py`, `docs/plans/2026-07-12-27b-finetune-quality-tokens.md`.
 
 - **Date:** 2026-07-12 00:06 · **Track:** engine-bench campaign (`run.sh` per-probe, `serve_llamacpp.sh` Vulkan launcher; consolidated by the `27b-maxctx-f16` campaign)
 - **GPU/Host:** AMD Radeon AI PRO R9700, ~31.86 GiB usable · `HSA_OVERRIDE_GFX_VERSION=12.0.1` · ROCm 7.x · Ryzen 5 3600, 31 GB RAM, no swap

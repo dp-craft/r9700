@@ -1,5 +1,11 @@
 # 27B dense — validate f16 max context (and highest q8_0 context) (R9700, 2026-07-12)
 
+> ⚠️ **CORRECTED (2026-07-12).** The "260 KiB/tok / VRAM-binds-at-64K" premise below is **wrong** —
+> Qwen3.6-27B is **hybrid** (16 of 65 blocks full-attention; 48 SSM/linear-attn with no growing KV),
+> so f16 KV is **64 KiB/tok** and it reaches **~240K (f16) / native 262K (q8_0)**. MEASURED: 200K f16
+> = 29.0 GiB. This campaign only tested up to 64K/120K; those are not ceilings. See `analysis.md`'s
+> correction banner and `bench/gguf_kv.py` (hybrid-aware).
+
 Scaffolded by `bench/gen_campaign.py`. The executable driver is **`run.sh`** in this folder
 (resumable — per-probe markers in `done/`, rerun to continue).
 
