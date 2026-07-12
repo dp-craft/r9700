@@ -4,7 +4,7 @@ A self-contained run plan. Built from the conventions in `docs/GUIDE.md`.
 ✅ = command uses verified repo tooling · ⚠️ = watch point.
 
 **Two ways to run it.** ① **Automated + resumable:** after Phase 1 (fixtures), just
-`bash docs/campaigns/2026-07-11-deep-context/run.sh` — it loops every server/probe below with
+`bash campaigns/2026-07-11-deep-context/run.sh` — it loops every server/probe below with
 per-probe `done/` markers (rerun to continue after an interruption), consolidates every probe
 into one `results.jsonl`, and auto-generates `report.html` as the last step. `run.sh` is generated from `spec.json` by `bench/gen_campaign.py`;
 edit the spec and regenerate, or hand-edit. ② **Manual:** run the phase commands below yourself.
@@ -100,7 +100,7 @@ done
 Each `run.sh` writes `bench/runs/<stamp>-engine-deep-*/results.jsonl` (+ per-engine `/props`,
 copied prompts). Server cmdline/props/log live under `bench/.servers/8081.*` per launch.
 
-## Phase 5 — write it up (/benchmark skill)
+## Phase 5 — write it up (/benchmark-results skill)
 `docs/analysis/<stamp>-deep-context-35b.md` — depth curve to 200K (prefill+decode collapse),
 MTP on/off at depth, q8_0-vs-f16 confirmatory row, parallel decode/stream + aggregate + TTFT p95
 at np 2/4. Update the README TL;DR max-context line (provenance: these runs).

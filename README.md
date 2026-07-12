@@ -77,5 +77,6 @@ cd ../engine-bench
 Everything writes to `bench/runs/<stamp>-<track>-<slug>/` with full meta (cmdline, /props,
 GPU/VRAM samples).
 
-New measurements and research are documented to a fixed spec via the `/benchmark` and `/research`
-skills (`.claude/skills/`) — English, summary + table first, one file per run.
+New measurements and research are documented to a fixed spec via the `/benchmark-results` and
+`/research` skills (plan a campaign first with `/benchmark-new-campaign`) in `.claude/skills/` —
+English, summary + table first, one file per run.

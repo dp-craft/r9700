@@ -15,6 +15,10 @@
 # Env knobs: PROMPT_FILE (required for probe; space-separated list = per-stream variants)
 #            SLUG MAX_TOKENS CONCURRENCY REPS WARMUP PREFIX_MODE (none|unique|shared)
 #            USE_BENCHY BENCHY_ARGS
+#            SAMPLE_VRAM=1  → log GPU VRAM+GTT+power across the probe (gpu_samples.csv) and fold a
+#                            `gpu` row into results.jsonl. NOTE: the sampler spans the whole engine
+#                            loop, so the memory row is only cleanly attributable when ENGINES_LIST
+#                            has ONE engine (the campaign case). Multi-engine comparisons share it.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
@@ -56,6 +60,23 @@ if [ "$USE_BENCHY" != "1" ]; then
   for f in $PROMPT_FILE; do cp "$f" "$OUT/"; done
 fi
 
+# --- VRAM/GTT sampling (SAMPLE_VRAM=1): logs GPU memory across the probe so the report can show
+#     memory-at-load, peak VRAM, and peak GTT (host-RAM spill = freeze risk). Best-effort. ---
+SAMPLER_PID=""
+if [ "${SAMPLE_VRAM:-0}" = "1" ] && { command -v rocm-smi >/dev/null 2>&1 || command -v nvidia-smi >/dev/null 2>&1; }; then
+  python3 "$REPO/bench/lib/vram_sampler.py" --out "$OUT/gpu_samples.csv" --interval 1 &
+  SAMPLER_PID=$!
+  # wait (≤2s) for the sampler to initialize (handler installed + first sample written) so a fast
+  # probe can't kill it mid-startup and lose the memory row
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    [ -s "$OUT/gpu_samples.csv" ] && [ "$(wc -l <"$OUT/gpu_samples.csv")" -ge 2 ] && break
+    kill -0 "$SAMPLER_PID" 2>/dev/null || break   # sampler died (e.g. smi missing) — stop waiting
+    sleep 0.2
+  done
+fi
+stop_sampler () { [ -n "$SAMPLER_PID" ] && kill "$SAMPLER_PID" 2>/dev/null && wait "$SAMPLER_PID" 2>/dev/null || true; SAMPLER_PID=""; }
+trap stop_sampler EXIT
+
 for e in "${ENGINES[@]}"; do
   IFS='|' read -r name url model <<<"$e"
   echo "== $name ($url) =="
@@ -78,6 +99,26 @@ for e in "${ENGINES[@]}"; do
       --engine "$name" --label "$SLUG" >> "$OUT/results.jsonl" || echo "  probe failed for $name"
   fi
 done
+
+stop_sampler
+# fold the GPU memory summary into results.jsonl as a `gpu` row (report + write-up read it)
+if [ -f "$OUT/gpu_samples.csv" ] && [ -f "$OUT/results.jsonl" ]; then
+  python3 - "$OUT/gpu_samples.csv" "$SLUG" >> "$OUT/results.jsonl" <<'PY' || true
+import sys, re
+csv, slug = sys.argv[1], sys.argv[2]
+last = ""
+for line in open(csv):
+    if line.startswith("#"): last = line
+if last:
+    g = dict(re.findall(r"(\w+)=([\d.]+)", last))
+    import json
+    print(json.dumps({"kind": "gpu", "label": slug,
+        "vram_used_mib_at_load": int(float(g["load_vram_used_mib"])) if "load_vram_used_mib" in g else None,
+        "peak_vram_mib": int(float(g["peak_vram_used_mib"])) if "peak_vram_used_mib" in g else None,
+        "peak_gtt_mib": int(float(g["peak_gtt_used_mib"])) if "peak_gtt_used_mib" in g else None,
+        "avg_power_w": float(g["avg_power_w"]) if "avg_power_w" in g else None}))
+PY
+fi
 
 echo "→ results: $OUT"
 [ -f "$OUT/results.jsonl" ] && { echo "--- summary (aggregate rows) ---"; \

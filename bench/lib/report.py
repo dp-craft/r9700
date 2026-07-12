@@ -50,7 +50,15 @@ def load_run(d: Path) -> dict:
     if (d / "results.jsonl").exists():
         rows = [json.loads(l) for l in (d / "results.jsonl").read_text().splitlines() if l.strip()]
         run["type"] = "probe"
-        run["aggregates"] = [r for r in rows if r.get("kind") == "aggregate"]
+        aggs = [r for r in rows if r.get("kind") == "aggregate"]
+        # merge GPU memory rows (kind=="gpu", keyed by label) onto the matching aggregate rows
+        gpu = {r.get("label"): r for r in rows if r.get("kind") == "gpu"}
+        for a in aggs:
+            g = gpu.get(a.get("label"))
+            if g:
+                for k in ("vram_used_mib_at_load", "peak_vram_mib", "peak_gtt_mib"):
+                    a[k] = g.get(k)
+        run["aggregates"] = aggs
         run["n_requests"] = sum(1 for r in rows if r.get("kind") == "request")
         fails = d / "failures.txt"
         run["failures"] = [l.strip() for l in fails.read_text().splitlines() if l.strip()] if fails.exists() else []
@@ -440,9 +448,11 @@ function renderProbe(root, run) {
     mkDepth('prefill vs context depth (p50)', 'prefill tok/s', 'prefill_tok_s_p50');
     mkDepth('decode vs context depth (p50, per stream)', 'decode tok/s', 'decode_tok_s_per_stream_p50');
     detailsTable(root, 'depth rows (p50)',
-      ['engine', 'label', 'prompt tok', 'prefill tok/s', 'decode tok/s', 'TTFT p50 s', 'TTFT p95 s', 'errs'],
+      ['engine', 'label', 'prompt tok', 'prefill tok/s', 'decode tok/s', 'TTFT p50 s', 'TTFT p95 s',
+       'VRAM@load MiB', 'peak VRAM MiB', 'peak GTT MiB', 'errs'],
       crRows.map(r => [r.engine, r.label, r.prompt_tokens, r.prefill_tok_s_p50,
-                       r.decode_tok_s_per_stream_p50, r.ttft_s_p50, r.ttft_s_p95, r.n_err || 0]),
+                       r.decode_tok_s_per_stream_p50, r.ttft_s_p50, r.ttft_s_p95,
+                       r.vram_used_mib_at_load, r.peak_vram_mib, r.peak_gtt_mib, r.n_err || 0]),
       4, true);
   }
 
@@ -502,10 +512,11 @@ function renderProbe(root, run) {
   if (rest.length) {
     detailsTable(root, `other aggregate rows (${rest.length})`,
       ['engine', 'label', 'conc', 'prompt tok', 'prefill tok/s', 'decode tok/s', 'aggregate tok/s',
-       'TTFT p50 s', 'ttfa s', 'errs'],
+       'TTFT p50 s', 'ttfa s', 'VRAM@load MiB', 'peak VRAM MiB', 'peak GTT MiB', 'errs'],
       rest.map(r => [r.engine, r.label, r.concurrency, r.prompt_tokens, r.prefill_tok_s_p50,
                      r.decode_tok_s_per_stream_p50, r.aggregate_tok_s, r.ttft_s_p50,
-                     r.ttfa_s_p50, r.n_err || 0]));
+                     r.ttfa_s_p50, r.vram_used_mib_at_load, r.peak_vram_mib, r.peak_gtt_mib,
+                     r.n_err || 0]));
   }
 }
 

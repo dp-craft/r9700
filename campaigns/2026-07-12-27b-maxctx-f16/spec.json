@@ -1,0 +1,27 @@
+{
+  "slug": "27b-maxctx-f16",
+  "date": "2026-07-12",
+  "title": "27B dense — validate f16 max context (and highest q8_0 context)",
+  "model": "/home/dev/models/gguf/Qwen3.6-27B-Q4_K_S.gguf",
+  "backend": "vulkan",
+  "port": 8081,
+  "tuning": {"ub": 2048, "b": 4096, "fa": "on"},
+  "servers": [
+    {"name": "f16-c48k", "ctx": 49152,  "np": 1, "kv": "f16",  "mtp": 0,
+     "probes": [{"slug": "maxctx-f16-c48k",  "prompts": ["codereview-40000.txt"], "max_tokens": 256, "api": "completions", "concurrency": 1, "reps": 2}]},
+    {"name": "f16-c56k", "ctx": 57344,  "np": 1, "kv": "f16",  "mtp": 0,
+     "probes": [{"slug": "maxctx-f16-c56k",  "prompts": ["codereview-40000.txt"], "max_tokens": 256, "api": "completions", "concurrency": 1, "reps": 2}]},
+    {"name": "f16-c60k", "ctx": 61440,  "np": 1, "kv": "f16",  "mtp": 0,
+     "probes": [{"slug": "maxctx-f16-c60k",  "prompts": ["codereview-40000.txt"], "max_tokens": 256, "api": "completions", "concurrency": 1, "reps": 2}]},
+    {"name": "f16-c64k", "ctx": 65536,  "np": 1, "kv": "f16",  "mtp": 0,
+     "probes": [{"slug": "maxctx-f16-c64k",  "prompts": ["codereview-40000.txt"], "max_tokens": 256, "api": "completions", "concurrency": 1, "reps": 2}]},
+    {"name": "q8-c96k",  "ctx": 98304,  "np": 1, "kv": "q8_0", "mtp": 0,
+     "probes": [{"slug": "maxctx-q8-c96k",   "prompts": ["codereview-40000.txt"], "max_tokens": 256, "api": "completions", "concurrency": 1, "reps": 2}]},
+    {"name": "q8-c104k", "ctx": 106496, "np": 1, "kv": "q8_0", "mtp": 0,
+     "probes": [{"slug": "maxctx-q8-c104k",  "prompts": ["codereview-40000.txt"], "max_tokens": 256, "api": "completions", "concurrency": 1, "reps": 2}]},
+    {"name": "q8-c112k", "ctx": 114688, "np": 1, "kv": "q8_0", "mtp": 0,
+     "probes": [{"slug": "maxctx-q8-c112k",  "prompts": ["codereview-40000.txt"], "max_tokens": 256, "api": "completions", "concurrency": 1, "reps": 2}]},
+    {"name": "q8-c120k", "ctx": 122880, "np": 1, "kv": "q8_0", "mtp": 0,
+     "probes": [{"slug": "maxctx-q8-c120k",  "prompts": ["codereview-40000.txt"], "max_tokens": 256, "api": "completions", "concurrency": 1, "reps": 2}]}
+  ]
+}

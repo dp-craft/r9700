@@ -1,13 +1,13 @@
 ---
-name: benchmark
-description: Run a benchmark on the R9700 (RDNA4) box AND document it to a fixed, reproducible spec — every run's full parameterization and measured numbers captured, nothing lost. Routes between two tracks: model-bench (llama-bench tuning; sweep.py adaptive optimum search with the KV ≤5% rule) and engine-bench (cross-engine + serving combos: MTP × KV × context depth × concurrency via campaign.sh). Use when the user wants to measure a runtime/model/tuning config, compare backends/engines, find an optimum, test parallel/agentic throughput, or turn a bench/runs/ result into a report. Produces canonical run data plus an English analysis doc in docs/analysis/ (summary + table first). May pull external context via the research skill.
+name: benchmark-results
+description: Run a benchmark on the R9700 (RDNA4) box AND document it to a fixed, reproducible spec — every run's full parameterization and measured numbers (including VRAM/GTT memory) captured, nothing lost. Routes between two tracks: model-bench (llama-bench tuning; sweep.py adaptive optimum search with the KV ≤5% rule) and engine-bench (cross-engine + serving combos: MTP × KV × context depth × concurrency via campaign.sh). Use when the user wants to measure a runtime/model/tuning config, compare backends/engines, find an optimum, test parallel/agentic throughput, or turn a bench/runs/ result into a report. Produces canonical run data plus an English analysis doc co-located in the campaign dir (campaigns/<date>-<slug>/analysis.md, summary + table first). May pull external context via the research skill. To plan/scaffold a new campaign first, use the benchmark-new-campaign skill.
 ---
 
-# benchmark — measure, then document (nothing lost)
+# benchmark-results — measure, then document (nothing lost)
 
 The measured counterpart to the research skill. **Every configuration tested becomes a data row AND
 a documented line in the report.** Output language: **English**. Deterministic shape every time.
-Full how-to for a human: `docs/GUIDE.md`. Standard campaign: `docs/campaigns/2026-07-11-starter-baseline/`.
+Full how-to for a human: `docs/GUIDE.md`. Standard campaign: `campaigns/2026-07-11-starter-baseline/`.
 
 ## Route first — which track?
 | If the goal is… | Tool | Dir |
@@ -38,7 +38,17 @@ point (campaign.sh) before they go in a TL;DR.
 6. **Provenance tags**: our `bench/runs/` = `MEASURED` (cite run dir), external = `CLAIMED`
    (research skill, with source), reasoning = `INFERRED`. Never blend in one table.
 7. **Failures are results**: campaign `failures.txt` rows (e.g. MTP mid-stream crash, OOM combos)
-   go in the report as FAILED — an OOM at f16 that fits at q8_0 is a finding, not a gap.
+   go in the report as FAILED — an OOM at f16 that fits at q8_0 is a finding, not a gap. A server the
+   pre-flight guard **SKIPPED** (predicted VRAM > budget, never launched) is also a result: report it
+   as `SKIPPED (predicted N GiB > budget)`, distinct from a launched-then-OOMed FAILED row.
+8. **Memory is a first-class number** — every server records `vram_used_mib_at_load` and
+   `peak_vram_mib`/`peak_gtt_mib` during the probe (from `gpu_samples.csv`, sampled by
+   `vram_sampler.py`). **A memory column is mandatory in the results table.** `peak_gtt_mib` must
+   stay near its **idle baseline** (tens of MiB — ~77 on this box, NOT 0); a peak hundreds–thousands
+   of MiB above baseline means the model spilled into GPU-accessible system RAM (GTT) — the freeze
+   risk — so flag it loudly. For max-context runs, fit the **measured** VRAM-vs-ctx line from the
+   rungs that loaded and report the **calculated** max ctx per budget (safe budget + physical VRAM),
+   not just the a-priori formula. Physical VRAM on this box = **32624 MiB**.
 
 ## Token policy
 Running is shell work — do it directly. For interpreting large logs or pulling external comparison
@@ -60,8 +70,11 @@ binaries or `*.err`/`*.log` into the main context — parse the JSON/JSONL
    in the doc marked **OPEN**, never papered over.
 5. **Document** to the contract below; register via the `<!-- meta -->` block + `docs/reindex.py`.
 
-## Output contract → `docs/analysis/YYYY-MM-DD-HHMM-<slug>.md`
-Name the doc with the **same stamp+slug as the `bench/runs/` dir** (1:1 raw data ↔ report).
+## Output contract → `campaigns/<date>-<slug>/analysis.md`
+The analysis is **co-located in the campaign dir** next to `spec.json` / `run.sh` / `README.md`
+(one self-contained folder: plan → driver → write-up). Use the **same `<date>-<slug>` as the
+campaign and the `bench/runs/` dir** (1:1 raw data ↔ report). A one-off measurement with no campaign
+dir still writes `docs/analysis/YYYY-MM-DD-HHMM-<slug>.md` (reindex scans both locations).
 
 ```markdown
 # Benchmark: <what was measured> — R9700 (gfx1201)
@@ -79,10 +92,17 @@ run-specific ones); tailor the "effect on this box" cell to what THIS run showed
 | Term | What it is | Effect on this box (R9700 / RDNA4, 32 GB) | How it's tested here |
 |------|------------|-------------------------------------------|----------------------|
 
-## Results (table first — pick the columns that apply)
-| Config | build | ctx | depth | ub | b | fa | KV | MTP | conc | Prefill tok/s | Decode/stream | Aggregate tok/s | TTFT p50/p95 | ttfa | VRAM peak |
-|--------|-------|----:|------:|---:|--:|:--:|:--:|:---:|-----:|--------------:|--------------:|----------------:|-------------:|-----:|----------:|
-(all MEASURED; mark plateau ties; FAILED rows stay in the table)
+## Results (table first — pick the columns that apply; a memory column is MANDATORY)
+| Config | build | ctx | depth | ub | b | fa | KV | MTP | conc | Prefill tok/s | Decode/stream | Aggregate tok/s | TTFT p50/p95 | ttfa | VRAM@load MiB | Peak VRAM MiB | Peak GTT MiB |
+|--------|-------|----:|------:|---:|--:|:--:|:--:|:---:|-----:|--------------:|--------------:|----------------:|-------------:|-----:|--------------:|-------------:|------------:|
+(all MEASURED; mark plateau ties; FAILED and SKIPPED rows stay in the table. Peak GTT must be ~0 —
+a nonzero value means a host-RAM spill; call it out.)
+
+## Max-context (if the run pinned a ceiling)
+| KV | ctx | VRAM@load MiB | peak GTT MiB | fits? | measured KV MiB/tok (slope) | **calculated max ctx** @safe-budget / @physical |
+(Fit `VRAM@load ≈ intercept + slope·ctx` from the rows that loaded; the intercept absorbs
+weights+compute, the slope is KV/tok. Report the calculated ceiling at the guard's safe budget AND
+at physical 32624 MiB — not just the a-priori formula. Guard-SKIPPED rows show predicted VRAM only.)
 
 ## KV decision (if the sweep ran)
 | Depth | f16 pp/tg | q8_0 pp/tg | Δpp% | Δtg% | VRAM saved | Verdict (≤5% rule) |

@@ -10,31 +10,40 @@ Usage (from a run script):
     ... run the benchmark ...
     kill $SAMPLER_PID
 
-CSV columns: unix_ts, vram_used_mib, vram_total_mib, power_w
-Summary appended as a final '# peak_vram_used_mib=... avg_power_w=...' comment line on SIGTERM/INT.
+CSV columns: unix_ts, vram_used_mib, vram_total_mib, gtt_used_mib, power_w
+gtt_used_mib = GPU-accessible SYSTEM RAM in use. On a healthy VRAM-only run it stays ~flat at the
+idle baseline; a rising GTT figure means the model/KV spilled into host RAM (the freeze risk) and
+the run is NOT VRAM-only. Summary appended as a final comment line on SIGTERM/INT:
+'# load_vram_used_mib=<first sample> peak_vram_used_mib=... peak_gtt_used_mib=... avg_power_w=... samples=...'
 """
 import argparse, json, shutil, signal, subprocess, sys, time
 
 def read_amd():
-    out = subprocess.run(["rocm-smi", "--showmeminfo", "vram", "--showpower", "--json"],
+    out = subprocess.run(["rocm-smi", "--showmeminfo", "vram", "gtt", "--showpower", "--json"],
                          capture_output=True, text=True, timeout=10).stdout
     card = next(iter(json.loads(out).values()))
     used = int(card["VRAM Total Used Memory (B)"]) // 2**20
     total = int(card["VRAM Total Memory (B)"]) // 2**20
+    gtt = None
+    for k in ("GTT Total Used Memory (B)", "GTT Used Memory (B)"):
+        if k in card:
+            try: gtt = int(card[k]) // 2**20
+            except (ValueError, TypeError): pass
+            break
     power = None
     for k, v in card.items():
         if "Power" in k:
             try: power = float(v)
             except ValueError: pass
             break
-    return used, total, power
+    return used, total, gtt, power
 
 def read_nvidia():
     out = subprocess.run(["nvidia-smi", "--query-gpu=memory.used,memory.total,power.draw",
                           "--format=csv,noheader,nounits"],
                          capture_output=True, text=True, timeout=10).stdout
     used, total, power = [x.strip() for x in out.splitlines()[0].split(",")]
-    return int(float(used)), int(float(total)), float(power)
+    return int(float(used)), int(float(total)), None, float(power)  # no GTT concept on NVIDIA
 
 def main():
     ap = argparse.ArgumentParser()
@@ -57,13 +66,14 @@ def main():
     signal.signal(signal.SIGINT, on_sig)
 
     with open(a.out, "w") as f:
-        f.write("unix_ts,vram_used_mib,vram_total_mib,power_w\n")
+        f.write("unix_ts,vram_used_mib,vram_total_mib,gtt_used_mib,power_w\n")
         while not stop:
             try:
-                used, total, power = reader()
-                f.write(f"{time.time():.1f},{used},{total},{'' if power is None else power}\n")
+                used, total, gtt, power = reader()
+                f.write(f"{time.time():.1f},{used},{total},"
+                        f"{'' if gtt is None else gtt},{'' if power is None else power}\n")
                 f.flush()
-                rows.append((used, power))
+                rows.append((used, gtt, power))
             except Exception:
                 pass  # transient smi hiccup — keep sampling
             # sleep in small slices so signals interrupt promptly
@@ -71,10 +81,14 @@ def main():
             while not stop and time.time() < t_end:
                 time.sleep(0.1)
         if rows:
+            load = rows[0][0]
             peak = max(r[0] for r in rows)
-            powers = [r[1] for r in rows if r[1] is not None]
+            gtts = [r[1] for r in rows if r[1] is not None]
+            peak_gtt = max(gtts) if gtts else ""
+            powers = [r[2] for r in rows if r[2] is not None]
             avg_p = f"{sum(powers)/len(powers):.1f}" if powers else "n/a"
-            f.write(f"# peak_vram_used_mib={peak} avg_power_w={avg_p} samples={len(rows)}\n")
+            f.write(f"# load_vram_used_mib={load} peak_vram_used_mib={peak} "
+                    f"peak_gtt_used_mib={peak_gtt} avg_power_w={avg_p} samples={len(rows)}\n")
 
 if __name__ == "__main__":
     main()

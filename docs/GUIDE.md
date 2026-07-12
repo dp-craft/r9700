@@ -1,7 +1,8 @@
 # Benchmark harness guide — how to run everything (offline, solo)
 
 > This is the generic operator guide. Concrete, dated run plans ("runbooks") live in
-> `docs/campaigns/<date>-<slug>/`. Scaffold a new one with the `/new-campaign` skill.
+> `campaigns/<date>-<slug>/` (project root), each with its co-located `analysis.md` write-up.
+> Scaffold a new one with the `/benchmark-new-campaign` skill.
 
 Step-by-step for both tracks. Legend: ✅ = verified working in this repo (2026-07-11 session) ·
 ⚠️ = confirm on your machine first.
@@ -137,8 +138,9 @@ has a raw-numbers table behind a `▶ details` toggle. `report.html` is gitignor
 from the tracked JSONL anytime).
 
 ## 6. Turn a run into a report
-Use the `/benchmark` skill: reads the run dir, computes deltas, writes
-`docs/analysis/<same-stamp>-<slug>.md` (summary + table first), registers it in `docs/INDEX.md`.
+Use the `/benchmark-results` skill: reads the run dir, computes deltas, writes the co-located
+`campaigns/<date>-<slug>/analysis.md` (or `docs/analysis/<stamp>-<slug>.md` for a one-off with no
+campaign; summary + table first, **memory column mandatory**), registers it in `docs/INDEX.md`.
 The doc must include (spec + canonical glossary rows live in the skill's output contract):
 - a **Legend** right after the Summary — every knob/label the run used (`-ub`, `-b`, `-fa`,
   KV f16/q8_0, MTP, crN depth, agentic-cN, TTFT/ttfa, …): definition, effect on this hardware,

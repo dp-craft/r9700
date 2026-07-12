@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Regenerate the report lists in docs/INDEX.md from each report's own metadata.
 
-Every report in docs/analysis/ and docs/research/ must carry an HTML-comment meta
-block at the top (invisible in rendered Markdown):
+Every report in docs/analysis/, docs/research/, and each co-located campaign analysis
+(campaigns/<date>-<slug>/analysis.md, indexed under "analysis") must carry an HTML-comment
+meta block at the top (invisible in rendered Markdown):
 
     <!-- meta
     date: 2026-07-11 18:44
@@ -22,6 +23,7 @@ Usage:  docs/reindex.py [--check]
 import sys, os, re, glob
 
 DOCS = os.path.dirname(os.path.abspath(__file__))
+REPO = os.path.dirname(DOCS)
 INDEX = os.path.join(DOCS, "INDEX.md")
 META_RE = re.compile(r"<!--\s*meta\b(.*?)-->", re.DOTALL)
 
@@ -49,18 +51,36 @@ def sort_key(date_str):
     return (int(y), int(mo), int(d), int(hh or 0), int(mm or 0))
 
 
+def _slug(name):
+    """Strip a leading YYYY-MM-DD(-HHMM) date so the link text is the slug. The HHMM part must be
+    exactly 4 digits, so a slug that starts with digits (e.g. '27b-...') is NOT eaten."""
+    return re.sub(r"^\d{4}-\d{2}-\d{2}(?:-\d{4})?-", "", name) or name
+
+
 def build_section(kind):
     lines, errors = [], []
+    # 1) standalone reports in docs/<kind>/*.md
     for path in glob.glob(os.path.join(DOCS, kind, "*.md")):
         meta = parse_meta(path)
         fname = os.path.basename(path)
         if not meta or "date" not in meta or "takeaway" not in meta:
             errors.append(f"  MISSING meta (date+takeaway) in {kind}/{fname}")
             continue
-        link = re.sub(r"^\d{4}-\d{2}-\d{2}-?\d*-?", "", fname[:-3]) or fname[:-3]
+        link = _slug(fname[:-3])
         rel = f"{kind}/{fname}"
         lines.append((sort_key(meta["date"]),
                       f"- {meta['date']} · {kind} · [{link}]({rel}) — {meta['takeaway']}"))
+    # 2) analyses co-located in campaigns/<date>-<slug>/analysis.md (project-root campaigns dir)
+    if kind == "analysis":
+        for path in sorted(glob.glob(os.path.join(REPO, "campaigns", "*", "analysis.md"))):
+            meta = parse_meta(path)
+            cdir = os.path.basename(os.path.dirname(path))
+            if not meta or "date" not in meta or "takeaway" not in meta:
+                errors.append(f"  MISSING meta (date+takeaway) in campaigns/{cdir}/analysis.md")
+                continue
+            rel = f"../campaigns/{cdir}/analysis.md"
+            lines.append((sort_key(meta["date"]),
+                          f"- {meta['date']} · {kind} · [{_slug(cdir)}]({rel}) — {meta['takeaway']}"))
     if errors:
         sys.exit("reindex: reports without a meta block:\n" + "\n".join(errors))
     lines.sort(key=lambda t: t[0], reverse=True)

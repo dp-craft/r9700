@@ -69,7 +69,7 @@ agentic-c1/c2/c4}; server cmdline+props per config in `servers/`; failed combos 
 mid-stream crash — known upstream issue, see `bench/engine-bench/README.md`) in `failures.txt`,
 never silently averaged.
 
-## Phase 4 — write it up (/benchmark skill)
+## Phase 4 — write it up (/benchmark-results skill)
 - `docs/analysis/<stamp>-sweep-35b-rocm-vs-vulkan.md` — Phase 2: optimum + KV decision table.
 - `docs/analysis/<stamp>-campaign-combo35b.md` — Phase 3: depth curve, MTP×KV interaction,
   concurrency scaling (per-stream vs aggregate), TTFT p95. Update README TL;DR with the new

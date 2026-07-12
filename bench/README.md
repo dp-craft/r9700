@@ -47,8 +47,9 @@ against any llama.cpp build you point it at (ROCm, Vulkan, CUDA, Metal…).
 
 - A `sweep-summary.json` with the tuning curves, the KV verdict, and a **copy-pasteable
   recommended `llama-server` command**.
-- A campaign `results.jsonl` (per-request + aggregate rows) that turns into a dated report in
-  `docs/analysis/` via the `/benchmark` skill — summary + table first, raw data linked 1:1.
+- A campaign `results.jsonl` (per-request + aggregate + `gpu` memory rows) that turns into a report
+  co-located at `campaigns/<date>-<slug>/analysis.md` via the `/benchmark-results` skill — summary +
+  table first (memory column mandatory), raw data linked 1:1.
 - **A one-command visual report**: `lib/report.py <run-dir> [...]` renders any run dir (sweep or
   campaign) into a self-contained `report.html` — tuning curves, KV verdict, depth/concurrency
   charts, failure banner, raw-number tables. Stdlib Python + vendored Chart.js; works offline.
@@ -68,17 +69,20 @@ against any llama.cpp build you point it at (ROCm, Vulkan, CUDA, Metal…).
 
 **Scaffolding & bookkeeping (repo-level):**
 - **`bench/gen_campaign.py`** — deterministic campaign scaffolder: a JSON `spec.json` → a resumable
-  `run.sh` (per-probe `done/` markers) + README skeleton under `docs/campaigns/<date>-<slug>/`.
-  Also `gen_campaign.py vram-ctx …` = the VRAM-budget → max-context calculator. `--help` for both.
-- **`/new-campaign` skill** — the *judgement* layer over `gen_campaign.py`: works out the VRAM
-  budget, the MTP/KV/depth/concurrency matrix, and the gaps (fixtures, ctx headroom) **before** you
-  spend GPU hours, then emits the spec + driver. Use it to start a new campaign.
+  `run.sh` (per-probe `done/` markers) + README skeleton under `campaigns/<date>-<slug>/` (project
+  root). The emitted driver **continues past a failed server** and **skips (before launch) any
+  server predicted over the VRAM budget** (GPU/VRAM-only, no system-RAM spill), and honors
+  `ONLY=`/`REPS=`/`MAX_TOKENS=`/`VRAM_BUDGET_MIB=` for subset/short runs. Also
+  `gen_campaign.py vram-ctx …` = the VRAM-budget → max-context calculator. `--help` for both.
+- **`/benchmark-new-campaign` skill** — the *judgement* layer over `gen_campaign.py`: works out the
+  VRAM budget, the MTP/KV/depth/concurrency matrix (honoring your explicit ladder), and the gaps
+  (fixtures, ctx headroom) **before** you spend GPU hours, then emits the spec + driver.
 - **`docs/reindex.py`** — regenerates `docs/INDEX.md` from each report's `<!-- meta -->` block
-  (fails if one is missing — the enforcement the old hand-edited index lacked).
+  (scans `docs/{analysis,research}/` and `campaigns/*/analysis.md`; fails if one is missing).
 
 **How to run everything (offline, solo): [`docs/GUIDE.md`](../docs/GUIDE.md).**
-**Campaign plans (runbooks): [`starter-baseline`](../docs/campaigns/2026-07-11-starter-baseline/README.md) ·
-[`deep-context`](../docs/campaigns/2026-07-11-deep-context/README.md). New one → `/new-campaign`.**
+**Campaign plans (runbooks): [`starter-baseline`](../campaigns/2026-07-11-starter-baseline/README.md) ·
+[`deep-context`](../campaigns/2026-07-11-deep-context/README.md). New one → `/benchmark-new-campaign`.**
 
 ## Legacy (frozen)
 `bench/legacy/` holds the original harness (`harness/` + the pre-harness `*.sh` + `*_results.jsonl`).
