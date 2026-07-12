@@ -383,7 +383,7 @@ def emit_quality_runsh(spec):
     ad('done')
     ad("")
     ad('echo; echo "=== deterministic scoring ==="')
-    ad('python3 "$CAMPAIGN_DIR/graders/score_deterministic.py" --tasks "$TASKS" \\')
+    ad('python3 "$ROOT/bench/lib/graders/score_deterministic.py" --tasks "$TASKS" \\')
     ad('  --outputs "$OUTF" --out "$OUT/scores_deterministic.jsonl" || true')
     ad('echo; echo "=== charts + appendix (SVG, embedded in analysis.md) ==="')
     ad('python3 "$LIB/report.py" "$CAMPAIGN_DIR" || true')
@@ -432,23 +432,24 @@ The `judge`-category tasks (code review, explanations, refactors) have no determ
 Extract them into a paste-ready bundle, then judge them **in a Claude session** with the prompt
 below (deterministic instruction; temp is the session's, so note it in the write-up):
 ```bash
-python3 campaigns/{date}-{slug}/graders/prepare_judge.py \\
+python3 bench/lib/graders/prepare_judge.py \\
   --outputs campaigns/{date}-{slug}/out/outputs.jsonl \\
   --tasks   campaigns/{date}-{slug}/tasks/tasks.jsonl \\
   --out     campaigns/{date}-{slug}/out/judge_bundle.md
 ```
-Paste `judge_bundle.md` into Claude under this exact prompt:
+Paste the ENTIRE `judge_bundle.md` into Claude under this exact prompt (the blocks are already
+blind — opaque ids, shuffled — so you can't tell which model wrote which):
 
-> You are grading LLM answers to open-ended tasks. For EACH (config, task) block below, score three
-> axes 0–5 (integers): **correctness** (factually right, no errors), **depth** (completeness /
-> insight), **clarity** (well-structured, readable). Judge blindly — ignore which config produced
-> it. Output ONLY a JSON array, one object per block, exact shape:
-> `[{{"config": "...", "task_id": "...", "correctness": 0, "depth": 0, "clarity": 0, "note": "one-line reason"}}]`
+> You are grading LLM answers to open-ended tasks. For EACH `## Block <id>` below, score three axes
+> as integers 0–5: **correctness** (factually right, no errors), **depth** (completeness / insight),
+> **clarity** (well-structured, readable). Be strict and consistent; use the whole 0–5 range. Output
+> ONLY a JSON array, one object per block, exact shape:
+> `[{{"id": "b01", "correctness": 0, "depth": 0, "clarity": 0, "note": "one-line reason"}}]`
 > No prose outside the JSON.
 
 Save Claude's JSON array to `out/judge_raw.json`, then fold it in:
 ```bash
-python3 campaigns/{date}-{slug}/graders/apply_judge_scores.py \\
+python3 bench/lib/graders/apply_judge_scores.py \\
   --raw campaigns/{date}-{slug}/out/judge_raw.json \\
   --out campaigns/{date}-{slug}/out/judge_scores.jsonl
 python3 bench/lib/report.py campaigns/{date}-{slug}     # re-render with judge data
