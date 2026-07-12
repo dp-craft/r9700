@@ -1,0 +1,29 @@
+{
+  "kind": "quality",
+  "slug": "27b-finetune-quality",
+  "date": "2026-07-12",
+  "title": "Qwen3.6-27B fine-tune shootout — output quality + token usage",
+  "notes": [
+    "All 5 configs share the identical qwen35 HYBRID arch (16 full-attn + 48 SSM + 1 nextn),",
+    "so KV geometry (f16 64 KiB/tok) and max-context are identical -> the comparison is quality",
+    "+ token economy, NOT context. ctx 32768 is far above task need and keeps VRAM comparable."
+  ],
+  "backend": "vulkan",
+  "port": 8081,
+  "models_dir": "/home/dev/models/gguf",
+  "ctx": 32768,
+  "kv": "f16",
+  "tuning": {"ub": 2048, "b": 4096, "fa": "on"},
+  "api": "chat",
+  "reps": 1,
+  "max_tokens": 8192,
+  "tasks": "tasks/tasks.jsonl",
+  "vram": {"kv_kib_per_tok": {"f16": 64, "q8_0": 34}, "budget_mib": 32400, "overhead_mib": 2000},
+  "configs": [
+    {"label": "rico03-distilled",  "file": "Qwen3.6-27B-Claude-Opus-Reasoning-Distilled-Q4_K_S.gguf", "mtp": 0},
+    {"label": "unsloth-mtp-off",   "file": "Qwen3.6-27B-MTP-Q4_K_M.gguf", "mtp": 0},
+    {"label": "unsloth-mtp-on",    "file": "Qwen3.6-27B-MTP-Q4_K_M.gguf", "mtp": 1},
+    {"label": "hauhau-uncensored", "file": "Qwen3.6-27B-Uncensored-HauhauCS-Aggressive-IQ4_XS.gguf", "mtp": 0},
+    {"label": "jackrong-qwopus",   "file": "Qwopus3.6-27B-v1-preview-Q4_K_M.gguf", "mtp": 0}
+  ]
+}
