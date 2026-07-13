@@ -2,7 +2,8 @@
 
 *Campaign 3 of the agentic-config series (plan: `docs/plans/2026-07-12-27b-agentic-config-campaign-series.md`).
 Status: **harness + grader BUILT & stress-tested** (self-contained, auto-installs); next = vendor the task corpus + depth driver.
-Research: `docs/research/2026-07-13-1712-hard-ts-quality-benchmark-design.md`.*
+Research: `docs/research/2026-07-13-1712-hard-ts-quality-benchmark-design.md`.
+**Reader's guide to the eval, every task, and test-data quality: `eval-design.md` (calibration data: `calibration.jsonl`).***
 
 ## Proven so far (this scaffold)
 - **`ts-harness/`** — self-contained, **auto-installs** (`score_typescript.py` runs `npm install` if `node_modules`
