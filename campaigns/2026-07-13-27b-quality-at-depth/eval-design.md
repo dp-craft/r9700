@@ -136,10 +136,16 @@ Sonnet scores clearly higher** — that gap is the band the 27B configs will lan
 To find tasks that only a strong model *with thinking* clears, two multi/strict tasks were authored and
 graded across three capability tiers (data: `calibration-hard.jsonl`):
 
-| task | kind | haiku | Sonnet | Opus-high | outcome |
+| task | kind | haiku | Sonnet | Opus-high | tier |
 |------|------|:---:|:---:|:---:|---------|
 | `shape-variant` | multi-file union refactor + exhaustiveness | 1.0 P | 1.0 P | 1.0 P | **rejected — too easy** |
-| `async-memo` | async dedup + don't-cache-failures + strict lint | 0.667 F | 0.625 F | **1.0 P** | **admitted — Opus-only** |
+| `store-remove` | indirect coupling: keep a derived cache consistent | 0.812 F | 1.0 P | 1.0 P | **Sonnet-tier** (haiku fails on types) |
+| `async-memo` | async dedup + don't-cache-failures + strict lint | 0.667 F | 0.625 F | **1.0 P** | **Opus-only** |
+
+This gives a deliberate **difficulty spread** so the 27B configs have somewhere to land at every capability
+level: easy controls (`count-words`, `shape-variant`), Sonnet-tier (`lru-cache`, `rate-limiter`,
+`store-remove`), and one Opus-only ceiling (`async-memo`). The three hard tasks are also *different in kind*
+(time+eviction, indirect cache coupling, async concurrency) so a config can't win by being good at one trick.
 
 Two lessons, both useful for authoring the rest of the set:
 1. **Compiler-guided refactors are easy.** Adding a variant to a discriminated union with `assertNever`
