@@ -54,8 +54,11 @@ for l in open(sys.argv[1]):
 PY
 }
 
-CUR_UP=0
-stop_cur () { [ "$CUR_UP" = 1 ] && { PORT="$PORT" bash "$SERVE" stop >/dev/null 2>&1 || true; CUR_UP=0; }; }
+CUR_UP=0 ; SPID=""
+stop_cur () {
+  [ -n "$SPID" ] && { kill "$SPID" 2>/dev/null || true; SPID=""; }   # stop this server's VRAM sampler (else it leaks + keeps appending)
+  [ "$CUR_UP" = 1 ] && { PORT="$PORT" bash "$SERVE" stop >/dev/null 2>&1 || true; CUR_UP=0; }
+}
 trap stop_cur EXIT
 
 while IFS=$'\t' read -r kind a b c d e f; do
