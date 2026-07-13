@@ -36,8 +36,9 @@ def mean(xs):
 
 # ---------- SVG toolkit ----------
 def _style(n):
-    css_l = ";".join(f"--s{i+1}:{SLOT_L[i]}" for i in range(n))
-    css_d = ";".join(f"--s{i+1}:{SLOT_D[i]}" for i in range(n))
+    n = max(n, 16)                                        # always define enough slots (cycle past 8)
+    css_l = ";".join(f"--s{i+1}:{SLOT_L[i % len(SLOT_L)]}" for i in range(n))
+    css_d = ";".join(f"--s{i+1}:{SLOT_D[i % len(SLOT_D)]}" for i in range(n))
     return f"""<style>
 :root{{--surface:#fcfcfb;--ink:#0b0b0b;--ink2:#52514e;--muted:#898781;--grid:#e1e0d9;--axis:#c3c2b7;{css_l}}}
 @media (prefers-color-scheme:dark){{:root{{--surface:#1a1a19;--ink:#fff;--ink2:#c3c2b7;--muted:#898781;--grid:#2c2c2a;--axis:#383835;{css_d}}}}}
@@ -55,16 +56,23 @@ def esc(s):
     return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
-def hbar(title, rows, unit="", fmt="{:.0f}", w=720, sub=""):
-    """rows: list of (label, value, slot_idx). One axis (x=value). Direct value labels."""
+def hbar(title, rows, unit="", fmt="{:.0f}", w=720, sub="", refs=None):
+    """rows: list of (label, value, slot_idx). One axis (x=value). Direct value labels.
+    refs: optional [(label, value)] drawn as vertical dashed reference lines (e.g. haiku/sonnet/opus
+    capability bands) sharing the bar x-scale."""
     rows = [r for r in rows if isinstance(r[1], (int, float))]
     pad_l, pad_r, top, rh, gap = 168, 74, 54, 26, 12
     h = top + len(rows) * (rh + gap) + 24
-    vmax = max([r[1] for r in rows] + [1e-9]) * 1.12
+    refs = [(l, v) for l, v in (refs or []) if isinstance(v, (int, float))]
+    vmax = max([r[1] for r in rows] + [v for _, v in refs] + [1e-9]) * 1.12
     plot_w = w - pad_l - pad_r
     b = [f'<text x="20" y="26" class="t" font-size="15">{esc(title)}</text>']
     if sub:
         b.append(f'<text x="20" y="44" class="mut" font-size="11">{esc(sub)}</text>')
+    for rlab, rval in refs:                              # vertical dashed reference lines (behind bars)
+        rx = pad_l + plot_w * rval / vmax
+        b.append(f'<line x1="{rx:.1f}" y1="{top-4}" x2="{rx:.1f}" y2="{h-18}" stroke="var(--muted)" stroke-width="1" stroke-dasharray="4 3"/>')
+        b.append(f'<text x="{rx:.1f}" y="{h-4}" text-anchor="middle" class="mut" font-size="10">{esc(rlab)} {fmt.format(rval)}{unit}</text>')
     for i, (lab, val, slot) in enumerate(rows):
         y = top + i * (rh + gap)
         bw = max(2, plot_w * val / vmax)
@@ -185,11 +193,15 @@ def small_multiples(title, panels, w=720):
     return svg(w, int(h), "".join(b))
 
 
-def line_panels(title, xlabel, panels, w=720):
+def line_panels(title, xlabel, panels, w=720, refs=None, ref_titles=None):
     """Connected-parameter view: a swept scalar on x (e.g. reasoning-budget), one colored line
     per series (e.g. model), a separate panel per metric (own y-scale). Each point direct-labeled;
     x uses categorical rank ticks so uneven / '∞' stops space evenly.
-    panels: [(panel_title, unit, fmt, series)]  series: [(name, slot, [(xtick, y), ...])]"""
+    panels: [(panel_title, unit, fmt, series)]  series: [(name, slot, [(xtick, y), ...])]
+    refs: optional [(label, value)] drawn as horizontal dashed lines on panels whose title is in
+    ref_titles (capability bands on the quality panel)."""
+    refs = [(l, v) for l, v in (refs or []) if isinstance(v, (int, float))]
+    ref_titles = ref_titles or set()
     import math
     cols = 2
     pw = w // cols
@@ -212,7 +224,9 @@ def line_panels(title, xlabel, panels, w=720):
         oy = 74 + (pi // cols) * ph
         plot_w = pw - 96
         plot_h = ph - 66
+        panel_refs = refs if pt in ref_titles else []
         allv = [y for _, _, pts in series for _, y in pts if isinstance(y, (int, float))]
+        allv += [v for _, v in panel_refs]
         if not allv:
             continue
         vmax = max(allv) * 1.14 or 1.0
@@ -221,6 +235,9 @@ def line_panels(title, xlabel, panels, w=720):
         def X(t): return ox + (plot_w * (xpos[t] + 0.5) / nx)
         def Y(v): return oy + plot_h * (1 - (v - vmin) / (vmax - vmin + 1e-9))
         b.append(f'<text x="{ox-6}" y="{oy-8}" class="t" font-size="12">{esc(pt)}</text>')
+        for rlab, rval in panel_refs:                    # capability bands (haiku/sonnet/opus)
+            b.append(f'<line x1="{ox}" y1="{Y(rval):.1f}" x2="{ox+plot_w}" y2="{Y(rval):.1f}" stroke="var(--muted)" stroke-width="1" stroke-dasharray="4 3"/>')
+            b.append(f'<text x="{ox+2}" y="{Y(rval)-3:.1f}" class="mut" font-size="9">{esc(rlab)}</text>')
         # baseline + x ticks
         b.append(f'<line x1="{ox}" y1="{Y(vmin):.1f}" x2="{ox+plot_w}" y2="{Y(vmin):.1f}" stroke="var(--axis)" stroke-width="1"/>')
         for t in ticks:
@@ -274,11 +291,15 @@ def main():
                     help="output dir for SVGs+appendix (default: campaign/charts, next to analysis.md)")
     ap.add_argument("--order", default="",
                     help="comma-separated config order (palette + row order); overrides CANON for this campaign")
+    ap.add_argument("--calibration", default="",
+                    help="path to calibration jsonl ({tier|model, score, hard_pass}); drawn as reference "
+                         "bands (haiku/sonnet/opus) on the quality charts")
     a = ap.parse_args()
     D = a.dir
     outs = [r for r in load_jsonl(f"{D}/outputs.jsonl") if "error" not in r]
     vram = load_jsonl(f"{D}/vram.jsonl")
     dets = load_jsonl(f"{D}/scores_deterministic.jsonl")
+    tss = load_jsonl(f"{D}/scores_typescript.jsonl")     # multi-objective TS grader (quality-at-depth)
     judg = load_jsonl(f"{D}/judge_scores.jsonl")
     cdir = a.charts; cbase = os.path.basename(cdir.rstrip("/")); os.makedirs(cdir, exist_ok=True)
 
@@ -306,12 +327,41 @@ def main():
     for c in configs:
         rows = [d for d in dets if d.get("config") == c]
         detpass[c] = 100 * sum(1 for d in rows if d.get("passed")) / len(rows) if rows else None
+    # judge axes vary by campaign (finetune: correctness/depth/clarity · quality-at-depth: design/clarity/robustness)
+    JUDGE_AXES = ["design", "clarity", "robustness", "correctness", "depth", "polish"]
+    def jmean(row):
+        return mean([row.get(a) for a in JUDGE_AXES])
     judge_mean = {}
     for c in configs:
         rows = [j for j in judg if j.get("config") == c]
-        vals = [mean([j.get("correctness"), j.get("depth"), j.get("clarity")]) for j in rows]
+        vals = [jmean(j) for j in rows]
         judge_mean[c] = mean(vals) if vals else None
     vr = {v.get("config"): v for v in vram}
+
+    # --- TS multi-objective grader (quality-at-depth): mean score %, hard-pass %, per-objective means ---
+    OBJ_KEYS = ["types", "lint", "tests", "edge", "reuse", "bdd", "novj"]
+    tsscore, tshard, obj_mean = {}, {}, {}
+    for c in configs:
+        rows = [t for t in tss if t.get("config") == c]
+        if rows:
+            tsscore[c] = 100 * (mean([t.get("score") for t in rows]) or 0)
+            tshard[c] = 100 * sum(1 for t in rows if t.get("hard_pass")) / len(rows)
+            obj_mean[c] = {k: mean([(t.get("objectives") or {}).get(k) for t in rows]) for k in OBJ_KEYS}
+    if tss and not dets:            # TS campaign: the mean TS score IS the headline "quality %"
+        detpass = {c: tsscore.get(c) for c in configs}
+
+    # --- capability reference bands from calibration (haiku floor / sonnet / opus ceiling) ---
+    calib_files = [p.strip() for p in a.calibration.split(",") if p.strip()]
+    calib = [r for p in calib_files for r in load_jsonl(p)]
+    run_tasks = {t.get("task_id") for t in tss}         # compare bands over the SAME tasks the run scored
+    calib_ref = {}                  # model -> mean score % over the (intersected) calibration tasks
+    for r in calib:
+        if run_tasks and r.get("task") not in run_tasks:
+            continue
+        calib_ref.setdefault(r.get("model", "?"), []).append(r.get("score"))
+    calib_ref = {k: 100 * (mean(v) or 0) for k, v in calib_ref.items() if mean(v) is not None}
+    REF_ORDER = ["haiku", "sonnet", "opus"]
+    refs = [(m, calib_ref[m]) for m in REF_ORDER if m in calib_ref]
 
     S = lambda c: slot_of(c, order)
     files = OrderedDict()
@@ -370,11 +420,32 @@ def main():
             return (WARN, "◐") if (d.get("detail") or "").startswith("timeout") else (BAD, "✗")
         js = jdg_idx.get((c, t))
         if js:
-            sc = mean([mean([x.get("correctness"), x.get("depth"), x.get("clarity")]) for x in js]) or 0
+            sc = mean([jmean(x) for x in js]) or 0
             return (JBLUE[min(5, int(round(sc)))], f"{sc:.1f}")
         return ("var(--grid)", "")
     if tasks:
         files["task_heatmap.svg"] = heatmap("Per-task outcomes (config × task)", configs, tasks, cell)
+
+    # TS quality-at-depth charts (only when the multi-objective TS grader ran)
+    if tss:
+        files["capability.svg"] = hbar(
+            "Capability — mean TS score per config",
+            sorted([(c, tsscore.get(c), S(c)) for c in configs if tsscore.get(c) is not None],
+                   key=lambda r: -(r[1] or 0)), unit="%", fmt="{:.0f}",
+            sub="dashed = haiku(floor)/sonnet/opus(ceiling) one-shot reference from calibration", refs=refs)
+        files["hard_pass.svg"] = hbar(
+            "Hard-pass rate — % of tasks passing ALL gate objectives (types+lint+tests+reuse+edge)",
+            sorted([(c, tshard.get(c), S(c)) for c in configs if tshard.get(c) is not None],
+                   key=lambda r: -(r[1] or 0)), unit="%", fmt="{:.0f}")
+        OBJ_RAMP = ["#e06666", "#f0a860", "#f6d24b", "#c6d94a", "#8ec96a", "#4fb06a"]  # 0..1 red→green
+        def ocell(c, k):
+            v = (obj_mean.get(c) or {}).get(k)
+            if v is None:
+                return ("var(--grid)", "")
+            return (OBJ_RAMP[min(5, int(round(v * 5)))], f"{v:.2f}")
+        files["objective_breakdown.svg"] = heatmap(
+            "Objective breakdown (config × objective; 1.00 = clean, red = where it fails)",
+            configs, OBJ_KEYS, ocell)
 
     # 9. connected-parameter sweeps (optional): out/sweeps.json declares line charts over a swept
     #    scalar (e.g. reasoning-budget) so relationships read as trends, not unordered bars.
@@ -390,6 +461,8 @@ def main():
         "prefill_tps": ("Prefill tok/s", "", "{:.0f}", prefill),
         "runaway_pct": ("Runaway rate", "%", "{:.0f}",
                         {c: trunc.get(c) for c in configs}),
+        "ts_score": ("TS mean score", "%", "{:.0f}", tsscore),
+        "ts_hardpass": ("Hard-pass rate", "%", "{:.0f}", tshard),
     }
     sweeps = []
     if os.path.exists(f"{D}/sweeps.json"):                  # whole-file JSON array (not JSONL)
@@ -409,7 +482,8 @@ def main():
         if not panels:
             continue
         fn = sw.get("file", f"sweep_{si}.svg")
-        files[fn] = line_panels(sw.get("title", "Parameter sweep"), sw.get("xlabel", "x"), panels)
+        files[fn] = line_panels(sw.get("title", "Parameter sweep"), sw.get("xlabel", "x"), panels,
+                                refs=refs, ref_titles={"TS mean score", "Hard-pass rate"})
         sweep_appendix.append((fn, sw.get("title", "Parameter sweep")))
 
     for name, content in files.items():
@@ -421,6 +495,9 @@ def main():
                 "each chart uses a single axis (differently-scaled metrics are separate panels). "
                 "SVGs are theme-aware (light/dark)._\n"]
     order_titles = list(sweep_appendix) + [
+        ("capability.svg", "Capability — mean TS score vs haiku/sonnet/opus reference"),
+        ("hard_pass.svg", "Hard-pass rate (all gate objectives)"),
+        ("objective_breakdown.svg", "Objective breakdown (where configs fail)"),
         ("quality_vs_cost.svg", "Headline: quality vs token cost (up-and-left wins)"),
         ("quality_deterministic.svg", "Objective accuracy"),
         ("quality_judge.svg", "Open-ended quality (LLM-judge)"),
@@ -435,12 +512,12 @@ def main():
             ap_lines.append(f"\n**{ti}**\n\n![{ti}]({cbase}/{fn})\n")
     # data table (relief for low-contrast slots + color-independent record)
     ap_lines.append("\n### Data table\n")
-    ap_lines.append("| config | det % | judge/5 | think tok | ans tok | decode t/s | ttfa s | peak VRAM | trunc % |")
-    ap_lines.append("|--------|------:|--------:|----------:|--------:|-----------:|-------:|----------:|--------:|")
+    ap_lines.append("| config | TS % | hard % | det % | judge/5 | think tok | ans tok | decode t/s | ttfa s | peak VRAM | trunc % |")
+    ap_lines.append("|--------|-----:|-------:|------:|--------:|----------:|--------:|-----------:|-------:|----------:|--------:|")
     def f(x, d=0): return "—" if x is None else (f"{x:.{d}f}")
     for c in configs:
         v = vr.get(c, {})
-        ap_lines.append(f"| {c} | {f(detpass.get(c))} | {f(judge_mean.get(c),1)} | {f(tok_think.get(c))} | "
+        ap_lines.append(f"| {c} | {f(tsscore.get(c))} | {f(tshard.get(c))} | {f(detpass.get(c))} | {f(judge_mean.get(c),1)} | {f(tok_think.get(c))} | "
                         f"{f(tok_ans.get(c))} | {f(decode.get(c),1)} | {f(ttfa.get(c),1)} | "
                         f"{f(v.get('peak_vram_used_mib', v.get('vram_used_mib_at_load')))} | {f(trunc.get(c))} |")
     open(f"{cdir}/appendix.md", "w").write("\n".join(ap_lines) + "\n")

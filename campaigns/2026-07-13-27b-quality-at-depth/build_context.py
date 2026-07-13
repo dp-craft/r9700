@@ -36,6 +36,20 @@ def lib_sources():
     return "\n\n".join(parts)
 
 
+def base_project(task_dir):
+    """Multi-file tasks ship a green mini-project in base/ that the model EDITS. Embed those files
+    verbatim (with their real relpaths as headers) so the model knows the paths to emit `// FILE:`
+    blocks for. Returns ("", None) for single-file tasks."""
+    base = os.path.join(task_dir, "base")
+    if not os.path.isdir(base):
+        return "", None
+    parts = []
+    for p in sorted(glob.glob(os.path.join(base, "**", "*.ts"), recursive=True)):
+        rel = os.path.relpath(p, base)
+        parts.append(f"// ==== {rel} ====\n" + open(p, encoding="utf-8").read())
+    return "\n\n".join(parts), base
+
+
 def build(task_dir, target_tokens):
     spec = open(os.path.join(task_dir, "spec.md")).read()
     rules = open(os.path.join(task_dir, "rules.md")).read()
@@ -44,6 +58,15 @@ def build(task_dir, target_tokens):
     if filler:
         ctx += filler + "\n\n"
     ctx += lib_sources() + "\n\n"          # reuse targets last = deepest
+    proj, base = base_project(task_dir)
+    if base:                               # multi-file task: show the editable project + emit-all instruction
+        return (ctx
+                + "[PROJECT FILES — this is the current project; EDIT these by re-emitting whole files]\n\n"
+                + proj + "\n\n"
+                + "[CODING RULES — obey ALL]\n" + rules + "\n\n"
+                + "[TASK]\n" + spec + "\n\n"
+                + "Respond with ONLY the changed/added files, each preceded by its `// FILE: <path>` "
+                  "marker (paths relative to the project root, as shown above). No prose.\n")
     return (ctx
             + "[CODING RULES — obey ALL]\n" + rules + "\n\n"
             + "[TASK]\n" + spec + "\n\n"

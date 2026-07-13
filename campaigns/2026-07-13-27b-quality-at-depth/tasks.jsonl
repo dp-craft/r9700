@@ -1,0 +1,8 @@
+{"id": "count-words",  "tier": "easy",   "kind": "text-aggregation",      "shape": "single", "matrix": false, "note": "smoke only (SMOKE=1) — saturates; excluded from the depth matrix to save GPU"}
+{"id": "shape-variant", "tier": "easy",   "kind": "union-refactor",         "shape": "multi",  "matrix": false, "note": "smoke only — REJECTED as discriminator (compiler-guided exhaustiveness self-checklists → all tiers pass)"}
+{"id": "lru-cache",     "tier": "sonnet", "kind": "eviction+time",          "shape": "single", "reuse": "Clock"}
+{"id": "rate-limiter",  "tier": "sonnet", "kind": "lazy-refill+time",       "shape": "single", "reuse": "Clock"}
+{"id": "store-remove",  "tier": "sonnet", "kind": "indirect-cache-coupling","shape": "multi"}
+{"id": "deep-equal",    "tier": "sonnet", "kind": "structural-recursion",   "shape": "single"}
+{"id": "async-memo",    "tier": "opus",   "kind": "async-concurrency",      "shape": "single", "note": "don't-cache-failures + in-flight dedup"}
+{"id": "expr-eval",     "tier": "opus",   "kind": "recursive-parsing",      "shape": "single", "note": "Result-union, no-throw; even Opus one-shot fails strict lint → ceiling"}

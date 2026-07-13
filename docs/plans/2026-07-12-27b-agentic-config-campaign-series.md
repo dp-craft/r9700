@@ -96,24 +96,36 @@ throughput probes, not the quality/judge flow — see the campaign README).
 - **B5** KV q8_0 quality spot-check at the chosen config.
 - **Output:** the quality config = `{sampling, reasoning-budget, MTP-quality settings}` per model.
 
-## Campaign 3 — Quality at agentic DEPTH  *(HARNESS+EVAL BUILT — see campaign README + eval-design.md)*
-`campaigns/2026-07-13-27b-quality-at-depth/`. **Locked design:** depth×KV matrix **{64k-f16, 128k-f16, 128k-q8}**
-(thinking-mode, context filled with real AiChatney TS source, not padding); **integrated TypeScript TDD tasks**
-(model writes vitest tests + strict-typed impl obeying the user's real `code-logic-writer.md` rules); multi-objective
-grader runs real `tsc`+`eslint`+`vitest` (linting is the grader's job, not model tool-calls) + static rule-checks.
-**Built & validated:** self-contained auto-installing `ts-harness/` + `score_typescript.py` (single- & multi-file);
-**8 tasks** on a full difficulty ladder (2 easy / 4 Sonnet-tier / 2 Opus-tier, across 6 problem kinds), each
-tier-confirmed by a haiku/Sonnet/Opus gradient (`calibration-hard.jsonl`); ~682k-tok sanitized corpus (128k assembly
-verified). **Only remaining build: the depth driver** (Phase-3a sampling-lock → the grid, REPS=3) + blind LLM judge
-for open-ended clarity. · the C2 knobs were tuned on ~50–100-token prompts; the real
-operating point is **10–50K context** (system rules + code). Re-measure the finalists (`un-rb1024`,
-`un-rb2048`, `jr-rb1024`) at context **{8K, 16K, 32K}** via `run_capture.sh`'s `CONTEXT_PREFIX`, with
-**`REPS=3`** (break the reps=1 noise on the budget ranking) and the **KV-q8 quality spot-check placed here**
-(where its VRAM saving is real). Answers: (a) does the optimal `--reasoning-budget` rise with depth? (b) does
-rule-following survive lost-in-the-middle? (c) q8 accuracy at depth. **Prereq tooling** (extend, don't fork):
-a `multi_constraint` grader in `score_deterministic.py` (the current one saturates at 100% → can't
-discriminate "several rules" adherence) and `min_p`/`presence_penalty` in `capture.py` (Qwen's
-anti-repetition knobs, on-target for the runaway).
+## Campaign 3 — Quality + parameter-effects at agentic DEPTH  *(READY TO RUN — driver + charts wired)*
+`campaigns/2026-07-13-27b-quality-at-depth/` · runs on C1's frozen substrate, both 27B models.
+**Why this replaces the earlier "{8K,16K,32K} + score_deterministic multi_constraint" sketch:** that
+plan died when the deterministic eval saturated at 100% (couldn't discriminate configs). The built
+campaign instead measures at the **real operating point (64k/128k of actual TS source)** with a **hard,
+integrated TypeScript-TDD eval** whose multi-objective grader (real `tsc`+`eslint`+`vitest` + static
+rule-checks) does not saturate — so temperature/reasoning-budget finally separate.
+**Built & validated:** self-contained auto-installing `ts-harness/` + `score_typescript.py`
+(single- & multi-file, `batch` mode); **8 tasks** on a full difficulty ladder (2 easy / 4 Sonnet-tier /
+2 Opus-tier, 6 problem kinds), each tier-confirmed by a haiku/Sonnet/Opus gradient
+(`calibration-hard.jsonl`); ~682k-tok sanitized corpus. **Driver + charts now built too:** `configs.jsonl`
+(10 core cells) + `tasks.jsonl` + `run_capture.sh` (reuses `capture.py`+`score_typescript.py`+`vram_sampler.py`,
+resumable, VRAM-sampled) + extended `make_charts.py` (TS-score charts + haiku/Sonnet/Opus reference bands +
+budget-sweep line charts). See the campaign README + `eval-design.md`.
+- **Locked matrix (fixed Qwen3.6-thinking sampling temp 0.6 / top_p 0.95 / top_k 20 / min_p 0; REPS=2;
+  ~120 replies, trimmed from 288):** reasoning-budget **{1024,2048,4096}** × depth **{64k-f16, 128k-f16}**
+  on unsloth-MTP (6 cells) + a 128k **f16-vs-q8 A/B** at budget 2048 (1 cell) + jackrong cross-check at
+  budget 2048 × {64k-f16,128k-f16,128k-q8} (3 cells) + an opt-in **16384** ceiling cell at 128k-f16
+  (`RUN_OPTIN=1`). **6 discriminating tasks** in the matrix (the 2 saturating easy tasks are smoke-only,
+  `SMOKE=1`). Sampling is **fixed, not swept** (temp axis dropped — C2 settled 0.6; 0.6-vs-0.7 is noise);
+  **budget is the primary axis** (C2's master economy knob). The corpus is a **shared cached prefix** →
+  one deep prefill per server, all tasks reuse it (C1's 13.7× ttft win).
+- **Answers:** (a) does the optimal `--reasoning-budget` rise with depth (budget curve at 64k vs 128k)?
+  (b) does rule-adherence / util-reuse survive 64k→128k (lost-in-the-middle)? (c) does KV-q8 cost quality at
+  128k (f16-vs-q8 A/B, ≤5% rule)? (d) where does the local 27B sit vs the haiku/Sonnet/Opus capability bands?
+- **Blind LLM judge wired:** `judge.py` scores the subjective design/clarity/robustness axes (blind, any
+  OpenAI-compatible endpoint via `JUDGE_BASE_URL`), saving both parsed scores and the full judge prompt+reply
+  for audit. Deterministic correctness stays the toolchain's job; the judge only adds what it can't measure.
+- **Reusable across models:** adding a model = one `configs.jsonl` line (local GGUF *or* any OpenAI-compatible
+  URL, since `capture.py` speaks plain HTTP); see the campaign's `REUSE.md`.
 
 ## Campaign 4 — Multi-turn tool-use validation  *(the acceptance test / deliverable)*
 The goal says *tool use*; everything so far is single-turn. Run one realistic **read→edit→test loop**
@@ -130,6 +142,6 @@ in AITER's arch table.
 ## Execution order (updated)
 1. ~~C1 substrate~~ **DONE** (frozen: Vulkan · f16 · MTP-on).
 2. ~~C2 quality knobs~~ **DONE** (cap reasoning-budget; unsloth-MTP; keep MTP-draft defaults). Skipped configs dropped as low-value.
-3. **C3 quality-at-depth** (finalists × {8K,16K,32K} × REPS=3 + q8@depth) — after the grader/capture extensions. ← next
+3. **C3 quality + parameter-effects at depth** (budget {1024,2048,4096} × {64k-f16,128k-f16} + q8 A/B, REPS=2, ~120 replies, TS-TDD eval + blind judge) — **driver + judge + charts BUILT, ready to run**. ← next: `bash run_capture.sh`
 4. **C4 multi-turn tool-use** validation → the deliverable.
 5. (Optional) C5 vLLM Gate-0, only if already installed.

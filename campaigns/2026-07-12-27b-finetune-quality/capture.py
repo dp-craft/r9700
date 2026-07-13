@@ -108,6 +108,8 @@ def main():
     ap.add_argument("--temp", type=float, default=1.0)     # GGUF-recommended Qwen3.6 sampling
     ap.add_argument("--top-p", type=float, default=0.95)
     ap.add_argument("--top-k", type=int, default=20)
+    ap.add_argument("--min-p", type=float, default=None,   # Qwen3.6 thinking wants 0; server default is 0.05.
+                    help="only sent when set — pin to 0 for Qwen3.6 thinking; omit to keep server default")
     ap.add_argument("--seed", type=int, default=42)        # fixed for reproducibility
     a = ap.parse_args()
 
@@ -119,6 +121,8 @@ def main():
             for rep in range(a.reps):
                 sampling = {"temperature": a.temp, "top_p": a.top_p, "top_k": a.top_k,
                             "seed": a.seed + rep}
+                if a.min_p is not None:
+                    sampling["min_p"] = a.min_p
                 payload = {"messages": [{"role": "user", "content": t["prompt"]}],
                            "max_tokens": a.max_tokens, **sampling}
                 try:

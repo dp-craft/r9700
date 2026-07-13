@@ -228,7 +228,9 @@ a full ladder — 2 easy controls, 4 Sonnet-tier, 2 Opus-tier — across 6 diffe
 reference that scores 1.0 and a haiku/Sonnet/Opus tier confirmed (`calibration-hard.jsonl`). Corpus vendored
 to ~682k tokens (self-contained; secrets excluded); 128k assembly verified. `selftest` green; deps auto-install.
 
-**Next — the depth driver (the only remaining build before a run):** wire Phase-3a sampling-lock
-(temp {0.4,0.6,0.7} at 64k, freeze the winner) → the real grid `reasoning-budget × {64k-f16, 128k-f16,
-128k-q8}`, `REPS=3`, tasks assembled at depth via `build_context.py`, graded by `score_typescript.py`, then
-analyzed with the **benchmark-results** skill. See `README.md` and the plan.
+**Built — the depth driver + judge (ready to run).** Sampling is fixed at the Qwen3.6-thinking research
+values (no sampling-lock phase needed); the grid is `reasoning-budget {1024,2048,4096} × {64k-f16, 128k-f16}`
++ a 128k f16-vs-q8 A/B + a jackrong cross-check, `REPS=2` (~120 replies, trimmed from 288 — see README §4).
+Tasks are assembled at depth via `build_context.py`, graded by `score_typescript.py batch`, judged (subjective
+design/clarity/robustness) by `judge.py` (blind, `JUDGE_BASE_URL`), charted by `make_charts.py`, then analyzed
+with the **benchmark-results** skill. Run: `bash run_capture.sh`. See `README.md`, `REUSE.md`, and the plan.

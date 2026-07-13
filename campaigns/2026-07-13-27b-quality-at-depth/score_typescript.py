@@ -13,6 +13,7 @@ reuse(per-task reuse.json) bdd(test naming) novj(no jest). Deps auto-install on 
 
   python3 score_typescript.py fixture  --dir ts-harness/fixtures/count-words-good --task ts-harness/tasks/count-words
   python3 score_typescript.py response --response-file reply.txt --task ts-harness/tasks/lru-cache --id un-rb2048
+  python3 score_typescript.py batch    --outputs out/outputs.jsonl --tasks tasks.jsonl --out out/scores_typescript.jsonl
   python3 score_typescript.py selftest
 """
 import argparse, glob, json, os, re, shutil, subprocess, sys
@@ -157,11 +158,51 @@ def extract_files(response):
     return out
 
 
+def grade_batch(outputs_path, tasks_path, out_path):
+    """Grade a whole capture run. outputs.jsonl rows carry {config, task_id, rep, response}; the
+    task manifest (tasks.jsonl) maps task_id -> ts-harness/tasks/<id>. One score row per output row,
+    tagged with config/task_id/rep/tier so make_charts can aggregate + draw the calibration bands."""
+    tiers = {}
+    for l in open(tasks_path):
+        if l.strip():
+            t = json.loads(l); tiers[t["id"]] = t.get("tier", "?")
+    rows, n_err = [], 0
+    with open(out_path, "w") as fout:
+        for l in open(outputs_path):
+            if not l.strip():
+                continue
+            o = json.loads(l)
+            tid, cfg, rep = o.get("task_id"), o.get("config"), o.get("rep", 0)
+            if o.get("error") or not o.get("response"):
+                sc = {"config": cfg, "task_id": tid, "rep": rep, "tier": tiers.get(tid, "?"),
+                      "score": 0.0, "hard_pass": False, "objectives": {}, "grade_error": o.get("error") or "empty response"}
+                n_err += 1
+            else:
+                files = extract_files(o["response"])
+                task_dir = os.path.join(HARNESS, "tasks", tid)
+                if not files:
+                    sc = {"config": cfg, "task_id": tid, "rep": rep, "tier": tiers.get(tid, "?"),
+                          "score": 0.0, "hard_pass": False, "objectives": {}, "grade_error": "no FILE/fence blocks"}
+                    n_err += 1
+                else:
+                    g = grade_files(files, task_dir, f"{cfg}:{tid}:{rep}")
+                    sc = {"config": cfg, "task_id": tid, "rep": rep, "tier": tiers.get(tid, "?"),
+                          "score": g["score"], "hard_pass": g["hard_pass"], "objectives": g["objectives"]}
+            fout.write(json.dumps(sc) + "\n"); fout.flush()
+            rows.append(sc)
+            hp = "P" if sc["hard_pass"] else "F"
+            print(f"  [{cfg}] {tid} rep{rep}: score={sc['score']} {hp}"
+                  + (f"  ({sc['grade_error']})" if sc.get("grade_error") else ""))
+    print(f"graded {len(rows)} rows ({n_err} errors/empty) -> {out_path}", file=sys.stderr)
+    return rows
+
+
 def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
     f = sub.add_parser("fixture"); f.add_argument("--dir", required=True); f.add_argument("--task", required=True)
     r = sub.add_parser("response"); r.add_argument("--response-file", required=True); r.add_argument("--task", required=True); r.add_argument("--id", default="case")
+    b = sub.add_parser("batch"); b.add_argument("--outputs", required=True); b.add_argument("--tasks", required=True); b.add_argument("--out", required=True)
     sub.add_parser("selftest")
     a = ap.parse_args()
 
@@ -174,6 +215,8 @@ def main():
         if not files:
             sys.exit("no `// FILE:` blocks or ```ts fences found in response")
         print(json.dumps(grade_files(files, a.task, a.id), indent=2))
+    elif a.cmd == "batch":
+        grade_batch(a.outputs, a.tasks, a.out)
     elif a.cmd == "selftest":
         task = os.path.join(HARNESS, "tasks", "count-words")
         def g(name):
