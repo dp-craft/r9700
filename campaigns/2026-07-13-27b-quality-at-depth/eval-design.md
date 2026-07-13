@@ -161,13 +161,13 @@ Note: authoring these surfaced two **test-file** lint rules that unfairly failed
 `no-empty-function` on mock callbacks) — now relaxed for `*.test.ts` only; strict rules stay on impl files.
 
 ## 6. The context corpus (deep-context filler)
-- **134 sanitized `.ts` files, ~75k tokens**, vendored from the user's AiChatney `src/` into
-  `ts-harness/corpus/`. Every auth/crypto/secret file was **excluded** (37 skipped) and the result verified
-  free of secret patterns — this is a shared knowledge-base repo.
+- **545 sanitized files, ~682k tokens** (`.ts`/`.tsx`/`.test.ts`), vendored from the user's AiChatney
+  `src/` into `ts-harness/corpus/` — enough headroom to build any depth up to the model's 256k RoPE cap.
+  Every auth/crypto/secret file was **excluded** and the full corpus was scanned clean of secret patterns
+  (this is a shared knowledge-base repo). ~4.3 MB.
 - `build_context.py` assembles a prompt: real code up to a target token count, with the **reuse-target
-  utils placed deepest** (hardest retrieval), then the rules, then the task. Verified at 64k (~66k tok).
-- **Gap:** 75k covers the 64k depth point; the **128k** point needs a top-up (add the vendored test files
-  or a second small MIT repo).
+  utils placed deepest** (hardest retrieval), then the rules, then the task. Verified at 64k and **128k**
+  (~130k tok).
 
 ## 7. Reproduce it yourself
 ```bash
