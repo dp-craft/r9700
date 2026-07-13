@@ -166,7 +166,14 @@ python3 "$REPO/campaigns/2026-07-12-27b-finetune-quality/make_charts.py" --dir "
   --order "$ORDER" --calibration "$HERE/calibration.jsonl,$HERE/calibration-hard.jsonl" \
   || echo "make_charts failed (see above)"
 
-# --- 5. auto-write analysis.md via the benchmark-results skill (claude, through tmux) ---
+# --- 5. deterministic digest: aggregate.py crunches ALL the numbers in Python (per-cell table +
+#        the 4 campaign questions answered numerically) so the analysis LLM never touches bulk JSON. ---
+echo; echo "=== aggregate (deterministic digest → out/summary.md) ==="
+python3 "$HERE/aggregate.py" --dir "$OUTDIR" --out "$OUTDIR/summary.md" || echo "aggregate failed (see above)"
+
+# --- 6. auto-write analysis.md via the benchmark-results skill (claude, through tmux) ---
+# The prompt points ONLY at the deterministic digest + charts — NOT the per-reply jsonl (outputs.jsonl
+# is 120 full replies incl. thinking). The model's job is prose synthesis, not aggregation.
 if [ "$SUMMARY" = "1" ]; then
   echo; echo "=== final analysis (benchmark-results skill via claude/tmux, model=$SUMMARY_MODEL) ==="
   sp="$OUTDIR/summary_prompt.txt"
@@ -175,22 +182,20 @@ You are finishing benchmark Campaign 3 in this repo. Follow the repo's benchmark
 (read .claude/skills/benchmark-results/SKILL.md) and write the analysis to
 campaigns/2026-07-13-27b-quality-at-depth/analysis.md.
 
-All measured data is in campaigns/2026-07-13-27b-quality-at-depth/out/ :
-  - scores_typescript.jsonl  (per-reply objectives, score, hard_pass, tier)  [MEASURED]
-  - judge_scores.jsonl       (subjective design/clarity/robustness, blind LLM judge)
-  - vram.jsonl + gpu_*.csv    (memory/GTT/power/thermal per cell)
-  - outputs.jsonl            (tokens/latency/throughput), props_*.json (server provenance)
-  - charts/appendix.md + charts/*.svg  (already generated)
-The matrix is configs.jsonl; capability reference bands are in calibration.jsonl + calibration-hard.jsonl;
-the campaign design + glossary are in README.md and eval-design.md.
+ALL the numbers are ALREADY aggregated deterministically — read ONLY these two files:
+  - campaigns/2026-07-13-27b-quality-at-depth/out/summary.md   (per-cell table + the 4 findings, computed in Python)
+  - campaigns/2026-07-13-27b-quality-at-depth/charts/appendix.md  (charts to embed + a data table)
+DO NOT read outputs.jsonl / scores_typescript.jsonl / judge_scores.jsonl — they are large per-reply logs
+and everything you need is already in summary.md. For design context/glossary you may skim README.md and
+eval-design.md.
 
 Write analysis.md to the skill's contract: TL;DR + results TABLE FIRST (a memory column is MANDATORY),
-then detail. Tag every number MEASURED / INFERRED / CLAIMED — read numbers from the jsonl, do not invent
-any. Answer the 4 campaign questions: (a) does the optimal reasoning-budget rise with depth (64k vs 128k
-budget curve)? (b) does rule-adherence/util-reuse sag 64k->128k (lost-in-the-middle)? (c) does KV-q8 cost
-quality at 128k (f16-vs-q8 A/B, <=5% rule)? (d) where does the 27B sit vs haiku/Sonnet/Opus? Embed
-charts/appendix.md. Include a <!-- meta --> block as other reports do (see docs/analysis/ examples) so
-docs/reindex.py can register it. If any cell FAILED or a step was skipped, say so plainly.
+then detail. Every number you cite comes from summary.md/appendix.md — tag them MEASURED, and mark any
+reasoning INFERRED; invent nothing. Cover the 4 campaign questions exactly as summary.md's "Findings"
+lists them: (a) budget optimum vs depth, (b) 64k->128k rule-adherence/reuse (lost-in-the-middle), (c) KV
+f16-vs-q8 @128k (<=5% rule), (d) capability vs haiku/Sonnet/Opus. Embed charts/appendix.md. Include a
+<!-- meta --> block (see docs/analysis/ examples) so docs/reindex.py can register it. If summary.md's
+Health line flags failures/runaways/GTT spill, surface them.
 EOF
   bash "$HERE/claude_ask.sh" --prompt "$sp" --result "$OUTDIR/summary_result.json" \
     --cwd "$REPO" --model "$SUMMARY_MODEL" --permission-mode acceptEdits \

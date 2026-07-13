@@ -118,15 +118,18 @@ llama-server on the frozen substrate with `--reasoning-budget N`, samples VRAM/G
 matrix tasks (built at the cell's depth by `build_context.py`, corpus = shared cached prefix) through
 `capture.py`, stops the server; (2) **grades** every reply with the real toolchain
 (`score_typescript.py batch`); (3) **judges** subjective quality (`judge.py --engine claude-tmux`, blind,
-via `claude_ask.sh`); (4) **charts** (`make_charts.py`); (5) **writes `analysis.md`** by driving the
-**benchmark-results skill** through `claude` (again via tmux), then reindexes `docs/INDEX.md`.
+via `claude_ask.sh`); (4) **charts** (`make_charts.py`); (5) **aggregates every number deterministically
+in Python** (`aggregate.py` → `out/summary.md`: per-cell table + the 4 findings computed, not inferred);
+(6) **writes `analysis.md`** by driving the **benchmark-results skill** through `claude` (via tmux) — the
+LLM reads **only the digest + charts, never the per-reply jsonl** — then reindexes `docs/INDEX.md`.
 
 **Outputs (in `out/`):** `outputs.jsonl` (replies + token/latency/throughput), `scores_typescript.jsonl`
 (per-reply objectives + score + hard_pass), `judge_scores.jsonl` + `judge_raw.jsonl` (subjective
 design/clarity/robustness + the full judge prompt & reply), `vram.jsonl` + `gpu_*.csv`
 (memory/power/thermal), `props_*.json` (per-server provenance), `charts/*.svg` + `charts/appendix.md`,
-and the co-located **`analysis.md`**. Commit the run data after eyeballing `analysis.md` (the model
-wrote it — verify the numbers trace to the jsonl before trusting it).
+`summary.md` + `summary.json` (the deterministic digest), and the co-located **`analysis.md`**. Commit the
+run data after eyeballing `analysis.md` (the model wrote its prose from the digest — spot-check it against
+`summary.md`).
 
 ---
 
