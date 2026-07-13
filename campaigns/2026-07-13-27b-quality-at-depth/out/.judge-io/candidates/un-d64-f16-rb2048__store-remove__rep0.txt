@@ -1,0 +1,2 @@
+// FILE: src/store-remove.ts
+export const v6=6

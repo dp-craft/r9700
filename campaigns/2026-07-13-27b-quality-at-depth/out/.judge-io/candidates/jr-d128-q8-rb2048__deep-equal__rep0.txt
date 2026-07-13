@@ -1,0 +1,2 @@
+// FILE: src/deep-equal.ts
+export const v4=4

@@ -1,0 +1,137 @@
+// FILE: impl.ts
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isPrimitive(
+  value: unknown,
+): value is string | number | boolean | undefined | symbol | bigint {
+  return value === null ? false : typeof value !== "object";
+}
+
+function primitiveEqual(a: unknown, b: unknown): boolean {
+  if (typeof a === "number" && typeof b === "number") {
+    return a === b || (Number.isNaN(a) && Number.isNaN(b));
+  }
+  return a === b;
+}
+
+function arraysEqual(a: unknown[], b: unknown[]): boolean {
+  if (a.length !== b.length) {
+    return false;
+  }
+  for (let i = 0; i < a.length; i++) {
+    if (!deepEqual(a[i], b[i])) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function objectsEqual(
+  a: Record<string, unknown>,
+  b: Record<string, unknown>,
+): boolean {
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+  if (aKeys.length !== bKeys.length) {
+    return false;
+  }
+  for (const key of aKeys) {
+    if (!Object.prototype.hasOwnProperty.call(b, key)) {
+      return false;
+    }
+    if (!deepEqual(a[key], b[key])) {
+      return false;
+    }
+  }
+  return true;
+}
+
+export function deepEqual(a: unknown, b: unknown): boolean {
+  if (a === null || b === null) {
+    return a === b;
+  }
+  if (isPrimitive(a) || isPrimitive(b)) {
+    return primitiveEqual(a, b);
+  }
+  if (Array.isArray(a) || Array.isArray(b)) {
+    if (!Array.isArray(a) || !Array.isArray(b)) {
+      return false;
+    }
+    return arraysEqual(a, b);
+  }
+  if (isPlainObject(a) && isPlainObject(b)) {
+    return objectsEqual(a, b);
+  }
+  return false;
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it } from "vitest";
+import { deepEqual } from "./impl";
+
+describe("deepEqual", () => {
+  it("should return true when comparing NaN to NaN", () => {
+    expect(deepEqual(NaN, NaN)).toBe(true);
+  });
+
+  it("should return true when comparing equal primitives", () => {
+    expect(deepEqual(1, 1)).toBe(true);
+    expect(deepEqual("a", "a")).toBe(true);
+    expect(deepEqual(true, true)).toBe(true);
+  });
+
+  it("should return false when comparing different primitives", () => {
+    expect(deepEqual(1, 2)).toBe(false);
+    expect(deepEqual("a", "b")).toBe(false);
+  });
+
+  it("should return true when comparing deeply-equal nested structures", () => {
+    const a = { x: [1, 2, { y: "z" }], w: { nested: [true, false] } };
+    const b = { x: [1, 2, { y: "z" }], w: { nested: [true, false] } };
+    expect(deepEqual(a, b)).toBe(true);
+  });
+
+  it("should return false when comparing nested structures with a differing leaf value", () => {
+    const a = { x: [1, 2, { y: "z" }] };
+    const b = { x: [1, 2, { y: "different" }] };
+    expect(deepEqual(a, b)).toBe(false);
+  });
+
+  it("should return false when objects have a key-count mismatch", () => {
+    const a = { x: 1, y: 2 };
+    const b = { x: 1 };
+    expect(deepEqual(a, b)).toBe(false);
+  });
+
+  it("should return false when comparing an array to a plain object with matching indices", () => {
+    const a = [1, 2, 3];
+    const b = { 0: 1, 1: 2, 2: 3 };
+    expect(deepEqual(a, b)).toBe(false);
+  });
+
+  it("should return false when comparing null to an empty object", () => {
+    expect(deepEqual(null, {})).toBe(false);
+  });
+
+  it("should return true when comparing null to null", () => {
+    expect(deepEqual(null, null)).toBe(true);
+  });
+
+  it("should return false when arrays have different lengths", () => {
+    expect(deepEqual([1, 2], [1, 2, 3])).toBe(false);
+  });
+
+  it("should return true when comparing two empty arrays", () => {
+    expect(deepEqual([], [])).toBe(true);
+  });
+
+  it("should return true when comparing two empty objects", () => {
+    expect(deepEqual({}, {})).toBe(true);
+  });
+
+  it("should return false when comparing undefined to null", () => {
+    expect(deepEqual(undefined, null)).toBe(false);
+  });
+});

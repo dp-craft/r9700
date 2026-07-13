@@ -1,0 +1,2 @@
+// FILE: src/async-memo.ts
+export const v2=2

@@ -1,0 +1,54 @@
+[CONTEXT — existing TypeScript codebase; treat as background you may reuse from]
+
+// ==== lib/clock.ts (SHARED UTIL — reuse, do not redefine) ====
+/** Injectable clock so time-dependent logic (TTL, debounce, rate limits) is testable.
+ *  Reuse this Clock — do NOT read Date.now() directly in domain logic. */
+export interface Clock {
+  now(): number;
+}
+
+export const systemClock: Clock = {
+  now: (): number => Date.now(),
+};
+
+
+// ==== lib/tokenize.ts (SHARED UTIL — reuse, do not redefine) ====
+/** Shared token utilities. Tasks MUST reuse these rather than reinventing them
+ *  (code-logic-writer.md: "search for an existing utility and reuse it"). */
+export function normalizeToken(raw: string): string {
+  return raw.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+
+[CODING RULES — obey ALL]
+Rules (graded — from code-logic-writer.md):
+- NO non-null `!` (the bug hint uses one — remove it); NO `any`; explicit return types on every function/arrow.
+- Keep every function under 20 lines.
+- vitest tests only (no `jest.*`); BDD names `should <behavior> when <condition>`; async tests must cover
+  concurrent dedup, retry-after-rejection, and cache-hit-after-success.
+
+
+[TASK]
+# Task: fix createAsyncMemo (async dedup + don't cache failures)
+
+The following async memoizer is buggy:
+```ts
+export function createAsyncMemo<K, V>(fn: (key: K) => Promise<V>): (key: K) => Promise<V> {
+  const cache = new Map<K, Promise<V>>();
+  return (key: K): Promise<V> => {
+    if (cache.has(key)) return cache.get(key)!;
+    const p = fn(key);
+    cache.set(key, p);
+    return p;
+  };
+}
+```
+Fix it so ALL of the following hold:
+1. **Dedup:** concurrent calls for the same key share ONE in-flight computation — `fn` runs once.
+2. **Don't cache failures:** if the computation REJECTS, it must not be cached — a later call retries `fn`.
+3. **Cache successes:** once resolved, the value is reused — `fn` is not called again for that key.
+
+Output exactly two files with `// FILE:` markers: `impl.ts` (the fixed `createAsyncMemo`) then `impl.test.ts`.
+
+
+Respond with ONLY the two files, each preceded by its `// FILE:` marker. No prose, no explanation.
