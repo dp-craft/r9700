@@ -6,16 +6,19 @@ adds the SUBJECTIVE axes a toolchain can't measure — design, clarity, robustne
 judge model to review each candidate. **Blind:** the prompt never reveals which config/model produced
 the answer. Works against any OpenAI-compatible endpoint (hosted API or a strong local model).
 
-Because the 27B under test IS the strongest LOCAL model, the judge is Claude via the `claude` CLI, run
-THROUGH tmux (--engine claude-tmux; headless/background claude is restricted here) — or any stronger
-hosted model (--engine http). Human-readable rubric + run modes: JUDGE.md (kept in sync with this
-file). Saves BOTH the parsed scores (--out judge_scores.jsonl: config/task_id/rep/design/clarity/
-robustness/notes) AND the full judge prompt+reply (--raw judge_raw.jsonl) so every input is committable
-+ auditable. Resumable: (config,task_id,rep) already in --out are skipped.
+Because the 27B under test IS the strongest LOCAL model, the judge is Claude. Judging one reply is a
+small self-contained review, so --engine claude-tmux does NOT boot claude per reply: it runs ONE
+interactive claude session (via the tmux gateway claude_ask.sh; headless/background is restricted here)
+that FANS OUT one cheap blind haiku subagent per batch of candidates, in parallel. Python does the
+deterministic prep + parsing on either side. Or use any stronger hosted model per-reply (--engine http).
+Human-readable rubric + run modes: JUDGE.md (kept in sync with this file). Saves BOTH the parsed scores
+(--out judge_scores.jsonl: config/task_id/rep/design/clarity/robustness/notes) AND the raw verdict
+(--raw judge_raw.jsonl) so every judgement is committable + auditable. Resumable: (config,task_id,rep)
+already in --out are skipped; subagents also skip candidates whose verdict file already exists.
 
   # Claude via tmux (local box, 27B is the best local model) — needs a tmux session (see claude_ask.sh):
   python3 judge.py --engine claude-tmux --outputs out/outputs.jsonl --tasks tasks.jsonl \
-      --model opus --out out/judge_scores.jsonl --raw out/judge_raw.jsonl
+      --model opus --subagent-model haiku --out out/judge_scores.jsonl --raw out/judge_raw.jsonl
   # or a hosted OpenAI-compatible endpoint:
   JUDGE_API_KEY=... python3 judge.py --engine http --base-url https://api.example/v1 --model my-judge \
       --outputs out/outputs.jsonl --tasks tasks.jsonl --out out/judge_scores.jsonl --raw out/judge_raw.jsonl
@@ -69,27 +72,111 @@ def call_http(base, model, key, prompt, timeout=300):
     return obj["choices"][0]["message"]["content"]
 
 
-def call_claude_tmux(model, prompt, timeout=900):
-    """Ask the judge prompt through the tmux gateway (claude_ask.sh) — headless/background claude is
-    restricted here, so it runs as an INTERACTIVE claude session in a tmux window, driven by typed
-    keystrokes exactly as a human would. We stage the prompt as a file; claude reads it, does the
-    review, and writes ONLY its answer back to the result file, which we read and return verbatim for
-    parse_scores (the reply is the free-text/JSON the model produced, no envelope to unwrap)."""
-    os.makedirs(JUDGE_IO, exist_ok=True)
-    pf = os.path.join(JUDGE_IO, "judge.prompt.txt"); rf = os.path.join(JUDGE_IO, "judge.result.txt")
+# --- claude-tmux path: ONE interactive claude session that FANS OUT haiku subagents ---------------
+# Judging one reply is a small, self-contained review, so we don't boot claude per reply. Instead
+# Python does the deterministic prep (extract each candidate's code, split into batch manifests), then a
+# SINGLE claude session (via the tmux gateway) fans out one cheap haiku subagent per batch to score them
+# in parallel. Each subagent is blind (sees only spec + code). Python re-collects and parses the verdict
+# files, so the fragile bit (JSON parsing / row assembly) stays deterministic.
+ORCH = """You are orchestrating a BLIND TypeScript code-review judging pass. Do NOT review any code
+yourself — your ONLY job is to fan out subagents and make sure every verdict file gets written.
+
+Paths (relative to the current directory):
+  out/.judge-io/rubric.txt        the scoring rubric (0-5 on design, clarity, robustness)
+  out/.judge-io/batches/*.jsonl   {n} batch files; each line is one candidate: {{"id":..., "spec":<path>, "code":<path>}}
+  out/.judge-io/results/          write verdicts here, one <id>.json per candidate
+
+For EACH of the {n} batch files, launch ONE subagent with the Task tool (model "{sub}", subagent_type
+"general-purpose"), all in parallel. Instruct each subagent to do exactly this for its one batch file:
+
+  1. Read out/.judge-io/rubric.txt.
+  2. For EVERY candidate line in its batch file:
+     - if out/.judge-io/results/<id>.json already exists and is non-empty, skip that candidate;
+     - otherwise read the candidate's `spec` file and `code` file, score it per the rubric, and write
+       ONLY a JSON object {{"design":N,"clarity":N,"robustness":N,"notes":"<=1 sentence"}} to
+       out/.judge-io/results/<id>.json  (<id> is that candidate's id). Write nothing else to that file.
+  3. The review is BLIND: it sees only the spec and the code, never which model/config produced it.
+
+When all subagents have finished, verify out/.judge-io/results/ holds one <id>.json for every candidate
+id across all batch files; re-dispatch a subagent for any that are missing. Then write a one-line
+confirmation ("judged <count> candidates") as your final answer — that is what the harness collects.
+"""
+
+
+def prepare_fanout(outputs_path, tiers, done, io_dir, batch_size):
+    """Deterministic prep: write each pending candidate's code to a file, the rubric to a file, and split
+    the work into batch manifests. Returns (items, n_batches)."""
+    cand, res, bat = (os.path.join(io_dir, d) for d in ("candidates", "results", "batches"))
+    for d in (cand, res, bat):
+        os.makedirs(d, exist_ok=True)
+    for f in os.listdir(bat):                                   # clear stale batches from a prior run
+        os.remove(os.path.join(bat, f))
+    items = []
+    with open(outputs_path) as fh:
+        for l in fh:
+            if not l.strip():
+                continue
+            o = json.loads(l)
+            cfg, tid, rep = o.get("config"), o.get("task_id"), o.get("rep", 0)
+            if o.get("error") or not o.get("response") or (cfg, tid, rep) in done:
+                continue
+            files = extract_files(THINK_RE.sub("", o["response"]))
+            if not files:
+                continue
+            cid = re.sub(r"[^A-Za-z0-9_.-]", "_", f"{cfg}__{tid}__rep{rep}")
+            with open(os.path.join(cand, cid + ".txt"), "w") as cf:
+                cf.write("\n\n".join(f"// FILE: {p}\n{c}" for p, c in files.items()))
+            items.append({"id": cid, "config": cfg, "task_id": tid, "rep": rep, "tier": tiers.get(tid, "?"),
+                          "spec": f"ts-harness/tasks/{tid}/spec.md", "code": f"out/.judge-io/candidates/{cid}.txt"})
+    nb = 0
+    for i in range(0, len(items), batch_size):
+        with open(os.path.join(bat, f"batch-{nb:03d}.jsonl"), "w") as bf:
+            for it in items[i:i + batch_size]:
+                bf.write(json.dumps({"id": it["id"], "spec": it["spec"], "code": it["code"]}) + "\n")
+        nb += 1
+    with open(os.path.join(io_dir, "rubric.txt"), "w") as rf:
+        rf.write(RUBRIC + "\n")
+    return items, nb
+
+
+def run_claude_once(prompt_text, result_path, model, timeout):
+    """One interactive claude session via the tmux gateway (claude_ask.sh)."""
+    os.makedirs(os.path.dirname(result_path), exist_ok=True)
+    pf = os.path.join(os.path.dirname(result_path), "orch_prompt.txt")
     with open(pf, "w") as f:
-        f.write(prompt)
-    cmd = [os.path.join(HERE, "claude_ask.sh"), "--prompt", pf, "--result", rf, "--cwd", HERE]
+        f.write(prompt_text)
+    cmd = [os.path.join(HERE, "claude_ask.sh"), "--prompt", pf, "--result", result_path, "--cwd", HERE]
     if model:
         cmd += ["--model", model]
     env = dict(os.environ, CLAUDE_ASK_TIMEOUT=str(timeout))
-    r = subprocess.run(cmd, capture_output=True, text=True, env=env)
-    if r.returncode != 0:
-        raise RuntimeError((r.stderr or "claude_ask.sh failed")[-600:])
-    if not os.path.exists(rf) or os.path.getsize(rf) == 0:
-        raise RuntimeError("claude produced no result file")
-    with open(rf) as f:
-        return f.read()
+    return subprocess.run(cmd, env=env).returncode
+
+
+def collect_fanout(items, io_dir, out_path, raw_path):
+    """Read each subagent's verdict file, parse it (robust), and write the score rows + raw audit."""
+    res = os.path.join(io_dir, "results")
+    fout = open(out_path, "a"); fraw = open(raw_path, "a") if raw_path else None
+    ok = miss = bad = 0
+    for it in items:
+        rp = os.path.join(res, it["id"] + ".json")
+        if not os.path.exists(rp) or os.path.getsize(rp) == 0:
+            miss += 1; print(f"  MISSING verdict: {it['id']}", file=sys.stderr); continue
+        with open(rp) as f:
+            raw = f.read()
+        if fraw:
+            fraw.write(json.dumps({"config": it["config"], "task_id": it["task_id"], "rep": it["rep"],
+                                   "code": it["code"], "raw": raw}) + "\n")
+        sc = parse_scores(raw)
+        if not sc:
+            bad += 1; print(f"  UNPARSEABLE verdict: {it['id']}", file=sys.stderr); continue
+        fout.write(json.dumps({"config": it["config"], "task_id": it["task_id"], "rep": it["rep"],
+                               "tier": it["tier"], **sc}) + "\n")
+        ok += 1
+    fout.close()
+    if fraw:
+        fraw.close()
+    print(f"collected {ok}/{len(items)} verdicts ({miss} missing, {bad} unparseable) -> {out_path}", file=sys.stderr)
+    return ok
 
 
 def parse_scores(text):
@@ -111,36 +198,9 @@ def parse_scores(text):
     return out
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--outputs", required=True)
-    ap.add_argument("--tasks", required=True)
-    ap.add_argument("--engine", choices=["http", "claude-tmux"], default="http",
-                    help="http = any OpenAI-compatible endpoint; claude-tmux = `claude` via the tmux "
-                         "gateway (use this when 27B is the strongest LOCAL model, so Claude must judge)")
-    ap.add_argument("--base-url", default="", help="required for --engine http")
-    ap.add_argument("--model", default="")
-    ap.add_argument("--out", required=True)
-    ap.add_argument("--raw", default="")
-    ap.add_argument("--key-env", default="JUDGE_API_KEY", help="env var holding the API key (if any)")
-    a = ap.parse_args()
+def judge_http(a, tiers, done):
+    """Per-reply loop against any OpenAI-compatible endpoint (a hosted/remote stronger model)."""
     key = os.environ.get(a.key_env, "")
-    if a.engine == "http" and not a.base_url:
-        sys.exit("--engine http needs --base-url (an OpenAI-compatible /v1). "
-                 "For a local box where 27B is the best model, use --engine claude-tmux instead.")
-
-    # matrix tasks only, and remember tiers for the score rows
-    tiers = {}
-    for l in open(a.tasks):
-        if l.strip():
-            t = json.loads(l); tiers[t["id"]] = t.get("tier", "?")
-
-    done = set()
-    if os.path.exists(a.out):
-        for l in open(a.out):
-            if l.strip():
-                r = json.loads(l); done.add((r.get("config"), r.get("task_id"), r.get("rep")))
-
     n = ok = 0
     fout = open(a.out, "a"); fraw = open(a.raw, "a") if a.raw else None
     for l in open(a.outputs):
@@ -157,8 +217,7 @@ def main():
         prompt = judge_prompt(tid, code)
         n += 1
         try:
-            raw = (call_claude_tmux(a.model, prompt) if a.engine == "claude-tmux"
-                   else call_http(a.base_url, a.model, key, prompt))
+            raw = call_http(a.base_url, a.model, key, prompt)
         except Exception as e:
             print(f"  [{cfg}] {tid} rep{rep}: JUDGE ERROR {e}", file=sys.stderr)
             continue
@@ -173,7 +232,69 @@ def main():
         fout.write(json.dumps(row) + "\n"); fout.flush()
         ok += 1
         print(f"  [{cfg}] {tid} rep{rep}: design={sc['design']} clarity={sc['clarity']} robustness={sc['robustness']}")
+    fout.close()
+    if fraw:
+        fraw.close()
     print(f"judged {ok}/{n} replies -> {a.out}", file=sys.stderr)
+
+
+def judge_fanout(a, tiers, done):
+    """One interactive claude session fans out haiku subagents (one per batch); Python collects."""
+    os.makedirs(JUDGE_IO, exist_ok=True)
+    items, nb = prepare_fanout(a.outputs, tiers, done, JUDGE_IO, a.batch_size)
+    if not items:
+        print("judge: nothing to do (all replies already judged, or no gradable code)", file=sys.stderr)
+        return
+    print(f"judge: fanning out {len(items)} candidates in {nb} '{a.subagent_model}'-subagent batches "
+          f"via ONE claude session (orchestrator={a.model or 'default'})", file=sys.stderr)
+    prompt = ORCH.format(n=nb, sub=a.subagent_model)
+    rc = run_claude_once(prompt, os.path.join(JUDGE_IO, "orch_result.txt"), a.model, a.timeout)
+    if rc != 0:
+        print(f"judge: claude orchestration returned {rc} (see out/.judge-io/orch_result.txt.err) — "
+              f"collecting whatever verdicts landed", file=sys.stderr)
+    collect_fanout(items, JUDGE_IO, a.out, a.raw)
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--outputs", required=True)
+    ap.add_argument("--tasks", required=True)
+    ap.add_argument("--engine", choices=["http", "claude-tmux"], default="http",
+                    help="http = any OpenAI-compatible endpoint; claude-tmux = ONE claude session (via "
+                         "the tmux gateway) that fans out haiku subagents (use when 27B is the strongest "
+                         "LOCAL model, so Claude must judge)")
+    ap.add_argument("--base-url", default="", help="required for --engine http")
+    ap.add_argument("--model", default="", help="claude-tmux: the ORCHESTRATOR model; http: the judge model")
+    ap.add_argument("--subagent-model", dest="subagent_model", default="haiku",
+                    help="claude-tmux: model each blind judging subagent runs on (default haiku — the "
+                         "review is simple, so a cheap fast model per candidate)")
+    ap.add_argument("--batch-size", dest="batch_size", type=int, default=8,
+                    help="claude-tmux: candidates per subagent batch")
+    ap.add_argument("--timeout", type=int, default=2400, help="claude-tmux: seconds for the whole fan-out")
+    ap.add_argument("--out", required=True)
+    ap.add_argument("--raw", default="")
+    ap.add_argument("--key-env", default="JUDGE_API_KEY", help="env var holding the API key (if any)")
+    a = ap.parse_args()
+    if a.engine == "http" and not a.base_url:
+        sys.exit("--engine http needs --base-url (an OpenAI-compatible /v1). "
+                 "For a local box where 27B is the best model, use --engine claude-tmux instead.")
+
+    # matrix tasks only, and remember tiers for the score rows
+    tiers = {}
+    for l in open(a.tasks):
+        if l.strip():
+            t = json.loads(l); tiers[t["id"]] = t.get("tier", "?")
+
+    done = set()
+    if os.path.exists(a.out):
+        for l in open(a.out):
+            if l.strip():
+                r = json.loads(l); done.add((r.get("config"), r.get("task_id"), r.get("rep")))
+
+    if a.engine == "claude-tmux":
+        judge_fanout(a, tiers, done)
+    else:
+        judge_http(a, tiers, done)
 
 
 if __name__ == "__main__":

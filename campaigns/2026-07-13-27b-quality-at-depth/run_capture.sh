@@ -27,7 +27,8 @@ SERVE="$REPO/bench/engine-bench/serve_llamacpp.sh"
 : "${WAIT:=600}"                       # 128k cold load can take ~3 min
 # claude-driven steps (default ON → one script, no human interaction). Both run THROUGH tmux.
 : "${JUDGE_ENGINE:=claude-tmux}"       # claude-tmux | http | none
-: "${JUDGE_MODEL:=opus}"               # judge must be STRONGER than the 27B under test
+: "${JUDGE_MODEL:=opus}"               # claude-tmux: ORCHESTRATOR model (http: the judge model)
+: "${JUDGE_SUBAGENT_MODEL:=haiku}"     # claude-tmux: the blind per-candidate judging subagents (cheap/fast)
 : "${SUMMARY:=1}"                      # 1 = auto-write analysis.md via the benchmark-results skill
 : "${SUMMARY_MODEL:=opus}"
 : "${CLAUDE_TMUX_SESSION:=claude-run}"
@@ -148,9 +149,10 @@ python3 "$HERE/score_typescript.py" batch --outputs "$OUT" --tasks "$HERE/tasks.
 # JUDGE_BASE_URL). Both save the full prompt+raw reply (judge_raw.jsonl) AND parsed scores. Rubric: JUDGE.md.
 case "$JUDGE_ENGINE" in
   claude-tmux)
-    echo; echo "=== blind judge via claude (tmux, model=$JUDGE_MODEL) ==="
+    echo; echo "=== blind judge: ONE claude session fans out $JUDGE_SUBAGENT_MODEL subagents (orchestrator=$JUDGE_MODEL) ==="
     python3 "$HERE/judge.py" --engine claude-tmux --outputs "$OUT" --tasks "$HERE/tasks.jsonl" \
-      --model "$JUDGE_MODEL" --out "$OUTDIR/judge_scores.jsonl" --raw "$OUTDIR/judge_raw.jsonl" \
+      --model "$JUDGE_MODEL" --subagent-model "$JUDGE_SUBAGENT_MODEL" \
+      --out "$OUTDIR/judge_scores.jsonl" --raw "$OUTDIR/judge_raw.jsonl" \
       || echo "judge step failed (see above / JUDGE.md)" ;;
   http)
     echo; echo "=== blind judge via HTTP (${JUDGE_BASE_URL:-UNSET}) ==="

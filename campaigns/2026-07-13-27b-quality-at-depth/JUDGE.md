@@ -33,28 +33,35 @@ can change `AXES`/`RUBRIC` (here and in `judge.py`) without touching the charts.
 
 ## Three ways to run it
 
-### 1. Automatic — Claude via tmux (default; fully hands-off)
-Headless/background `claude` is restricted here, so every claude call runs as an **interactive** session
-driven **through tmux** — exactly as a human would use it (no `claude -p`). Start the session **once**,
-then the runner does the rest:
+### 1. Automatic — Claude via tmux, **one session fanning out subagents** (default; fully hands-off)
+Headless/background `claude` is restricted here, so claude runs as an **interactive** session driven
+**through tmux** — as a human would (no `claude -p`). But judging one reply is a small self-contained
+review, so we do **not** boot claude per reply. **One** claude session fans out **one cheap blind
+`haiku` subagent per batch of candidates, in parallel**. Start the tmux session **once**, then the runner
+does the rest:
 
 ```bash
 tmux new-session -d -s claude-run                      # ONCE (name overridable: CLAUDE_TMUX_SESSION)
 bash run_capture.sh                                    # judges (and writes analysis.md) automatically
 # or judge an existing run without re-capturing:
-python3 judge.py --engine claude-tmux --model opus \
+python3 judge.py --engine claude-tmux --model opus --subagent-model haiku \
   --outputs out/outputs.jsonl --tasks tasks.jsonl \
   --out out/judge_scores.jsonl --raw out/judge_raw.jsonl
 ```
-Mechanism (`claude_ask.sh`): per reply, the rubric+spec+code is staged to a **prompt file**; the gateway
-opens an interactive `claude` in a fresh tmux window and **types a one-line request** ("read that file,
-do the task, write your answer to this result file"), then waits for the result file to settle and reads
-it back. Nothing large or multi-line is ever typed — only the short request line — so keystroke injection
-stays reliable. It runs with `--cwd` inside the (trusted) repo so there is no folder-trust dialog and the
-result file is an in-workspace edit `acceptEdits` auto-approves; the candidate's config/model never
-appears in the prompt, so the judge stays **blind**. If the tmux session is missing, it **errors and
-tells you to start it** — it never silently falls back to headless. Resumable: replies already in
-`out/judge_scores.jsonl` are skipped.
+Mechanism: **Python does the deterministic prep** — for each not-yet-judged reply it strips `<think>`,
+extracts the code to `out/.judge-io/candidates/<id>.txt`, and splits the work into batch manifests
+(`out/.judge-io/batches/*.jsonl`) plus a single `rubric.txt`. Then `claude_ask.sh` opens **one**
+interactive `claude` in a tmux window and **types a one-line request** pointing it at an orchestration
+prompt (the heavy content lives in files, so only a short line is ever typed → reliable keystrokes). That
+claude session is a pure **orchestrator**: it launches one `--subagent-model` (`haiku`) subagent per batch
+via the Task tool, each of which reads the rubric + a candidate's spec + code and writes
+`out/.judge-io/results/<id>.json`. **Python then re-collects and parses** those verdict files
+(`parse_scores`, robust to fenced/extra text) into `out/judge_scores.jsonl` — so the fragile bit stays
+deterministic. It runs `--cwd` inside the (trusted) repo (no folder-trust dialog; `acceptEdits` covers the
+in-workspace writes); each subagent sees only spec + code, never which model/config produced it, so the
+judge stays **blind**. If the tmux session is missing it **errors with the start command** — never a
+silent headless fallback. Resumable at both levels: replies already in `out/judge_scores.jsonl` are
+skipped in prep, and a subagent skips any candidate whose verdict file already exists.
 
 ### 2. Automatic — any stronger hosted model (OpenAI-compatible)
 ```bash
