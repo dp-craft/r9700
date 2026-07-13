@@ -1,18 +1,29 @@
 #!/usr/bin/env bash
-# claude_ask.sh — run ONE `claude -p` call THROUGH tmux and capture its result to a file.
-#
-# Why tmux: headless/background claude is restricted in this environment, so every claude call must run
-# inside a real terminal (a tmux window = a PTY). This is the single gateway both the judge (judge.py)
-# and the final-summary step use. The prompt is fed on stdin (no argv escaping of code-laden prompts);
-# output is the `--output-format json` envelope written to --result (stderr -> --result.err).
+# claude_ask.sh — drive an INTERACTIVE `claude` session THROUGH tmux, exactly the way a human uses it:
+# open `claude` in a tmux window, TYPE a one-line request that points it at a prompt file and asks it to
+# write its answer to a result file, wait for that file, then close the window. **No `claude -p`, no
+# headless/background** — every call is a real interactive session driven by simulated keystrokes.
 #
 #   claude_ask.sh --prompt PROMPT_FILE --result RESULT_FILE [--cwd DIR] [--model M] [--permission-mode MODE]
 #
-# Requires a pre-existing tmux session (default: claude-run); if absent it errors and tells you to start
-# one — it will NOT silently fall back to headless. Env: CLAUDE_TMUX_SESSION, CLAUDE_ASK_TIMEOUT (s).
+# The heavy content (rubric, candidate code, task) lives in PROMPT_FILE; we only TYPE a short single-line
+# request that references it, so nothing large or multi-line is ever sent through the keyboard (a newline
+# would submit early). Completion is detected by watching RESULT_FILE settle — claude writes it with its
+# Write tool. Keep PROMPT_FILE/RESULT_FILE inside the repo tree and --cwd inside the repo so the session
+# lands in an already-trusted project (no folder-trust dialog) and RESULT_FILE is an in-workspace edit
+# that --permission-mode acceptEdits auto-approves.
+#
+# Requires a pre-existing tmux session (default: claude-run); errors with the start command if absent —
+# it will NOT fall back to headless. Env knobs:
+#   CLAUDE_TMUX_SESSION   session to open the window in            (default claude-run)
+#   CLAUDE_ASK_TIMEOUT    seconds to wait for the answer file      (default 900)
+#   CLAUDE_ASK_STARTUP    seconds to let claude boot before typing (default 8)
+#   CLAUDE_ASK_STABLE     seconds RESULT_FILE size must hold steady to count as done (default 3)
 set -uo pipefail
 : "${CLAUDE_TMUX_SESSION:=claude-run}"
 : "${CLAUDE_ASK_TIMEOUT:=900}"
+: "${CLAUDE_ASK_STARTUP:=8}"
+: "${CLAUDE_ASK_STABLE:=3}"
 
 prompt="" result="" cwd="$PWD" model="" pmode="acceptEdits"
 while [ $# -gt 0 ]; do
@@ -26,13 +37,14 @@ while [ $# -gt 0 ]; do
   esac
 done
 [ -n "$prompt" ] && [ -n "$result" ] || { echo "claude_ask.sh: need --prompt and --result" >&2; exit 2; }
+[ -f "$prompt" ] || { echo "claude_ask.sh: prompt file not found: $prompt" >&2; exit 2; }
 command -v tmux >/dev/null 2>&1 || { echo "claude_ask.sh: tmux is not installed" >&2; exit 3; }
 command -v claude >/dev/null 2>&1 || { echo "claude_ask.sh: 'claude' CLI not on PATH" >&2; exit 3; }
 
 if ! tmux has-session -t "$CLAUDE_TMUX_SESSION" 2>/dev/null; then
   {
-    echo "ERROR: claude must run through tmux (headless/background is restricted), but tmux session"
-    echo "       '$CLAUDE_TMUX_SESSION' does not exist. Start it once, then re-run:"
+    echo "ERROR: claude runs INTERACTIVELY through tmux here (headless/background is restricted), but"
+    echo "       tmux session '$CLAUDE_TMUX_SESSION' does not exist. Start it once, then re-run:"
     echo
     echo "         tmux new-session -d -s $CLAUDE_TMUX_SESSION"
     echo
@@ -41,21 +53,54 @@ if ! tmux has-session -t "$CLAUDE_TMUX_SESSION" 2>/dev/null; then
   exit 3
 fi
 
-done_f="$result.done"; err_f="$result.err"; rm -f "$done_f" "$result" "$err_f"
-cargs=(-p --output-format json --permission-mode "$pmode")
-[ -n "$model" ] && cargs+=(--model "$model")
+# absolute paths, so whatever cwd claude runs in doesn't affect locating the files
+prompt="$(cd "$(dirname "$prompt")" && pwd)/$(basename "$prompt")"
+result="$(cd "$(dirname "$result")" && pwd)/$(basename "$result")"
+err_f="$result.err"; rm -f "$result" "$err_f"
 
-# Build the in-window command with safe quoting; $? stays literal (single-quoted printf format).
-inner=$(printf 'cd %q && claude' "$cwd")
-for a in "${cargs[@]}"; do inner+=$(printf ' %q' "$a"); done
-inner+=$(printf ' < %q > %q 2> %q; echo $? > %q' "$prompt" "$result" "$err_f" "$done_f")
+# 1. open an interactive claude in a fresh tmux window; capture ITS pane id so we drive exactly this one.
+#    `exec` replaces the shell with claude so kill-pane later tears down claude cleanly.
+if [ -n "$model" ]; then
+  launch=$(printf 'cd %q && exec claude --permission-mode %q --model %q' "$cwd" "$pmode" "$model")
+else
+  launch=$(printf 'cd %q && exec claude --permission-mode %q' "$cwd" "$pmode")
+fi
+pane=$(tmux new-window -t "$CLAUDE_TMUX_SESSION" -P -F '#{pane_id}' "$launch")
+[ -n "$pane" ] || { echo "claude_ask.sh: failed to open tmux window" >&2; exit 3; }
+cleanup() { tmux capture-pane -p -S -400 -t "$pane" > "$result.transcript" 2>/dev/null || true
+            tmux kill-pane -t "$pane" 2>/dev/null || true; }
+trap cleanup EXIT
 
-tmux new-window -t "$CLAUDE_TMUX_SESSION" "$inner"
+# 2. let claude boot, then TYPE the request like a human and press Enter. Single line only (a newline
+#    would submit prematurely); the bulky task text stays in PROMPT_FILE, never on the keyboard.
+sleep "$CLAUDE_ASK_STARTUP"
+req="Read the file ${prompt} . It contains exactly one task. Do that task, then write your final answer to the file ${result} (that file must contain ONLY the answer itself, with no preamble or commentary). Writing that file is the last thing you do."
+tmux send-keys -t "$pane" -l "$req"
+sleep 1
+tmux send-keys -t "$pane" Enter
 
-waited=0
-while [ ! -f "$done_f" ]; do
+# 3. wait for RESULT_FILE to appear and settle (size unchanged for CLAUDE_ASK_STABLE consecutive polls).
+waited=0; last=-1; stable=0
+while :; do
+  if [ -f "$result" ]; then
+    sz=$(stat -c%s "$result" 2>/dev/null || echo 0)
+    if [ "$sz" -gt 0 ] && [ "$sz" = "$last" ]; then
+      stable=$((stable + 1))
+      [ "$stable" -ge "$CLAUDE_ASK_STABLE" ] && exit 0
+    else
+      stable=0
+    fi
+    last="$sz"
+  fi
+  if ! tmux capture-pane -p -t "$pane" >/dev/null 2>&1; then
+    echo "claude_ask.sh: the claude window exited before writing $result" > "$err_f"
+    echo "claude_ask.sh: claude window closed before producing a result (see $err_f)" >&2
+    exit 4
+  fi
   sleep 1; waited=$((waited + 1))
-  [ "$waited" -ge "$CLAUDE_ASK_TIMEOUT" ] && { echo "claude_ask.sh: timed out after ${CLAUDE_ASK_TIMEOUT}s" >&2; exit 4; }
+  if [ "$waited" -ge "$CLAUDE_ASK_TIMEOUT" ]; then
+    tmux capture-pane -p -S -200 -t "$pane" > "$err_f" 2>/dev/null || true
+    echo "claude_ask.sh: timed out after ${CLAUDE_ASK_TIMEOUT}s waiting for $result (pane dump in $err_f)" >&2
+    exit 4
+  fi
 done
-rc="$(cat "$done_f" 2>/dev/null || echo 1)"
-exit "$rc"

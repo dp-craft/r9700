@@ -20,14 +20,17 @@ robustness/notes) AND the full judge prompt+reply (--raw judge_raw.jsonl) so eve
   JUDGE_API_KEY=... python3 judge.py --engine http --base-url https://api.example/v1 --model my-judge \
       --outputs out/outputs.jsonl --tasks tasks.jsonl --out out/judge_scores.jsonl --raw out/judge_raw.jsonl
 """
-import argparse, json, os, re, subprocess, sys, tempfile, urllib.request
+import argparse, json, os, re, subprocess, sys, urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from score_typescript import extract_files            # reuse the exact same code-block parser
-# a neutral cwd so `claude` does NOT auto-load the repo CLAUDE.md as context (a blind judge sees only
-# the prompt we give it — verified: cuts loaded context ~19k->4k tokens)
-NEUTRAL_CWD = tempfile.mkdtemp(prefix="judge-claude-")
+# claude_ask.sh drives an INTERACTIVE claude in tmux (typed like a human), so we stage the per-call
+# prompt/result files inside the repo tree and run claude with --cwd HERE. Staying inside the (already
+# trusted) repo avoids the folder-trust dialog and makes RESULT an in-workspace edit that acceptEdits
+# auto-approves. Blindness is preserved regardless: the candidate's model/config never appears in the
+# prompt — the repo CLAUDE.md that loads carries no clue about which cell produced the code.
+JUDGE_IO = os.path.join(HERE, "out", ".judge-io")
 
 THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
 AXES = ["design", "clarity", "robustness"]
@@ -67,24 +70,26 @@ def call_http(base, model, key, prompt, timeout=300):
 
 
 def call_claude_tmux(model, prompt, timeout=900):
-    """Run the judge prompt through the tmux gateway (claude_ask.sh) — headless/background claude is
-    restricted here, so it runs inside a tmux window (real PTY). Prompt on stdin (no argv escaping);
-    result is claude's `--output-format json` envelope; we return its `.result` text for parse_scores.
-    Runs from NEUTRAL_CWD so the repo CLAUDE.md isn't loaded (blind judge)."""
-    pf = os.path.join(NEUTRAL_CWD, "prompt.txt"); rf = os.path.join(NEUTRAL_CWD, "result.json")
+    """Ask the judge prompt through the tmux gateway (claude_ask.sh) — headless/background claude is
+    restricted here, so it runs as an INTERACTIVE claude session in a tmux window, driven by typed
+    keystrokes exactly as a human would. We stage the prompt as a file; claude reads it, does the
+    review, and writes ONLY its answer back to the result file, which we read and return verbatim for
+    parse_scores (the reply is the free-text/JSON the model produced, no envelope to unwrap)."""
+    os.makedirs(JUDGE_IO, exist_ok=True)
+    pf = os.path.join(JUDGE_IO, "judge.prompt.txt"); rf = os.path.join(JUDGE_IO, "judge.result.txt")
     with open(pf, "w") as f:
         f.write(prompt)
-    cmd = [os.path.join(HERE, "claude_ask.sh"), "--prompt", pf, "--result", rf, "--cwd", NEUTRAL_CWD]
+    cmd = [os.path.join(HERE, "claude_ask.sh"), "--prompt", pf, "--result", rf, "--cwd", HERE]
     if model:
         cmd += ["--model", model]
     env = dict(os.environ, CLAUDE_ASK_TIMEOUT=str(timeout))
     r = subprocess.run(cmd, capture_output=True, text=True, env=env)
     if r.returncode != 0:
         raise RuntimeError((r.stderr or "claude_ask.sh failed")[-600:])
-    env_json = json.load(open(rf))
-    if env_json.get("is_error"):
-        raise RuntimeError("claude is_error: " + str(env_json.get("result"))[:300])
-    return env_json.get("result", "")
+    if not os.path.exists(rf) or os.path.getsize(rf) == 0:
+        raise RuntimeError("claude produced no result file")
+    with open(rf) as f:
+        return f.read()
 
 
 def parse_scores(text):

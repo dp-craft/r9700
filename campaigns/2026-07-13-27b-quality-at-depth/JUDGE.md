@@ -34,8 +34,9 @@ can change `AXES`/`RUBRIC` (here and in `judge.py`) without touching the charts.
 ## Three ways to run it
 
 ### 1. Automatic — Claude via tmux (default; fully hands-off)
-Headless/background `claude` is restricted here, so every claude call runs **through tmux** (a real
-PTY). Start the session **once**, then the runner does the rest:
+Headless/background `claude` is restricted here, so every claude call runs as an **interactive** session
+driven **through tmux** — exactly as a human would use it (no `claude -p`). Start the session **once**,
+then the runner does the rest:
 
 ```bash
 tmux new-session -d -s claude-run                      # ONCE (name overridable: CLAUDE_TMUX_SESSION)
@@ -45,10 +46,15 @@ python3 judge.py --engine claude-tmux --model opus \
   --outputs out/outputs.jsonl --tasks tasks.jsonl \
   --out out/judge_scores.jsonl --raw out/judge_raw.jsonl
 ```
-Mechanism (`claude_ask.sh`): per reply, the rubric+spec+code is fed to `claude -p` **on stdin** inside a
-fresh tmux window (`--output-format json`), from a **neutral cwd** so the repo's CLAUDE.md is NOT loaded
-(the judge stays blind). If the tmux session is missing, it **errors and tells you to start it** — it
-never silently falls back to headless. Resumable: replies already in `out/judge_scores.jsonl` are skipped.
+Mechanism (`claude_ask.sh`): per reply, the rubric+spec+code is staged to a **prompt file**; the gateway
+opens an interactive `claude` in a fresh tmux window and **types a one-line request** ("read that file,
+do the task, write your answer to this result file"), then waits for the result file to settle and reads
+it back. Nothing large or multi-line is ever typed — only the short request line — so keystroke injection
+stays reliable. It runs with `--cwd` inside the (trusted) repo so there is no folder-trust dialog and the
+result file is an in-workspace edit `acceptEdits` auto-approves; the candidate's config/model never
+appears in the prompt, so the judge stays **blind**. If the tmux session is missing, it **errors and
+tells you to start it** — it never silently falls back to headless. Resumable: replies already in
+`out/judge_scores.jsonl` are skipped.
 
 ### 2. Automatic — any stronger hosted model (OpenAI-compatible)
 ```bash

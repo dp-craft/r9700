@@ -171,11 +171,13 @@ python3 "$REPO/campaigns/2026-07-12-27b-finetune-quality/make_charts.py" --dir "
 echo; echo "=== aggregate (deterministic digest → out/summary.md) ==="
 python3 "$HERE/aggregate.py" --dir "$OUTDIR" --out "$OUTDIR/summary.md" || echo "aggregate failed (see above)"
 
-# --- 6. auto-write analysis.md via the benchmark-results skill (claude, through tmux) ---
+# --- 6. auto-write analysis.md via the benchmark-results skill (interactive claude, through tmux) ---
+# claude_ask.sh opens an interactive claude in tmux and TYPES the request (no headless -p); claude runs
+# the skill, writes analysis.md, then writes a short confirmation to the result file to signal it's done.
 # The prompt points ONLY at the deterministic digest + charts — NOT the per-reply jsonl (outputs.jsonl
 # is 120 full replies incl. thinking). The model's job is prose synthesis, not aggregation.
 if [ "$SUMMARY" = "1" ]; then
-  echo; echo "=== final analysis (benchmark-results skill via claude/tmux, model=$SUMMARY_MODEL) ==="
+  echo; echo "=== final analysis (benchmark-results skill via interactive claude/tmux, model=$SUMMARY_MODEL) ==="
   sp="$OUTDIR/summary_prompt.txt"
   cat > "$sp" <<EOF
 You are finishing benchmark Campaign 3 in this repo. Follow the repo's benchmark-results skill
@@ -196,11 +198,14 @@ lists them: (a) budget optimum vs depth, (b) 64k->128k rule-adherence/reuse (los
 f16-vs-q8 @128k (<=5% rule), (d) capability vs haiku/Sonnet/Opus. Embed charts/appendix.md. Include a
 <!-- meta --> block (see docs/analysis/ examples) so docs/reindex.py can register it. If summary.md's
 Health line flags failures/runaways/GTT spill, surface them.
+
+This task is complete once analysis.md is fully written. Your final answer (the result file the harness
+asks for) is just a one-line confirmation, e.g. "analysis.md written (N cells)".
 EOF
-  bash "$HERE/claude_ask.sh" --prompt "$sp" --result "$OUTDIR/summary_result.json" \
+  bash "$HERE/claude_ask.sh" --prompt "$sp" --result "$OUTDIR/summary_result.txt" \
     --cwd "$REPO" --model "$SUMMARY_MODEL" --permission-mode acceptEdits \
     && echo "  analysis.md written by claude" \
-    || echo "  summary step failed (see $OUTDIR/summary_result.json.err)"
+    || echo "  summary step failed (see $OUTDIR/summary_result.txt.err)"
   # reindex is deterministic — do it here, not via the model
   python3 "$REPO/docs/reindex.py" 2>/dev/null && echo "  docs/INDEX.md reindexed" || echo "  (reindex skipped)"
 fi

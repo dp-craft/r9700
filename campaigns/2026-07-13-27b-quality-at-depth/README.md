@@ -107,10 +107,10 @@ MODELS_DIR=/path/to/gguf bash run_capture.sh     # models elsewhere
 ```
 
 > **One script, no human interaction.** It requires a **tmux session** first (`claude-run`) because
-> headless/background `claude` is restricted here — the judge and the final analysis run `claude`
-> *through tmux* (a real PTY). If the session is missing, the script **fails fast with the exact
-> command to start it**, before the hours-long capture. To run without any claude steps:
-> `JUDGE_ENGINE=none SUMMARY=0`.
+> headless/background `claude` is restricted here — the judge and the final analysis drive an
+> **interactive** `claude` *through tmux*, typing the request in like a human (no `claude -p`). If the
+> session is missing, the script **fails fast with the exact command to start it**, before the
+> hours-long capture. To run without any claude steps: `JUDGE_ENGINE=none SUMMARY=0`.
 
 The driver is **resumable** (per-cell `out/done/<label>` markers — a re-run skips finished cells) and
 **continues past a failed cell** (logged to `out/failures.txt`). End to end it: (1) per cell, starts one
