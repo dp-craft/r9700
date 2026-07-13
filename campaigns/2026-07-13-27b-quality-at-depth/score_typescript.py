@@ -76,7 +76,13 @@ def grade(impl_src, test_src, task_dir, cid="case"):
         edge_frac = (ep / et) if et else 0.0
 
     # static rule checks
-    reuse = bool(re.search(r'normalizeToken', impl_src) and re.search(r'from\s+["\'][^"\']*lib/tokenize', impl_src))
+    reuse = None                                   # per-task reuse target (tasks/<t>/reuse.json); None = n/a
+    rj = os.path.join(task_dir, "reuse.json")
+    if os.path.exists(rj):
+        spec = json.load(open(rj))
+        sym, mod = spec["symbol"], spec["module"]
+        reuse = bool(re.search(r'\b' + re.escape(sym) + r'\b', impl_src)
+                     and re.search(r'from\s+["\'][^"\']*' + re.escape(mod), impl_src))
     novj = not re.search(r'\bjest\b', test_src)
     titles = re.findall(r'(?:\bit|\btest)\s*\(\s*["\'`](.+?)["\'`]', test_src)
     bdd = (sum(1 for t in titles if re.search(r'should .+ when ', t, re.I)) / len(titles)) if titles else 0.0
@@ -85,14 +91,16 @@ def grade(impl_src, test_src, task_dir, cid="case"):
         "types": 1.0 if rc_types == 0 else 0.0,
         "lint": 1.0 if rc_lint == 0 else 0.0,
         "tests": (tp / tt) if tt else 0.0,
-        "reuse": 1.0 if reuse else 0.0,
         "bdd": round(bdd, 2),
         "novj": 1.0 if novj else 0.0,
     }
-    if edge_frac is not None:                      # only score edge when a hidden suite exists
+    if reuse is not None:                           # only score reuse when the task declares a target
+        obj["reuse"] = 1.0 if reuse else 0.0
+    if edge_frac is not None:                       # only score edge when a hidden suite exists
         obj["edge"] = round(edge_frac, 2)
     score = round(sum(obj[k] * WEIGHTS[k] for k in obj) / sum(WEIGHTS[k] for k in obj), 3)
-    gates = [obj["types"], obj["lint"], obj["tests"], obj["reuse"]] + ([obj["edge"]] if "edge" in obj else [])
+    gates = [obj["types"], obj["lint"], obj["tests"]]
+    gates += [obj[k] for k in ("reuse", "edge") if k in obj]
     hard_pass = all(g == 1 for g in gates)
     return {"id": cid, "score": score, "hard_pass": hard_pass, "objectives": obj,
             "test_counts": {"own": [tp, tt]}}

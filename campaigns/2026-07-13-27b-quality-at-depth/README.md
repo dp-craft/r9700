@@ -13,15 +13,18 @@ Research: `docs/research/2026-07-13-1712-hard-ts-quality-benchmark-design.md`.*
   **Stress test (`selftest`) PASSES**: good=**1.0** (hard-pass) > mediocre=**0.357** (partial: tests/bdd/novj pass;
   types/lint/reuse/edge fail) > bad=**0.0** — proves *smooth ordered discrimination*, not just binary, which is what
   lets temp/reasoning-effort separate.
-- **Difficulty-floor calibration (haiku-no-think as the gate).** A task is admitted only if a weak model
-  (haiku, no extended reasoning) **fails** it — otherwise it can't discriminate configs. Measured:
-  | task | haiku score | hard-pass | verdict |
-  |------|------------:|:---------:|---------|
-  | `count-words` (easy) | 0.949 | ✅ | too easy — smoke test only |
-  | `lru-cache` (hard) | **0.536** | ❌ | **admitted** — haiku fails lint/reuse/edge; headroom above for a strong 27B |
-  `rate-limiter` authored at the same bar (clock-injected token bucket — the lazy-refill pattern models
-  struggled with in C2). **Gate rule: run `score_typescript.py response` on a haiku answer per new task; keep
-  only those with haiku hard-pass=false.** Corpus vendored: 134 sanitized `.ts` (~75k tok), secrets excluded.
+- **Difficulty band — haiku (floor) vs Sonnet (ceiling), one-shot no-think.** A task is admitted only if the
+  weak model **fails** it and the strong model scores clearly higher (a real band the 27B configs land in):
+  | task | haiku (floor) | Sonnet (ceiling) | reads as |
+  |------|------------:|------------:|---------|
+  | `count-words` (easy) | 0.949 ✅ | — | smoke only (both pass) |
+  | `lru-cache` (hard) | 0.679 ❌ | 0.831 ❌ | ordered; even one-shot Sonnet can't hard-pass → deep headroom |
+  | `rate-limiter` (hard) | 0.834 ❌ | 0.982 ✅ | clean spread; ceiling hard-passes |
+  Both hard tasks are admitted (haiku hard-fails, Sonnet > haiku). `lint` (strict types + `<20`-line + reuse)
+  is the gate both struggle with on `lru-cache` — the intended discriminator. **Gate rule: a new task must have
+  haiku hard-pass=false AND Sonnet > haiku.** Corpus vendored: 134 sanitized `.ts` (~75k tok), secrets excluded.
+  ⚠️ The Sonnet cross-check exposed a grader bug (reuse target was hardcoded to count-words' util) — now
+  per-task via `tasks/<t>/reuse.json`; fixed + re-graded.
 - **Research verdict (adopt-vs-author):** ADOPT Exercism-TypeScript (MIT) + type-challenges (MIT) as the base TDD/typing
   corpus (vendor offline); AUTHOR only the long-context layer (find+reuse a planted util at 64–128k depth while obeying
   top-of-prompt rules) — no existing benchmark tests that shape. Multi-objective grading (COMPASS precedent) is *the*
