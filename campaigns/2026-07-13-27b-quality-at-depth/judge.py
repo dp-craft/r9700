@@ -6,11 +6,14 @@ adds the SUBJECTIVE axes a toolchain can't measure — design, clarity, robustne
 judge model to review each candidate. **Blind:** the prompt never reveals which config/model produced
 the answer. Works against any OpenAI-compatible endpoint (hosted API or a strong local model).
 
-Because the 27B under test IS the strongest LOCAL model, the judge is Claude. Judging one reply is a
-small self-contained review, so --engine claude-tmux does NOT boot claude per reply: it runs ONE
-interactive claude session (via the tmux gateway claude_ask.sh; headless/background is restricted here)
-that FANS OUT one cheap blind haiku subagent per batch of candidates, in parallel. Python does the
-deterministic prep + parsing on either side. Or use any stronger hosted model per-reply (--engine http).
+Because the 27B under test IS the strongest LOCAL model, the judge is Claude. --engine claude-tmux does
+NOT boot claude per reply: it runs ONE interactive claude session (via the tmux gateway claude_ask.sh;
+headless/background is restricted here) that FANS OUT one blind judge subagent per batch of candidates,
+in parallel — the fan-out is for PARALLELISM, not to save model strength. The subagent model must still
+clear the judging bar: it reviews opus-tier design/robustness, so it defaults to a STRONG single model
+(opus) — one model for every candidate keeps the 0-5 score scale internally consistent across tiers.
+Python does the deterministic prep + parsing on either side. Or use any stronger hosted model per-reply
+(--engine http).
 Human-readable rubric + run modes: JUDGE.md (kept in sync with this file). Saves BOTH the parsed scores
 (--out judge_scores.jsonl: config/task_id/rep/design/clarity/robustness/notes) AND the raw verdict
 (--raw judge_raw.jsonl) so every judgement is committable + auditable. Resumable: (config,task_id,rep)
@@ -18,7 +21,7 @@ already in --out are skipped; subagents also skip candidates whose verdict file 
 
   # Claude via tmux (local box, 27B is the best local model) — needs a tmux session (see claude_ask.sh):
   python3 judge.py --engine claude-tmux --outputs out/outputs.jsonl --tasks tasks.jsonl \
-      --model opus --subagent-model haiku --out out/judge_scores.jsonl --raw out/judge_raw.jsonl
+      --model opus --subagent-model opus --out out/judge_scores.jsonl --raw out/judge_raw.jsonl
   # or a hosted OpenAI-compatible endpoint:
   JUDGE_API_KEY=... python3 judge.py --engine http --base-url https://api.example/v1 --model my-judge \
       --outputs out/outputs.jsonl --tasks tasks.jsonl --out out/judge_scores.jsonl --raw out/judge_raw.jsonl
@@ -72,12 +75,13 @@ def call_http(base, model, key, prompt, timeout=300):
     return obj["choices"][0]["message"]["content"]
 
 
-# --- claude-tmux path: ONE interactive claude session that FANS OUT haiku subagents ---------------
-# Judging one reply is a small, self-contained review, so we don't boot claude per reply. Instead
-# Python does the deterministic prep (extract each candidate's code, split into batch manifests), then a
-# SINGLE claude session (via the tmux gateway) fans out one cheap haiku subagent per batch to score them
-# in parallel. Each subagent is blind (sees only spec + code). Python re-collects and parses the verdict
-# files, so the fragile bit (JSON parsing / row assembly) stays deterministic.
+# --- claude-tmux path: ONE interactive claude session that FANS OUT judge subagents ---------------
+# We don't boot claude per reply. Python does the deterministic prep (extract each candidate's code,
+# split into batch manifests), then a SINGLE claude session (via the tmux gateway) fans out one judge
+# subagent per batch to score them IN PARALLEL. The fan-out buys parallelism, not cheapness: the subagent
+# defaults to a strong model (opus) because it reviews opus-tier design/robustness, and one model judges
+# every candidate so the 0-5 scale stays consistent across tiers. Each subagent is blind (sees only spec
+# + code). Python re-collects and parses the verdict files, so the fragile bit stays deterministic.
 ORCH = """You are orchestrating a BLIND TypeScript code-review judging pass. Do NOT review any code
 yourself — your ONLY job is to fan out subagents and make sure every verdict file gets written.
 
@@ -239,7 +243,7 @@ def judge_http(a, tiers, done):
 
 
 def judge_fanout(a, tiers, done):
-    """One interactive claude session fans out haiku subagents (one per batch); Python collects."""
+    """One interactive claude session fans out judge subagents (one per batch); Python collects."""
     os.makedirs(JUDGE_IO, exist_ok=True)
     items, nb = prepare_fanout(a.outputs, tiers, done, JUDGE_IO, a.batch_size)
     if not items:
@@ -261,13 +265,15 @@ def main():
     ap.add_argument("--tasks", required=True)
     ap.add_argument("--engine", choices=["http", "claude-tmux"], default="http",
                     help="http = any OpenAI-compatible endpoint; claude-tmux = ONE claude session (via "
-                         "the tmux gateway) that fans out haiku subagents (use when 27B is the strongest "
-                         "LOCAL model, so Claude must judge)")
+                         "the tmux gateway) that fans out judge subagents in parallel (use when 27B is the "
+                         "strongest LOCAL model, so Claude must judge)")
     ap.add_argument("--base-url", default="", help="required for --engine http")
     ap.add_argument("--model", default="", help="claude-tmux: the ORCHESTRATOR model; http: the judge model")
-    ap.add_argument("--subagent-model", dest="subagent_model", default="haiku",
-                    help="claude-tmux: model each blind judging subagent runs on (default haiku — the "
-                         "review is simple, so a cheap fast model per candidate)")
+    ap.add_argument("--subagent-model", dest="subagent_model", default="opus",
+                    help="claude-tmux: model each blind judging subagent runs on. Default opus — the "
+                         "judge must exceed the 27B and resolve opus-tier design/robustness; use ONE "
+                         "strong model for all candidates so the 0-5 scale is consistent. 'sonnet' is a "
+                         "cheaper-but-still-strong single-judge alternative; avoid haiku (too coarse).")
     ap.add_argument("--batch-size", dest="batch_size", type=int, default=8,
                     help="claude-tmux: candidates per subagent batch")
     ap.add_argument("--timeout", type=int, default=2400, help="claude-tmux: seconds for the whole fan-out")

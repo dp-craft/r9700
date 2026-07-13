@@ -35,16 +35,19 @@ can change `AXES`/`RUBRIC` (here and in `judge.py`) without touching the charts.
 
 ### 1. Automatic — Claude via tmux, **one session fanning out subagents** (default; fully hands-off)
 Headless/background `claude` is restricted here, so claude runs as an **interactive** session driven
-**through tmux** — as a human would (no `claude -p`). But judging one reply is a small self-contained
-review, so we do **not** boot claude per reply. **One** claude session fans out **one cheap blind
-`haiku` subagent per batch of candidates, in parallel**. Start the tmux session **once**, then the runner
-does the rest:
+**through tmux** — as a human would (no `claude -p`). We do **not** boot claude per reply: **one** claude
+session fans out **one blind judge subagent per batch of candidates, in parallel**. The fan-out is for
+**parallelism, not to save model strength** — each subagent runs a **strong single model (`opus` by
+default)**, because it must clear the judging bar (exceed the 27B, resolve opus-tier design/robustness)
+and because using one model for every candidate keeps the 0-5 scale consistent across tiers. **Don't drop
+this to `haiku`** — it collapses the score distribution on the subtle judgments that matter. `sonnet` is a
+reasonable cheaper single-judge. Start the tmux session **once**, then the runner does the rest:
 
 ```bash
 tmux new-session -d -s claude-run                      # ONCE (name overridable: CLAUDE_TMUX_SESSION)
 bash run_capture.sh                                    # judges (and writes analysis.md) automatically
 # or judge an existing run without re-capturing:
-python3 judge.py --engine claude-tmux --model opus --subagent-model haiku \
+python3 judge.py --engine claude-tmux --model opus --subagent-model opus \
   --outputs out/outputs.jsonl --tasks tasks.jsonl \
   --out out/judge_scores.jsonl --raw out/judge_raw.jsonl
 ```
@@ -53,8 +56,8 @@ extracts the code to `out/.judge-io/candidates/<id>.txt`, and splits the work in
 (`out/.judge-io/batches/*.jsonl`) plus a single `rubric.txt`. Then `claude_ask.sh` opens **one**
 interactive `claude` in a tmux window and **types a one-line request** pointing it at an orchestration
 prompt (the heavy content lives in files, so only a short line is ever typed → reliable keystrokes). That
-claude session is a pure **orchestrator**: it launches one `--subagent-model` (`haiku`) subagent per batch
-via the Task tool, each of which reads the rubric + a candidate's spec + code and writes
+claude session is a pure **orchestrator**: it launches one `--subagent-model` (`opus` by default) subagent
+per batch via the Task tool, each of which reads the rubric + a candidate's spec + code and writes
 `out/.judge-io/results/<id>.json`. **Python then re-collects and parses** those verdict files
 (`parse_scores`, robust to fenced/extra text) into `out/judge_scores.jsonl` — so the fragile bit stays
 deterministic. It runs `--cwd` inside the (trusted) repo (no folder-trust dialog; `acceptEdits` covers the

@@ -97,10 +97,12 @@ confirm the grader still discriminates before spending GPU time.
 The blind judge (`judge.py`) has two transports — pick per your environment:
 - **`--engine claude-tmux`** (`JUDGE_ENGINE=claude-tmux`, the default) — **one** interactive `claude`
   session driven **through tmux** by typed keystrokes (`claude_ask.sh`, no headless `-p`) that **fans out
-  one blind `haiku` subagent per batch** (`JUDGE_SUBAGENT_MODEL`, default haiku; `JUDGE_MODEL` is the
-  orchestrator). Use when the model under test is the strongest thing you have locally (a 27B can't judge
-  itself). Needs the `claude` CLI authenticated **and** a tmux session (headless/background is
-  restricted); the runner errors with the start command if it's missing.
+  one blind subagent per batch** for parallelism. The subagent runs a **strong single model**
+  (`JUDGE_SUBAGENT_MODEL`, default `opus`; `JUDGE_MODEL` is the orchestrator) — it must exceed the model
+  under test and resolve opus-tier design/robustness, and one model keeps the 0-5 scale consistent, so
+  **don't set it to haiku** (`sonnet` is the cheaper single-judge). Use when the model under test is the
+  strongest thing you have locally (a 27B can't judge itself). Needs the `claude` CLI authenticated **and**
+  a tmux session (headless/background is restricted); the runner errors with the start command if missing.
 - **`--engine http`** (`JUDGE_BASE_URL=<…/v1> JUDGE_MODEL=<name> JUDGE_API_KEY=<env>`) — any stronger
   OpenAI-compatible endpoint.
 

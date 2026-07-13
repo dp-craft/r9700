@@ -28,7 +28,9 @@ SERVE="$REPO/bench/engine-bench/serve_llamacpp.sh"
 # claude-driven steps (default ON → one script, no human interaction). Both run THROUGH tmux.
 : "${JUDGE_ENGINE:=claude-tmux}"       # claude-tmux | http | none
 : "${JUDGE_MODEL:=opus}"               # claude-tmux: ORCHESTRATOR model (http: the judge model)
-: "${JUDGE_SUBAGENT_MODEL:=haiku}"     # claude-tmux: the blind per-candidate judging subagents (cheap/fast)
+: "${JUDGE_SUBAGENT_MODEL:=opus}"      # claude-tmux: model of the blind judging subagents. STRONG single
+                                       # judge (opus) — it reviews opus-tier design/robustness, and one
+                                       # model keeps the 0-5 scale consistent. 'sonnet' = cheaper; not haiku.
 : "${SUMMARY:=1}"                      # 1 = auto-write analysis.md via the benchmark-results skill
 : "${SUMMARY_MODEL:=opus}"
 : "${CLAUDE_TMUX_SESSION:=claude-run}"

@@ -118,8 +118,8 @@ llama-server on the frozen substrate with `--reasoning-budget N`, samples VRAM/G
 matrix tasks (built at the cell's depth by `build_context.py`, corpus = shared cached prefix) through
 `capture.py`, stops the server; (2) **grades** every reply with the real toolchain
 (`score_typescript.py batch`); (3) **judges** subjective quality (`judge.py --engine claude-tmux`, blind
-— **one** claude session fans out one `haiku` subagent per batch, Python collects the verdicts);
-(4) **charts** (`make_charts.py`); (5) **aggregates every number deterministically
+— **one** claude session fans out one strong-model (`opus`) subagent per batch, Python collects the
+verdicts); (4) **charts** (`make_charts.py`); (5) **aggregates every number deterministically
 in Python** (`aggregate.py` → `out/summary.md`: per-cell table + the 4 findings computed, not inferred);
 (6) **writes `analysis.md`** by driving the **benchmark-results skill** through `claude` (via tmux) — the
 LLM reads **only the digest + charts, never the per-reply jsonl** — then reindexes `docs/INDEX.md`.
