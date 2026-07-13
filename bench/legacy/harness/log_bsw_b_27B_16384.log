@@ -1,0 +1,20 @@
+0.00.026.243 I cmn  common_param: common_params_print_info: verbosity = 3 (adjust with the `-lv N` CLI arg)
+0.00.026.349 I srv          init: The UI is disabled
+0.00.026.351 I srv          init: Use --ui/--no-ui (or deprecated --webui/--no-webui) to enable/disable
+0.00.027.662 I srv    load_model: loading model '/home/dev/models/gguf/Qwen3.6-27B-Q4_K_S.gguf'
+0.03.632.623 I srv    load_model: initializing, n_slots = 4, n_ctx_slot = 65536, kv_unified = 'true'
+0.03.651.706 I srv          init: chat template supports preserving reasoning, consider enabling it via --reasoning-preserve
+0.03.651.729 I srv  llama_server: model loaded
+0.03.651.732 I srv  llama_server: listening on http://127.0.0.1:8899
+0.06.078.734 I slot get_availabl: id  3 | task -1 | selected slot by LRU, t_last = -1
+0.06.078.803 I slot launch_slot_: id  3 | task 0 | processing task, is_child = 0
+0.11.323.489 I slot print_timing: id  3 | task 0 | prompt processing, n_tokens =   4937, progress = 0.71, t =   5.24 s / 941.36 tokens per second
+0.12.200.299 I slot print_timing: id  3 | task 0 | prompt processing, n_tokens =   6985, progress = 1.00, t =   6.12 s / 1141.09 tokens per second
+0.17.649.090 I slot print_timing: id  3 | task 0 | n_decoded =    100, tg =  29.02 t/s, tg_3s =  29.02 t/s
+0.20.659.055 I slot print_timing: id  3 | task 0 | n_decoded =    185, tg =  28.65 t/s, tg_3s =  28.24 t/s
+0.23.123.650 I slot print_timing: id  3 | task 0 | prompt eval time =    8123.80 ms /  6989 tokens (    1.16 ms per token,   860.31 tokens per second)
+0.23.123.654 I slot print_timing: id  3 | task 0 |        eval time =    8920.88 ms /   256 tokens (   34.85 ms per token,    28.70 tokens per second)
+0.23.123.655 I slot print_timing: id  3 | task 0 |       total time =   17044.68 ms /  7245 tokens
+0.23.123.657 I slot print_timing: id  3 | task 0 |    graphs reused =        254
+0.23.123.791 I slot      release: id  3 | task 0 | stop processing: n_tokens = 7244, truncated = 0
+0.23.131.956 I srv    operator(): operator(): cleaning up before exit...

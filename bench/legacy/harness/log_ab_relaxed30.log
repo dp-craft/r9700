@@ -1,0 +1,29 @@
+>>> starting vLLM 35B-AWQ fp16, memflag='[--memory=30g --memory-swap=30g]' tag=relaxed30
+server up; warmup + timed 200-tok greedy decode with live GPU/host sampling
+RESULT[relaxed30] tokens=200 time=9.39s decode=21.3 tok/s
+=== GPU/host samples during decode (relaxed30) ===
+  t1s use/pow=17.03  cont=5.704GiB / 30GiB|101.19%
+  t2s use/pow=17.02  cont=5.757GiB / 30GiB|100.41%
+  t3s use/pow=80.087  cont=5.795GiB / 30GiB|177.46%
+  t4s use/pow=137.0100  cont=5.794GiB / 30GiB|207.11%
+  t5s use/pow=144.0100  cont=5.794GiB / 30GiB|207.29%
+  t6s use/pow=136.0100  cont=5.794GiB / 30GiB|207.19%
+  t7s use/pow=175.0100  cont=5.795GiB / 30GiB|203.48%
+  t8s use/pow=18.02  cont=5.794GiB / 30GiB|1.07%
+  t9s use/pow=18.02  cont=5.794GiB / 30GiB|1.15%
+  t10s use/pow=17.03  cont=5.794GiB / 30GiB|1.51%
+  t11s use/pow=18.02  cont=5.794GiB / 30GiB|1.27%
+  t12s use/pow=17.03  cont=5.794GiB / 30GiB|1.54%
+  t13s use/pow=17.02  cont=5.794GiB / 30GiB|0.66%
+  t14s use/pow=17.02  cont=5.794GiB / 30GiB|0.74%
+  t15s use/pow=17.03  cont=5.794GiB / 30GiB|1.44%
+  t16s use/pow=17.02  cont=5.794GiB / 30GiB|1.15%
+  t17s use/pow=18.02  cont=5.794GiB / 30GiB|0.90%
+  t18s use/pow=17.02  cont=5.794GiB / 30GiB|1.15%
+  t19s use/pow=17.02  cont=5.794GiB / 30GiB|1.24%
+  t20s use/pow=17.03  cont=5.794GiB / 30GiB|1.00%
+  t21s use/pow=17.02  cont=5.794GiB / 30GiB|1.38%
+  t22s use/pow=17.02  cont=5.794GiB / 30GiB|0.69%
+  t23s use/pow=17.02  cont=5.794GiB / 30GiB|1.28%
+  t24s use/pow=17.02  cont=5.794GiB / 30GiB|1.45%
+  t25s use/pow=17.03  cont=5.794GiB / 30GiB|1.48%

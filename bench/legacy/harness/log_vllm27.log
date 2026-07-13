@@ -1,0 +1,8 @@
+>>> 27B compressed-tensors, KV=fp16 (auto quant detect, no --quantization flag)
+LOAD FAIL — reason:
+(EngineCore pid=131)     raise ValueError(
+(EngineCore pid=131) ValueError: Failed to find a kernel that can implement the WNA16 linear layer. Reasons: 
+(EngineCore pid=131)  ConchLinearKernel cannot implement due to: Group size (32) not supported by ConchLinearKernel, supported group sizes are: [-1, 128]
+(EngineCore pid=131)  ExllamaLinearKernel cannot implement due to: Quant type (uint4) not supported by Exllama, supported types are: [ScalarType.uint4b8, ScalarType.uint8
+(APIServer pid=1)     raise RuntimeError(
+(APIServer pid=1) RuntimeError: Engine core initialization failed. See root cause above. Failed core proc(s): {}

@@ -1,0 +1,56 @@
+### dpm state = auto ###
+>>> fin35_vk (Vulkan-RADV mtp=0)
+{"model": "35B-A3B", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "f16", "ub": 2048, "batch": 8192, "flash_attn": "on", "ngl": 99, "backend": "Vulkan-RADV", "mtp": false, "dpm": "auto", "runtime": "llamacpp", "label": "fin35_vk", "prefill_tok_s": 3221.5, "decode_tok_s": 114.3, "prompt_tokens": 6989, "vram_used_mb": 22598}
+>>> fin27_vk (Vulkan-RADV mtp=0)
+{"model": "27B-MTP", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "f16", "ub": 2048, "batch": 8192, "flash_attn": "on", "ngl": 99, "backend": "Vulkan-RADV", "mtp": false, "dpm": "auto", "runtime": "llamacpp", "label": "fin27_vk", "prefill_tok_s": 905.9, "decode_tok_s": 31.7, "prompt_tokens": 6988, "vram_used_mb": 20801}
+>>> fin35_rocm (ROCm-b9950 mtp=0)
+{"model": "35B-A3B", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "f16", "ub": 2048, "batch": 8192, "flash_attn": "on", "ngl": 99, "backend": "ROCm-b9950", "mtp": false, "dpm": "auto", "runtime": "llamacpp", "label": "fin35_rocm", "prefill_tok_s": 48.6, "decode_tok_s": 11.2, "prompt_tokens": 6988, "vram_used_mb": 577}
+>>> fin27_rocm (ROCm-b9950 mtp=0)
+Traceback (most recent call last):
+  File "/home/dev/work/dippe/amd/bench/harness/probe.py", line 80, in <module>
+    prefill, decode, ptoks, da, dn = fn(TARGET)
+                                     ^^^^^^^^^^
+  File "/home/dev/work/dippe/amd/bench/harness/probe.py", line 28, in bench_llamacpp
+    r = json.load(post(f"http://127.0.0.1:{port}/completion",
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/dev/work/dippe/amd/bench/harness/probe.py", line 24, in post
+    return urllib.request.urlopen(req, timeout=timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 215, in urlopen
+    return opener.open(url, data, timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 515, in open
+    response = self._open(req, data)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 532, in _open
+    result = self._call_chain(self.handle_open, protocol, protocol +
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 492, in _call_chain
+    result = func(*args)
+             ^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 1373, in http_open
+    return self.do_open(http.client.HTTPConnection, req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 1348, in do_open
+    r = h.getresponse()
+        ^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/http/client.py", line 1457, in getresponse
+    response.begin()
+  File "/usr/lib/python3.12/http/client.py", line 336, in begin
+    version, status, reason = self._read_status()
+                              ^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/http/client.py", line 297, in _read_status
+    line = str(self.fp.readline(_MAXLINE + 1), "iso-8859-1")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/socket.py", line 707, in readinto
+    return self._sock.recv_into(b)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+TimeoutError: timed out
+  PROBE FAIL fin27_rocm
+>>> fin35_vk_nomtp (Vulkan-RADV mtp=0)
+{"model": "35B-A3B-MTPgguf", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "f16", "ub": 2048, "batch": 8192, "flash_attn": "on", "ngl": 99, "backend": "Vulkan-RADV", "mtp": false, "dpm": "auto", "runtime": "llamacpp", "label": "fin35_vk_nomtp", "prefill_tok_s": 3288.0, "decode_tok_s": 105.0, "prompt_tokens": 6989, "vram_used_mb": 23784}
+>>> fin35_vk_mtp (Vulkan-RADV-MTP mtp=1)
+{"model": "35B-A3B-MTPgguf", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "f16", "ub": 2048, "batch": 8192, "flash_attn": "on", "ngl": 99, "backend": "Vulkan-RADV-MTP", "mtp": true, "dpm": "auto", "runtime": "llamacpp", "label": "fin35_vk_mtp", "prefill_tok_s": 2992.8, "decode_tok_s": 135.9, "prompt_tokens": 6987, "vram_used_mb": 25121, "draft": "160/285"}
+>>> fin27_vk_mtp (Vulkan-RADV-MTP mtp=1)
+{"model": "27B-MTP", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "f16", "ub": 2048, "batch": 8192, "flash_attn": "on", "ngl": 99, "backend": "Vulkan-RADV-MTP", "mtp": true, "dpm": "auto", "runtime": "llamacpp", "label": "fin27_vk_mtp", "prefill_tok_s": 854.5, "decode_tok_s": 73.5, "prompt_tokens": 6987, "vram_used_mb": 23400, "draft": "181/220"}
+=== llama final batch done (dpm=auto) ===

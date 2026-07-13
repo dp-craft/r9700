@@ -1,0 +1,45 @@
+{"config": "rico03-distilled", "task_id": "math-primes", "rep": 0, "passed": true, "detail": "got='10' exp='10'", "completion_tokens": 1520, "think_tokens": 1263}
+{"config": "rico03-distilled", "task_id": "math-clock", "rep": 0, "passed": true, "detail": "got='7.5' exp='7.5'", "completion_tokens": 1075, "think_tokens": 637}
+{"config": "rico03-distilled", "task_id": "logic-knights", "rep": 0, "passed": false, "detail": "got='a=knight,b=knave**' exp='a=knight,b=knave'", "completion_tokens": 813, "think_tokens": 417}
+{"config": "rico03-distilled", "task_id": "math-trains", "rep": 0, "passed": true, "detail": "got='120' exp='120'", "completion_tokens": 691, "think_tokens": 481}
+{"config": "rico03-distilled", "task_id": "code-anagram", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 902, "think_tokens": 773}
+{"config": "rico03-distilled", "task_id": "code-parsekv", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 1069, "think_tokens": 1011}
+{"config": "rico03-distilled", "task_id": "code-fixbug", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 2214, "think_tokens": 2168}
+{"config": "rico03-distilled", "task_id": "json-invoice", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 504, "think_tokens": 237}
+{"config": "rico03-distilled", "task_id": "instr-langs", "rep": 0, "passed": false, "detail": "22 lines != 5", "completion_tokens": 361, "think_tokens": 169}
+{"config": "unsloth-mtp-off", "task_id": "math-primes", "rep": 0, "passed": true, "detail": "got='10' exp='10'", "completion_tokens": 4820, "think_tokens": 3819}
+{"config": "unsloth-mtp-off", "task_id": "math-clock", "rep": 0, "passed": true, "detail": "got='7.5' exp='7.5'", "completion_tokens": 1493, "think_tokens": 1181}
+{"config": "unsloth-mtp-off", "task_id": "logic-knights", "rep": 0, "passed": true, "detail": "got='a=knight,b=knave' exp='a=knight,b=knave'", "completion_tokens": 2525, "think_tokens": 2229}
+{"config": "unsloth-mtp-off", "task_id": "math-trains", "rep": 0, "passed": true, "detail": "got='120' exp='120'", "completion_tokens": 1002, "think_tokens": 863}
+{"config": "unsloth-mtp-off", "task_id": "code-anagram", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 965, "think_tokens": 901}
+{"config": "unsloth-mtp-off", "task_id": "code-parsekv", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 1933, "think_tokens": 1891}
+{"config": "unsloth-mtp-off", "task_id": "code-fixbug", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 4120, "think_tokens": 4030}
+{"config": "unsloth-mtp-off", "task_id": "json-invoice", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 1479, "think_tokens": 1387}
+{"config": "unsloth-mtp-off", "task_id": "instr-langs", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 1271, "think_tokens": 1254}
+{"config": "unsloth-mtp-on", "task_id": "math-primes", "rep": 0, "passed": true, "detail": "got='10' exp='10'", "completion_tokens": 4208, "think_tokens": 3365}
+{"config": "unsloth-mtp-on", "task_id": "math-clock", "rep": 0, "passed": true, "detail": "got='7.5' exp='7.5'", "completion_tokens": 1713, "think_tokens": 1204}
+{"config": "unsloth-mtp-on", "task_id": "logic-knights", "rep": 0, "passed": true, "detail": "got='a=knight,b=knave' exp='a=knight,b=knave'", "completion_tokens": 2072, "think_tokens": 1798}
+{"config": "unsloth-mtp-on", "task_id": "math-trains", "rep": 0, "passed": true, "detail": "got='120' exp='120'", "completion_tokens": 1014, "think_tokens": 766}
+{"config": "unsloth-mtp-on", "task_id": "code-anagram", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 1087, "think_tokens": 1036}
+{"config": "unsloth-mtp-on", "task_id": "code-parsekv", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 1997, "think_tokens": 1955}
+{"config": "unsloth-mtp-on", "task_id": "code-fixbug", "rep": 0, "passed": false, "detail": "NameError: name 'second_largest' is not defined", "completion_tokens": 8192, "think_tokens": 8192}
+{"config": "unsloth-mtp-on", "task_id": "json-invoice", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 1153, "think_tokens": 1061}
+{"config": "unsloth-mtp-on", "task_id": "instr-langs", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 1587, "think_tokens": 1570}
+{"config": "hauhau-uncensored", "task_id": "math-primes", "rep": 0, "passed": false, "detail": "got='' exp='10'", "completion_tokens": 8192, "think_tokens": 8192}
+{"config": "hauhau-uncensored", "task_id": "math-clock", "rep": 0, "passed": true, "detail": "got='7.5' exp='7.5'", "completion_tokens": 2033, "think_tokens": 1517}
+{"config": "hauhau-uncensored", "task_id": "logic-knights", "rep": 0, "passed": true, "detail": "got='a=knight,b=knave' exp='a=knight,b=knave'", "completion_tokens": 3543, "think_tokens": 3161}
+{"config": "hauhau-uncensored", "task_id": "math-trains", "rep": 0, "passed": true, "detail": "got='120' exp='120'", "completion_tokens": 1234, "think_tokens": 1111}
+{"config": "hauhau-uncensored", "task_id": "code-anagram", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 2176, "think_tokens": 2111}
+{"config": "hauhau-uncensored", "task_id": "code-parsekv", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 2094, "think_tokens": 2039}
+{"config": "hauhau-uncensored", "task_id": "code-fixbug", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 2402, "think_tokens": 2356}
+{"config": "hauhau-uncensored", "task_id": "json-invoice", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 1302, "think_tokens": 1207}
+{"config": "hauhau-uncensored", "task_id": "instr-langs", "rep": 0, "passed": false, "detail": "0 lines != 5", "completion_tokens": 8192, "think_tokens": 8192}
+{"config": "jackrong-qwopus", "task_id": "math-primes", "rep": 0, "passed": true, "detail": "got='10' exp='10'", "completion_tokens": 2714, "think_tokens": 1769}
+{"config": "jackrong-qwopus", "task_id": "math-clock", "rep": 0, "passed": true, "detail": "got='7.5' exp='7.5'", "completion_tokens": 1407, "think_tokens": 967}
+{"config": "jackrong-qwopus", "task_id": "logic-knights", "rep": 0, "passed": true, "detail": "got='a=knight,b=knave' exp='a=knight,b=knave'", "completion_tokens": 1143, "think_tokens": 679}
+{"config": "jackrong-qwopus", "task_id": "math-trains", "rep": 0, "passed": true, "detail": "got='120' exp='120'", "completion_tokens": 706, "think_tokens": 533}
+{"config": "jackrong-qwopus", "task_id": "code-anagram", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 599, "think_tokens": 534}
+{"config": "jackrong-qwopus", "task_id": "code-parsekv", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 1160, "think_tokens": 1038}
+{"config": "jackrong-qwopus", "task_id": "code-fixbug", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 747, "think_tokens": 706}
+{"config": "jackrong-qwopus", "task_id": "json-invoice", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 899, "think_tokens": 807}
+{"config": "jackrong-qwopus", "task_id": "instr-langs", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 293, "think_tokens": 275}

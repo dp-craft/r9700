@@ -1,0 +1,62 @@
+rocm7.13.0_gfx120X-all_ubuntu24.04_py3.13_pytorch_2.10.0_vllm_0.19.1: Pulling from rocm/vllm
+105b1329a6eb: Pulling fs layer
+909468118d8d: Pulling fs layer
+c0675f061534: Pulling fs layer
+1f1842b1970e: Pulling fs layer
+f997f9eeb4ec: Pulling fs layer
+4722d971a853: Pulling fs layer
+de0725057bf9: Pulling fs layer
+944f58babb64: Pulling fs layer
+4f4fb700ef54: Pulling fs layer
+a33d9b1d4e50: Pulling fs layer
+4f4fb700ef54: Pulling fs layer
+55a350056577: Pulling fs layer
+447594593aaa: Pulling fs layer
+4c235356e030: Pulling fs layer
+fd318188b93a: Pulling fs layer
+1ef014a3b2c5: Pulling fs layer
+c4b247c03a58: Pulling fs layer
+b0d25fbd39bf: Pulling fs layer
+4f4fb700ef54: Pulling fs layer
+b40150c1c271: Pulling fs layer
+a4056c820d11: Pulling fs layer
+4f4fb700ef54: Pulling fs layer
+d1a71ff21e24: Pulling fs layer
+a0eba329de6b: Pulling fs layer
+4f4fb700ef54: Pulling fs layer
+088ef87a16f2: Pulling fs layer
+4f4fb700ef54: Pulling fs layer
+aaa485ae285e: Pulling fs layer
+909468118d8d: Download complete
+d1a71ff21e24: Download complete
+4f4fb700ef54: Download complete
+1ef014a3b2c5: Download complete
+1f1842b1970e: Download complete
+f997f9eeb4ec: Download complete
+b0d25fbd39bf: Download complete
+c4b247c03a58: Download complete
+088ef87a16f2: Download complete
+a0eba329de6b: Download complete
+55a350056577: Download complete
+fd318188b93a: Download complete
+aaa485ae285e: Download complete
+b40150c1c271: Download complete
+a4056c820d11: Download complete
+4f4fb700ef54: Pull complete
+1f1842b1970e: Pull complete
+b40150c1c271: Pull complete
+4c235356e030: Download complete
+de0725057bf9: Download complete
+c0675f061534: Download complete
+944f58babb64: Download complete
+a33d9b1d4e50: Download complete
+a33d9b1d4e50: Pull complete
+a4056c820d11: Pull complete
+de0725057bf9: Pull complete
+a0eba329de6b: Pull complete
+4c235356e030: Pull complete
+105b1329a6eb: Download complete
+fd318188b93a: Pull complete
+447594593aaa: Download complete
+4722d971a853: Download complete
+wrong diff id "sha256:2680712be660311788eaeaca95c0bfa05197ffc967970ee233706d33f5b3aeec" calculated on extraction "sha256:ae4391e8deb78c1d6439250e05942770c433bec19db404228ec0f8ec042c4318", desc "sha256:4722d971a853d12f1e876fc26a12118e5cb4e1f5c8bb66969cbd7e544472214e"

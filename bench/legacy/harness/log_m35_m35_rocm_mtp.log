@@ -1,0 +1,4 @@
+0.00.104.530 I cmn  common_param: common_params_print_info: verbosity = 3 (adjust with the `-lv N` CLI arg)
+0.00.109.582 I srv          init: The UI is disabled
+0.00.109.585 I srv          init: Use --ui/--no-ui (or deprecated --webui/--no-webui) to enable/disable
+0.00.113.076 I srv    load_model: loading model '/home/dev/models/gguf/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf'

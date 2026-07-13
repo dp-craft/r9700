@@ -1,0 +1,18 @@
+0.00.027.650 I cmn  common_param: common_params_print_info: verbosity = 3 (adjust with the `-lv N` CLI arg)
+0.00.029.757 I srv          init: The UI is disabled
+0.00.029.759 I srv          init: Use --ui/--no-ui (or deprecated --webui/--no-webui) to enable/disable
+0.00.031.893 I srv    load_model: loading model '/home/dev/models-local/gguf/Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive-Q4_K_M.gguf'
+0.42.165.917 I srv    load_model: initializing, n_slots = 4, n_ctx_slot = 65536, kv_unified = 'true'
+0.42.194.834 I srv          init: chat template supports preserving reasoning, consider enabling it via --reasoning-preserve
+0.42.195.009 I srv  llama_server: model loaded
+0.42.195.012 I srv  llama_server: listening on http://127.0.0.1:8899
+0.46.295.851 I slot get_availabl: id  3 | task -1 | selected slot by LRU, t_last = -1
+0.46.296.155 I slot launch_slot_: id  3 | task 0 | processing task, is_child = 0
+0.49.308.435 I slot print_timing: id  3 | task 0 | prompt processing, n_tokens =   6983, progress = 1.00, t =   3.01 s / 2318.33 tokens per second
+0.52.928.151 I slot print_timing: id  3 | task 0 | n_decoded =    235, tg =  78.18 t/s, tg_3s =  78.18 t/s
+0.53.188.533 I slot print_timing: id  3 | task 0 | prompt eval time =    3625.99 ms /  6987 tokens (    0.52 ms per token,  1926.92 tokens per second)
+0.53.188.536 I slot print_timing: id  3 | task 0 |        eval time =    3266.19 ms /   256 tokens (   12.76 ms per token,    78.38 tokens per second)
+0.53.188.536 I slot print_timing: id  3 | task 0 |       total time =    6892.18 ms /  7243 tokens
+0.53.188.538 I slot print_timing: id  3 | task 0 |    graphs reused =        254
+0.53.188.658 I slot      release: id  3 | task 0 | stop processing: n_tokens = 7242, truncated = 0
+0.53.201.040 I srv    operator(): operator(): cleaning up before exit...

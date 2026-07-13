@@ -1,0 +1,11 @@
+>>> transformers-HF 35B-A3B-AWQ
+[transformers] `torch_dtype` is deprecated! Use `dtype` instead!
+{"runtime": "transformers-hf", "model": "35B-A3B-AWQ", "format": "AWQ 4-bit", "engine": "transformers generate()", "status": "FAIL", "error": "Loading an AWQ quantized model requires gptqmodel. Please install it with `pip install gptqmodel`"}
+>>> transformers-HF 27B-AWQ
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+- MISSING:	those params were newly initialized because missing from the checkpoint. Consider training on your downstream task.
+Decompressing model:   0%|          | 0/1063 [00:00<?, ?it/s]Decompressing model:   1%|          | 10/1063 [00:00<00:11, 93.05it/s]Decompressing model:   3%|▎         | 29/1063 [00:00<00:07, 147.10it/s]Decompressing model:   5%|▍         | 50/1063 [00:00<00:05, 172.03it/s]Decompressing model:   6%|▋         | 68/1063 [00:00<00:06, 162.15it/s]/opt/python/lib/python3.13/site-packages/compressed_tensors/compressors/pack_quantized/helpers.py:142: UserWarning: Truncating the start/stop/step of slice. This is likely because of saved old models when the start/stop/step were larger.
+  unpacked = unpacked[:, :original_row_size]
+Decompressing model:   7%|▋         | 78/1063 [00:00<00:05, 167.11it/s]
+{"runtime": "transformers-hf", "model": "27B-AWQ", "format": "AWQ 4-bit", "engine": "transformers generate()", "status": "FAIL", "error": "1 validation error for QuantizationArgs\n  Value error, strategy group requires group_size to be set to a positive value [type=value_error, input_value={'strategy': <Quantizatio...roup'>, 'group_size':"}
+=== transformers-HF phase done ===

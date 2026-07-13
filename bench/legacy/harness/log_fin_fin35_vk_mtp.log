@@ -1,0 +1,26 @@
+WARNING: radv is not a conformant Vulkan implementation, testing use only.
+0.00.080.556 I cmn  common_param: common_params_print_info: verbosity = 3 (adjust with the `-lv N` CLI arg)
+0.00.080.812 I srv          init: The UI is disabled
+0.00.080.814 I srv          init: Use --ui/--no-ui (or deprecated --webui/--no-webui) to enable/disable
+0.00.082.117 I srv    load_model: loading model '/home/dev/models-local/gguf/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf'
+0.08.069.590 I srv    load_model: initializing, n_slots = 4, n_ctx_slot = 65536, kv_unified = 'true'
+0.08.167.666 I srv          init: chat template supports preserving reasoning, consider enabling it via --reasoning-preserve
+0.08.167.708 I srv  llama_server: model loaded
+0.08.167.713 I srv  llama_server: listening on http://127.0.0.1:8899
+0.11.164.511 I slot get_availabl: id  3 | task -1 | selected slot by LRU, t_last = -1
+0.11.164.542 I slot launch_slot_: id  3 | task 0 | processing task, is_child = 0
+0.15.431.686 I slot print_timing: id  3 | task 0 | prompt eval time =    2543.77 ms /  6989 tokens (    0.36 ms per token,  2747.50 tokens per second)
+0.15.431.706 I slot print_timing: id  3 | task 0 |        eval time =    1723.01 ms /   256 tokens (    6.73 ms per token,   148.58 tokens per second)
+0.15.431.707 I slot print_timing: id  3 | task 0 |       total time =    4266.77 ms /  7245 tokens
+0.15.431.712 I slot print_timing: id  3 | task 0 |    graphs reused =         83
+0.15.431.716 I slot print_timing: id  3 | task 0 | draft acceptance = 0.66535 (  169 accepted /   254 generated), mean len =  2.99
+0.15.431.887 I slot      release: id  3 | task 0 | stop processing: n_tokens = 7244, truncated = 0
+0.15.588.796 I slot get_availabl: id  2 | task -1 | selected slot by LRU, t_last = -1
+0.15.588.828 I slot launch_slot_: id  2 | task 90 | processing task, is_child = 0
+0.19.976.832 I slot print_timing: id  2 | task 90 | prompt eval time =    2334.63 ms /  6987 tokens (    0.33 ms per token,  2992.76 tokens per second)
+0.19.976.837 I slot print_timing: id  2 | task 90 |        eval time =    1883.90 ms /   256 tokens (    7.36 ms per token,   135.89 tokens per second)
+0.19.976.837 I slot print_timing: id  2 | task 90 |       total time =    4218.53 ms /  7243 tokens
+0.19.976.838 I slot print_timing: id  2 | task 90 |    graphs reused =        176
+0.19.976.841 I slot print_timing: id  2 | task 90 | draft acceptance = 0.56140 (  160 accepted /   285 generated), mean len =  2.68
+0.19.976.994 I slot      release: id  2 | task 90 | stop processing: n_tokens = 7242, truncated = 0
+0.19.984.783 I srv    operator(): operator(): cleaning up before exit...

@@ -1,0 +1,21 @@
+0.00.028.081 I cmn  common_param: common_params_print_info: verbosity = 3 (adjust with the `-lv N` CLI arg)
+0.00.028.194 I srv          init: The UI is disabled
+0.00.028.196 I srv          init: Use --ui/--no-ui (or deprecated --webui/--no-webui) to enable/disable
+0.00.029.494 I srv    load_model: loading model '/home/dev/models/gguf/Qwen3.6-27B-Q4_K_S.gguf'
+0.32.554.574 I srv    load_model: initializing, n_slots = 4, n_ctx_slot = 65536, kv_unified = 'true'
+0.32.581.309 I srv          init: chat template supports preserving reasoning, consider enabling it via --reasoning-preserve
+0.32.581.337 I srv  llama_server: model loaded
+0.32.581.341 I srv  llama_server: listening on http://127.0.0.1:8899
+0.36.282.603 I slot get_availabl: id  3 | task -1 | selected slot by LRU, t_last = -1
+0.36.282.632 I slot launch_slot_: id  3 | task 0 | processing task, is_child = 0
+0.39.663.190 I slot print_timing: id  3 | task 0 | prompt processing, n_tokens =   4096, progress = 0.59, t =   3.38 s / 1211.69 tokens per second
+0.41.406.231 I slot print_timing: id  3 | task 0 | prompt processing, n_tokens =   4942, progress = 0.71, t =   5.12 s / 964.59 tokens per second
+0.42.272.822 I slot print_timing: id  3 | task 0 | prompt processing, n_tokens =   6986, progress = 1.00, t =   5.99 s / 1166.27 tokens per second
+0.47.675.263 I slot print_timing: id  3 | task 0 | n_decoded =    100, tg =  29.16 t/s, tg_3s =  29.16 t/s
+0.50.699.891 I slot print_timing: id  3 | task 0 | n_decoded =    186, tg =  28.82 t/s, tg_3s =  28.43 t/s
+0.53.246.364 I slot print_timing: id  3 | task 0 | prompt eval time =    7962.53 ms /  6990 tokens (    1.14 ms per token,   877.86 tokens per second)
+0.53.246.368 I slot print_timing: id  3 | task 0 |        eval time =    9001.03 ms /   256 tokens (   35.16 ms per token,    28.44 tokens per second)
+0.53.246.369 I slot print_timing: id  3 | task 0 |       total time =   16963.56 ms /  7246 tokens
+0.53.246.372 I slot print_timing: id  3 | task 0 |    graphs reused =        254
+0.53.246.525 I slot      release: id  3 | task 0 | stop processing: n_tokens = 7245, truncated = 0
+0.53.255.038 I srv    operator(): operator(): cleaning up before exit...

@@ -1,0 +1,21 @@
+WARNING: radv is not a conformant Vulkan implementation, testing use only.
+0.00.533.503 I cmn  common_param: common_params_print_info: verbosity = 3 (adjust with the `-lv N` CLI arg)
+0.00.533.916 I srv          init: The UI is disabled
+0.00.533.918 I srv          init: Use --ui/--no-ui (or deprecated --webui/--no-webui) to enable/disable
+0.00.535.437 I srv    load_model: loading model '/home/dev/models/gguf/Qwen3.6-27B-Q4_K_S.gguf'
+0.37.556.336 I srv    load_model: initializing, n_slots = 4, n_ctx_slot = 65536, kv_unified = 'true'
+0.37.588.262 I srv          init: chat template supports preserving reasoning, consider enabling it via --reasoning-preserve
+0.37.588.504 I srv  llama_server: model loaded
+0.37.588.507 I srv  llama_server: listening on http://127.0.0.1:8899
+0.40.480.834 I slot get_availabl: id  3 | task -1 | selected slot by LRU, t_last = -1
+0.40.480.874 I slot launch_slot_: id  3 | task 0 | processing task, is_child = 0
+0.45.226.299 I slot print_timing: id  3 | task 0 | prompt processing, n_tokens =   4935, progress = 0.71, t =   4.75 s / 1040.02 tokens per second
+0.47.342.513 I slot print_timing: id  3 | task 0 | prompt processing, n_tokens =   6983, progress = 1.00, t =   6.86 s / 1017.74 tokens per second
+0.51.841.948 I slot print_timing: id  3 | task 0 | n_decoded =    100, tg =  31.05 t/s, tg_3s =  31.05 t/s
+0.54.858.547 I slot print_timing: id  3 | task 0 | n_decoded =    194, tg =  31.11 t/s, tg_3s =  31.16 t/s
+0.56.857.464 I slot print_timing: id  3 | task 0 | prompt eval time =    8140.57 ms /  6987 tokens (    1.17 ms per token,   858.29 tokens per second)
+0.56.857.468 I slot print_timing: id  3 | task 0 |        eval time =    8235.67 ms /   256 tokens (   32.17 ms per token,    31.08 tokens per second)
+0.56.857.469 I slot print_timing: id  3 | task 0 |       total time =   16376.25 ms /  7243 tokens
+0.56.857.473 I slot print_timing: id  3 | task 0 |    graphs reused =        254
+0.56.857.653 I slot      release: id  3 | task 0 | stop processing: n_tokens = 7242, truncated = 0
+0.56.867.072 I srv    operator(): operator(): cleaning up before exit...

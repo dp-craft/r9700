@@ -1,0 +1,110 @@
+{"config": "jr-rb2048", "task_id": "math-modular", "rep": 0, "passed": true, "detail": "got='49' exp='49'", "completion_tokens": 2435, "think_tokens": 2047}
+{"config": "jr-rb2048", "task_id": "math-inclusion", "rep": 0, "passed": true, "detail": "got='734' exp='734'", "completion_tokens": 2961, "think_tokens": 2047}
+{"config": "jr-rb2048", "task_id": "math-pipes", "rep": 0, "passed": true, "detail": "got='9' exp='9'", "completion_tokens": 615, "think_tokens": 326}
+{"config": "jr-rb2048", "task_id": "math-increasing", "rep": 0, "passed": true, "detail": "got='126' exp='126'", "completion_tokens": 2433, "think_tokens": 2029}
+{"config": "jr-rb2048", "task_id": "math-gcd", "rep": 0, "passed": true, "detail": "got='30' exp='30'", "completion_tokens": 2841, "think_tokens": 2047}
+{"config": "jr-rb2048", "task_id": "logic-knave", "rep": 0, "passed": true, "detail": "got='knight' exp='knight'", "completion_tokens": 960, "think_tokens": 684}
+{"config": "jr-rb2048", "task_id": "code-intervals", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 832, "think_tokens": 704}
+{"config": "jr-rb2048", "task_id": "code-toposort", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 811, "think_tokens": 597}
+{"config": "jr-rb2048", "task_id": "code-fixbug", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 1336, "think_tokens": 1247}
+{"config": "jr-rb2048", "task_id": "instr-multirule", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 687, "think_tokens": 663}
+{"config": "jr-rb2048", "task_id": "json-plan", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 538, "think_tokens": 453}
+{"config": "jr-rb1024", "task_id": "math-modular", "rep": 0, "passed": true, "detail": "got='49' exp='49'", "completion_tokens": 1815, "think_tokens": 1023}
+{"config": "jr-rb1024", "task_id": "math-inclusion", "rep": 0, "passed": true, "detail": "got='734' exp='734'", "completion_tokens": 1867, "think_tokens": 1023}
+{"config": "jr-rb1024", "task_id": "math-pipes", "rep": 0, "passed": true, "detail": "got='9' exp='9'", "completion_tokens": 511, "think_tokens": 320}
+{"config": "jr-rb1024", "task_id": "math-increasing", "rep": 0, "passed": true, "detail": "got='126' exp='126'", "completion_tokens": 1166, "think_tokens": 868}
+{"config": "jr-rb1024", "task_id": "math-gcd", "rep": 0, "passed": true, "detail": "got='30' exp='30'", "completion_tokens": 1749, "think_tokens": 1023}
+{"config": "jr-rb1024", "task_id": "logic-knave", "rep": 0, "passed": true, "detail": "got='knight' exp='knight'", "completion_tokens": 970, "think_tokens": 684}
+{"config": "jr-rb1024", "task_id": "code-intervals", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 397, "think_tokens": 277}
+{"config": "jr-rb1024", "task_id": "code-toposort", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 647, "think_tokens": 480}
+{"config": "jr-rb1024", "task_id": "code-fixbug", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 1041, "think_tokens": 952}
+{"config": "jr-rb1024", "task_id": "instr-multirule", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 643, "think_tokens": 618}
+{"config": "jr-rb1024", "task_id": "json-plan", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 294, "think_tokens": 218}
+{"config": "jr-rb512", "task_id": "math-modular", "rep": 0, "passed": true, "detail": "got='49' exp='49'", "completion_tokens": 1389, "think_tokens": 511}
+{"config": "jr-rb512", "task_id": "math-inclusion", "rep": 0, "passed": true, "detail": "got='734' exp='734'", "completion_tokens": 1351, "think_tokens": 511}
+{"config": "jr-rb512", "task_id": "math-pipes", "rep": 0, "passed": true, "detail": "got='9' exp='9'", "completion_tokens": 577, "think_tokens": 326}
+{"config": "jr-rb512", "task_id": "math-increasing", "rep": 0, "passed": true, "detail": "got='126' exp='126'", "completion_tokens": 784, "think_tokens": 511}
+{"config": "jr-rb512", "task_id": "math-gcd", "rep": 0, "passed": true, "detail": "got='30' exp='30'", "completion_tokens": 959, "think_tokens": 511}
+{"config": "jr-rb512", "task_id": "logic-knave", "rep": 0, "passed": true, "detail": "got='knight' exp='knight'", "completion_tokens": 780, "think_tokens": 503}
+{"config": "jr-rb512", "task_id": "code-intervals", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 397, "think_tokens": 277}
+{"config": "jr-rb512", "task_id": "code-toposort", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 673, "think_tokens": 511}
+{"config": "jr-rb512", "task_id": "code-fixbug", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 600, "think_tokens": 511}
+{"config": "jr-rb512", "task_id": "instr-multirule", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 535, "think_tokens": 511}
+{"config": "jr-rb512", "task_id": "json-plan", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 270, "think_tokens": 196}
+{"config": "jr-rb0", "task_id": "math-modular", "rep": 0, "passed": true, "detail": "got='49' exp='49'", "completion_tokens": 4016, "think_tokens": 3558}
+{"config": "jr-rb0", "task_id": "math-inclusion", "rep": 0, "passed": true, "detail": "got='734' exp='734'", "completion_tokens": 7935, "think_tokens": 7120}
+{"config": "jr-rb0", "task_id": "math-pipes", "rep": 0, "passed": true, "detail": "got='9' exp='9'", "completion_tokens": 590, "think_tokens": 320}
+{"config": "jr-rb0", "task_id": "math-increasing", "rep": 0, "passed": true, "detail": "got='126' exp='126'", "completion_tokens": 1532, "think_tokens": 1192}
+{"config": "jr-rb0", "task_id": "math-gcd", "rep": 0, "passed": true, "detail": "got='30' exp='30'", "completion_tokens": 2005, "think_tokens": 1323}
+{"config": "jr-rb0", "task_id": "logic-knave", "rep": 0, "passed": true, "detail": "got='knight' exp='knight'", "completion_tokens": 936, "think_tokens": 667}
+{"config": "jr-rb0", "task_id": "code-intervals", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 397, "think_tokens": 277}
+{"config": "jr-rb0", "task_id": "code-toposort", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 2097, "think_tokens": 1879}
+{"config": "jr-rb0", "task_id": "code-fixbug", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 1110, "think_tokens": 1021}
+{"config": "jr-rb0", "task_id": "instr-multirule", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 581, "think_tokens": 556}
+{"config": "jr-rb0", "task_id": "json-plan", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 554, "think_tokens": 426}
+{"config": "un-rb2048", "task_id": "math-modular", "rep": 0, "passed": true, "detail": "got='49' exp='49'", "completion_tokens": 2587, "think_tokens": 2047}
+{"config": "un-rb2048", "task_id": "math-inclusion", "rep": 0, "passed": true, "detail": "got='734' exp='734'", "completion_tokens": 2938, "think_tokens": 2047}
+{"config": "un-rb2048", "task_id": "math-pipes", "rep": 0, "passed": true, "detail": "got='9' exp='9'", "completion_tokens": 1486, "think_tokens": 1288}
+{"config": "un-rb2048", "task_id": "math-increasing", "rep": 0, "passed": true, "detail": "got='126' exp='126'", "completion_tokens": 2610, "think_tokens": 2047}
+{"config": "un-rb2048", "task_id": "math-gcd", "rep": 0, "passed": true, "detail": "got='30' exp='30'", "completion_tokens": 2575, "think_tokens": 2047}
+{"config": "un-rb2048", "task_id": "logic-knave", "rep": 0, "passed": true, "detail": "got='knight' exp='knight'", "completion_tokens": 1371, "think_tokens": 1106}
+{"config": "un-rb2048", "task_id": "code-intervals", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 2152, "think_tokens": 2047}
+{"config": "un-rb2048", "task_id": "code-toposort", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 1926, "think_tokens": 1762}
+{"config": "un-rb2048", "task_id": "code-fixbug", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 2136, "think_tokens": 2047}
+{"config": "un-rb2048", "task_id": "instr-multirule", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 1970, "think_tokens": 1946}
+{"config": "un-rb2048", "task_id": "json-plan", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 1758, "think_tokens": 1676}
+{"config": "un-rb1024", "task_id": "math-modular", "rep": 0, "passed": true, "detail": "got='49' exp='49'", "completion_tokens": 1641, "think_tokens": 1023}
+{"config": "un-rb1024", "task_id": "math-inclusion", "rep": 0, "passed": true, "detail": "got='734' exp='734'", "completion_tokens": 1951, "think_tokens": 1023}
+{"config": "un-rb1024", "task_id": "math-pipes", "rep": 0, "passed": true, "detail": "got='9' exp='9'", "completion_tokens": 1196, "think_tokens": 1023}
+{"config": "un-rb1024", "task_id": "math-increasing", "rep": 0, "passed": true, "detail": "got='126' exp='126'", "completion_tokens": 1540, "think_tokens": 1023}
+{"config": "un-rb1024", "task_id": "math-gcd", "rep": 0, "passed": true, "detail": "got='30' exp='30'", "completion_tokens": 1674, "think_tokens": 1023}
+{"config": "un-rb1024", "task_id": "logic-knave", "rep": 0, "passed": true, "detail": "got='knight' exp='knight'", "completion_tokens": 1309, "think_tokens": 1023}
+{"config": "un-rb1024", "task_id": "code-intervals", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 1138, "think_tokens": 1023}
+{"config": "un-rb1024", "task_id": "code-toposort", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 1190, "think_tokens": 1023}
+{"config": "un-rb1024", "task_id": "code-fixbug", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 1112, "think_tokens": 1023}
+{"config": "un-rb1024", "task_id": "instr-multirule", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 1047, "think_tokens": 1023}
+{"config": "un-rb1024", "task_id": "json-plan", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 1129, "think_tokens": 1023}
+{"config": "un-rb512", "task_id": "math-modular", "rep": 0, "passed": true, "detail": "got='49' exp='49'", "completion_tokens": 1760, "think_tokens": 511}
+{"config": "un-rb512", "task_id": "math-inclusion", "rep": 0, "passed": true, "detail": "got='734' exp='734'", "completion_tokens": 1420, "think_tokens": 511}
+{"config": "un-rb512", "task_id": "math-pipes", "rep": 0, "passed": true, "detail": "got='9' exp='9'", "completion_tokens": 787, "think_tokens": 511}
+{"config": "un-rb512", "task_id": "math-increasing", "rep": 0, "passed": true, "detail": "got='126' exp='126'", "completion_tokens": 962, "think_tokens": 511}
+{"config": "un-rb512", "task_id": "math-gcd", "rep": 0, "passed": true, "detail": "got='30' exp='30'", "completion_tokens": 1229, "think_tokens": 511}
+{"config": "un-rb512", "task_id": "logic-knave", "rep": 0, "passed": true, "detail": "got='knight' exp='knight'", "completion_tokens": 774, "think_tokens": 511}
+{"config": "un-rb512", "task_id": "code-intervals", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 620, "think_tokens": 511}
+{"config": "un-rb512", "task_id": "code-toposort", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 675, "think_tokens": 511}
+{"config": "un-rb512", "task_id": "code-fixbug", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 600, "think_tokens": 511}
+{"config": "un-rb512", "task_id": "instr-multirule", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 535, "think_tokens": 511}
+{"config": "un-rb512", "task_id": "json-plan", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 742, "think_tokens": 511}
+{"config": "un-pmin05", "task_id": "math-modular", "rep": 0, "passed": true, "detail": "got='49' exp='49'", "completion_tokens": 8159, "think_tokens": 7471}
+{"config": "un-pmin05", "task_id": "math-inclusion", "rep": 0, "passed": true, "detail": "got='734' exp='734'", "completion_tokens": 7779, "think_tokens": 7000}
+{"config": "un-pmin05", "task_id": "math-pipes", "rep": 0, "passed": true, "detail": "got='9' exp='9'", "completion_tokens": 1422, "think_tokens": 1229}
+{"config": "un-pmin05", "task_id": "math-increasing", "rep": 0, "passed": true, "detail": "got='126' exp='126'", "completion_tokens": 4706, "think_tokens": 4103}
+{"config": "un-pmin05", "task_id": "math-gcd", "rep": 0, "passed": true, "detail": "got='30' exp='30'", "completion_tokens": 4503, "think_tokens": 3895}
+{"config": "un-pmin05", "task_id": "logic-knave", "rep": 0, "passed": true, "detail": "got='knight' exp='knight'", "completion_tokens": 1644, "think_tokens": 1366}
+{"config": "un-pmin05", "task_id": "code-intervals", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 2207, "think_tokens": 2101}
+{"config": "un-pmin05", "task_id": "code-toposort", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 2050, "think_tokens": 1885}
+{"config": "un-pmin05", "task_id": "code-fixbug", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 6313, "think_tokens": 6224}
+{"config": "un-pmin05", "task_id": "instr-multirule", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 1676, "think_tokens": 1651}
+{"config": "un-pmin05", "task_id": "json-plan", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 2294, "think_tokens": 2210}
+{"config": "un-pmin075", "task_id": "math-modular", "rep": 0, "passed": true, "detail": "got='49' exp='49'", "completion_tokens": 5870, "think_tokens": 5212}
+{"config": "un-pmin075", "task_id": "math-inclusion", "rep": 0, "passed": true, "detail": "got='734' exp='734'", "completion_tokens": 7943, "think_tokens": 7221}
+{"config": "un-pmin075", "task_id": "math-pipes", "rep": 0, "passed": true, "detail": "got='9' exp='9'", "completion_tokens": 1408, "think_tokens": 1210}
+{"config": "un-pmin075", "task_id": "math-increasing", "rep": 0, "passed": true, "detail": "got='126' exp='126'", "completion_tokens": 2277, "think_tokens": 1780}
+{"config": "un-pmin075", "task_id": "math-gcd", "rep": 0, "passed": true, "detail": "got='30' exp='30'", "completion_tokens": 5241, "think_tokens": 4706}
+{"config": "un-pmin075", "task_id": "logic-knave", "rep": 0, "passed": true, "detail": "got='knight' exp='knight'", "completion_tokens": 2009, "think_tokens": 1761}
+{"config": "un-pmin075", "task_id": "code-intervals", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 2010, "think_tokens": 1905}
+{"config": "un-pmin075", "task_id": "code-toposort", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 2499, "think_tokens": 2335}
+{"config": "un-pmin075", "task_id": "code-fixbug", "rep": 0, "passed": false, "detail": "NameError: name 'search' is not defined", "completion_tokens": 8192, "think_tokens": 8192}
+{"config": "un-pmin075", "task_id": "instr-multirule", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 1809, "think_tokens": 1785}
+{"config": "un-pmin075", "task_id": "json-plan", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 2427, "think_tokens": 2351}
+{"config": "un-nmax5", "task_id": "math-modular", "rep": 0, "passed": true, "detail": "got='49' exp='49'", "completion_tokens": 6320, "think_tokens": 5737}
+{"config": "un-nmax5", "task_id": "math-inclusion", "rep": 0, "passed": false, "detail": "got='' exp='734'", "completion_tokens": 8192, "think_tokens": 8192}
+{"config": "un-nmax5", "task_id": "math-pipes", "rep": 0, "passed": true, "detail": "got='9' exp='9'", "completion_tokens": 1394, "think_tokens": 1186}
+{"config": "un-nmax5", "task_id": "math-increasing", "rep": 0, "passed": true, "detail": "got='126' exp='126'", "completion_tokens": 1951, "think_tokens": 1737}
+{"config": "un-nmax5", "task_id": "math-gcd", "rep": 0, "passed": true, "detail": "got='30' exp='30'", "completion_tokens": 4635, "think_tokens": 3828}
+{"config": "un-nmax5", "task_id": "logic-knave", "rep": 0, "passed": true, "detail": "got='knight' exp='knight'", "completion_tokens": 2259, "think_tokens": 1979}
+{"config": "un-nmax5", "task_id": "code-intervals", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 1857, "think_tokens": 1738}
+{"config": "un-nmax5", "task_id": "code-toposort", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 2650, "think_tokens": 2488}
+{"config": "un-nmax5", "task_id": "code-fixbug", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 2584, "think_tokens": 2489}
+{"config": "un-nmax5", "task_id": "instr-multirule", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 1780, "think_tokens": 1755}
+{"config": "un-nmax5", "task_id": "json-plan", "rep": 0, "passed": true, "detail": "OK", "completion_tokens": 1113, "think_tokens": 962}

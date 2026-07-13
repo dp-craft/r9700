@@ -1,0 +1,100 @@
+### b-sweep ###
+>>> b-sweep b_35B_2048 (b=2048 ub=2048)
+{"model": "35B-A3B", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "f16", "ub": 2048, "batch": 2048, "flash_attn": "on", "ngl": 99, "backend": "ROCm/HIP", "mtp": false, "runtime": "llamacpp", "label": "b_35B_2048", "prefill_tok_s": 1753.3, "decode_tok_s": 75.5, "prompt_tokens": 6987, "vram_used_mb": 23087}
+>>> b-sweep b_35B_4096 (b=4096 ub=2048)
+{"model": "35B-A3B", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "f16", "ub": 2048, "batch": 4096, "flash_attn": "on", "ngl": 99, "backend": "ROCm/HIP", "mtp": false, "runtime": "llamacpp", "label": "b_35B_4096", "prefill_tok_s": 1801.0, "decode_tok_s": 1000000.0, "prompt_tokens": 6986, "vram_used_mb": 23087}
+>>> b-sweep b_35B_8192 (b=8192 ub=2048)
+{"model": "35B-A3B", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "f16", "ub": 2048, "batch": 8192, "flash_attn": "on", "ngl": 99, "backend": "ROCm/HIP", "mtp": false, "runtime": "llamacpp", "label": "b_35B_8192", "prefill_tok_s": 1928.3, "decode_tok_s": 77.4, "prompt_tokens": 6989, "vram_used_mb": 23146}
+>>> b-sweep b_35B_16384 (b=16384 ub=2048)
+{"model": "35B-A3B", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "f16", "ub": 2048, "batch": 16384, "flash_attn": "on", "ngl": 99, "backend": "ROCm/HIP", "mtp": false, "runtime": "llamacpp", "label": "b_35B_16384", "prefill_tok_s": 1861.2, "decode_tok_s": 76.7, "prompt_tokens": 6989, "vram_used_mb": 23138}
+>>> b-sweep b_27B_2048 (b=2048 ub=2048)
+{"model": "27B-MTP", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "f16", "ub": 2048, "batch": 2048, "flash_attn": "on", "ngl": 99, "backend": "ROCm/HIP", "mtp": false, "runtime": "llamacpp", "label": "b_27B_2048", "prefill_tok_s": 877.9, "decode_tok_s": 28.4, "prompt_tokens": 6990, "vram_used_mb": 21335}
+>>> b-sweep b_27B_4096 (b=4096 ub=2048)
+{"model": "27B-MTP", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "f16", "ub": 2048, "batch": 4096, "flash_attn": "on", "ngl": 99, "backend": "ROCm/HIP", "mtp": false, "runtime": "llamacpp", "label": "b_27B_4096", "prefill_tok_s": 862.9, "decode_tok_s": 28.7, "prompt_tokens": 6990, "vram_used_mb": 21336}
+>>> b-sweep b_27B_8192 (b=8192 ub=2048)
+{"model": "27B-MTP", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "f16", "ub": 2048, "batch": 8192, "flash_attn": "on", "ngl": 99, "backend": "ROCm/HIP", "mtp": false, "runtime": "llamacpp", "label": "b_27B_8192", "prefill_tok_s": 859.8, "decode_tok_s": 28.7, "prompt_tokens": 6989, "vram_used_mb": 21334}
+>>> b-sweep b_27B_16384 (b=16384 ub=2048)
+{"model": "27B-MTP", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "f16", "ub": 2048, "batch": 16384, "flash_attn": "on", "ngl": 99, "backend": "ROCm/HIP", "mtp": false, "runtime": "llamacpp", "label": "b_27B_16384", "prefill_tok_s": 860.3, "decode_tok_s": 28.7, "prompt_tokens": 6989, "vram_used_mb": 21334}
+=== b sweep done ===
+### backend: official ROCm 7.2 (b9950) ###
+build=/home/dev/work/dippe/amd/bench/llamacpp-rocm-b9950 backend=ROCm7.2-b9950
+version: 9950 (961e4b26a)
+>>> ROCm7.2-b9950 be_ROCm7.2-b9950_35B (ub=2048 fa_on)
+Traceback (most recent call last):
+  File "/home/dev/work/dippe/amd/bench/harness/probe.py", line 73, in <module>
+    prefill, decode, ptoks, da, dn = fn(TARGET)
+                                     ^^^^^^^^^^
+  File "/home/dev/work/dippe/amd/bench/harness/probe.py", line 27, in bench_llamacpp
+    r = json.load(post(f"http://127.0.0.1:{port}/completion",
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/dev/work/dippe/amd/bench/harness/probe.py", line 24, in post
+    return urllib.request.urlopen(req, timeout=timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 215, in urlopen
+    return opener.open(url, data, timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 515, in open
+    response = self._open(req, data)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 532, in _open
+    result = self._call_chain(self.handle_open, protocol, protocol +
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 492, in _call_chain
+    result = func(*args)
+             ^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 1373, in http_open
+    return self.do_open(http.client.HTTPConnection, req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 1348, in do_open
+    r = h.getresponse()
+        ^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/http/client.py", line 1457, in getresponse
+    response.begin()
+  File "/usr/lib/python3.12/http/client.py", line 336, in begin
+    version, status, reason = self._read_status()
+                              ^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/http/client.py", line 305, in _read_status
+    raise RemoteDisconnected("Remote end closed connection without"
+http.client.RemoteDisconnected: Remote end closed connection without response
+/home/dev/work/dippe/amd/bench/harness/run_backend.sh: line 12: 85376 Killed                  LD_LIBRARY_PATH="$BUILD" "$BUILD/llama-server" -m "$gguf" --host 127.0.0.1 --port $PORT -c "$CTX" $faflag -ctk "$KV" -ctv "$KV" -ngl 99 -b "$batch" -ub "$UB" --no-webui > "$HARNESS/log_be_${BE}_${label}.log" 2>&1
+  PROBE FAIL be_ROCm7.2-b9950_35B
+>>> ROCm7.2-b9950 be_ROCm7.2-b9950_27B (ub=2048 fa_on)
+Traceback (most recent call last):
+  File "/home/dev/work/dippe/amd/bench/harness/probe.py", line 73, in <module>
+    prefill, decode, ptoks, da, dn = fn(TARGET)
+                                     ^^^^^^^^^^
+  File "/home/dev/work/dippe/amd/bench/harness/probe.py", line 27, in bench_llamacpp
+    r = json.load(post(f"http://127.0.0.1:{port}/completion",
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/dev/work/dippe/amd/bench/harness/probe.py", line 24, in post
+    return urllib.request.urlopen(req, timeout=timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 215, in urlopen
+    return opener.open(url, data, timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 515, in open
+    response = self._open(req, data)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 532, in _open
+    result = self._call_chain(self.handle_open, protocol, protocol +
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 492, in _call_chain
+    result = func(*args)
+             ^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 1373, in http_open
+    return self.do_open(http.client.HTTPConnection, req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 1348, in do_open
+    r = h.getresponse()
+        ^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/http/client.py", line 1457, in getresponse
+    response.begin()
+  File "/usr/lib/python3.12/http/client.py", line 336, in begin
+    version, status, reason = self._read_status()
+                              ^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/http/client.py", line 305, in _read_status
+    raise RemoteDisconnected("Remote end closed connection without"
+http.client.RemoteDisconnected: Remote end closed connection without response
+/home/dev/work/dippe/amd/bench/harness/run_backend.sh: line 12: 88378 Killed                  LD_LIBRARY_PATH="$BUILD" "$BUILD/llama-server" -m "$gguf" --host 127.0.0.1 --port $PORT -c "$CTX" $faflag -ctk "$KV" -ctv "$KV" -ngl 99 -b "$batch" -ub "$UB" --no-webui > "$HARNESS/log_be_${BE}_${label}.log" 2>&1
+  PROBE FAIL be_ROCm7.2-b9950_27B
+=== backend ROCm7.2-b9950 done ===

@@ -1,0 +1,17 @@
+WARNING: radv is not a conformant Vulkan implementation, testing use only.
+0.00.070.295 I cmn  common_param: common_params_print_info: verbosity = 3 (adjust with the `-lv N` CLI arg)
+0.00.070.551 I srv          init: The UI is disabled
+0.00.070.553 I srv          init: Use --ui/--no-ui (or deprecated --webui/--no-webui) to enable/disable
+0.00.071.863 I srv    load_model: loading model '/home/dev/models/gguf/Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive-Q4_K_M.gguf'
+0.55.624.961 I srv    load_model: initializing, n_slots = 4, n_ctx_slot = 65536, kv_unified = 'true'
+0.55.656.399 I srv          init: chat template supports preserving reasoning, consider enabling it via --reasoning-preserve
+0.55.656.760 I srv  llama_server: model loaded
+0.55.656.765 I srv  llama_server: listening on http://127.0.0.1:8899
+0.58.450.961 I slot get_availabl: id  3 | task -1 | selected slot by LRU, t_last = -1
+0.58.451.007 I slot launch_slot_: id  3 | task 0 | processing task, is_child = 0
+1.03.836.549 I slot print_timing: id  3 | task 0 | prompt eval time =    3011.26 ms /  6988 tokens (    0.43 ms per token,  2320.62 tokens per second)
+1.03.836.553 I slot print_timing: id  3 | task 0 |        eval time =    2374.09 ms /   256 tokens (    9.27 ms per token,   107.83 tokens per second)
+1.03.836.553 I slot print_timing: id  3 | task 0 |       total time =    5385.35 ms /  7244 tokens
+1.03.836.557 I slot print_timing: id  3 | task 0 |    graphs reused =        254
+1.03.836.712 I slot      release: id  3 | task 0 | stop processing: n_tokens = 7243, truncated = 0
+1.03.846.376 I srv    operator(): operator(): cleaning up before exit...

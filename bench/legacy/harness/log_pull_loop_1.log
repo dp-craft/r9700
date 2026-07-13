@@ -1,0 +1,78 @@
+rocm7.13.0_gfx120X-all_ubuntu24.04_py3.13_pytorch_2.10.0_vllm_0.19.1: Pulling from rocm/vllm
+b40150c1c271: Pulling fs layer
+909468118d8d: Pulling fs layer
+1f1842b1970e: Pulling fs layer
+4f4fb700ef54: Pulling fs layer
+088ef87a16f2: Pulling fs layer
+4f4fb700ef54: Pulling fs layer
+944f58babb64: Pulling fs layer
+de0725057bf9: Pulling fs layer
+aaa485ae285e: Pulling fs layer
+c0675f061534: Pulling fs layer
+4f4fb700ef54: Pulling fs layer
+d1a71ff21e24: Pulling fs layer
+447594593aaa: Pulling fs layer
+105b1329a6eb: Pulling fs layer
+c4b247c03a58: Pulling fs layer
+1ef014a3b2c5: Pulling fs layer
+4722d971a853: Pulling fs layer
+a0eba329de6b: Pulling fs layer
+fd318188b93a: Pulling fs layer
+a33d9b1d4e50: Pulling fs layer
+a4056c820d11: Pulling fs layer
+4f4fb700ef54: Pulling fs layer
+4f4fb700ef54: Pulling fs layer
+4f4fb700ef54: Pulling fs layer
+b0d25fbd39bf: Pulling fs layer
+4c235356e030: Pulling fs layer
+55a350056577: Pulling fs layer
+f997f9eeb4ec: Pulling fs layer
+4f4fb700ef54: Download complete
+d1a71ff21e24: Download complete
+b40150c1c271: Download complete
+aaa485ae285e: Download complete
+a0eba329de6b: Download complete
+088ef87a16f2: Download complete
+b40150c1c271: Pull complete
+1ef014a3b2c5: Download complete
+1f1842b1970e: Download complete
+de0725057bf9: Download complete
+4f4fb700ef54: Pull complete
+1f1842b1970e: Pull complete
+909468118d8d: Download complete
+b0d25fbd39bf: Download complete
+f997f9eeb4ec: Download complete
+55a350056577: Download complete
+c4b247c03a58: Download complete
+fd318188b93a: Download complete
+a4056c820d11: Download complete
+4c235356e030: Download complete
+c0675f061534: Download complete
+a33d9b1d4e50: Download complete
+944f58babb64: Download complete
+a33d9b1d4e50: Pull complete
+a4056c820d11: Pull complete
+de0725057bf9: Pull complete
+a0eba329de6b: Pull complete
+105b1329a6eb: Download complete
+4c235356e030: Pull complete
+fd318188b93a: Pull complete
+447594593aaa: Download complete
+4722d971a853: Download complete
+4722d971a853: Pull complete
+c4b247c03a58: Pull complete
+d1a71ff21e24: Pull complete
+55a350056577: Pull complete
+c0675f061534: Pull complete
+088ef87a16f2: Pull complete
+aaa485ae285e: Pull complete
+105b1329a6eb: Pull complete
+447594593aaa: Pull complete
+1ef014a3b2c5: Pull complete
+909468118d8d: Pull complete
+b0d25fbd39bf: Pull complete
+f997f9eeb4ec: Pull complete
+944f58babb64: Pull complete
+Digest: sha256:015dc53ab8c9ddbbdca034c68fe7c169e6884c63094adb49071d1911b1cbd474
+Status: Downloaded newer image for rocm/vllm:rocm7.13.0_gfx120X-all_ubuntu24.04_py3.13_pytorch_2.10.0_vllm_0.19.1
+docker.io/rocm/vllm:rocm7.13.0_gfx120X-all_ubuntu24.04_py3.13_pytorch_2.10.0_vllm_0.19.1

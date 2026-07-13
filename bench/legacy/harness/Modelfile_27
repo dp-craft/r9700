@@ -1,0 +1,1 @@
+FROM /home/dev/models-local/gguf/Qwen3.6-27B-Q4_K_S.gguf

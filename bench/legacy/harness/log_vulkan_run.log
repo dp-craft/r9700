@@ -1,0 +1,41 @@
+build=/home/dev/work/dippe/amd/bench/llamacpp-vulkan backend=Vulkan-b9950
+WARNING: radv is not a conformant Vulkan implementation, testing use only.
+>>> Vulkan-b9950 be_Vulkan-b9950_35B (ub=2048 fa_on)
+Traceback (most recent call last):
+  File "/home/dev/work/dippe/amd/bench/harness/probe.py", line 73, in <module>
+    prefill, decode, ptoks, da, dn = fn(TARGET)
+                                     ^^^^^^^^^^
+  File "/home/dev/work/dippe/amd/bench/harness/probe.py", line 27, in bench_llamacpp
+    r = json.load(post(f"http://127.0.0.1:{port}/completion",
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/dev/work/dippe/amd/bench/harness/probe.py", line 24, in post
+    return urllib.request.urlopen(req, timeout=timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 215, in urlopen
+    return opener.open(url, data, timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 515, in open
+    response = self._open(req, data)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 532, in _open
+    result = self._call_chain(self.handle_open, protocol, protocol +
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 492, in _call_chain
+    result = func(*args)
+             ^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 1373, in http_open
+    return self.do_open(http.client.HTTPConnection, req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 1348, in do_open
+    r = h.getresponse()
+        ^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/http/client.py", line 1457, in getresponse
+    response.begin()
+  File "/usr/lib/python3.12/http/client.py", line 336, in begin
+    version, status, reason = self._read_status()
+                              ^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/http/client.py", line 305, in _read_status
+    raise RemoteDisconnected("Remote end closed connection without"
+http.client.RemoteDisconnected: Remote end closed connection without response
+  PROBE FAIL be_Vulkan-b9950_35B
+>>> Vulkan-b9950 be_Vulkan-b9950_27B (ub=2048 fa_on)

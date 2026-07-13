@@ -1,0 +1,17 @@
+[
+  {"title": "Reasoning-budget sweep — quality is flat, cost/latency scale with the cap",
+   "xlabel": "--reasoning-budget (tokens; ∞ = uncapped)",
+   "file": "reasoning_budget_sweep.svg",
+   "metrics": ["det_pass_pct", "judge_mean", "think_tokens", "ttfa_s"],
+   "series": [
+     {"name": "jackrong", "slot": 4, "points": [
+        {"x": 512,  "tick": "512",  "config": "jr-rb512"},
+        {"x": 1024, "tick": "1024", "config": "jr-rb1024"},
+        {"x": 2048, "tick": "2048", "config": "jr-rb2048"},
+        {"x": 4096, "tick": "∞",    "config": "jr-rb0"}]},
+     {"name": "unsloth-MTP", "slot": 0, "points": [
+        {"x": 512,  "tick": "512",  "config": "un-rb512"},
+        {"x": 1024, "tick": "1024", "config": "un-rb1024"},
+        {"x": 2048, "tick": "2048", "config": "un-rb2048"}]}
+   ]}
+]

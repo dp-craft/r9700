@@ -1,0 +1,11 @@
+>>> hi_35B_vk (Vulkan-RADV mtp=0)
+{"model": "35B-A3B", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "f16", "ub": 2048, "batch": 8192, "flash_attn": "on", "ngl": 99, "backend": "Vulkan-RADV", "mtp": false, "dpm": "high", "runtime": "llamacpp", "label": "hi_35B_vk", "prefill_tok_s": 2584.1, "decode_tok_s": 99.0, "prompt_tokens": 6986, "vram_used_mb": 22864}
+>>> hi_27B_vk_mtp (Vulkan-RADV-MTP mtp=1)
+{"model": "27B-MTP", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "f16", "ub": 2048, "batch": 8192, "flash_attn": "on", "ngl": 99, "backend": "Vulkan-RADV-MTP", "mtp": true, "dpm": "high", "runtime": "llamacpp", "label": "hi_27B_vk_mtp", "prefill_tok_s": 731.6, "decode_tok_s": 65.0, "prompt_tokens": 6989, "vram_used_mb": 23741, "draft": "177/232"}
+>>> m35_vk_nomtp (Vulkan-RADV mtp=0)
+{"model": "35B-A3B-MTPgguf", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "f16", "ub": 2048, "batch": 8192, "flash_attn": "on", "ngl": 99, "backend": "Vulkan-RADV", "mtp": false, "dpm": "high", "runtime": "llamacpp", "label": "m35_vk_nomtp", "prefill_tok_s": 2529.6, "decode_tok_s": 94.5, "prompt_tokens": 6988, "vram_used_mb": 24132}
+>>> m35_vk_mtp (Vulkan-RADV-MTP mtp=1)
+{"model": "35B-A3B-MTPgguf", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "f16", "ub": 2048, "batch": 8192, "flash_attn": "on", "ngl": 99, "backend": "Vulkan-RADV-MTP", "mtp": true, "dpm": "high", "runtime": "llamacpp", "label": "m35_vk_mtp", "prefill_tok_s": 2308.8, "decode_tok_s": 125.1, "prompt_tokens": 6991, "vram_used_mb": 25470, "draft": "167/263"}
+>>> m35_rocm_mtp (ROCm-b1295-MTP mtp=1)
+{"model": "35B-A3B-MTPgguf", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "f16", "ub": 2048, "batch": 8192, "flash_attn": "on", "ngl": 99, "backend": "ROCm-b1295-MTP", "mtp": true, "dpm": "high", "runtime": "llamacpp", "label": "m35_rocm_mtp", "prefill_tok_s": 1268.2, "decode_tok_s": 112.8, "prompt_tokens": 6987, "vram_used_mb": 25711, "draft": "182/219"}
+=== 35B MTP + dpm batch done ===

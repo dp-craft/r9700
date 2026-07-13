@@ -1,0 +1,27 @@
+0.00.026.242 I cmn  common_param: common_params_print_info: verbosity = 3 (adjust with the `-lv N` CLI arg)
+0.00.026.361 I srv          init: The UI is disabled
+0.00.026.363 I srv          init: Use --ui/--no-ui (or deprecated --webui/--no-webui) to enable/disable
+0.00.027.674 I srv    load_model: loading model '/home/dev/models/gguf/Qwen3.6-27B-Q4_K_S.gguf'
+0.03.423.546 I srv    load_model: initializing, n_slots = 4, n_ctx_slot = 65536, kv_unified = 'true'
+0.03.423.655 W llama_sampler_backend_support: device 'ROCm0' does not have support for op TOP_K needed for sampler 'top-k'
+0.03.423.662 W llama_sampler_backend_support: device 'ROCm0' does not have support for op TOP_K needed for sampler 'top-k'
+0.03.423.665 W llama_sampler_backend_support: device 'ROCm0' does not have support for op TOP_K needed for sampler 'top-k'
+0.03.423.667 W llama_sampler_backend_support: device 'ROCm0' does not have support for op TOP_K needed for sampler 'top-k'
+0.03.487.557 I srv          init: chat template supports preserving reasoning, consider enabling it via --reasoning-preserve
+0.03.487.578 I srv  llama_server: model loaded
+0.03.487.581 I srv  llama_server: listening on http://127.0.0.1:8899
+0.06.074.958 I slot get_availabl: id  3 | task -1 | selected slot by LRU, t_last = -1
+0.06.075.000 I slot launch_slot_: id  3 | task 0 | processing task, is_child = 0
+0.12.006.801 I slot print_timing: id  3 | task 0 | prompt processing, n_tokens =   2048, progress = 0.29, t =   5.93 s / 345.28 tokens per second
+0.16.339.609 I slot print_timing: id  3 | task 0 | prompt processing, n_tokens =   4096, progress = 0.59, t =  10.26 s / 399.06 tokens per second
+0.20.825.702 I slot print_timing: id  3 | task 0 | prompt processing, n_tokens =   6144, progress = 0.88, t =  14.75 s / 416.53 tokens per second
+0.22.625.724 I slot print_timing: id  3 | task 0 | prompt processing, n_tokens =   6921, progress = 0.99, t =  16.55 s / 418.18 tokens per second
+0.22.859.073 I slot print_timing: id  3 | task 0 | prompt processing, n_tokens =   6985, progress = 1.00, t =  16.78 s / 416.18 tokens per second
+0.25.953.281 I slot print_timing: id  3 | task 0 | n_decoded =    151, tg =  49.77 t/s, tg_3s =  49.77 t/s
+0.27.954.435 I slot print_timing: id  3 | task 0 | prompt eval time =   16844.00 ms /  6989 tokens (    2.41 ms per token,   414.93 tokens per second)
+0.27.954.439 I slot print_timing: id  3 | task 0 |        eval time =    5034.95 ms /   256 tokens (   19.67 ms per token,    50.84 tokens per second)
+0.27.954.440 I slot print_timing: id  3 | task 0 |       total time =   21878.95 ms /  7245 tokens
+0.27.954.442 I slot print_timing: id  3 | task 0 |    graphs reused =        150
+0.27.954.445 I slot print_timing: id  3 | task 0 | draft acceptance = 0.85514 (  183 accepted /   214 generated), mean len =  3.54
+0.27.954.585 I slot      release: id  3 | task 0 | stop processing: n_tokens = 7244, truncated = 0
+0.27.962.540 I srv    operator(): operator(): cleaning up before exit...

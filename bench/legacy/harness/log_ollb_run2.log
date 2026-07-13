@@ -1,0 +1,14 @@
+models q35/q27 already imported; skipping re-create
+>>> ollama ollb_35B_nb512 (num_batch=512)
+{"model": "35B-A3B", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "q8_0", "num_batch": 512, "flash_attn": "on", "engine": "ollama", "backend": "ROCm", "runtime": "ollama", "label": "ollb_35B_nb512", "prefill_tok_s": 2071.5, "decode_tok_s": 62.4, "prompt_tokens": 6999, "vram_used_mb": 21961}
+>>> ollama ollb_27B_nb512 (num_batch=512)
+{"model": "27B-MTP", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "q8_0", "num_batch": 512, "flash_attn": "on", "engine": "ollama", "backend": "ROCm", "runtime": "ollama", "label": "ollb_27B_nb512", "prefill_tok_s": 1013.2, "decode_tok_s": 26.8, "prompt_tokens": 7000, "vram_used_mb": 18579}
+>>> ollama ollb_35B_nb1024 (num_batch=1024)
+{"model": "35B-A3B", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "q8_0", "num_batch": 1024, "flash_attn": "on", "engine": "ollama", "backend": "ROCm", "runtime": "ollama", "label": "ollb_35B_nb1024", "prefill_tok_s": 2712.7, "decode_tok_s": 63.0, "prompt_tokens": 7000, "vram_used_mb": 22148}
+>>> ollama ollb_27B_nb1024 (num_batch=1024)
+{"model": "27B-MTP", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "q8_0", "num_batch": 1024, "flash_attn": "on", "engine": "ollama", "backend": "ROCm", "runtime": "ollama", "label": "ollb_27B_nb1024", "prefill_tok_s": 1036.3, "decode_tok_s": 26.8, "prompt_tokens": 6997, "vram_used_mb": 18710}
+>>> ollama ollb_35B_nb2048 (num_batch=2048)
+{"model": "35B-A3B", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "q8_0", "num_batch": 2048, "flash_attn": "on", "engine": "ollama", "backend": "ROCm", "runtime": "ollama", "label": "ollb_35B_nb2048", "prefill_tok_s": 2882.3, "decode_tok_s": 63.2, "prompt_tokens": 6996, "vram_used_mb": 22389}
+>>> ollama ollb_27B_nb2048 (num_batch=2048)
+{"model": "27B-MTP", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "q8_0", "num_batch": 2048, "flash_attn": "on", "engine": "ollama", "backend": "ROCm", "runtime": "ollama", "label": "ollb_27B_nb2048", "prefill_tok_s": 1025.4, "decode_tok_s": 26.8, "prompt_tokens": 6999, "vram_used_mb": 19005}
+=== ollama num_batch sweep done ===

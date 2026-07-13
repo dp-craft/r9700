@@ -1,0 +1,122 @@
+{
+"S00": {
+"config": "un-rb512",
+"task_id": "design-ratelimiter"
+},
+"S01": {
+"config": "un-rb2048",
+"task_id": "agentic-plan"
+},
+"S02": {
+"config": "jr-rb0",
+"task_id": "design-ratelimiter"
+},
+"S03": {
+"config": "un-pmin075",
+"task_id": "agentic-plan"
+},
+"S04": {
+"config": "un-pmin05",
+"task_id": "design-ratelimiter"
+},
+"S05": {
+"config": "jr-rb512",
+"task_id": "review-concurrency"
+},
+"S06": {
+"config": "jr-rb1024",
+"task_id": "agentic-plan"
+},
+"S07": {
+"config": "un-rb2048",
+"task_id": "review-concurrency"
+},
+"S08": {
+"config": "jr-rb0",
+"task_id": "agentic-plan"
+},
+"S09": {
+"config": "un-rb1024",
+"task_id": "review-concurrency"
+},
+"S10": {
+"config": "jr-rb0",
+"task_id": "review-concurrency"
+},
+"S11": {
+"config": "un-pmin075",
+"task_id": "design-ratelimiter"
+},
+"S12": {
+"config": "un-nmax5",
+"task_id": "agentic-plan"
+},
+"S13": {
+"config": "un-pmin05",
+"task_id": "review-concurrency"
+},
+"S14": {
+"config": "un-rb1024",
+"task_id": "design-ratelimiter"
+},
+"S15": {
+"config": "un-nmax5",
+"task_id": "review-concurrency"
+},
+"S16": {
+"config": "jr-rb2048",
+"task_id": "design-ratelimiter"
+},
+"S17": {
+"config": "un-rb2048",
+"task_id": "design-ratelimiter"
+},
+"S18": {
+"config": "un-rb512",
+"task_id": "review-concurrency"
+},
+"S19": {
+"config": "jr-rb2048",
+"task_id": "agentic-plan"
+},
+"S20": {
+"config": "un-rb1024",
+"task_id": "agentic-plan"
+},
+"S21": {
+"config": "un-nmax5",
+"task_id": "design-ratelimiter"
+},
+"S22": {
+"config": "jr-rb1024",
+"task_id": "design-ratelimiter"
+},
+"S23": {
+"config": "un-pmin075",
+"task_id": "review-concurrency"
+},
+"S24": {
+"config": "jr-rb512",
+"task_id": "design-ratelimiter"
+},
+"S25": {
+"config": "jr-rb512",
+"task_id": "agentic-plan"
+},
+"S26": {
+"config": "un-pmin05",
+"task_id": "agentic-plan"
+},
+"S27": {
+"config": "jr-rb2048",
+"task_id": "review-concurrency"
+},
+"S28": {
+"config": "jr-rb1024",
+"task_id": "review-concurrency"
+},
+"S29": {
+"config": "un-rb512",
+"task_id": "agentic-plan"
+}
+}

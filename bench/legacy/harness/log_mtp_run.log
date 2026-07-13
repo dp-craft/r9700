@@ -1,0 +1,7 @@
+>>> MTP Vulkan-RADV-MTP (27B, ub2048/b8192/f16)
+{"model": "27B-MTP", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "f16", "ub": 2048, "batch": 8192, "flash_attn": "on", "ngl": 99, "backend": "Vulkan-RADV-MTP", "mtp": true, "runtime": "llamacpp", "label": "mtp_Vulkan-RADV-MTP", "prefill_tok_s": 843.1, "decode_tok_s": 72.2, "prompt_tokens": 6987, "vram_used_mb": 23707, "draft": "180/223"}
+run_mtp_backend.sh: line 10: 109838 Killed                  LD_LIBRARY_PATH="$build" "$build/llama-server" -m "$GGUF_27B" --host 127.0.0.1 --port $PORT -c "$CTX" -ngl 99 -b 8192 -ub 2048 --flash-attn on -ctk f16 -ctv f16 --spec-type draft-mtp --spec-draft-n-max 3 --no-webui > "$HARNESS/log_mtp_${be}.log" 2>&1
+>>> MTP ROCm-b1295-MTP (27B, ub2048/b8192/f16)
+{"model": "27B-MTP", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "f16", "ub": 2048, "batch": 8192, "flash_attn": "on", "ngl": 99, "backend": "ROCm-b1295-MTP", "mtp": true, "runtime": "llamacpp", "label": "mtp_ROCm-b1295-MTP", "prefill_tok_s": 790.2, "decode_tok_s": 51.8, "prompt_tokens": 6986, "vram_used_mb": 23894, "draft": "183/215"}
+run_mtp_backend.sh: line 10: 110556 Killed                  LD_LIBRARY_PATH="$build" "$build/llama-server" -m "$GGUF_27B" --host 127.0.0.1 --port $PORT -c "$CTX" -ngl 99 -b 8192 -ub 2048 --flash-attn on -ctk f16 -ctv f16 --spec-type draft-mtp --spec-draft-n-max 3 --no-webui > "$HARNESS/log_mtp_${be}.log" 2>&1
+=== MTP backend test done ===

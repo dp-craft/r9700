@@ -185,6 +185,59 @@ def small_multiples(title, panels, w=720):
     return svg(w, int(h), "".join(b))
 
 
+def line_panels(title, xlabel, panels, w=720):
+    """Connected-parameter view: a swept scalar on x (e.g. reasoning-budget), one colored line
+    per series (e.g. model), a separate panel per metric (own y-scale). Each point direct-labeled;
+    x uses categorical rank ticks so uneven / '∞' stops space evenly.
+    panels: [(panel_title, unit, fmt, series)]  series: [(name, slot, [(xtick, y), ...])]"""
+    import math
+    cols = 2
+    pw = w // cols
+    ph = 150
+    prows = math.ceil(len(panels) / cols)
+    h = 70 + prows * ph
+    b = [f'<text x="20" y="26" class="t" font-size="15">{esc(title)}</text>',
+         f'<text x="20" y="44" class="mut" font-size="11">x = {esc(xlabel)} · one line per series · each panel its own y-scale · connect the dots to read the trend</text>']
+    # shared categorical x ticks (union of all series ticks, in first-seen order)
+    ticks = []
+    for _, _, _, series in panels:
+        for _, _, pts in series:
+            for xt, _y in pts:
+                if xt not in ticks:
+                    ticks.append(xt)
+    nx = max(len(ticks), 1)
+    xpos = {t: i for i, t in enumerate(ticks)}
+    for pi, (pt, unit, fmt, series) in enumerate(panels):
+        ox = (pi % cols) * pw + 60
+        oy = 74 + (pi // cols) * ph
+        plot_w = pw - 96
+        plot_h = ph - 66
+        allv = [y for _, _, pts in series for _, y in pts if isinstance(y, (int, float))]
+        if not allv:
+            continue
+        vmax = max(allv) * 1.14 or 1.0
+        vmin = min(allv + [0])
+        vmin = 0 if vmin >= 0 else vmin * 1.1
+        def X(t): return ox + (plot_w * (xpos[t] + 0.5) / nx)
+        def Y(v): return oy + plot_h * (1 - (v - vmin) / (vmax - vmin + 1e-9))
+        b.append(f'<text x="{ox-6}" y="{oy-8}" class="t" font-size="12">{esc(pt)}</text>')
+        # baseline + x ticks
+        b.append(f'<line x1="{ox}" y1="{Y(vmin):.1f}" x2="{ox+plot_w}" y2="{Y(vmin):.1f}" stroke="var(--axis)" stroke-width="1"/>')
+        for t in ticks:
+            b.append(f'<text x="{X(t):.1f}" y="{oy+plot_h+15}" text-anchor="middle" class="mut" font-size="10">{esc(str(t))}</text>')
+        for name, slot, pts in series:
+            pts = [(t, y) for t, y in pts if isinstance(y, (int, float))]
+            if not pts:
+                continue
+            d = " ".join(f"{'M' if i==0 else 'L'}{X(t):.1f} {Y(y):.1f}" for i, (t, y) in enumerate(pts))
+            b.append(f'<path d="{d}" fill="none" stroke="var(--s{slot+1})" stroke-width="2.5"/>')
+            for t, y in pts:
+                b.append(f'<circle cx="{X(t):.1f}" cy="{Y(y):.1f}" r="4" fill="var(--s{slot+1})" stroke="var(--surface)" stroke-width="1.5"/>')
+            lt, ly = pts[-1]
+            b.append(f'<text x="{X(lt)+7:.1f}" y="{Y(ly)+4:.1f}" class="val" font-size="10.5" fill="var(--s{slot+1})">{esc(name)} {fmt.format(ly)}{unit}</text>')
+    return svg(w, int(h), "".join(b))
+
+
 def heatmap(title, configs, tasks, cell, w=760):
     """cell(config,task) -> (fill_css, label). Status-colored pass/fail/partial grid."""
     pad_l, top = 168, 90
@@ -219,6 +272,8 @@ def main():
     ap.add_argument("--dir", default=os.path.join(HERE, "out"), help="dir with the Phase-A/B jsonl outputs")
     ap.add_argument("--charts", default=os.path.join(HERE, "charts"),
                     help="output dir for SVGs+appendix (default: campaign/charts, next to analysis.md)")
+    ap.add_argument("--order", default="",
+                    help="comma-separated config order (palette + row order); overrides CANON for this campaign")
     a = ap.parse_args()
     D = a.dir
     outs = [r for r in load_jsonl(f"{D}/outputs.jsonl") if "error" not in r]
@@ -227,8 +282,9 @@ def main():
     judg = load_jsonl(f"{D}/judge_scores.jsonl")
     cdir = a.charts; cbase = os.path.basename(cdir.rstrip("/")); os.makedirs(cdir, exist_ok=True)
 
-    configs = [c for c in CANON if any(r.get("config") == c for r in outs)]
-    for r in outs:                                      # keep any non-canonical configs too
+    seed = [c.strip() for c in a.order.split(",") if c.strip()] or CANON
+    configs = [c for c in seed if any(r.get("config") == c for r in outs)]
+    for r in outs:                                      # keep any config not named in the seed order
         if r.get("config") not in configs:
             configs.append(r["config"])
     order = configs
@@ -320,6 +376,42 @@ def main():
     if tasks:
         files["task_heatmap.svg"] = heatmap("Per-task outcomes (config × task)", configs, tasks, cell)
 
+    # 9. connected-parameter sweeps (optional): out/sweeps.json declares line charts over a swept
+    #    scalar (e.g. reasoning-budget) so relationships read as trends, not unordered bars.
+    METRICS = {  # metric key -> (pretty title, unit, fmt, value-dict)
+        "det_pass_pct": ("Deterministic accuracy", "%", "{:.0f}", detpass),
+        "judge_mean": ("LLM-judge quality", "/5", "{:.1f}", judge_mean),
+        "think_tokens": ("Thinking tokens / task", "", "{:.0f}", tok_think),
+        "answer_tokens": ("Answer tokens / task", "", "{:.0f}", tok_ans),
+        "total_tokens": ("Total tokens / task", "", "{:.0f}", tok_total),
+        "ttfa_s": ("Time to first ANSWER token", "s", "{:.0f}", ttfa),
+        "ttft_s": ("Time to first token", "s", "{:.1f}", ttft),
+        "decode_tps": ("Decode tok/s", "", "{:.0f}", decode),
+        "prefill_tps": ("Prefill tok/s", "", "{:.0f}", prefill),
+        "runaway_pct": ("Runaway rate", "%", "{:.0f}",
+                        {c: trunc.get(c) for c in configs}),
+    }
+    sweeps = []
+    if os.path.exists(f"{D}/sweeps.json"):                  # whole-file JSON array (not JSONL)
+        sweeps = json.load(open(f"{D}/sweeps.json"))
+    sweep_appendix = []
+    for si, sw in enumerate(sweeps):
+        panels = []
+        for mk in sw.get("metrics", []):
+            if mk not in METRICS:
+                continue
+            ptitle, unit, fmt, vals = METRICS[mk]
+            series = []
+            for ser in sw.get("series", []):
+                pts = [(pt.get("tick", str(pt["x"])), vals.get(pt["config"])) for pt in ser["points"]]
+                series.append((ser["name"], ser.get("slot", sw["series"].index(ser)), pts))
+            panels.append((ptitle, unit, fmt, series))
+        if not panels:
+            continue
+        fn = sw.get("file", f"sweep_{si}.svg")
+        files[fn] = line_panels(sw.get("title", "Parameter sweep"), sw.get("xlabel", "x"), panels)
+        sweep_appendix.append((fn, sw.get("title", "Parameter sweep")))
+
     for name, content in files.items():
         open(f"{cdir}/{name}", "w").write(content)
 
@@ -328,7 +420,7 @@ def main():
                 "_Generated by `make_charts.py`. One fixed color per config across all charts; "
                 "each chart uses a single axis (differently-scaled metrics are separate panels). "
                 "SVGs are theme-aware (light/dark)._\n"]
-    order_titles = [
+    order_titles = list(sweep_appendix) + [
         ("quality_vs_cost.svg", "Headline: quality vs token cost (up-and-left wins)"),
         ("quality_deterministic.svg", "Objective accuracy"),
         ("quality_judge.svg", "Open-ended quality (LLM-judge)"),

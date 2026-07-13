@@ -1,0 +1,46 @@
+serve up
+>>> creating q35 from /home/dev/models-local/gguf/Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive-Q4_K_M.gguf
+copying file sha256:bbef58c37ce88820be9d98b6437f1cf4bac890c947bd55fc7b68e22098574231 100% [K
+parsing GGUF [K
+verifying conversion ⠦ [K[?25h[?2026l  create rc=124 elapsed=401s  blobstore=59G
+>>> creating q27 from /home/dev/models-local/gguf/Qwen3.6-27B-Q4_K_S.gguf
+creating new layer sha256:a32505aa92522ab7d09209a46ca1c82b6226a5f3b43ac9bf775a3dd60a9e9b08 [K
+writing manifest [K
+success [K[?25h[?2026l
+  create rc=0 elapsed=361s  blobstore=70G
+=== models ===
+NAME          ID              SIZE     MODIFIED               
+q27:latest    a2da17baa4f1    16 GB    Less than a second ago    
+>>> ollama ollv2_35B_nb2048 (num_batch=2048)
+Traceback (most recent call last):
+  File "/home/dev/work/dippe/amd/bench/harness/probe.py", line 80, in <module>
+    prefill, decode, ptoks, da, dn = fn(TARGET)
+                                     ^^^^^^^^^^
+  File "/home/dev/work/dippe/amd/bench/harness/probe.py", line 44, in bench_ollama
+    r = json.load(post("http://127.0.0.1:11434/api/generate",
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/dev/work/dippe/amd/bench/harness/probe.py", line 24, in post
+    return urllib.request.urlopen(req, timeout=timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 215, in urlopen
+    return opener.open(url, data, timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 521, in open
+    response = meth(req, response)
+               ^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 630, in http_response
+    response = self.parent.error(
+               ^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 559, in error
+    return self._call_chain(*args)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 492, in _call_chain
+    result = func(*args)
+             ^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 639, in http_error_default
+    raise HTTPError(req.full_url, code, msg, hdrs, fp)
+urllib.error.HTTPError: HTTP Error 404: Not Found
+  PROBE FAIL ollv2_35B_nb2048
+>>> ollama ollv2_27B_nb2048 (num_batch=2048)
+{"model": "27B-MTP", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "q8_0", "num_batch": 2048, "flash_attn": "on", "engine": "ollama", "backend": "ROCm7.2", "dpm": "auto", "runtime": "ollama", "label": "ollv2_27B_nb2048", "prefill_tok_s": 1064.9, "decode_tok_s": 27.0, "prompt_tokens": 6999, "vram_used_mb": 18632}
+=== ollama clean verify done ===

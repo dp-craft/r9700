@@ -1,0 +1,15 @@
+>>> hi_35B_vk (Vulkan-RADV mtp=0)
+{"model": "35B-A3B", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "f16", "ub": 2048, "batch": 8192, "flash_attn": "on", "ngl": 99, "backend": "Vulkan-RADV", "mtp": false, "dpm": "high", "runtime": "llamacpp", "label": "hi_35B_vk", "prefill_tok_s": 2513.8, "decode_tok_s": 100.8, "prompt_tokens": 6988, "vram_used_mb": 22955}
+>>> hi_27B_vk_mtp (Vulkan-RADV-MTP mtp=1)
+{"model": "27B-MTP", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "f16", "ub": 2048, "batch": 8192, "flash_attn": "on", "ngl": 99, "backend": "Vulkan-RADV-MTP", "mtp": true, "dpm": "high", "runtime": "llamacpp", "label": "hi_27B_vk_mtp", "prefill_tok_s": 720.7, "decode_tok_s": 67.7, "prompt_tokens": 6989, "vram_used_mb": 23754, "draft": "182/217"}
+>>> m35_vk_nomtp (Vulkan-RADV mtp=0)
+{"model": "35B-A3B-MTPgguf", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "f16", "ub": 2048, "batch": 8192, "flash_attn": "on", "ngl": 99, "backend": "Vulkan-RADV", "mtp": false, "dpm": "high", "runtime": "llamacpp", "label": "m35_vk_nomtp", "prefill_tok_s": 2564.2, "decode_tok_s": 82.4, "prompt_tokens": 6990, "vram_used_mb": 24127}
+>>> m35_vk_mtp (Vulkan-RADV-MTP mtp=1)
+{"model": "35B-A3B-MTPgguf", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "f16", "ub": 2048, "batch": 8192, "flash_attn": "on", "ngl": 99, "backend": "Vulkan-RADV-MTP", "mtp": true, "dpm": "high", "runtime": "llamacpp", "label": "m35_vk_mtp", "prefill_tok_s": 2369.2, "decode_tok_s": 127.0, "prompt_tokens": 6989, "vram_used_mb": 25464, "draft": "164/271"}
+>>> m35_rocm_mtp (ROCm-b1295-MTP mtp=1)
+  LOAD FAIL m35_rocm_mtp
+0.00.104.530 I cmn  common_param: common_params_print_info: verbosity = 3 (adjust with the `-lv N` CLI arg)
+0.00.109.582 I srv          init: The UI is disabled
+0.00.109.585 I srv          init: Use --ui/--no-ui (or deprecated --webui/--no-webui) to enable/disable
+0.00.113.076 I srv    load_model: loading model '/home/dev/models/gguf/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf'
+=== 35B MTP + dpm batch done ===

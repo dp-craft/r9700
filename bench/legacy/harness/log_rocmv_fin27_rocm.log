@@ -1,0 +1,20 @@
+0.00.027.039 I cmn  common_param: common_params_print_info: verbosity = 3 (adjust with the `-lv N` CLI arg)
+0.00.027.316 I srv          init: The UI is disabled
+0.00.027.318 I srv          init: Use --ui/--no-ui (or deprecated --webui/--no-webui) to enable/disable
+0.00.028.807 I srv    load_model: loading model '/home/dev/models-local/gguf/Qwen3.6-27B-Q4_K_S.gguf'
+0.32.219.264 I srv    load_model: initializing, n_slots = 4, n_ctx_slot = 65536, kv_unified = 'true'
+0.32.257.301 I srv          init: chat template supports preserving reasoning, consider enabling it via --reasoning-preserve
+0.32.257.534 I srv  llama_server: model loaded
+0.32.257.538 I srv  llama_server: listening on http://127.0.0.1:8899
+0.36.244.470 I slot get_availabl: id  3 | task -1 | selected slot by LRU, t_last = -1
+0.36.244.806 I slot launch_slot_: id  3 | task 0 | processing task, is_child = 0
+0.41.286.139 I slot print_timing: id  3 | task 0 | prompt processing, n_tokens =   4939, progress = 0.71, t =   5.04 s / 979.74 tokens per second
+0.42.149.369 I slot print_timing: id  3 | task 0 | prompt processing, n_tokens =   6987, progress = 1.00, t =   5.90 s / 1183.36 tokens per second
+0.47.528.796 I slot print_timing: id  3 | task 0 | n_decoded =    100, tg =  29.29 t/s, tg_3s =  29.29 t/s
+0.50.562.629 I slot print_timing: id  3 | task 0 | n_decoded =    187, tg =  29.00 t/s, tg_3s =  28.68 t/s
+0.52.928.800 I slot print_timing: id  3 | task 0 | prompt eval time =    7870.06 ms /  6991 tokens (    1.13 ms per token,   888.30 tokens per second)
+0.52.928.803 I slot print_timing: id  3 | task 0 |        eval time =    8813.73 ms /   256 tokens (   34.43 ms per token,    29.05 tokens per second)
+0.52.928.804 I slot print_timing: id  3 | task 0 |       total time =   16683.79 ms /  7247 tokens
+0.52.928.806 I slot print_timing: id  3 | task 0 |    graphs reused =        254
+0.52.928.937 I slot      release: id  3 | task 0 | stop processing: n_tokens = 7246, truncated = 0
+0.52.940.606 I srv    operator(): operator(): cleaning up before exit...

@@ -1,0 +1,3030 @@
+[run-id 5b4eca32555e — unique prefix to defeat prefix cache]
+
+Think step by step before answering.
+
+Using the codebase in the CONTEXT section as the existing system, implement a new feature:
+a `--resume` capability that lets a long-running batch job checkpoint its progress and restart from
+the last completed unit of work after a crash.
+
+Deliver:
+1. Your reasoning about where checkpoint state should live and the failure modes you must handle
+   (put this reasoning inside a <think>...</think> block).
+2. The complete implementation: new/changed files with full code, matching the existing style and
+   conventions visible in the CONTEXT.
+3. A short test plan that exercises the crash/resume path end-to-end.
+
+Write production-quality code. Prefer editing the existing modules over adding parallel ones.
+
+
+===== CONTEXT (real sources) =====
+
+
+===== FILE: ts-agentic-code-runner/README.md =====
+# Agentic Code Runner
+
+Standalone agentic loop (feature 044) that drives a local/cloud LLM through tools to implement a single speckit task (`{S}` or non-UI `{M}`), runs a TDD/impl gate pipeline, and escalates across a model ladder on repeated failure.
+
+- Workspace root (no own `package.json`); type-checked via `tsconfig.scripts.json`
+- Tested via the Tooling vitest config (`npm run runner:test` / `npm run test:tools`)
+- Integrated into `speckit.implement` Step-8 behind `RUNNER_DELEGATION`
+
+---
+
+## Quick Start
+
+```bash
+npm run runner -- \
+  --agent code-logic-writer \
+  --nav specs/<branch>/task-dag/nav/<T###>.json \
+  --mode tdd \
+  [--profile local-default] \
+  [--rules path/to/rules.md]
+```
+
+The nav bundle (`--nav`) is **mandatory** — the runner reads target files, spec excerpts, and hover signatures from it. Prints `AgentRunResult` JSON to stdout.
+
+`--rules <path>` (optional): a custom rules `.md` (e.g. a Claude agent definition) overrides the built-in digest; `@`-imports are expanded recursively and YAML frontmatter is stripped.
+
+**Exit codes:** `0` = completed, `1` = failed, `2` = bad usage.
+
+---
+
+## Orchestrator Contract
+
+The orchestrator MUST treat this as the source of truth and MUST NOT grep the runner's TypeScript source or probe the filesystem to learn its behaviour.
+
+- **No build step.** The runner runs via `tsx` — there is **no `dist/`**. MUST NOT probe `tools/agentic-code-runner/dist/`. (Contrast: `task-dag` IS compiled — `npm run taskdag:build` — do not conflate them.)
+- **Discover capabilities, don't reverse-engineer them:** `npm run runner -- --capabilities` prints a `runner-capabilities/v1` JSON contract (exit 0) projected live from the runtime constants — agent types, modes, `maxTargetFiles`, gates per mode, complexity cap, escalation ladder, profiles, env vars. It cannot drift from real behaviour.
+- **Outcome routing — read the booleans, not the error string.** The `--out` JSON carries `fallbackSanctioned` and `backend`:
+  - `status:'completed'` → done.
+  - `fallbackSanctioned:true` → the runner genuinely tried and a Claude fallback is sanctioned (record it loud).
+  - `status!=='completed'` **and** `fallbackSanctioned:false` → infra/config **hard-stop** (`failureClass` = `auth` = expired/invalid API key · `connectivity` = provider down · `fatal`/`interrupted`): surface `error` and fix the cause; MUST NOT silently fall back to (billable) Claude.
+  - `backend` is the provider that actually ran (e.g. `openrouter`) even when `finalRung` still reads `ollama`.
+
+---
+
+## Architecture
+
+All source lives in `tools/agentic-code-runner/src/`.
+
+| File | Role |
+|---|---|
+| `cli.ts` | CLI entry. Parses `--agent --nav --mode [--profile]`, calls `runTask`, prints result JSON. |
+| `runTask.ts` | Reads the nav bundle, extracts target files from `specExcerpts` source paths + gate targets, asserts footprint, calls `runAgentLoop`. Applies `RUNNER_MODEL_ID`/`RUNNER_BASE_URL` env overrides. |
+| `runner.ts` | Orchestration seam (`runAgentLoop`). Resolves profile, projects rules into the system prompt, runs `runEscalation` (drives `repeatUntilExhausted`), builds a fresh model per attempt per rung, records telemetry. Hosts `defaultRunTests` (shells to vitest; spawn `ENOENT` → fatal, non-zero exit → test fail). |
+| `pipeline.ts` | Stage machine. Stages: `red`, `impl`, `green`, `lint`, `tsc`, `test`, `decomposition`, `functional-style`. Two named pipelines: `tdd=[red,impl,green,lint,tsc,decomposition,functional-style]`, `impl=[impl,lint,tsc,test,decomposition,functional-style]`. `STAGE_NAME` maps each stage to its contract name (projected by `--capabilities`). `runPipeline` reduces stages; `repeatUntilExhausted` re-runs the attempt until pass / aborted / ladder exhausted / no-progress. |
+| `escalation.ts` | Model ladder `['ollama','openrouter','claude']`, `FAILS_PER_RUNG=3`. `recordFailure` advances the rung; `claude` rung is terminal (status `local-exhausted` — review handoff, not a Claude bill). |
+| `profiles.ts` | Built-in model profiles + `resolveProfile` / `profileForRung`. Env vars override the resolved profile. |
+| `connector.ts` | AI SDK boundary. `createModel` per backend; `generate` via Vercel AI SDK `generateText` with `stepCountIs(maxSteps)`. |
+| `tools/index.ts` | Tool registry + AI SDK tool schemas: `read`, `write`, `edit`, `bash`, `grep`, `verify_edit`, `lsp`. Enforces cwd-jail (paths cannot escape the working dir) and footprint guard (mutating tools reject paths outside declared targets). `bash` uses `execFile` — no shell, metacharacters are not interpreted. |
+| `tools/lsp.ts` | LSP lookup over the nav bundle. |
+| `tools/verifyEdit.ts` | Anchored-edit apply + verify. |
+| `retryClassifier.ts` | `classifyAttempt(signal, cfg)` → `retry` \| `abort`. Idle-stall detection via tool-activity count + idle timeout. |
+| `telemetry.ts` | SQLite telemetry. Writes one `task_runs` row per run (status, final_rung, attempts, duration_ms, red/green observed). |
+| `rulesProjection.ts` | Composes the per-agent system-prompt digest from `claude-artifacts/agentic-runner-rules/roles/<agent>.md` (expands its `@io` + `@atoms` imports, strips HTML comments). |
+| `executor.ts` | `TaskSpec` + `assertFootprint`. |
+| `gates.ts` | Gate helpers consumed by the stage machine. |
+| `aimd.ts` | Adaptive concurrency (designed-in, switched OFF per spec I-14). |
+
+---
+
+## Configuration (runner.config.json)
+
+`runner.config.json` at the project root is the **single source of truth** for model selection, sampling, and run-behavior caps. `loadRunnerConfig()` reads it on startup and seeds `RUNNER_*` env vars authoritatively — overwriting any prior env values — so settings survive the tmux→orchestrator→Bash chain.
+
+### Files
+
+| File | Purpose |
+|---|---|
+| `runner.config.json` | Active config; committed; edit by hand |
+| `runner.config.example.json` | Full-surface reference showing all fields |
+
+Validate: `npm run runner:config -- --check` (exits non-zero on schema error). Generate/update: `runner:config -- generate` (idempotent — preserves an existing `profiles` catalog, no clobber).
+
+### Top-level fields
+
+| Field | Type | Purpose |
+|---|---|---|
+| `delegation` | `"runner" \| "claude"` | Speckit routing mode (see §Integration) |
+| `activeProfile` | string | Fallback profile when no role mapping applies |
+| `roleProfiles` | `Record<agentType, profileName>` | Maps agent type → profile; applied per-task over `activeProfile` |
+| `run` | object | Model-agnostic cap defaults for all profiles |
+| `profiles` | `Record<name, Profile>` | Profile catalog |
+
+#### `run` block — cap defaults
+
+| Field | Default | Purpose |
+|---|---|---|
+| `generateTimeoutMs` | `1200000` | Per-step abort timer (ms) |
+| `maxSteps` | `32` | Tool-loop step cap per drive |
+| `maxToolOutputChars` | `16000` | Per-tool-result truncation cap |
+| `largeFileLines` | — | File-size threshold for compaction |
+
+### Profile shape
+
+Each entry in `profiles` has:
+
+| Field | Required | Notes |
+|---|---|---|
+| `backend` | yes | `"ollama"` / `"openrouter"` / `"openai-compatible"` |
+| `modelId` | yes | Model identifier sent to the backend |
+| `baseUrl` | for `openai-compatible`; optional for ollama | Base URL override |
+| `ollama` | no | Sampling block; ignored for other backends |
+| `openrouter` | no | Sampling block; ignored for other backends |
+| `generateTimeoutMs` / `maxSteps` / `maxToolOutputChars` / `largeFileLines` | no | Per-profile cap overrides — take precedence over `run` block |
+
+#### Ollama sampling (`ollama`)
+
+| Field | Notes |
+|---|---|
+| `numCtx` | Context window (tokens) |
+| `temperature` / `topP` / `topK` / `repeatPenalty` | Standard sampling |
+| `numPredict` | Max output tokens |
+| `think` | Enable thinking mode (boolean) |
+| `idleTimeoutMs` | Ollama model idle-unload timeout |
+
+#### OpenRouter sampling (`openrouter`)
+
+| Field | Notes |
+|---|---|
+| `temperature` / `topP` / `topK` / `minP` / `repetitionPenalty` | Standard sampling |
+| `reasoningMaxTokens` / `reasoningEffort` | Reasoning budget (model-dependent) |
+| `cacheControl` | Ephemeral prompt caching (Anthropic-routed models only) |
+| `allowFallbacks` / `provider` / `quantization` | Provider routing |
+
+### Role-based model selection
+
+`--agent <type>` (e.g. `code-logic-writer`) is the only selector the orchestrator passes. The runner looks up `roleProfiles[agentType]` and applies that profile over the `activeProfile` baseline. This means:
+
+- The same physical model can have two profiles with different sampling (e.g. `a3b-code` at `temperature: 0.6` for impl, `a3b-test` at `temperature: 0.4` for tests).
+- `--profile <name>` is a manual override for ad-hoc testing only; the orchestrator never passes it.
+
+A profile's `backend` maps to a builtin escalation base (`ollama` → `local-default`, `openrouter` → `openrouter-default`, `openai-compatible` → `vllm-qwen-coder`), which seeds `RUNNER_PROFILE` for the connector and escalation ladder.
+
+### How to configure
+
+1. Add a profile to `runner.config.json`:
+
+```json
+"profiles": {
+  "my-model": {
+    "backend": "ollama",
+    "modelId": "my-model:latest",
+    "baseUrl": "http://192.168.1.10:11434",
+    "ollama": { "numCtx": 32768, "temperature": 0.6 }
+  }
+}
+```
+
+2. Map a role to it:
+
+```json
+"roleProfiles": { "code-logic-writer": "my-model" }
+```
+
+3. Validate: `npm run runner:config -- --check`
+
+### Precedence
+
+`runner.config.json` (authoritative — seeds env on load) → `RUNNER_*` env override (for fields absent from the file, or `--profile` manual flag) → code `DEFAULT_*` constants.
+
+**Secrets**: `RUNNER_OPENROUTER_API_KEY` is env-only — never put API keys in the committed config.
+
+### Builtin profiles (escalation ladder base)
+
+The escalation ladder (`ollama → openrouter → claude`) falls back to these builtin profiles when no catalog entry is active:
+
+| Profile | Backend | Model | Notes |
+|---|---|---|---|
+| `local-default` *(default)* | ollama | qwen2.5-coder:7b | — |
+| `local-fallback` | ollama | Devstral-24B | — |
+| `openrouter-default` | openrouter | qwen/qwen3.6-35b-a3b | requires `RUNNER_OPENROUTER_API_KEY` |
+| `vllm-qwen-coder` | openai-compatible | Qwen3-Coder-30B-A3B | `http://127.0.0.1:8000/v1` |
+| `unsloth-devstral` | openai-compatible | Devstral-24B | `http://127.0.0.1:8001/v1` |
+
+### Notes & limitations
+
+| Limitation | Detail |
+|---|---|
+| `openai-compatible` sampling under the `openrouter` block | A profile with `backend: openai-compatible` (vLLM/Unsloth) declares its OpenAI-style sampling under the `openrouter` block — both are OpenAI-style chat APIs sharing one param shape. The builder forwards it into every request via `transformRequestBody`. |
+| `openrouter.allowFallbacks` needs `provider` | `allow_fallbacks` is emitted only inside a `provider` routing block, so `allowFallbacks` on its own is inert. `false` (no fallbacks) is the default behaviour regardless. |
+| Profiles should be self-complete | A profile's omitted param keys are NOT reset — a previously-applied profile's value (or the model default) carries over. The shipped `a3b-code` / `a3b-test` are symmetric, so this is latent today. |
+
+---
+
+## Types
+
+```
+AgentType:   code-logic-writer | ts-test-writer | ui-writer
+RunMode:     impl | tdd
+RungName:    ollama | openrouter | claude
+RunStatus:   completed | failed | local-exhausted
+```
+
+`local-exhausted` is the terminal local-ladder outcome: every local rung is spent and the task is handed off for orchestrator/human review (NOT a billable Claude fallback). The legacy alias `escalate-to-claude` is still accepted on read (historical telemetry rows + older runner builds).
+
+`AgentRunResult` (printed as JSON on exit):
+
+| Field | Type | Meaning |
+|---|---|---|
+| `status` | `RunStatus` | Final outcome |
+| `agentType` | `AgentType` | Agent that ran |
+| `touchedFiles` | `string[]` | Files the runner mutated |
+| `finalRung` | `RungName` | Last escalation-**ladder** rung reached — the ladder position, **not** the backend (read `backend`). Can stay `ollama` while an openrouter model ran, because no-progress halts before the ladder advances. |
+| `backend?` | `BackendKind` | Actual backend the final attempt ran on (from the resolved profile). Absent only when no model ran (fatal / interrupt). |
+| `escalated` | `boolean` | The ladder advanced past its first rung. |
+| `failureClass?` | `FailureClass` | Why a non-`completed` run failed: `auth` / `connectivity` / `fatal` / `interrupted` (infra/config **hard stops**) or `no-progress` / `idle-stall` / `gate-fail` (model genuinely tried). Absent on completed runs; drives `fallbackSanctioned`. |
+| `fallbackSanctioned` | `boolean` | A Claude fallback is the **sanctioned** next step (`failureClass` ∈ no-progress / idle-stall / gate-fail). `false` for an infra/config hard stop (`auth` / `connectivity` / `fatal` / `interrupted` — surface it, do **not** bill Claude) and for completed runs. |
+| `attempts` | `number` | Total pipeline attempts |
+| `redObserved` | `boolean` | TDD red phase confirmed |
+| `greenObserved` | `boolean` | Green gate passed at least once |
+| `modelId` | `string` | Model id of the final attempt (`unknown` when no model ran) |
+| `error?` | `string` | Present on failure |
+
+---
+
+## Environment Variables
+
+Most run-behavior settings are owned by `runner.config.json` (see §Configuration). `loadRunnerConfig()` seeds the `RUNNER_*` env vars listed below on startup, overwriting any prior values. Set env vars directly only to override individual fields that are absent from the config file, or for one-off manual runs.
+
+| Variable | Purpose | Config equivalent |
+|---|---|---|
+| `RUNNER_DELEGATION` | `runner` or `claude` — speckit routing | `delegation` |
+| `RUNNER_PROFILE` | Active builtin profile name | `activeProfile` / `roleProfiles` |
+| `RUNNER_MODEL_ID` | Override model id | profile `modelId` |
+| `RUNNER_BASE_URL` | Override backend base URL | profile `baseUrl` |
+| `RUNNER_GENERATE_TIMEOUT_MS` | Per-step abort timer (ms) | `run.generateTimeoutMs` |
+| `RUNNER_MAX_STEPS` | Tool-loop step cap per drive | `run.maxSteps` |
+| `RUNNER_MAX_TOOL_OUTPUT_CHARS` | Per-tool-result truncation cap | `run.maxToolOutputChars` |
+| `RUNNER_LARGE_FILE_LINES` | File-size threshold for compaction | `run.largeFileLines` |
+| `RUNNER_OLLAMA_NUM_CTX` | Ollama context window | profile `ollama.numCtx` |
+| `RUNNER_OLLAMA_TEMPERATURE` | Ollama temperature | profile `ollama.temperature` |
+| `RUNNER_OLLAMA_THINK` | Ollama thinking mode (`"true"`/`"false"`) | profile `ollama.think` |
+| `RUNNER_OLLAMA_IDLE_TIMEOUT_MS` | Ollama idle-unload timeout | profile `ollama.idleTimeoutMs` |
+| `RUNNER_OPENROUTER_TEMPERATURE` | OpenRouter temperature | profile `openrouter.temperature` |
+| `RUNNER_OPENROUTER_CACHE_CONTROL` | Ephemeral prompt caching (Anthropic-routed models only) | profile `openrouter.cacheControl` |
+| `RUNNER_OPENROUTER_REASONING_EFFORT` | Reasoning budget hint | profile `openrouter.reasoningEffort` |
+| `RUNNER_OPENROUTER_ALLOW_FALLBACKS` | OpenRouter model fallbacks | profile `openrouter.allowFallbacks` |
+| `RUNNER_OPENROUTER_API_KEY` | OpenRouter API key — **env-only, never put in config** | — |
+| `RUNNER_COMPACTION_WINDOW` | Large tool-results kept verbatim before compaction; `0` disables | — |
+| `RUNNER_TELEMETRY_DB` | SQLite telemetry file path | — |
+| `RUNNER_RULES_PATH` | Custom rules `.md` path (`@`-imports expanded, frontmatter stripped); same effect as `--rules` | — |
+
+---
+
+## Integration with speckit.implement
+
+Controlled by `RUNNER_DELEGATION` (`.claude/commands/speckit.implement.md` §Runner delegation):
+
+| Value | Behavior |
+|---|---|
+| `runner` *(default)* | `{S}` + non-UI `{M}` tasks dispatch to the runner via `npm run runner`. Outcome routing is two-tier (see §Orchestrator Contract): `fallbackSanctioned:true` → re-delegate the task to Claude; a connectivity failure (`fallbackSanctioned:false`, non-`completed`) → **hard-stop**, never silently fall back. |
+| `claude` | Bypass the runner entirely; all tasks use Claude subagents. |
+
+`{M:UI}`, `{L}`, and `{L:UI}` tasks **always** use the Claude subagent pipeline regardless of `RUNNER_DELEGATION`.
+
+The old-vs-new comparison harness is descoped. To compare behavior, run a task twice with the flag flipped.
+
+---
+
+## Rule Projection & System Prompt
+
+The model's system prompt is assembled in `runner.ts` (`buildSystemPrompt`):
+
+```
+Agent <type>. Nav bundle: <path>. Targets: <files>.
+
+Rules:
+<digest>
+```
+
+**Default (no `--rules` / `RUNNER_RULES_PATH`):** the `<digest>` block comes from `rulesProjection.ts` → `projectRules(agentType)` → `composeRole`, which reads `claude-artifacts/agentic-runner-rules/roles/<agent>.md` and expands its `@io/*` + `@atoms/*` `@`-imports (HTML comments stripped). Each role yields a shared Tool Catalog + per-agent Output Format + per-agent Rules Digest (~400 tokens). This is not the repo's `CLAUDE.md` / `LEARNED-RULES.md` / principles files — the fragments are a deliberately compressed rule surface for small local models. Only the wired agent types (`code-logic-writer`, `ts-test-writer`, `ui-writer`) are projected by default; the other role files are reachable only via `--rules`.
+
+**Override:** set `--rules <path>` (CLI flag) or `RUNNER_RULES_PATH=<path>` (env var). The CLI flag sets the env var via `runTask` `applyOverride`; `projectRules` then loads the file through `rulesLoader.ts` → `loadMarkdownWithImports` + `stripFrontmatter`.
+
+`@`-import expansion works for files loaded this way: a line that is exactly `@<path>` (leading indentation allowed) is replaced by that file's contents, recursively. Resolution is **root-relative** (resolved against repo-root / cwd), not relative to the importing file — use repo-root paths such as `@claude-artifacts/principles/COMMON.md`. Guards: cycle detection (throws), depth cap (default 8, throws), missing import (throws). YAML frontmatter is stripped from the top-level file so an agent `.md` is used body-as-is.
+
+| Goal | How |
+|---|---|
+| Use a custom rules file | `--rules path/to/rules.md` (or `RUNNER_RULES_PATH=…`) |
+| Feed the local model the same rules as the Claude subagent | `--rules .claude/agents/<agent>.md` — its `@claude-artifacts/principles/*` imports expand (≈35 K chars for code-logic-writer) |
+| Edit the built-in default digest | Edit the agent's `roles/<agent>.md` or the shared `atoms/*` it imports (under `claude-artifacts/agentic-runner-rules/`) |
+
+> **Note:** a very large expanded rule file can dilute small local models — empirically the full agent file did not always beat the compact digest on a 35B model; see `docs/plans/2026-06-18-runner-rules-flexible-templates.md`.
+
+---
+
+## Testing
+
+| Command | Scope |
+|---|---|
+| `npm run runner:test` | Runner package only (Tooling vitest config) |
+| `npm run test:tools` | Entire Tooling suite (includes runner) |
+
+**Smoke test** (`runner.smoke.test.ts`) has two paths selected at runtime:
+
+- **LIVE path** — runs when ollama is reachable at `http://127.0.0.1:11434/api/tags` AND the resolved model (`RUNNER_MODEL_ID` ?? `qwen2.5-coder:7b`) appears in `/api/tags`.
+- **FIXTURE path** — runs otherwise (stubbed connector). Tests pass with or without a live model.
+
+`runner.contract.json` + `runner.contract.test.ts` hold a recorded real-model interaction (runtime-exec proof, not grandfathered).
+
+---
+
+## Telemetry / Metrics
+
+Engine: SQLite via `better-sqlite3` (`telemetry.ts`). Location: env `RUNNER_TELEMETRY_DB`, default `.agentic-runner/telemetry.sqlite` (relative to cwd).
+
+Table `task_runs` is append-only (`CREATE TABLE IF NOT EXISTS` + idempotent additive `ALTER TABLE … ADD COLUMN` migration on open), no dedup key. One row is written per `runAgentLoop` call after the run finishes (success or fatal). The write is wrapped in try/catch — a telemetry failure logs to stderr and never fails the run.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `trace_id` / `span_id` | TEXT | Per-run UUIDs (OTel-named; no OTel exporter — plain local sink) |
+| `agent_type` | TEXT | `code-logic-writer` / `ts-test-writer` / `ui-writer`; historical rows may carry `lint-fix-loop` (legacy, mode removed) |
+| `status` | TEXT | `completed` / `failed` / `local-exhausted` (legacy rows: `escalate-to-claude`) |
+| `final_rung` | TEXT | Escalation-ladder position reached: `ollama` / `openrouter` / `claude` |
+| `backend` | TEXT | Actual backend that ran (`ollama` / `openrouter` / `openai-compatible`; `unknown` when no model ran) |
+| `model_id` | TEXT | Actual model id that ran (`unknown` when no model ran) |
+| `failure_class` | TEXT | Why it failed: `auth`/`connectivity`/`fatal`/`interrupted`/`dirty-tree` (hard stop) or `no-progress`/`idle-stall`/`gate-fail` (sanctioned); `''` when completed. `dirty-tree` = a target file had uncommitted changes; the runner refused to start (it reverts to the pre-run snapshot) |
+| `attempts` | INTEGER | Total pipeline attempts across escalation |
+| `duration_ms` | INTEGER | Wall time of the run |
+| `red_observed` / `green_observed` | INTEGER | 0/1 — TDD phases confirmed |
+| `escalated` | INTEGER | 0/1 — the ladder advanced past its first rung |
+| `fallback_sanctioned` | INTEGER | 0/1 — a Claude fallback was the sanctioned next step (non-connectivity failure) |
+| `touched_file_count` | INTEGER | Number of files the runner ACTUALLY mutated (honest; reverted on a non-`completed` run) |
+| `target_file_count` | INTEGER | Number of target files the run was scoped to. `0` on a `fatal` empty-footprint run (extraction found no targets in the nav bundle) |
+| `failed_stage` | TEXT | Pipeline stage that failed (`red`/`impl`/`green`/`lint`/`tsc`/`test`/`decomposition`/`functional-style`); `''` when none failed |
+| `started_at` | TEXT | ISO timestamp |
+| `input_tokens` / `output_tokens` / `total_tokens` | INTEGER | Tokens summed across EVERY model drive in the run (red + green + each gate-retry attempt across the ladder); `0` when no model ran or the provider reported no usage |
+
+> Additive schema migration: `openTelemetry` reads `PRAGMA table_info(task_runs)` on open and runs `ALTER TABLE task_runs ADD COLUMN …` for any missing column, so a pre-existing DB gains new columns (e.g. `target_file_count`, `failed_stage`, `input_tokens`/`output_tokens`/`total_tokens`) without losing rows. Only a column RENAME / type change still requires deleting `.agentic-runner/telemetry.sqlite`.
+
+```bash
+sqlite3 .agentic-runner/telemetry.sqlite \
+  "SELECT started_at, agent_type, status, backend, model_id, input_tokens, output_tokens, attempts FROM task_runs ORDER BY started_at DESC LIMIT 20;"
+```
+
+Tests override the path via `RUNNER_TELEMETRY_DB` (e.g. a temp file) so the smoke/telemetry tests assert exactly one row per run.
+
+---
+
+## Pre-commit Gate
+
+`tools/scripts/precommit-gate.sh` type-checks (`tsc -p tsconfig.scripts.json`) and lints (`eslint --config eslint.config.gate.mjs`) the package whenever a runner `.ts` file is staged. Formatting, import-sort and no-var/prefer-const ERROR-block; the FP/complexity atoms are warn-tier (pre-existing debt) — see `eslint.config.mjs` runner block.
+
+---
+
+## Extending the Runner
+
+| Goal | Where |
+|---|---|
+| Run a task end-to-end | CLI form above against a local ollama model |
+| Add a model profile | Add an entry to `profiles` in `runner.config.json`; optionally map a role in `roleProfiles` (see §Configuration). Extend `BUILTIN_PROFILES` in `profiles.ts` only for new escalation-ladder bases |
+| Add a tool | Add handler + zod schema in `tools/index.ts`; register in `createToolRegistry` + `buildSdkTools`; add a test |
+| Tune escalation | `FAILS_PER_RUNG` / `LADDER` in `escalation.ts` |
+| Inspect past runs | Query `task_runs` table in the SQLite telemetry DB |
+| Re-enable AIMD concurrency | `aimd.ts` (currently OFF per spec I-14) |
+
+TDD discipline applies (Tooling suite). Per R-030: any new seam/collaborator MUST have a test asserting invocation, not only the returned shape.
+
+
+===== FILE: ts-agentic-code-runner/scripts/trace-smoke.ts =====
+// Minimal end-to-end tracing smoke: one real OpenRouter generation through the
+// runner's instrumented connector, emitting an OTLP trace (prompt/response/usage).
+// Run with RUNNER_TRACING=1 and OTEL_EXPORTER_OTLP_ENDPOINT/HEADERS pointed at Langfuse.
+// NOT a Claude model — Claude stays on its own native telemetry by project policy.
+import { createModel, generate } from '../src/core/llm';
+import type { ModelProfile } from '../src/core/profiles';
+import { initTracing } from '../src/core/reporting';
+
+const MODEL_ID = process.env.RUNNER_MODEL_ID ?? 'qwen/qwen3.6-35b-a3b';
+
+const main = async (): Promise<void> => {
+  const tracing = initTracing();
+  const profile: ModelProfile = { name: 'trace-smoke', backend: 'openrouter', modelId: MODEL_ID };
+  const model = createModel(profile);
+  const result = await generate(model, {
+    system: 'You are a terse assistant.',
+    messages: [{ role: 'user', content: 'Reply with exactly: tracing works' }],
+    tools: {},
+    maxSteps: 1,
+    telemetry: {
+      modelId: MODEL_ID,
+      backend: profile.backend,
+      agentType: 'smoke',
+      rung: 'openrouter',
+    },
+  });
+  console.log('text:', result.text.trim());
+  console.log('usage:', JSON.stringify(result.usage ?? null));
+  await tracing.shutdown();
+};
+
+main().catch((error: unknown) => {
+  console.error(error);
+  process.exit(1);
+});
+
+
+===== FILE: ts-agentic-code-runner/src/cli/bootstrap.ts =====
+import { existsSync, readFileSync } from 'node:fs';
+import { parseEnv } from 'node:util';
+
+// Tracing/telemetry env is owned exclusively by launch-config.sh — `.env` MUST
+// NOT seed it, or a stray dotenv value would silently redirect traces/spans.
+const TRACING_KEY_PREFIXES: readonly string[] = ['OTEL_', 'CLAUDE_CODE_', 'LANGFUSE_'];
+const RUNNER_TRACING_KEY = 'RUNNER_TRACING';
+
+export const isTracingOwnedKey = (key: string): boolean =>
+  key === RUNNER_TRACING_KEY || TRACING_KEY_PREFIXES.some(prefix => key.startsWith(prefix));
+
+export const dotEnvDefaults = (
+  parsed: Record<string, string | undefined>,
+  current: NodeJS.ProcessEnv
+): Record<string, string> =>
+  Object.fromEntries(
+    Object.entries(parsed).filter(
+      (entry): entry is [string, string] =>
+        typeof entry[1] === 'string' &&
+        current[entry[0]] === undefined &&
+        !isTracingOwnedKey(entry[0])
+    )
+  );
+
+export const loadDotEnvDefaults = (path = '.env'): void => {
+  if (!existsSync(path)) return;
+  const parsed = parseEnv(readFileSync(path, 'utf8'));
+  const defaults = dotEnvDefaults(parsed, process.env);
+  Object.entries(defaults).forEach(([k, v]) => {
+    process.env[k] = v;
+  });
+};
+
+
+===== FILE: ts-agentic-code-runner/src/cli/cli-rules.flag.test.ts =====
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('../core/llm/connector', () => ({
+  createModel: vi.fn(() => ({ provider: 'stub' })),
+  generate: vi.fn(() => Promise.resolve({ text: 'ok', toolCallCount: 0 })),
+  resolveOllamaNumCtx: vi.fn(() => 65536),
+}));
+
+vi.mock('../gates/gates', () => ({
+  lintGate: async () => null,
+  scopedLintGate: () => async () => null,
+  tscGate: async () => null,
+  testGate: async () => null,
+  scopedTestGate: () => async () => null,
+  decompositionGate: async () => null,
+  functionalStyleGate: async () => null,
+  VITEST_BIN: './node_modules/.bin/vitest',
+}));
+
+vi.mock('../reporting/telemetry', () => ({
+  openTelemetry: () => ({ recordRun() {}, close() {} }),
+  toTaskRunRow: () => ({}),
+}));
+
+const { generate } = await import('../core/llm/connector');
+const generateMock = vi.mocked(generate);
+
+import { main } from './cli';
+
+const NAV_BUNDLE_CONTENTS = JSON.stringify({
+  specExcerpts: [{ anchor: 'x', text: 'Edit `src/x.ts` to add the feature.' }],
+});
+
+describe('cli --rules flag integration', () => {
+  let tmpDir: string;
+  let navPath: string;
+  let originalRulesPath: string | undefined;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    generateMock.mockResolvedValue({ text: 'ok', toolCallCount: 0 });
+    originalRulesPath = process.env.RUNNER_RULES_PATH;
+
+    tmpDir = mkdtempSync(join(tmpdir(), 'cli-rules-flag-test-'));
+    navPath = join(tmpDir, 'T001.json');
+    writeFileSync(navPath, NAV_BUNDLE_CONTENTS, 'utf8');
+  });
+
+  afterEach(() => {
+    if (originalRulesPath === undefined) {
+      delete process.env.RUNNER_RULES_PATH;
+    } else {
+      process.env.RUNNER_RULES_PATH = originalRulesPath;
+    }
+    try {
+      rmSync(tmpDir, { recursive: true, force: true });
+    } catch {
+      // best-effort cleanup
+    }
+  });
+
+  it('should inject custom rules body into the system prompt and strip frontmatter when --rules points to a temp file with YAML frontmatter', async () => {
+    const rulesPath = join(tmpDir, 'custom-rules.md');
+    writeFileSync(
+      rulesPath,
+      `---\nname: x\ndescription: y\n---\nSome body text.\nRULESFLAG_SENTINEL_BODY\n`,
+      'utf8'
+    );
+
+    await main([
+      '--agent',
+      'code-logic-writer',
+      '--nav',
+      navPath,
+      '--mode',
+      'impl',
+      '--rules',
+      rulesPath,
+    ]);
+
+    const calls = generateMock.mock.calls;
+    expect(calls.length).toBeGreaterThan(0);
+    const capturedSystem: string = (calls[0]?.[1] as { system: string }).system;
+
+    expect(capturedSystem).toContain('RULESFLAG_SENTINEL_BODY');
+    expect(capturedSystem).not.toContain('name: x');
+    expect(capturedSystem).not.toContain('description: y');
+    expect(capturedSystem).not.toContain('Rules Digest');
+  });
+
+  it('should expand @-imports and produce a substantially larger system prompt when --rules points to a real agent file with @-imports', async () => {
+    const agentFilePath = join(process.cwd(), '.claude/agents/code-logic-writer.md');
+
+    await main([
+      '--agent',
+      'code-logic-writer',
+      '--nav',
+      navPath,
+      '--mode',
+      'impl',
+      '--rules',
+      agentFilePath,
+    ]);
+
+    const calls = generateMock.mock.calls;
+    expect(calls.length).toBeGreaterThan(0);
+    const capturedSystem: string = (calls[0]?.[1] as { system: string }).system;
+
+    expect(capturedSystem.length).toBeGreaterThan(2000);
+    expect(capturedSystem).toContain('Single Responsibility Orientation');
+    expect(capturedSystem).not.toMatch(/^description:/m);
+  });
+});
+
+
+===== FILE: ts-agentic-code-runner/src/cli/cli.test.ts =====
+import { readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import type { AgentRunResult } from '../core/shared/types';
+
+vi.mock('../core/runner/runTask', () => ({
+  runTask: vi.fn(),
+}));
+
+const { runTask } = await import('../core/runner/runTask');
+const runTaskMock = vi.mocked(runTask);
+
+import { createEmitOnce, handleInterrupt, interruptedResult, main } from './cli';
+
+const completedResult: AgentRunResult = {
+  status: 'completed',
+  agentType: 'code-logic-writer',
+  touchedFiles: ['a.ts'],
+  finalRung: 'ollama',
+  escalated: false,
+  fallbackSanctioned: false,
+  attempts: 1,
+  redObserved: false,
+  greenObserved: false,
+  modelId: 'qwen2.5-coder:7b',
+};
+
+const NAV = 'specs/branch/nav/T001.json';
+const baseArgv = ['--agent', 'code-logic-writer', '--nav', NAV, '--mode', 'impl'];
+
+describe('cli main', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    runTaskMock.mockResolvedValue(completedResult);
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('should invoke runTask with parsed RunTaskInput when flags are valid', async () => {
+    await main(baseArgv);
+
+    expect(runTaskMock).toHaveBeenCalledWith(
+      {
+        agentType: 'code-logic-writer',
+        navBundle: NAV,
+        mode: 'impl',
+      },
+      expect.anything()
+    );
+  });
+
+  it('should pass profileName when --profile is provided', async () => {
+    await main([...baseArgv, '--profile', 'fast']);
+
+    expect(runTaskMock).toHaveBeenCalledWith(
+      {
+        agentType: 'code-logic-writer',
+        navBundle: NAV,
+        mode: 'impl',
+        profileName: 'fast',
+      },
+      expect.anything()
+    );
+  });
+
+  it('should print the runner capabilities JSON and exit 0 for --capabilities (no runTask)', async () => {
+    const logSpy = vi.spyOn(console, 'log');
+
+    const code = await main(['--capabilities']);
+
+    expect(code).toBe(0);
+    expect(runTaskMock).not.toHaveBeenCalled();
+    const printed = JSON.parse((logSpy.mock.calls[0]?.[0] as string) ?? 'null') as {
+      schema: string;
+      build: string;
+      agentTypes: string[];
+    };
+    expect(printed.schema).toBe('runner-capabilities/v2');
+    expect(printed.build).toBe('none (tsx)');
+    expect(printed.agentTypes).toContain('code-logic-writer');
+  });
+
+  it('should print the AgentRunResult as parseable JSON to stdout', async () => {
+    const logSpy = vi.spyOn(console, 'log');
+
+    await main(baseArgv);
+
+    expect(logSpy).toHaveBeenCalledWith(JSON.stringify(completedResult));
+    const printed: unknown = JSON.parse((logSpy.mock.calls[0]?.[0] as string) ?? 'null');
+    expect(printed).toEqual(completedResult);
+  });
+
+  it('should return exit code 0 when runTask resolves status completed', async () => {
+    const code = await main(baseArgv);
+
+    expect(code).toBe(0);
+  });
+
+  it('should return a non-zero exit code when status is failed', async () => {
+    runTaskMock.mockResolvedValue({ ...completedResult, status: 'failed' });
+
+    const code = await main(baseArgv);
+
+    expect(code).not.toBe(0);
+  });
+
+  it('should return a non-zero exit code when status is local-exhausted', async () => {
+    runTaskMock.mockResolvedValue({ ...completedResult, status: 'local-exhausted' });
+
+    const code = await main(baseArgv);
+
+    expect(code).not.toBe(0);
+  });
+
+  it('should resolve to a non-zero exit code (not reject) when runTask rejects', async () => {
+    runTaskMock.mockRejectedValue(new Error('footprint exceeded: 3 target files (max 2)'));
+
+    const code = await main(baseArgv);
+
+    expect(code).not.toBe(0);
+  });
+
+  it('should print a failed AgentRunResult JSON with a non-empty error when runTask rejects', async () => {
+    const logSpy = vi.spyOn(console, 'log');
+    runTaskMock.mockRejectedValue(new Error('footprint exceeded: 3 target files (max 2)'));
+
+    await main(baseArgv);
+
+    const printed = JSON.parse((logSpy.mock.calls[0]?.[0] as string) ?? 'null') as AgentRunResult;
+    expect(printed.status).toBe('failed');
+    expect(printed.error).toBeTruthy();
+  });
+
+  it('should print a usage error and not invoke runTask when --agent is missing', async () => {
+    const errSpy = vi.spyOn(console, 'error');
+
+    const code = await main(['--nav', NAV, '--mode', 'impl']);
+
+    expect(code).not.toBe(0);
+    expect(errSpy).toHaveBeenCalled();
+    expect(runTaskMock).not.toHaveBeenCalled();
+  });
+
+  it('should fail with usage error when --nav is missing', async () => {
+    const code = await main(['--agent', 'code-logic-writer', '--mode', 'impl']);
+
+    expect(code).not.toBe(0);
+    expect(runTaskMock).not.toHaveBeenCalled();
+  });
+
+  it('should fail with usage error when --mode is missing', async () => {
+    const code = await main(['--agent', 'code-logic-writer', '--nav', NAV]);
+
+    expect(code).not.toBe(0);
+    expect(runTaskMock).not.toHaveBeenCalled();
+  });
+
+  it('should fail with usage error when --agent value is not an allowed AgentType', async () => {
+    const code = await main(['--agent', 'nonsense', '--nav', NAV, '--mode', 'impl']);
+
+    expect(code).not.toBe(0);
+    expect(runTaskMock).not.toHaveBeenCalled();
+  });
+
+  it('should accept ui-writer as a valid --agent value and invoke runTask', async () => {
+    await main(['--agent', 'ui-writer', '--nav', NAV, '--mode', 'impl']);
+
+    expect(runTaskMock).toHaveBeenCalledWith(
+      { agentType: 'ui-writer', navBundle: NAV, mode: 'impl' },
+      expect.anything()
+    );
+  });
+
+  it('should fail with usage error when --mode value is not an allowed RunMode', async () => {
+    const code = await main(['--agent', 'code-logic-writer', '--nav', NAV, '--mode', 'bogus']);
+
+    expect(code).not.toBe(0);
+    expect(runTaskMock).not.toHaveBeenCalled();
+  });
+
+  it('should pass rulesPath to runTask when --rules flag is provided', async () => {
+    await main([...baseArgv, '--rules', 'r.md']);
+
+    expect(runTaskMock).toHaveBeenCalledWith(
+      {
+        agentType: 'code-logic-writer',
+        navBundle: NAV,
+        mode: 'impl',
+        rulesPath: 'r.md',
+      },
+      expect.anything()
+    );
+  });
+
+  it('should not include rulesPath in the runTask input when --rules flag is absent', async () => {
+    await main(baseArgv);
+
+    expect(runTaskMock).toHaveBeenCalledWith(
+      expect.not.objectContaining({ rulesPath: expect.anything() }),
+      expect.anything()
+    );
+  });
+
+  it('should print a result whose modelId is a string when status is completed', async () => {
+    const logSpy = vi.spyOn(console, 'log');
+
+    await main(baseArgv);
+
+    const printed = JSON.parse((logSpy.mock.calls[0]?.[0] as string) ?? 'null') as AgentRunResult;
+    expect(typeof printed.modelId).toBe('string');
+  });
+
+  it('should print a failed terminal result whose modelId is a string when runTask rejects', async () => {
+    const logSpy = vi.spyOn(console, 'log');
+    runTaskMock.mockRejectedValue(new Error('boom'));
+
+    await main(baseArgv);
+
+    const printed = JSON.parse((logSpy.mock.calls[0]?.[0] as string) ?? 'null') as AgentRunResult;
+    expect(printed.status).toBe('failed');
+    expect(typeof printed.modelId).toBe('string');
+  });
+});
+
+describe('cli main RUNNER_PROFILE env fallback', () => {
+  const savedProfile = process.env.RUNNER_PROFILE;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    runTaskMock.mockResolvedValue(completedResult);
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    delete process.env.RUNNER_PROFILE;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    if (savedProfile === undefined) delete process.env.RUNNER_PROFILE;
+    else process.env.RUNNER_PROFILE = savedProfile;
+  });
+
+  it('should fall back to RUNNER_PROFILE env when --profile flag is absent', async () => {
+    process.env.RUNNER_PROFILE = 'openrouter-default';
+
+    await main(baseArgv);
+
+    expect(runTaskMock).toHaveBeenCalledWith(
+      {
+        agentType: 'code-logic-writer',
+        navBundle: NAV,
+        mode: 'impl',
+        profileName: 'openrouter-default',
+      },
+      expect.anything()
+    );
+  });
+
+  it('should prefer the --profile flag over the RUNNER_PROFILE env', async () => {
+    process.env.RUNNER_PROFILE = 'openrouter-default';
+
+    await main([...baseArgv, '--profile', 'local-default']);
+
+    expect(runTaskMock).toHaveBeenCalledWith(
+      expect.objectContaining({ profileName: 'local-default' }),
+      expect.anything()
+    );
+  });
+
+  it('should not set profileName when neither flag nor env is present', async () => {
+    await main(baseArgv);
+
+    expect(runTaskMock).toHaveBeenCalledWith(
+      expect.not.objectContaining({ profileName: expect.anything() }),
+      expect.anything()
+    );
+  });
+
+  it('should ignore an empty RUNNER_PROFILE env value', async () => {
+    process.env.RUNNER_PROFILE = '';
+
+    await main(baseArgv);
+
+    expect(runTaskMock).toHaveBeenCalledWith(
+      expect.not.objectContaining({ profileName: expect.anything() }),
+      expect.anything()
+    );
+  });
+});
+
+describe('cli role-profile vs --profile precedence', () => {
+  const savedProfile = process.env.RUNNER_PROFILE;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    runTaskMock.mockResolvedValue(completedResult);
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    delete process.env.RUNNER_PROFILE;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    if (savedProfile === undefined) delete process.env.RUNNER_PROFILE;
+    else process.env.RUNNER_PROFILE = savedProfile;
+  });
+
+  it('should let an explicit --profile override a role-selected RUNNER_PROFILE', async () => {
+    const { applyRoleProfile } = await import('../core/config/config');
+    const { RunnerConfigSchema } = await import('../core/config/config');
+    const config = RunnerConfigSchema.parse({
+      delegation: 'runner',
+      roleProfiles: { 'code-logic-writer': 'cloud' },
+      profiles: { cloud: { backend: 'openrouter', modelId: 'qwen/qwen3.6-35b-a3b' } },
+    });
+    applyRoleProfile(config, 'code-logic-writer');
+    expect(process.env.RUNNER_PROFILE).toBe('openrouter-default');
+
+    await main([...baseArgv, '--profile', 'local-default']);
+
+    expect(runTaskMock).toHaveBeenCalledWith(
+      expect.objectContaining({ profileName: 'local-default' }),
+      expect.anything()
+    );
+  });
+
+  it('should fall back to the role-selected RUNNER_PROFILE env when no --profile flag is given', async () => {
+    const { applyRoleProfile, RunnerConfigSchema } = await import('../core/config/config');
+    const config = RunnerConfigSchema.parse({
+      delegation: 'runner',
+      roleProfiles: { 'code-logic-writer': 'cloud' },
+      profiles: { cloud: { backend: 'openrouter', modelId: 'qwen/qwen3.6-35b-a3b' } },
+    });
+    applyRoleProfile(config, 'code-logic-writer');
+
+    await main(baseArgv);
+
+    expect(runTaskMock).toHaveBeenCalledWith(
+      expect.objectContaining({ profileName: 'openrouter-default' }),
+      expect.anything()
+    );
+  });
+});
+
+describe('interruptedResult', () => {
+  it('should return status failed when signal is SIGTERM', () => {
+    const result = interruptedResult('code-logic-writer', 'SIGTERM');
+
+    expect(result.status).toBe('failed');
+  });
+
+  it('should include the signal name in the error field', () => {
+    const result = interruptedResult('code-logic-writer', 'SIGTERM');
+
+    expect(result.error).toContain('SIGTERM');
+  });
+
+  it('should carry the provided agentType', () => {
+    const result = interruptedResult('ts-test-writer', 'SIGTERM');
+
+    expect(result.agentType).toBe('ts-test-writer');
+  });
+
+  it('should set touchedFiles to an empty array', () => {
+    const result = interruptedResult('code-logic-writer', 'SIGTERM');
+
+    expect(result.touchedFiles).toEqual([]);
+  });
+
+  it('should set modelId to unknown', () => {
+    const result = interruptedResult('code-logic-writer', 'SIGTERM');
+
+    expect(result.modelId).toBe('unknown');
+  });
+});
+
+describe('handleInterrupt', () => {
+  it('should call emit exactly once with the built result and undefined outPath', async () => {
+    const emit = vi
+      .fn<(r: AgentRunResult, out: string | undefined) => Promise<void>>()
+      .mockResolvedValue(undefined);
+
+    await handleInterrupt('SIGTERM', { agentType: 'code-logic-writer', outPath: undefined, emit });
+
+    expect(emit).toHaveBeenCalledTimes(1);
+    expect(emit).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'failed', agentType: 'code-logic-writer' }),
+      undefined
+    );
+  });
+
+  it('should return a result that deep-equals the interruptedResult for the same inputs', async () => {
+    const emit = vi
+      .fn<(r: AgentRunResult, out: string | undefined) => Promise<void>>()
+      .mockResolvedValue(undefined);
+    const expected = interruptedResult('lint-fix-loop', 'SIGINT');
+
+    const actual = await handleInterrupt('SIGINT', {
+      agentType: 'lint-fix-loop',
+      outPath: undefined,
+      emit,
+    });
+
+    expect(actual).toEqual(expected);
+  });
+
+  it('should forward outPath to emit when provided', async () => {
+    const emit = vi
+      .fn<(r: AgentRunResult, out: string | undefined) => Promise<void>>()
+      .mockResolvedValue(undefined);
+
+    await handleInterrupt('SIGTERM', {
+      agentType: 'code-logic-writer',
+      outPath: '/tmp/out.json',
+      emit,
+    });
+
+    expect(emit).toHaveBeenCalledWith(expect.anything(), '/tmp/out.json');
+  });
+});
+
+describe('createEmitOnce', () => {
+  it('should invoke the underlying emitter exactly once when called twice', async () => {
+    const spy = vi
+      .fn<(r: AgentRunResult, out: string | undefined) => Promise<void>>()
+      .mockResolvedValue(undefined);
+    const firstResult: AgentRunResult = {
+      ...completedResult,
+      status: 'completed',
+    };
+    const secondResult: AgentRunResult = {
+      ...completedResult,
+      status: 'failed',
+    };
+    const guarded = createEmitOnce(spy);
+    const outPath = '/tmp/out.json';
+
+    await guarded(firstResult, outPath);
+    await guarded(secondResult, outPath);
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith(firstResult, outPath);
+  });
+
+  it('should resolve without throwing when called a second time', async () => {
+    const spy = vi
+      .fn<(r: AgentRunResult, out: string | undefined) => Promise<void>>()
+      .mockResolvedValue(undefined);
+    const guarded = createEmitOnce(spy);
+
+    await guarded(completedResult, undefined);
+    await expect(guarded(completedResult, undefined)).resolves.toBeUndefined();
+  });
+});
+
+describe('dotEnvDefaults', () => {
+  // Import after adding the export — tests will fail RED until implementation exists
+  it('should include a key that is in parsed but absent in current', async () => {
+    const { dotEnvDefaults } = await import('./cli');
+
+    const result = dotEnvDefaults({ MY_KEY: 'value' }, {});
+
+    expect(result).toEqual({ MY_KEY: 'value' });
+  });
+
+  it('should exclude a key that is present in both parsed and current (non-override)', async () => {
+    const { dotEnvDefaults } = await import('./cli');
+
+    const result = dotEnvDefaults({ MY_KEY: 'parsed-value' }, { MY_KEY: 'current-value' });
+
+    expect(result).not.toHaveProperty('MY_KEY');
+  });
+
+  it('should exclude a key whose parsed value is undefined', async () => {
+    const { dotEnvDefaults } = await import('./cli');
+
+    const result = dotEnvDefaults({ MY_KEY: undefined }, {});
+
+    expect(result).not.toHaveProperty('MY_KEY');
+  });
+
+  it('should return an empty object when parsed is empty', async () => {
+    const { dotEnvDefaults } = await import('./cli');
+
+    const result = dotEnvDefaults({}, {});
+
+    expect(result).toEqual({});
+  });
+});
+
+describe('isTracingOwnedKey', () => {
+  it('should return true for an OTEL_-prefixed key', async () => {
+    const { isTracingOwnedKey } = await import('./cli');
+
+    expect(isTracingOwnedKey('OTEL_EXPORTER_OTLP_ENDPOINT')).toBe(true);
+  });
+
+  it('should return true for a CLAUDE_CODE_-prefixed key', async () => {
+    const { isTracingOwnedKey } = await import('./cli');
+
+    expect(isTracingOwnedKey('CLAUDE_CODE_ENABLE_TELEMETRY')).toBe(true);
+  });
+
+  it('should return true for a LANGFUSE_-prefixed key', async () => {
+    const { isTracingOwnedKey } = await import('./cli');
+
+    expect(isTracingOwnedKey('LANGFUSE_PUBLIC_KEY')).toBe(true);
+  });
+
+  it('should return true for RUNNER_TRACING exactly', async () => {
+    const { isTracingOwnedKey } = await import('./cli');
+
+    expect(isTracingOwnedKey('RUNNER_TRACING')).toBe(true);
+  });
+
+  it('should return false for OPENROUTER_API_KEY', async () => {
+    const { isTracingOwnedKey } = await import('./cli');
+
+    expect(isTracingOwnedKey('OPENROUTER_API_KEY')).toBe(false);
+  });
+
+  it('should return false for RUNNER_PROVIDER', async () => {
+    const { isTracingOwnedKey } = await import('./cli');
+
+    expect(isTracingOwnedKey('RUNNER_PROVIDER')).toBe(false);
+  });
+
+  it('should return false for VITE_OLLAMA_URL', async () => {
+    const { isTracingOwnedKey } = await import('./cli');
+
+    expect(isTracingOwnedKey('VITE_OLLAMA_URL')).toBe(false);
+  });
+});
+
+describe('dotEnvDefaults — tracing key filtering', () => {
+  it('should omit RUNNER_TRACING and OTEL_-prefixed keys while keeping non-tracing keys', async () => {
+    const { dotEnvDefaults } = await import('./cli');
+    const parsed = {
+      RUNNER_TRACING: '1',
+      OTEL_EXPORTER_OTLP_ENDPOINT: 'http://localhost:4318',
+      OPENROUTER_API_KEY: 'k',
+      RUNNER_PROVIDER: 'ollama',
+    };
+
+    const result = dotEnvDefaults(parsed, {});
+
+    expect(result).not.toHaveProperty('RUNNER_TRACING');
+    expect(result).not.toHaveProperty('OTEL_EXPORTER_OTLP_ENDPOINT');
+    expect(result).toHaveProperty('OPENROUTER_API_KEY', 'k');
+    expect(result).toHaveProperty('RUNNER_PROVIDER', 'ollama');
+  });
+
+  it('should omit CLAUDE_CODE_-prefixed keys', async () => {
+    const { dotEnvDefaults } = await import('./cli');
+
+    const result = dotEnvDefaults({ CLAUDE_CODE_ENABLE_TELEMETRY: '1', MY_KEY: 'v' }, {});
+
+    expect(result).not.toHaveProperty('CLAUDE_CODE_ENABLE_TELEMETRY');
+    expect(result).toHaveProperty('MY_KEY', 'v');
+  });
+
+  it('should omit LANGFUSE_-prefixed keys', async () => {
+    const { dotEnvDefaults } = await import('./cli');
+
+    const result = dotEnvDefaults({ LANGFUSE_PUBLIC_KEY: 'pk', MY_KEY: 'v' }, {});
+
+    expect(result).not.toHaveProperty('LANGFUSE_PUBLIC_KEY');
+    expect(result).toHaveProperty('MY_KEY', 'v');
+  });
+});
+
+describe('cli config wiring', () => {
+  it('should re-export loadRunnerConfig as an importable function', async () => {
+    const config = await import('../core/config/config');
+
+    expect(typeof config.loadRunnerConfig).toBe('function');
+  });
+});
+
+describe('cli main --out', () => {
+  const outPath = join(tmpdir(), `runner-out-${process.pid}`, 'result.json');
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    runTaskMock.mockResolvedValue(completedResult);
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    await rm(join(tmpdir(), `runner-out-${process.pid}`), { recursive: true, force: true });
+  });
+
+  it('should write the result JSON to the --out path (creating the dir)', async () => {
+    await main([...baseArgv, '--out', outPath]);
+
+    const written = await readFile(outPath, 'utf8');
+    expect(JSON.parse(written)).toEqual(completedResult);
+  });
+
+  it('should keep stdout console.log when --out is provided', async () => {
+    const logSpy = vi.spyOn(console, 'log');
+
+    await main([...baseArgv, '--out', outPath]);
+
+    expect(logSpy).toHaveBeenCalledWith(JSON.stringify(completedResult));
+  });
+});
+
+
+===== FILE: ts-agentic-code-runner/src/cli/cli.ts =====
+import { mkdir, writeFile } from 'node:fs/promises';
+import { dirname } from 'node:path';
+
+import {
+  type AgentRunResult,
+  type AgentType,
+  applyRoleProfile,
+  buildCapabilities,
+  createProgress,
+  debugEnabled,
+  initTracing,
+  loadRunnerConfig,
+  type Progress,
+  type RunMode,
+  runTask,
+  type RunTaskInput,
+  SUPPORTED_AGENT_TYPES,
+  withParentContext
+} from '../core';
+import { loadDotEnvDefaults } from './bootstrap';
+
+export { dotEnvDefaults, isTracingOwnedKey, loadDotEnvDefaults } from './bootstrap';
+
+const FLAG_AGENT = '--agent';
+const FLAG_NAV = '--nav';
+const FLAG_MODE = '--mode';
+const FLAG_PROFILE = '--profile';
+const FLAG_RULES = '--rules';
+const FLAG_OUT = '--out';
+const FLAG_CAPABILITIES = '--capabilities';
+const FLAG_DEBUG = '--debug';
+
+// Env fallback for the profile (provider/backend) selection. The `--profile`
+// CLI flag still wins; this lets the implement.sh launch menu pick the
+// provider (ollama|openrouter → local-default|openrouter-default) without a flag.
+const ENV_PROFILE = 'RUNNER_PROFILE';
+
+const UNKNOWN_MODEL_ID = 'unknown';
+
+const EXIT_SUCCESS = 0;
+const EXIT_FAILURE = 1;
+const EXIT_USAGE = 2;
+
+// Single source of truth for accepted agent types: the executor's allow-list,
+// which is also what `--capabilities` advertises (no cli-vs-capabilities drift).
+const AGENT_TYPES: readonly AgentType[] = SUPPORTED_AGENT_TYPES;
+const RUN_MODES: readonly RunMode[] = ['impl', 'tdd'];
+
+const USAGE = `usage: runner ${FLAG_AGENT} <${AGENT_TYPES.join('|')}> ${FLAG_NAV} <path> ${FLAG_MODE} <${RUN_MODES.join('|')}> [${FLAG_PROFILE} <name>] [${FLAG_RULES} <path>] [${FLAG_OUT} <path>] [${FLAG_DEBUG}]\n   or: runner ${FLAG_CAPABILITIES}   (print the machine-readable runner contract as JSON, exit 0)`;
+
+const isAgentType = (value: string | undefined): value is AgentType =>
+  value !== undefined && (AGENT_TYPES as readonly string[]).includes(value);
+
+const isRunMode = (value: string | undefined): value is RunMode =>
+  value !== undefined && (RUN_MODES as readonly string[]).includes(value);
+
+const readFlag = (argv: readonly string[], flag: string): string | undefined => {
+  const index = argv.indexOf(flag);
+  return index >= 0 ? argv[index + 1] : undefined;
+};
+
+const envProfile = (): string | undefined => {
+  const value = process.env[ENV_PROFILE];
+  return value !== undefined && value !== '' ? value : undefined;
+};
+
+const parseInput = (argv: readonly string[]): RunTaskInput | undefined => {
+  const agentType = readFlag(argv, FLAG_AGENT);
+  const navBundle = readFlag(argv, FLAG_NAV);
+  const mode = readFlag(argv, FLAG_MODE);
+  const profileName = readFlag(argv, FLAG_PROFILE) ?? envProfile();
+  const rulesPath = readFlag(argv, FLAG_RULES);
+  if (!isAgentType(agentType) || !isRunMode(mode) || navBundle === undefined) {
+    return undefined;
+  }
+  const base: RunTaskInput = { agentType, navBundle, mode };
+  return {
+    ...base,
+    ...(profileName !== undefined ? { profileName } : {}),
+    ...(rulesPath !== undefined ? { rulesPath } : {}),
+  };
+};
+
+const emitResult = async (result: AgentRunResult, outPath: string | undefined): Promise<void> => {
+  const json = JSON.stringify(result);
+  console.log(json);
+  if (outPath !== undefined) {
+    await mkdir(dirname(outPath), { recursive: true });
+    await writeFile(outPath, json, 'utf8');
+  }
+};
+
+export const interruptedResult = (agentType: AgentType, signal: string): AgentRunResult => ({
+  status: 'failed',
+  agentType,
+  touchedFiles: [],
+  finalRung: 'ollama',
+  failureClass: 'interrupted',
+  escalated: false,
+  // An external interrupt (the orchestrator's own wall-clock kill) is not a
+  // sanctioned model-failure fallback — the orchestrator decides what to do.
+  fallbackSanctioned: false,
+  attempts: 0,
+  redObserved: false,
+  greenObserved: false,
+  modelId: UNKNOWN_MODEL_ID,
+  error: `interrupted by ${signal} (wall-clock timeout)`,
+});
+
+export const createEmitOnce = (
+  emit: (r: AgentRunResult, out: string | undefined) => Promise<void>
+): ((r: AgentRunResult, out: string | undefined) => Promise<void>) => {
+  let done = false;
+  return async (r: AgentRunResult, out: string | undefined): Promise<void> => {
+    if (done) return;
+    done = true;
+    await emit(r, out);
+  };
+};
+
+export const handleInterrupt = async (
+  signal: string,
+  ctx: {
+    readonly agentType: AgentType;
+    readonly outPath: string | undefined;
+    readonly emit: (r: AgentRunResult, out: string | undefined) => Promise<void>;
+  }
+): Promise<AgentRunResult> => {
+  const result = interruptedResult(ctx.agentType, signal);
+  await ctx.emit(result, ctx.outPath);
+  return result;
+};
+
+const resolveAgentType = (argv: readonly string[]): AgentType => {
+  const value = readFlag(argv, FLAG_AGENT);
+  return isAgentType(value) ? value : 'code-logic-writer';
+};
+
+export async function main(
+  argv: readonly string[],
+  emit: (r: AgentRunResult, out: string | undefined) => Promise<void> = emitResult,
+  progress: Progress = createProgress(false)
+): Promise<number> {
+  if (argv.includes(FLAG_CAPABILITIES)) {
+    console.log(JSON.stringify(buildCapabilities()));
+    return EXIT_SUCCESS;
+  }
+  const input = parseInput(argv);
+  if (input === undefined) {
+    console.error(USAGE);
+    return EXIT_USAGE;
+  }
+  const outPath = readFlag(argv, FLAG_OUT);
+  try {
+    const result = await runTask(input, progress);
+    await emit(result, outPath);
+    return result.status === 'completed' ? EXIT_SUCCESS : EXIT_FAILURE;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const terminal: AgentRunResult = {
+      status: 'failed',
+      agentType: input.agentType,
+      touchedFiles: [],
+      finalRung: 'ollama',
+      failureClass: 'fatal',
+      escalated: false,
+      fallbackSanctioned: false,
+      attempts: 0,
+      redObserved: false,
+      greenObserved: false,
+      modelId: UNKNOWN_MODEL_ID,
+      error: message,
+    };
+    await emit(terminal, outPath);
+    return EXIT_FAILURE;
+  }
+}
+
+const entryUrl = process.argv[1] ? new URL(`file://${process.argv[1]}`).href : undefined;
+if (import.meta.url === entryUrl) {
+  const config = loadRunnerConfig();
+  loadDotEnvDefaults();
+  let settled = false;
+  const argv = process.argv.slice(2);
+  const outPath = readFlag(argv, FLAG_OUT);
+  const agentType = resolveAgentType(argv);
+  // Role→profile env selection (config-authoritative) BEFORE parseInput reads
+  // RUNNER_PROFILE; an explicit --profile flag still wins inside parseInput.
+  applyRoleProfile(config, agentType);
+  const tracing = initTracing();
+  const progress = createProgress(debugEnabled(argv));
+
+  const emitOnce = createEmitOnce(emitResult);
+
+  const onSignal = (signal: string) => (): void => {
+    if (settled) {
+      process.exit(EXIT_FAILURE);
+    }
+    handleInterrupt(signal, { agentType, outPath, emit: emitOnce })
+      .then(() => tracing.shutdown())
+      .then(() => process.exit(EXIT_FAILURE))
+      .catch(() => process.exit(EXIT_FAILURE));
+  };
+
+  process.once('SIGTERM', onSignal('SIGTERM'));
+  process.once('SIGINT', onSignal('SIGINT'));
+
+  const onFatal = (err: unknown): void => {
+    console.error('[runner] fatal:', err);
+    if (settled) {
+      process.exit(EXIT_FAILURE);
+    }
+    settled = true;
+    void tracing
+      .shutdown()
+      .catch(() => {})
+      .then(() => process.exit(EXIT_FAILURE));
+  };
+
+  process.once('uncaughtException', onFatal);
+  process.once('unhandledRejection', onFatal);
+
+  withParentContext(() => main(argv, emitOnce, progress))
+    .then(async (code): Promise<number> => {
+      await tracing.shutdown();
+      return code;
+    })
+    .then(code => {
+      settled = true;
+      process.exit(code);
+    })
+    .catch(async () => {
+      settled = true;
+      await tracing.shutdown().catch(() => {});
+      process.exit(EXIT_FAILURE);
+    });
+}
+
+
+===== FILE: ts-agentic-code-runner/src/core/__fixtures__/add.ts =====
+export const add = (a: number, b: number): number => a + b;
+
+
+===== FILE: ts-agentic-code-runner/src/core/capture/eval-capture.test.ts =====
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import type { LadderState } from '../orchestration/escalation';
+import {
+  decompositionStage,
+  greenStage,
+  implStage,
+  lintStage,
+  type PipelineResult,
+  redStage
+} from '../orchestration/pipeline';
+import {
+  type AttemptCapture,
+  captureAttempt,
+  evalCaptureEnabled,
+  resolveEvalRunDir,
+  type RunSummary,
+  writeRunSummary
+} from './eval-capture';
+
+const LADDER: LadderState = { rung: 'ollama', exhausted: false } as unknown as LadderState;
+
+const passingPipeline = (): PipelineResult => ({
+  status: 'completed',
+  passed: true,
+  redObserved: true,
+  greenObserved: true,
+  failedStageIndex: undefined,
+  failedStage: undefined,
+  failure: undefined,
+  finalLadder: LADDER,
+});
+
+const failingPipeline = (): PipelineResult => ({
+  status: 'failed',
+  passed: false,
+  redObserved: true,
+  greenObserved: true,
+  failedStageIndex: 3,
+  failedStage: lintStage,
+  failure: { gate: 'lint', message: 'lint failed', output: 'ESLint: 2 errors' },
+  finalLadder: LADDER,
+});
+
+describe('evalCaptureEnabled', () => {
+  it('should be true when RUNNER_EVAL_CAPTURE is "1"', () => {
+    expect(evalCaptureEnabled({ RUNNER_EVAL_CAPTURE: '1' })).toBe(true);
+  });
+
+  it('should be false when RUNNER_EVAL_CAPTURE is unset', () => {
+    expect(evalCaptureEnabled({})).toBe(false);
+  });
+
+  it('should be false when RUNNER_EVAL_CAPTURE is "0"', () => {
+    expect(evalCaptureEnabled({ RUNNER_EVAL_CAPTURE: '0' })).toBe(false);
+  });
+});
+
+describe('resolveEvalRunDir', () => {
+  it('should compose the documented logs/runner-eval layout', () => {
+    const dir = resolveEvalRunDir({
+      cwd: '/work',
+      navBundlePath: 'specs/045-foo/task-dag/nav/T003.json',
+      timestamp: 1718900000000,
+    });
+    expect(dir).toBe(path.join('/work', 'logs', 'runner-eval', '045-T003-1718900000000'));
+  });
+});
+
+describe('captureAttempt', () => {
+  let cwd: string;
+  let runDir: string;
+
+  const baseCapture = (overrides: Partial<AttemptCapture> = {}): AttemptCapture => ({
+    runDir,
+    cwd,
+    attempt: 1,
+    rung: 'ollama',
+    stages: [redStage, implStage, greenStage, lintStage, decompositionStage],
+    pipeline: failingPipeline(),
+    mutatedFiles: ['src/a.ts'],
+    toolCalls: 4,
+    durationMs: 1234,
+    ...overrides,
+  });
+
+  beforeEach(() => {
+    cwd = mkdtempSync(path.join(tmpdir(), 'eval-capture-'));
+    runDir = path.join(cwd, 'logs', 'runner-eval', '045-T003-111');
+    writeFileSync(path.join(cwd, 'src-a.ts'), 'export const a = 1;\n');
+  });
+
+  afterEach(() => {
+    rmSync(cwd, { recursive: true, force: true });
+  });
+
+  it('should write meta.json with the documented attempt shape', async () => {
+    writeFileSync(path.join(cwd, 'a.ts'), 'x');
+    await captureAttempt(baseCapture({ mutatedFiles: ['a.ts'] }));
+    const meta = JSON.parse(readFileSync(path.join(runDir, 'attempt-1', 'meta.json'), 'utf8'));
+    expect(meta).toMatchObject({
+      attempt: 1,
+      rung: 'ollama',
+      furthestStage: 'lint',
+      failedStage: 'lint',
+      gateName: 'lint',
+      toolCalls: 4,
+      durationMs: 1234,
+    });
+  });
+
+  it('should write the failing gate output to gate-output.txt', async () => {
+    await captureAttempt(baseCapture());
+    const out = readFileSync(path.join(runDir, 'attempt-1', 'gate-output.txt'), 'utf8');
+    expect(out).toContain('ESLint: 2 errors');
+  });
+
+  it('should copy each mutated file content into attempt-<n>/files', async () => {
+    writeFileSync(path.join(cwd, 'a.ts'), 'export const a = 1;\n');
+    await captureAttempt(baseCapture({ attempt: 2, mutatedFiles: ['a.ts'] }));
+    const copied = readFileSync(path.join(runDir, 'attempt-2', 'files', 'a.ts'), 'utf8');
+    expect(copied).toBe('export const a = 1;\n');
+  });
+
+  it('should report furthestStage as the last stage for a passing pipeline', async () => {
+    await captureAttempt(baseCapture({ pipeline: passingPipeline(), mutatedFiles: [] }));
+    const meta = JSON.parse(readFileSync(path.join(runDir, 'attempt-1', 'meta.json'), 'utf8'));
+    expect(meta.furthestStage).toBe('decomposition');
+    expect(meta.failedStage).toBeNull();
+  });
+
+  it('should never throw when a mutated file is missing', async () => {
+    await expect(
+      captureAttempt(baseCapture({ mutatedFiles: ['does-not-exist.ts'] }))
+    ).resolves.toBeUndefined();
+  });
+});
+
+describe('writeRunSummary', () => {
+  let cwd: string;
+  let runDir: string;
+
+  beforeEach(() => {
+    cwd = mkdtempSync(path.join(tmpdir(), 'eval-summary-'));
+    runDir = path.join(cwd, 'logs', 'runner-eval', '045-T003-222');
+  });
+
+  afterEach(() => {
+    rmSync(cwd, { recursive: true, force: true });
+  });
+
+  it('should write run.json with the documented run shape', async () => {
+    const summary: RunSummary = {
+      specId: '045',
+      taskId: 'T003',
+      modelId: 'qwen3',
+      mode: 'tdd',
+      status: 'failed',
+      finalRung: 'openrouter',
+      attempts: 3,
+      totalTokens: 4200,
+    };
+    await writeRunSummary(runDir, summary);
+    const parsed = JSON.parse(readFileSync(path.join(runDir, 'run.json'), 'utf8'));
+    expect(parsed).toEqual(summary);
+  });
+
+  it('should create no directory when called with a runDir that does not exist yet', async () => {
+    await writeRunSummary(runDir, {
+      specId: '045',
+      taskId: 'T003',
+      modelId: 'm',
+      mode: 'impl',
+      status: 'completed',
+      finalRung: 'ollama',
+      attempts: 1,
+      totalTokens: 0,
+    });
+    expect(existsSync(path.join(runDir, 'run.json'))).toBe(true);
+    expect(readdirSync(runDir)).toContain('run.json');
+  });
+});
+
+
+===== FILE: ts-agentic-code-runner/src/core/capture/eval-capture.ts =====
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+
+import type { LadderState } from '../orchestration';
+import { type PipelineResult, type Stage, STAGE_NAME } from '../orchestration';
+import type { RunMode, RunStatus } from '../shared';
+import { parseSpecId, parseTaskId, sanitizeModelId } from './failed-output';
+
+const ENV_FLAG = 'RUNNER_EVAL_CAPTURE';
+
+// Opt-in gate: capture only when the flag is exactly "1". Reading a passed env
+// record (not process.env directly) keeps the resolver pure and testable.
+export const evalCaptureEnabled = (env: NodeJS.ProcessEnv): boolean => env[ENV_FLAG] === '1';
+
+export interface ResolveRunDirParams {
+  readonly cwd: string;
+  readonly navBundlePath: string;
+  readonly timestamp: number;
+}
+
+export const resolveEvalRunDir = (params: ResolveRunDirParams): string => {
+  const specId = parseSpecId(params.navBundlePath);
+  const taskId = parseTaskId(params.navBundlePath);
+  const dir = `${specId}-${taskId}-${params.timestamp}`;
+  return path.join(params.cwd, 'logs', 'runner-eval', dir);
+};
+
+export interface AttemptCapture {
+  readonly runDir: string;
+  readonly cwd: string;
+  readonly attempt: number;
+  readonly rung: LadderState['rung'];
+  readonly stages: readonly Stage[];
+  readonly pipeline: PipelineResult;
+  readonly mutatedFiles: readonly string[];
+  readonly toolCalls: number;
+  readonly durationMs: number;
+}
+
+const stageName = (stage: Stage | undefined): string | null =>
+  stage === undefined ? null : (STAGE_NAME.get(stage) ?? 'unknown');
+
+// The furthest stage reached: the failing stage when failed, else the last stage
+// in the plan (a passing pipeline ran the whole sequence).
+const furthestStageName = (capture: AttemptCapture): string | null => {
+  if (capture.pipeline.failedStage !== undefined) {
+    return stageName(capture.pipeline.failedStage);
+  }
+  return stageName(capture.stages.at(-1));
+};
+
+interface AttemptMeta {
+  readonly attempt: number;
+  readonly rung: LadderState['rung'];
+  readonly furthestStage: string | null;
+  readonly failedStage: string | null;
+  readonly gateName: string | null;
+  readonly toolCalls: number;
+  readonly durationMs: number;
+}
+
+const buildMeta = (capture: AttemptCapture): AttemptMeta => ({
+  attempt: capture.attempt,
+  rung: capture.rung,
+  furthestStage: furthestStageName(capture),
+  failedStage: stageName(capture.pipeline.failedStage),
+  gateName: capture.pipeline.failure?.gate ?? null,
+  toolCalls: capture.toolCalls,
+  durationMs: capture.durationMs,
+});
+
+const copyMutatedFile = async (file: string, capture: AttemptCapture, dir: string): Promise<void> => {
+  try {
+    const content = await readFile(path.resolve(capture.cwd, file), 'utf8');
+    await writeFile(path.join(dir, path.basename(file)), content);
+  } catch {
+    return;
+  }
+};
+
+// Side-effect boundary: snapshot one attempt's artifacts BEFORE the next attempt's
+// revert discards them. Fully best-effort — any failure resolves silently so the
+// pipeline is never disturbed (mirrors preserveFailedOutputs).
+export const captureAttempt = async (capture: AttemptCapture): Promise<void> => {
+  const attemptDir = path.join(capture.runDir, `attempt-${capture.attempt}`);
+  const filesDir = path.join(attemptDir, 'files');
+  try {
+    await mkdir(filesDir, { recursive: true });
+    await writeFile(path.join(attemptDir, 'meta.json'), JSON.stringify(buildMeta(capture), null, 2));
+    await writeFile(path.join(attemptDir, 'gate-output.txt'), capture.pipeline.failure?.output ?? '');
+    await Promise.all(capture.mutatedFiles.map((f): Promise<void> => copyMutatedFile(f, capture, filesDir)));
+  } catch {
+    return;
+  }
+};
+
+export interface RunSummary {
+  readonly specId: string;
+  readonly taskId: string;
+  readonly modelId: string;
+  readonly mode: RunMode;
+  readonly status: RunStatus;
+  readonly finalRung: LadderState['rung'];
+  readonly attempts: number;
+  readonly totalTokens: number;
+}
+
+export interface BuildRunSummaryParams {
+  readonly navBundlePath: string;
+  readonly modelId: string;
+  readonly mode: RunMode;
+  readonly status: RunStatus;
+  readonly finalRung: LadderState['rung'];
+  readonly attempts: number;
+  readonly totalTokens: number;
+}
+
+export const buildRunSummary = (params: BuildRunSummaryParams): RunSummary => ({
+  specId: parseSpecId(params.navBundlePath),
+  taskId: parseTaskId(params.navBundlePath),
+  modelId: sanitizeModelId(params.modelId),
+  mode: params.mode,
+  status: params.status,
+  finalRung: params.finalRung,
+  attempts: params.attempts,
+  totalTokens: params.totalTokens,
+});
+
+// Side-effect boundary: write the run-level summary once at run end. Best-effort.
+export const writeRunSummary = async (runDir: string, summary: RunSummary): Promise<void> => {
+  try {
+    await mkdir(runDir, { recursive: true });
+    await writeFile(path.join(runDir, 'run.json'), JSON.stringify(summary, null, 2));
+  } catch {
+    return;
+  }
+};
+
+
+===== FILE: ts-agentic-code-runner/src/core/capture/failed-output.test.ts =====
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import {
+  failedOutputFilename,
+  parseSpecId,
+  parseTaskId,
+  preserveFailedOutputs,
+  sanitizeModelId
+} from './failed-output';
+
+describe('parseSpecId', () => {
+  it('should extract leading digits of the feature dir when given a nav bundle path', () => {
+    expect(parseSpecId('specs/045-llm-result-evaluation/task-dag/nav/T003.json')).toBe('045');
+  });
+
+  it('should fall back to the full feature-dir segment when it has no leading digits', () => {
+    expect(parseSpecId('specs/llm-result-evaluation/task-dag/nav/T003.json')).toBe(
+      'llm-result-evaluation'
+    );
+  });
+
+  it('should fall back to unknown when there is no specs segment', () => {
+    expect(parseSpecId('foo/bar/baz.json')).toBe('unknown');
+  });
+});
+
+describe('parseTaskId', () => {
+  it('should return the basename without .json when given a nav bundle path', () => {
+    expect(parseTaskId('specs/045-llm-result-evaluation/task-dag/nav/T003.json')).toBe('T003');
+  });
+
+  it('should fall back to unknown when the path is empty', () => {
+    expect(parseTaskId('')).toBe('unknown');
+  });
+
+  it('should fall back to unknown when the basename is not a task id', () => {
+    expect(parseTaskId('nofile')).toBe('unknown');
+  });
+
+  it('should return a short task id like T12', () => {
+    expect(parseTaskId('specs/x/nav/T12.json')).toBe('T12');
+  });
+});
+
+describe('sanitizeModelId', () => {
+  it('should take the last slash segment and strip the tag', () => {
+    expect(sanitizeModelId('qwen/qwen3.6-35b-a3b:free')).toBe('qwen3.6-35b-a3b');
+  });
+
+  it('should replace disallowed characters with a dash', () => {
+    expect(sanitizeModelId('vendor/model name@v2')).toBe('model-name-v2');
+  });
+
+  it('should return unknown for an empty model id', () => {
+    expect(sanitizeModelId('')).toBe('unknown');
+  });
+
+  it('should return unknown for the unknown sentinel', () => {
+    expect(sanitizeModelId('unknown')).toBe('unknown');
+  });
+});
+
+describe('failedOutputFilename', () => {
+  it('should join the parts with dashes preserving the original basename', () => {
+    expect(
+      failedOutputFilename('045', 'T003', 1718900000000, 'qwen3.6-35b-a3b', 'usePromptTesterStore.ts')
+    ).toBe('045-T003-1718900000000-qwen3.6-35b-a3b-usePromptTesterStore.ts');
+  });
+});
+
+describe('preserveFailedOutputs', () => {
+  let cwd: string;
+
+  beforeEach(() => {
+    cwd = mkdtempSync(path.join(tmpdir(), 'failed-output-'));
+  });
+
+  afterEach(() => {
+    rmSync(cwd, { recursive: true, force: true });
+  });
+
+  it('should preserve a mutated file under the expected name with the same content', async () => {
+    const flatRel = 'foo.ts';
+    writeFileSync(path.join(cwd, flatRel), 'failed content');
+    const written = await preserveFailedOutputs({
+      navBundlePath: 'specs/045-llm-result-evaluation/task-dag/nav/T003.json',
+      modelId: 'qwen/qwen3.6-35b-a3b:free',
+      mutatedFiles: [flatRel],
+      timestamp: 1718900000000,
+      cwd,
+    });
+    const expectedName = '045-T003-1718900000000-qwen3.6-35b-a3b-foo.ts';
+    const dest = path.join(cwd, 'logs', 'failed_llm', expectedName);
+    expect(existsSync(dest)).toBe(true);
+    expect(readFileSync(dest, 'utf8')).toBe('failed content');
+    expect(written).toEqual([dest]);
+  });
+
+  it('should skip a missing mutated file without throwing', async () => {
+    const written = await preserveFailedOutputs({
+      navBundlePath: 'specs/045-llm-result-evaluation/task-dag/nav/T003.json',
+      modelId: 'qwen/qwen3.6-35b-a3b:free',
+      mutatedFiles: ['does-not-exist.ts'],
+      timestamp: 1718900000000,
+      cwd,
+    });
+    expect(written).toEqual([]);
+  });
+
+  it('should write into a custom destDir when provided', async () => {
+    writeFileSync(path.join(cwd, 'bar.ts'), 'data');
+    const destDir = path.join(cwd, 'custom');
+    const written = await preserveFailedOutputs({
+      navBundlePath: 'specs/045-x/task-dag/nav/T009.json',
+      modelId: 'unknown',
+      mutatedFiles: ['bar.ts'],
+      timestamp: 42,
+      cwd,
+      destDir,
+    });
+    expect(written).toEqual([path.join(destDir, '045-T009-42-unknown-bar.ts')]);
+    expect(existsSync(path.join(destDir, '045-T009-42-unknown-bar.ts'))).toBe(true);
+  });
+});
+
+
+===== FILE: ts-agentic-code-runner/src/core/capture/failed-output.ts =====
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+
+const UNKNOWN = 'unknown';
+const DISALLOWED_CHAR_RE = /[^A-Za-z0-9._-]/g;
+
+// The feature dir is the segment after `specs/`; the specId is its leading
+// digits. Falls back to the full feature-dir segment, else 'unknown'.
+export const parseSpecId = (navBundlePath: string): string => {
+  const segments = navBundlePath.split('/');
+  const specsIndex = segments.indexOf('specs');
+  const featureDir = specsIndex >= 0 ? segments[specsIndex + 1] : undefined;
+  if (featureDir === undefined || featureDir === '') {
+    return UNKNOWN;
+  }
+  const leadingDigits = featureDir.match(/^\d+/);
+  return leadingDigits === null ? featureDir : leadingDigits[0];
+};
+
+const TASK_ID_RE = /^T\d+$/;
+
+// The task id is the basename without `.json`, but only when it matches the
+// `T<digits>` shape; any other basename falls back to 'unknown'.
+export const parseTaskId = (navBundlePath: string): string => {
+  const base = path.basename(navBundlePath, '.json');
+  return TASK_ID_RE.test(base) ? base : UNKNOWN;
+};
+
+// Last `/`-segment, tag (`:...`) stripped, remaining disallowed chars dashed.
+export const sanitizeModelId = (modelId: string): string => {
+  if (modelId === '' || modelId === UNKNOWN) {
+    return UNKNOWN;
+  }
+  const lastSegment = modelId.split('/').at(-1) ?? modelId;
+  const withoutTag = lastSegment.split(':')[0];
+  const sanitized = withoutTag.replace(DISALLOWED_CHAR_RE, '-');
+  return sanitized === '' ? UNKNOWN : sanitized;
+};
+
+export const failedOutputFilename = (
+  specId: string,
+  taskId: string,
+  timestamp: number,
+  model: string,
+  originalBasename: string
+): string => `${specId}-${taskId}-${timestamp}-${model}-${originalBasename}`;
+
+export interface PreserveFailedOutputsParams {
+  readonly navBundlePath: string;
+  readonly modelId: string;
+  readonly mutatedFiles: readonly string[];
+  readonly timestamp: number;
+  readonly cwd?: string;
+  readonly destDir?: string;
+}
+
+// Best-effort copy of one failed file into destDir. A read/write error resolves
+// to null (skip), never throws — preservation must never break revert/return.
+interface PreserveOneContext {
+  readonly cwd: string;
+  readonly destDir: string;
+  readonly specId: string;
+  readonly taskId: string;
+  readonly timestamp: number;
+  readonly model: string;
+}
+
+const preserveOne = async (file: string, ctx: PreserveOneContext): Promise<string | null> => {
+  try {
+    const content = await readFile(path.resolve(ctx.cwd, file), 'utf8');
+    const name = failedOutputFilename(
+      ctx.specId,
+      ctx.taskId,
+      ctx.timestamp,
+      ctx.model,
+      path.basename(file)
+    );
+    const dest = path.join(ctx.destDir, name);
+    await writeFile(dest, content);
+    return dest;
+  } catch {
+    return null;
+  }
+};
+
+// Side-effect boundary: snapshot the failed model output to destDir before the
+// revert discards it. Fully best-effort — a per-file or mkdir failure resolves
+// to a (possibly empty) list, never throws.
+export const preserveFailedOutputs = async (
+  params: PreserveFailedOutputsParams
+): Promise<readonly string[]> => {
+  const cwd = params.cwd ?? process.cwd();
+  const destDir = params.destDir ?? path.join(cwd, 'logs', 'failed_llm');
+  try {
+    await mkdir(destDir, { recursive: true });
+  } catch {
+    return [];
+  }
+  const ctx: PreserveOneContext = {
+    cwd,
+    destDir,
+    specId: parseSpecId(params.navBundlePath),
+    taskId: parseTaskId(params.navBundlePath),
+    timestamp: params.timestamp,
+    model: sanitizeModelId(params.modelId),
+  };
+  const results = await Promise.all(
+    params.mutatedFiles.map((file): Promise<string | null> => preserveOne(file, ctx))
+  );
+  return results.filter((dest): dest is string => dest !== null);
+};
+
+
+===== FILE: ts-agentic-code-runner/src/core/capture/index.ts =====
+export type {
+  AttemptCapture,
+  BuildRunSummaryParams,
+  ResolveRunDirParams,
+  RunSummary
+} from './eval-capture';
+export {
+  buildRunSummary,
+  captureAttempt,
+  evalCaptureEnabled,
+  resolveEvalRunDir,
+  writeRunSummary
+} from './eval-capture';
+export type { PreserveFailedOutputsParams } from './failed-output';
+export {
+  failedOutputFilename,
+  parseSpecId,
+  parseTaskId,
+  preserveFailedOutputs,
+  sanitizeModelId
+} from './failed-output';
+
+
+===== FILE: ts-agentic-code-runner/src/core/config/config.test.ts =====
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { ENV } from '../shared/envKeys';
+import { applyProfileByName, applyRoleProfile, loadRunnerConfig, RunnerConfigSchema } from './config';
+
+const RUNNER_ENV_KEYS = Object.values(ENV);
+
+describe('loadRunnerConfig', () => {
+  let dir: string;
+  let savedEnv: Record<string, string | undefined>;
+
+  const writeConfig = (value: unknown): string => {
+    const path = join(dir, 'runner.config.json');
+    writeFileSync(path, JSON.stringify(value), 'utf8');
+    return path;
+  };
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'runner-config-'));
+    savedEnv = Object.fromEntries(RUNNER_ENV_KEYS.map(k => [k, process.env[k]]));
+    RUNNER_ENV_KEYS.forEach(k => delete process.env[k]);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    RUNNER_ENV_KEYS.forEach(k => {
+      const prior = savedEnv[k];
+      if (prior === undefined) delete process.env[k];
+      else process.env[k] = prior;
+    });
+    rmSync(dir, { recursive: true, force: true });
+    vi.restoreAllMocks();
+  });
+
+  it('should set all RUNNER_* env vars when given a valid full config', () => {
+    const path = writeConfig({
+      delegation: 'runner',
+      provider: 'openrouter',
+      profile: 'openrouter-default',
+      modelId: 'openai/gpt-oss-120b:free',
+      generateTimeoutMs: 90000,
+      openrouter: { allowFallbacks: true, provider: 'novita', quantization: 'fp8' },
+    });
+
+    loadRunnerConfig(path);
+
+    expect(process.env.RUNNER_DELEGATION).toBe('runner');
+    expect(process.env.RUNNER_PROVIDER).toBe('openrouter');
+    expect(process.env.RUNNER_PROFILE).toBe('openrouter-default');
+    expect(process.env.RUNNER_MODEL_ID).toBe('openai/gpt-oss-120b:free');
+    expect(process.env.RUNNER_GENERATE_TIMEOUT_MS).toBe('90000');
+    expect(process.env.RUNNER_OPENROUTER_ALLOW_FALLBACKS).toBe('true');
+    expect(process.env.RUNNER_OPENROUTER_PROVIDER).toBe('novita');
+    expect(process.env.RUNNER_OPENROUTER_QUANTIZATION).toBe('fp8');
+  });
+
+  it('should authoritatively overwrite a pre-set stale env value', () => {
+    process.env.RUNNER_MODEL_ID = 'stale/model';
+    const path = writeConfig({ delegation: 'runner', modelId: 'openai/gpt-oss-120b:free' });
+
+    loadRunnerConfig(path);
+
+    expect(process.env.RUNNER_MODEL_ID).toBe('openai/gpt-oss-120b:free');
+  });
+
+  it('should no-op when the config file is missing', () => {
+    loadRunnerConfig(join(dir, 'does-not-exist.json'));
+
+    RUNNER_ENV_KEYS.forEach(k => expect(process.env[k]).toBeUndefined());
+  });
+
+  it('should apply nothing and log an error when a field has the wrong type', () => {
+    const path = writeConfig({ delegation: 'runner', generateTimeoutMs: -1 });
+
+    loadRunnerConfig(path);
+
+    RUNNER_ENV_KEYS.forEach(k => expect(process.env[k]).toBeUndefined());
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining('[runner] invalid runner.config.json:')
+    );
+  });
+
+  it('should reject unknown keys via strict and apply nothing', () => {
+    const path = writeConfig({ delegation: 'runner', bogus: 'x' });
+
+    loadRunnerConfig(path);
+
+    RUNNER_ENV_KEYS.forEach(k => expect(process.env[k]).toBeUndefined());
+    expect(console.error).toHaveBeenCalled();
+  });
+
+  it('should set only RUNNER_DELEGATION when only delegation is present', () => {
+    const path = writeConfig({ delegation: 'claude' });
+
+    loadRunnerConfig(path);
+
+    expect(process.env.RUNNER_DELEGATION).toBe('claude');
+    expect(process.env.RUNNER_PROVIDER).toBeUndefined();
+    expect(process.env.RUNNER_MODEL_ID).toBeUndefined();
+    expect(process.env.RUNNER_OPENROUTER_ALLOW_FALLBACKS).toBeUndefined();
+  });
+
+  it('should set every ollama and openrouter sampling knob when given a full config', () => {
+    const path = writeConfig({
+      delegation: 'runner',
+      provider: 'ollama',
+      maxSteps: 40,
+      maxToolOutputChars: 64000,
+      largeFileLines: 800,
+      ollama: {
+        numCtx: 65536,
+        temperature: 0.2,
+        topP: 0.9,
+        topK: 40,
+        repeatPenalty: 1.1,
+        numPredict: 4096,
+        idleTimeoutMs: 300000,
+        think: true,
+      },
+      openrouter: {
+        allowFallbacks: false,
+        temperature: 0.3,
+        topP: 0.95,
+        topK: 50,
+        minP: 0.05,
+        repetitionPenalty: 1.05,
+        reasoningEffort: 'high',
+        reasoningMaxTokens: 8000,
+        cacheControl: 'ephemeral',
+      },
+    });
+
+    loadRunnerConfig(path);
+
+    expect(process.env[ENV.MAX_STEPS]).toBe('40');
+    expect(process.env[ENV.MAX_TOOL_OUTPUT_CHARS]).toBe('64000');
+    expect(process.env[ENV.LARGE_FILE_LINES]).toBe('800');
+    expect(process.env[ENV.OLLAMA_NUM_CTX]).toBe('65536');
+    expect(process.env[ENV.OLLAMA_TEMPERATURE]).toBe('0.2');
+    expect(process.env[ENV.OLLAMA_TOP_P]).toBe('0.9');
+    expect(process.env[ENV.OLLAMA_TOP_K]).toBe('40');
+    expect(process.env[ENV.OLLAMA_REPEAT_PENALTY]).toBe('1.1');
+    expect(process.env[ENV.OLLAMA_NUM_PREDICT]).toBe('4096');
+    expect(process.env[ENV.OLLAMA_IDLE_TIMEOUT_MS]).toBe('300000');
+    expect(process.env[ENV.OLLAMA_THINK]).toBe('true');
+    expect(process.env[ENV.OPENROUTER_TEMPERATURE]).toBe('0.3');
+    expect(process.env[ENV.OPENROUTER_TOP_P]).toBe('0.95');
+    expect(process.env[ENV.OPENROUTER_TOP_K]).toBe('50');
+    expect(process.env[ENV.OPENROUTER_MIN_P]).toBe('0.05');
+    expect(process.env[ENV.OPENROUTER_REPETITION_PENALTY]).toBe('1.05');
+    expect(process.env[ENV.OPENROUTER_REASONING_EFFORT]).toBe('high');
+    expect(process.env[ENV.OPENROUTER_REASONING_MAX_TOKENS]).toBe('8000');
+    expect(process.env[ENV.OPENROUTER_CACHE_CONTROL]).toBe('ephemeral');
+  });
+
+  it('should stringify think false to the literal "false"', () => {
+    const path = writeConfig({ delegation: 'runner', ollama: { think: false } });
+
+    loadRunnerConfig(path);
+
+    expect(process.env[ENV.OLLAMA_THINK]).toBe('false');
+  });
+
+  it('should not set ollama env vars when the ollama block is absent', () => {
+    const path = writeConfig({ delegation: 'runner', maxSteps: 10 });
+
+    loadRunnerConfig(path);
+
+    expect(process.env[ENV.MAX_STEPS]).toBe('10');
+    expect(process.env[ENV.OLLAMA_NUM_CTX]).toBeUndefined();
+    expect(process.env[ENV.OLLAMA_THINK]).toBeUndefined();
+    expect(process.env[ENV.OPENROUTER_TEMPERATURE]).toBeUndefined();
+  });
+
+  it('should apply the active ollama profile, overriding the run block cap', () => {
+    const path = writeConfig({
+      delegation: 'runner',
+      activeProfile: 'a3b',
+      run: { maxToolOutputChars: 48000 },
+      profiles: {
+        a3b: {
+          backend: 'ollama',
+          modelId: 'Qwen3-Coder-30B-A3B',
+          baseUrl: 'http://127.0.0.1:11434',
+          ollama: { numCtx: 65536, temperature: 0.2 },
+          maxToolOutputChars: 64000,
+        },
+      },
+    });
+
+    loadRunnerConfig(path);
+
+    expect(process.env[ENV.PROFILE]).toBe('local-default');
+    expect(process.env[ENV.MODEL_ID]).toBe('Qwen3-Coder-30B-A3B');
+    expect(process.env[ENV.BASE_URL]).toBe('http://127.0.0.1:11434');
+    expect(process.env[ENV.OLLAMA_NUM_CTX]).toBe('65536');
+    expect(process.env[ENV.OLLAMA_TEMPERATURE]).toBe('0.2');
+    expect(process.env[ENV.MAX_TOOL_OUTPUT_CHARS]).toBe('64000');
+  });
+
+  it('should apply the active openrouter profile env', () => {
+    const path = writeConfig({
+      delegation: 'runner',
+      activeProfile: 'cloud',
+      profiles: {
+        cloud: {
+          backend: 'openrouter',
+          modelId: 'qwen/qwen3.6-35b-a3b',
+          openrouter: { allowFallbacks: true, temperature: 0.4 },
+        },
+      },
+    });
+
+    loadRunnerConfig(path);
+
+    expect(process.env[ENV.PROFILE]).toBe('openrouter-default');
+    expect(process.env[ENV.OPENROUTER_TEMPERATURE]).toBe('0.4');
+  });
+
+  it('should apply the run block but no profile env when activeProfile is absent', () => {
+    const path = writeConfig({
+      delegation: 'runner',
+      run: { maxSteps: 25 },
+      profiles: {
+        a3b: { backend: 'ollama', modelId: 'Qwen3-Coder-30B-A3B', ollama: { numCtx: 65536 } },
+      },
+    });
+
+    loadRunnerConfig(path);
+
+    expect(process.env[ENV.MAX_STEPS]).toBe('25');
+    expect(process.env[ENV.MODEL_ID]).toBeUndefined();
+    expect(process.env[ENV.OLLAMA_NUM_CTX]).toBeUndefined();
+    expect(process.env[ENV.PROFILE]).toBeUndefined();
+  });
+
+  it('should apply the old flat fields unchanged when no catalog fields are present', () => {
+    const path = writeConfig({
+      delegation: 'runner',
+      provider: 'ollama',
+      profile: 'local-default',
+      modelId: 'qwen2.5-coder:7b',
+      generateTimeoutMs: 90000,
+      ollama: { numCtx: 32768 },
+    });
+
+    loadRunnerConfig(path);
+
+    expect(process.env[ENV.PROVIDER]).toBe('ollama');
+    expect(process.env[ENV.PROFILE]).toBe('local-default');
+    expect(process.env[ENV.MODEL_ID]).toBe('qwen2.5-coder:7b');
+    expect(process.env[ENV.GENERATE_TIMEOUT_MS]).toBe('90000');
+    expect(process.env[ENV.OLLAMA_NUM_CTX]).toBe('32768');
+  });
+
+  it('should set RUNNER_GENERATE_MAX_TOTAL_MS when generateMaxTotalMs is present in config', () => {
+    const path = writeConfig({ delegation: 'runner', generateMaxTotalMs: 600000 });
+
+    loadRunnerConfig(path);
+
+    expect(process.env['RUNNER_GENERATE_MAX_TOTAL_MS']).toBe('600000');
+  });
+});
+
+describe('RunnerConfigSchema', () => {
+  it('should reject a config missing the required delegation field', () => {
+    expect(RunnerConfigSchema.safeParse({}).success).toBe(false);
+  });
+
+  it('should reject an unknown nested ollama key via strict', () => {
+    const result = RunnerConfigSchema.safeParse({
+      delegation: 'runner',
+      ollama: { numCtx: 1024, foo: 'x' },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('should accept a config populating every new run-behavior field', () => {
+    const result = RunnerConfigSchema.safeParse({
+      delegation: 'runner',
+      maxSteps: 40,
+      maxToolOutputChars: 64000,
+      largeFileLines: 800,
+      ollama: { numCtx: 65536, temperature: 0.2, think: false },
+      openrouter: { allowFallbacks: true, temperature: 0.3, reasoningEffort: 'high' },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept a full catalog config with activeProfile, run block, and 3 profiles', () => {
+    const result = RunnerConfigSchema.safeParse({
+      delegation: 'runner',
+      activeProfile: 'a3b',
+      run: {
+        generateTimeoutMs: 600000,
+        maxSteps: 30,
+        maxToolOutputChars: 48000,
+        largeFileLines: 600,
+      },
+      profiles: {
+        a3b: {
+          backend: 'ollama',
+          modelId: 'Qwen3-Coder-30B-A3B',
+          baseUrl: 'http://127.0.0.1:11434',
+          ollama: { numCtx: 65536, temperature: 0.2, think: false },
+          maxToolOutputChars: 64000,
+        },
+        devstral: {
+          backend: 'ollama',
+          modelId: 'Devstral-24B',
+          ollama: { numCtx: 32768 },
+          maxSteps: 20,
+        },
+        cloud: {
+          backend: 'openrouter',
+          modelId: 'qwen/qwen3.6-35b-a3b',
+          openrouter: { allowFallbacks: true, temperature: 0.3, reasoningEffort: 'high' },
+          generateTimeoutMs: 300000,
+        },
+      },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept a roleProfiles map of agent names to profile names', () => {
+    const result = RunnerConfigSchema.safeParse({
+      delegation: 'runner',
+      roleProfiles: { 'ts-test-writer': 'devstral', 'code-logic-writer': 'a3b' },
+      profiles: {
+        a3b: { backend: 'ollama', modelId: 'Qwen3-Coder-30B-A3B' },
+        devstral: { backend: 'ollama', modelId: 'Devstral-24B' },
+      },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept a valid profile but reject one with an unknown nested key', () => {
+    const valid = RunnerConfigSchema.safeParse({
+      delegation: 'runner',
+      profiles: { a3b: { backend: 'ollama', modelId: 'x' } },
+    });
+    expect(valid.success).toBe(true);
+
+    const withBogus = RunnerConfigSchema.safeParse({
+      delegation: 'runner',
+      profiles: { a3b: { backend: 'ollama', modelId: 'x', bogus: 1 } },
+    });
+    expect(withBogus.success).toBe(false);
+  });
+});
+
+describe('RunnerConfigSchema referential integrity', () => {
+  const catalogProfiles = {
+    'a3b-code': { backend: 'ollama' as const, modelId: 'Qwen3-Coder-30B-A3B' },
+    devstral: { backend: 'ollama' as const, modelId: 'Devstral-24B' },
+  };
+
+  it('should accept activeProfile and roleProfiles that reference defined profile keys', () => {
+    const result = RunnerConfigSchema.safeParse({
+      delegation: 'runner',
+      activeProfile: 'a3b-code',
+      roleProfiles: { 'ts-test-writer': 'devstral', 'code-logic-writer': 'a3b-code' },
+      profiles: catalogProfiles,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('should reject an activeProfile that is not a defined profile key', () => {
+    const result = RunnerConfigSchema.safeParse({
+      delegation: 'runner',
+      activeProfile: 'a3b-cod',
+      profiles: catalogProfiles,
+    });
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error.issues[0]?.message).toContain('a3b-cod');
+    expect(result.error.issues[0]?.message).toContain('is not a defined profile');
+  });
+
+  it('should reject a roleProfiles value that is not a defined profile key, with the agent key in the path', () => {
+    const result = RunnerConfigSchema.safeParse({
+      delegation: 'runner',
+      roleProfiles: { 'ts-test-writer': 'nope' },
+      profiles: catalogProfiles,
+    });
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error.issues[0]?.path).toEqual(['roleProfiles', 'ts-test-writer']);
+  });
+
+  it('should accept a flat config with no profiles (refinement does not fire)', () => {
+    const result = RunnerConfigSchema.safeParse({
+      delegation: 'runner',
+      provider: 'ollama',
+      roleProfiles: { 'ts-test-writer': 'whatever' },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('should validate the committed runner.config.json and runner.config.example.json', () => {
+    const live = RunnerConfigSchema.safeParse(JSON.parse(readFileSync('runner.config.json', 'utf8')));
+    const example = RunnerConfigSchema.safeParse(
+      JSON.parse(readFileSync('runner.config.example.json', 'utf8'))
+    );
+    expect(live.success).toBe(true);
+    expect(example.success).toBe(true);
+  });
+});
+
+describe('role-based profile selection', () => {
+  let dir: string;
+  let savedEnv: Record<string, string | undefined>;
+
+  const writeConfig = (value: unknown): string => {
+    const path = join(dir, 'runner.config.json');
+    writeFileSync(path, JSON.stringify(value), 'utf8');
+    return path;
+  };
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'runner-roleprofile-'));
+    savedEnv = Object.fromEntries(RUNNER_ENV_KEYS.map(k => [k, process.env[k]]));
+    RUNNER_ENV_KEYS.forEach(k => delete process.env[k]);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    RUNNER_ENV_KEYS.forEach(k => {
+      const prior = savedEnv[k];
+      if (prior === undefined) delete process.env[k];
+      else process.env[k] = prior;
+    });
+    rmSync(dir, { recursive: true, force: true });
+    vi.restoreAllMocks();
+  });
+
+  it('should return the parsed config from loadRunnerConfig', () => {
+    const path = writeConfig({ delegation: 'runner', modelId: 'x' });
+
+    const config = loadRunnerConfig(path);
+
+    expect(config?.delegation).toBe('runner');
+    expect(config?.modelId).toBe('x');
+  });
+
+  it('should return undefined from loadRunnerConfig when the file is missing', () => {
+    const config = loadRunnerConfig(join(dir, 'nope.json'));
+
+    expect(config).toBeUndefined();
+  });
+
+  it('should overwrite the baseline active profile with the role-selected profile env', () => {
+    const path = writeConfig({
+      delegation: 'runner',
+      activeProfile: 'a3b',
+      roleProfiles: { 'ts-test-writer': 'devstral' },
+      profiles: {
+        a3b: { backend: 'ollama', modelId: 'Qwen3-Coder-30B-A3B', ollama: { numCtx: 65536 } },
+        devstral: { backend: 'ollama', modelId: 'Devstral-24B', ollama: { numCtx: 32768 } },
+      },
+    });
+    const config = loadRunnerConfig(path);
+
+    applyRoleProfile(config, 'ts-test-writer');
+
+    expect(process.env[ENV.PROFILE]).toBe('local-default');
+    expect(process.env[ENV.MODEL_ID]).toBe('Devstral-24B');
+    expect(process.env[ENV.OLLAMA_NUM_CTX]).toBe('32768');
+  });
+
+  it('should leave the baseline active profile untouched for an agent not in roleProfiles', () => {
+    const path = writeConfig({
+      delegation: 'runner',
+      activeProfile: 'a3b',
+      roleProfiles: { 'ts-test-writer': 'devstral' },
+      profiles: {
+        a3b: { backend: 'ollama', modelId: 'Qwen3-Coder-30B-A3B' },
+        devstral: { backend: 'ollama', modelId: 'Devstral-24B' },
+      },
+    });
+    const config = loadRunnerConfig(path);
+
+    applyRoleProfile(config, 'ui-writer');
+
+    expect(process.env[ENV.MODEL_ID]).toBe('Qwen3-Coder-30B-A3B');
+  });
+
+  it('should no-op applyRoleProfile when config is undefined', () => {
+    applyRoleProfile(undefined, 'ts-test-writer');
+
+    expect(process.env[ENV.MODEL_ID]).toBeUndefined();
+  });
+
+  it('should apply an openrouter-backed profile via applyProfileByName', () => {
+    const config = RunnerConfigSchema.parse({
+      delegation: 'runner',
+      profiles: {
+        cloud: {
+          backend: 'openrouter',
+          modelId: 'qwen/qwen3.6-35b-a3b',
+          openrouter: { allowFallbacks: true, temperature: 0.4 },
+        },
+      },
+    });
+
+    applyProfileByName(config, 'cloud');
+
+    expect(process.env[ENV.PROFILE]).toBe('openrouter-default');
+    expect(process.env[ENV.MODEL_ID]).toBe('qwen/qwen3.6-35b-a3b');
+    expect(process.env[ENV.OPENROUTER_TEMPERATURE]).toBe('0.4');
+  });
+
+  it('should no-op applyProfileByName when the named profile is absent', () => {
+    const config = RunnerConfigSchema.parse({ delegation: 'runner' });
+
+    applyProfileByName(config, 'missing');
+
+    expect(process.env[ENV.MODEL_ID]).toBeUndefined();
+  });
+});
+
+
+===== FILE: ts-agentic-code-runner/src/core/config/config.ts =====
+import { existsSync, readFileSync } from 'node:fs';
+
+import { z } from 'zod';
+
+import { DEFAULT_PROFILE_NAME, OPENROUTER_PROFILE_NAME } from '../profiles';
+import { ENV } from '../shared';
+
+// Single owner of the runner's global timeout default (20 min). One value governs
+// the per-step abort timer AND the HTTP client idle timeouts (see connector.ts),
+// and seeds the generated config's `generateTimeoutMs`. Override per-launch via the
+// `generateTimeoutMs` config field / RUNNER_GENERATE_TIMEOUT_MS env.
+export const DEFAULT_GENERATE_TIMEOUT_MS = 1_200_000;
+
+// Owns the schema for the runner's per-launch config (`runner.config.json` at
+// the project root). A separate generator CLI imports this schema to author the
+// file; the runner loads it AUTHORITATIVELY (overwrites process.env) so launch
+// settings survive the tmux→orchestrator→Bash chain where env is unreliable.
+// Reusable per-model sampling/cap sub-schemas, shared by the flat back-compat
+// fields AND the per-model PROFILES catalog (`profiles.<name>`).
+const OllamaParams = z
+  .object({
+    numCtx: z.number().optional(),
+    temperature: z.number().optional(),
+    topP: z.number().optional(),
+    topK: z.number().optional(),
+    repeatPenalty: z.number().optional(),
+    numPredict: z.number().optional(),
+    idleTimeoutMs: z.number().optional(),
+    think: z.boolean().optional(),
+  })
+  .strict();
+
+const OpenrouterParams = z
+  .object({
+    temperature: z.number().optional(),
+    topP: z.number().optional(),
+    topK: z.number().optional(),
+    minP: z.number().optional(),
+    repetitionPenalty: z.number().optional(),
+    reasoningMaxTokens: z.number().optional(),
+    reasoningEffort: z.string().optional(),
+    cacheControl: z.string().optional(),
+    allowFallbacks: z.boolean().optional(),
+    provider: z.string().optional(),
+    quantization: z.string().optional(),
+  })
+  .strict();
+
+// The four run-behavior caps, shared by the top-level flat fields, the `run`
+// block (catalog default), and per-profile overrides.
+const capFields = {
+  generateTimeoutMs: z.number().int().positive().optional(),
+  maxSteps: z.number().int().positive().optional(),
+  maxToolOutputChars: z.number().int().positive().optional(),
+  largeFileLines: z.number().int().positive().optional(),
+};
+
+const ProfileSchema = z
+  .object({
+    backend: z.enum(['ollama', 'openrouter', 'openai-compatible']),
+    modelId: z.string().min(1),
+    baseUrl: z.string().optional(),
+    ollama: OllamaParams.optional(),
+    openrouter: OpenrouterParams.optional(),
+    ...capFields,
+  })
+  .strict();
+
+export const RunnerConfigSchema = z
+  .object({
+    delegation: z.enum(['runner', 'claude']),
+    provider: z.enum(['openrouter', 'ollama']).optional(),
+    profile: z.string().min(1).optional(),
+    modelId: z.string().min(1).optional(),
+    generateMaxTotalMs: z.number().int().positive().optional(),
+    ...capFields,
+    ollama: OllamaParams.optional(),
+    openrouter: OpenrouterParams.extend({ allowFallbacks: z.boolean() }).strict().optional(),
+    activeProfile: z.string().min(1).optional(),
+    run: z.object(capFields).strict().optional(),
+    profiles: z.record(z.string(), ProfileSchema).optional(),
+    roleProfiles: z.record(z.string(), z.string()).optional(),
+  })
+  .strict()
+  .superRefine((config, ctx) => {
+    const profileKeys = Object.keys(config.profiles ?? {});
+    if (profileKeys.length === 0) return;
+    const isDefined = (name: string): boolean => profileKeys.includes(name);
+    if (config.activeProfile !== undefined && !isDefined(config.activeProfile)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['activeProfile'],
+        message: `activeProfile "${config.activeProfile}" is not a defined profile`,
+      });
+    }
+    Object.entries(config.roleProfiles ?? {}).forEach(([agentKey, profileName]) => {
+      if (isDefined(profileName)) return;
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['roleProfiles', agentKey],
+        message: `roleProfiles["${agentKey}"] = "${profileName}" is not a defined profile`,
+      });
+    });
+  });
+
+export type RunnerConfig = z.infer<typeof RunnerConfigSchema>;
+type ProfileEntry = z.infer<typeof ProfileSchema>;
+type OpenrouterConfig = z.infer<typeof OpenrouterParams>;
+type CapFields = z.infer<z.ZodObject<typeof capFields>>;
+
+const setEnv = (key: string, value: string | undefined): void => {
+  if (value !== undefined) process.env[key] = value;
+};
+
+// I/O boundary: applies each present field to process.env, overwriting any
+// stale value (config is authoritative over the env it ends up shaping).
+const setNum = (key: string, value: number | undefined): void => {
+  setEnv(key, value === undefined ? undefined : String(value));
+};
+
+const applyOllamaConfig = (ollama: NonNullable<RunnerConfig['ollama']>): void => {
+  setNum(ENV.OLLAMA_NUM_CTX, ollama.numCtx);
+  setNum(ENV.OLLAMA_TEMPERATURE, ollama.temperature);
+  setNum(ENV.OLLAMA_TOP_P, ollama.topP);
+  setNum(ENV.OLLAMA_TOP_K, ollama.topK);
+  setNum(ENV.OLLAMA_REPEAT_PENALTY, ollama.repeatPenalty);
+  setNum(ENV.OLLAMA_NUM_PREDICT, ollama.numPredict);
+  setNum(ENV.OLLAMA_IDLE_TIMEOUT_MS, ollama.idleTimeoutMs);
+  setEnv(ENV.OLLAMA_THINK, ollama.think === undefined ? undefined : String(ollama.think));
+};
+
+const applyOpenrouterConfig = (openrouter: OpenrouterConfig): void => {
+  const fallbacks = openrouter.allowFallbacks;
+  setEnv(ENV.OPENROUTER_ALLOW_FALLBACKS, fallbacks === undefined ? undefined : String(fallbacks));
+  setEnv(ENV.OPENROUTER_PROVIDER, openrouter.provider);
+  setEnv(ENV.OPENROUTER_QUANTIZATION, openrouter.quantization);
+  setEnv(ENV.OPENROUTER_CACHE_CONTROL, openrouter.cacheControl);
+  setEnv(ENV.OPENROUTER_REASONING_EFFORT, openrouter.reasoningEffort);
+  setNum(ENV.OPENROUTER_TEMPERATURE, openrouter.temperature);
+  setNum(ENV.OPENROUTER_TOP_P, openrouter.topP);
+  setNum(ENV.OPENROUTER_TOP_K, openrouter.topK);
+  setNum(ENV.OPENROUTER_MIN_P, openrouter.minP);
+  setNum(ENV.OPENROUTER_REPETITION_PENALTY, openrouter.repetitionPenalty);
+  setNum(ENV.OPENROUTER_REASONING_MAX_TOKENS, openrouter.reasoningMaxTokens);
+};
+
+const applyCaps = (caps: CapFields): void => {
+  setNum(ENV.GENERATE_TIMEOUT_MS, caps.generateTimeoutMs);
+  setNum(ENV.MAX_STEPS, caps.maxSteps);
+  setNum(ENV.MAX_TOOL_OUTPUT_CHARS, caps.maxToolOutputChars);
+  setNum(ENV.LARGE_FILE_LINES, caps.largeFileLines);
+};
+
+const baseProfileFor = (backend: ProfileEntry['backend']): string => {
+  if (backend === 'openrouter') return OPENROUTER_PROFILE_NAME;
+  if (backend === 'openai-compatible') return 'vllm-qwen-coder';
+  return DEFAULT_PROFILE_NAME;
+};
+
+const applyProfile = (profile: ProfileEntry): void => {
+  setEnv(ENV.PROFILE, baseProfileFor(profile.backend));
+  setEnv(ENV.MODEL_ID, profile.modelId);
+  setEnv(ENV.BASE_URL, profile.baseUrl);
+  if (profile.ollama !== undefined) applyOllamaConfig(profile.ollama);
+  if (profile.openrouter !== undefined) applyOpenrouterConfig(profile.openrouter);
+  applyCaps(profile);
+};
+
+// Applies the named profile from the catalog (RUNNER_PROFILE base-builtin +
+// model id + base url + sampling/caps). No-op when the name is absent.
+export const applyProfileByName = (config: RunnerConfig, name: string): void => {
+  const profile = config.profiles?.[name];
+  if (profile !== undefined) applyProfile(profile);
+};
+
+// Config-authoritative role→profile override: if the agent's role names a
+// catalog profile, applies it OVER the baseline active-profile env. No-op
+// otherwise (manual --profile / active-profile selection stands).
+export const applyRoleProfile = (config: RunnerConfig | undefined, agentType: string): void => {
+  const name = config?.roleProfiles?.[agentType];
+  if (config !== undefined && name !== undefined) applyProfileByName(config, name);
+};
+
+const applyActiveProfile = (config: RunnerConfig): void => {
+  const name = config.activeProfile;
+  if (name !== undefined) applyProfileByName(config, name);
+};
+
+const applyRunnerConfig = (config: RunnerConfig): void => {
+  setEnv(ENV.DELEGATION, config.delegation);
+  setEnv(ENV.PROVIDER, config.provider);
+  setEnv(ENV.PROFILE, config.profile);
+  setEnv(ENV.MODEL_ID, config.modelId);
+  setNum(ENV.GENERATE_MAX_TOTAL_MS, config.generateMaxTotalMs);
+  applyCaps(config);
+  if (config.ollama !== undefined) applyOllamaConfig(config.ollama);
+  if (config.openrouter !== undefined) applyOpenrouterConfig(config.openrouter);
+  if (config.run !== undefined) applyCaps(config.run);
+  applyActiveProfile(config);
+};
+
+export const loadRunnerConfig = (path = 'runner.config.json'): RunnerConfig | undefined => {
+  if (!existsSync(path)) return undefined;
+  const parsed = RunnerConfigSchema.safeParse(JSON.parse(readFileSync(path, 'utf8')));
+  if (!parsed.success) {
+    console.error(`[runner] invalid runner.config.json: ${parsed.error.message}`);
+    return undefined;
+  }
+  applyRunnerConfig(parsed.data);
+  return parsed.data;
+};
+
+
+===== FILE: ts-agentic-code-runner/src/core/config/index.ts =====
+export type { RunnerConfig } from './config';
+export {
+  applyProfileByName,
+  applyRoleProfile,
+  DEFAULT_GENERATE_TIMEOUT_MS,
+  loadRunnerConfig,
+  RunnerConfigSchema
+} from './config';
+
+
+===== FILE: ts-agentic-code-runner/src/core/execution/__tests__/editRegion.test.ts =====
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import {
+  buildEditRegionDirective,
+  type FileReader,
+  resolveLargeFileLines
+} from '../editRegion';
+import type { TaskSpec } from '../executor';
+
+// ─── helpers ─────────────────────────────────────────────────────────────────
+
+const makeSpec = (overrides: Partial<TaskSpec> = {}): TaskSpec => ({
+  agentType: 'code-logic-writer',
+  navBundlePath: 'nav.json',
+  targetFiles: ['src/foo.ts'],
+  ...overrides,
+});
+
+const makeReader =
+  (files: Record<string, string>): FileReader =>
+    async (path: string): Promise<string | null> =>
+      files[path] ?? null;
+
+const lines = (n: number): string => Array.from({ length: n }, (_, i) => `line ${i}`).join('\n');
+
+// ─── resolveLargeFileLines ───────────────────────────────────────────────────
+
+describe('resolveLargeFileLines', () => {
+  afterEach(() => {
+    delete process.env.RUNNER_LARGE_FILE_LINES;
+  });
+
+  it('should return 300 when env var is not set', () => {
+    delete process.env.RUNNER_LARGE_FILE_LINES;
+    expect(resolveLargeFileLines()).toBe(300);
+  });
+
+  it('should return the parsed value when env var is a valid number', () => {
+    process.env.RUNNER_LARGE_FILE_LINES = '500';
+    expect(resolveLargeFileLines()).toBe(500);
+  });
+
+  it('should return default 300 when env var is NaN', () => {
+    process.env.RUNNER_LARGE_FILE_LINES = 'not-a-number';
+    expect(resolveLargeFileLines()).toBe(300);
+  });
+
+  it('should return default 300 when env var is an empty string (Number("") === 0 must not win)', () => {
+    delete process.env.RUNNER_MAX_WHOLE_WRITE_LINES;
+    process.env.RUNNER_LARGE_FILE_LINES = '';
+    expect(resolveLargeFileLines()).toBe(300);
+  });
+});
+
+// ─── buildEditRegionDirective — no large files ───────────────────────────────
+
+describe('buildEditRegionDirective — small files', () => {
+  it('should return empty string when target file is below threshold', async () => {
+    const reader = makeReader({ 'src/foo.ts': lines(10) });
+    const result = await buildEditRegionDirective(makeSpec(), reader);
+    expect(result).toBe('');
+  });
+
+  it('should return empty string when target file is missing (new file path)', async () => {
+    const reader = makeReader({});
+    const result = await buildEditRegionDirective(makeSpec(), reader);
+    expect(result).toBe('');
+  });
+
+  it('should return empty string when all files are exactly one line below threshold', async () => {
+    process.env.RUNNER_LARGE_FILE_LINES = '10';
+    const reader = makeReader({ 'src/foo.ts': lines(9) });
+    const result = await buildEditRegionDirective(makeSpec(), reader);
+    expect(result).toBe('');
+    delete process.env.RUNNER_LARGE_FILE_LINES;
+  });
+});
+
+// ─── buildEditRegionDirective — large files ───────────────────────────────────
+
+describe('buildEditRegionDirective — large files', () => {
+  beforeEach(() => {
+    process.env.RUNNER_LARGE_FILE_LINES = '10';
+  });
+  afterEach(() => {
+    delete process.env.RUNNER_LARGE_FILE_LINES;
+  });
+
+  it('should return non-empty string when a target file meets the threshold', async () => {
+    const reader = makeReader({ 'src/foo.ts': lines(10) });
+    const result = await buildEditRegionDirective(makeSpec(), reader);
+    expect(result.length).toBeGreaterThan(0);
+  });
+
+  it('should include the file path and line count in the directive', async () => {
+    const reader = makeReader({ 'src/foo.ts': lines(15) });
+    const result = await buildEditRegionDirective(makeSpec(), reader);
+    expect(result).toContain('src/foo.ts');
+    expect(result).toContain('15 lines');
+  });
+
+  it('should instruct to use the edit tool with unique anchor', async () => {
+    const reader = makeReader({ 'src/foo.ts': lines(15) });
+    const result = await buildEditRegionDirective(makeSpec(), reader);
+    expect(result).toContain('edit tool');
+    expect(result).toContain('unique anchor');
+  });
+
+  it('should instruct to NOT use the write tool', async () => {
+    const reader = makeReader({ 'src/foo.ts': lines(15) });
+    const result = await buildEditRegionDirective(makeSpec(), reader);
+    expect(result).toContain('Do NOT use the write tool');
+  });
+
+  it('should list existing top-level export names from the file', async () => {
+    const fileText = [
+      ...Array.from({ length: 10 }, (_, i) => `// filler line ${i}`),
+      'export const myFunc = () => {};',
+      'export type MyType = string;',
+    ].join('\n');
+    const reader = makeReader({ 'src/foo.ts': fileText });
+    const result = await buildEditRegionDirective(makeSpec(), reader);
+    expect(result).toContain('myFunc');
+    expect(result).toContain('MyType');
+  });
+
+  it('should include do not duplicate or remove text for existing exports', async () => {
+    const fileText = [
+      ...Array.from({ length: 10 }, (_, i) => `// filler ${i}`),
+      'export const fn = () => {};',
+    ].join('\n');
+    const reader = makeReader({ 'src/foo.ts': fileText });
+    const result = await buildEditRegionDirective(makeSpec(), reader);
+    expect(result).toContain('do not duplicate or remove');
+  });
+
+  it('should note no exports when file has no top-level export declarations', async () => {
+    const reader = makeReader({ 'src/foo.ts': lines(15) });
+    const result = await buildEditRegionDirective(makeSpec(), reader);
+    expect(result).toContain('No top-level exports detected');
+  });
+
+  it('should instruct to implement exactly what the failing test requires', async () => {
+    const reader = makeReader({ 'src/foo.ts': lines(15) });
+    const result = await buildEditRegionDirective(makeSpec(), reader);
+    expect(result).toContain('failing test requires');
+  });
+
+  it('should include the Large-file edit guidance header', async () => {
+    const reader = makeReader({ 'src/foo.ts': lines(15) });
+    const result = await buildEditRegionDirective(makeSpec(), reader);
+    expect(result).toContain('Large-file edit guidance');
+  });
+});
+
+// ─── buildEditRegionDirective — nav bundle apiContracts ──────────────────────
+
+describe('buildEditRegionDirective — nav bundle surface', () => {
+  beforeEach(() => {
+    process.env.RUNNER_LARGE_FILE_LINES = '10';
+  });
+  afterEach(() => {
+    delete process.env.RUNNER_LARGE_FILE_LINES;
+  });
+
+  it('should list apiContract names as surface to add when bundle has them', async () => {
+    const bundle = JSON.stringify({
+      apiContracts: [{ name: 'useFoo' }, { name: 'FooState' }],
+    });
+    const reader = makeReader({ 'src/foo.ts': lines(15), 'nav.json': bundle });
+    const result = await buildEditRegionDirective(makeSpec(), reader);
+    expect(result).toContain('useFoo');
+    expect(result).toContain('FooState');
+    expect(result).toContain('New or changed surface to add');
+  });
+
+  it('should omit the surface line when bundle has no apiContracts', async () => {
+    const bundle = JSON.stringify({});
+    const reader = makeReader({ 'src/foo.ts': lines(15), 'nav.json': bundle });
+    const result = await buildEditRegionDirective(makeSpec(), reader);
+    expect(result).not.toContain('New or changed surface to add');
+  });
+
+  it('should omit the surface line when nav bundle is missing', async () => {
+    const reader = makeReader({ 'src/foo.ts': lines(15) });
+    const result = await buildEditRegionDirective(makeSpec(), reader);
+    expect(result).not.toContain('New or changed surface to add');
+  });
+
+  it('should omit the surface line when bundle apiContracts have no name field', async () => {
+    const bundle = JSON.stringify({ apiContracts: [{ signature: 'foo(): void' }] });
+    const reader = makeReader({ 'src/foo.ts': lines(15), 'nav.json': bundle });
+    const result = await buildEditRegionDirective(makeSpec(), reader);
+    expect(result).not.toContain('New or changed surface to add');
+  });
+});
+
+// ─── buildEditRegionDirective — multiple target files ────────────────────────
+
+describe('buildEditRegionDirective — multiple target files', () => {
+  beforeEach(() => {
+    process.env.RUNNER_LARGE_FILE_LINES = '10';
+  });
+  afterEach(() => {
+    delete process.env.RUNNER_LARGE_FILE_LINES;
+  });
+
+  it('should emit a paragraph for each large file', async () => {
+    const reader = makeReader({
+      'src/foo.ts': lines(15),
+      'src/bar.ts': lines(20),
+    });
+    const spec = makeSpec({ targetFiles: ['src/foo.ts', 'src/bar.ts'] });
+    const result = await buildEditRegionDirective(spec, reader);
+    expect(result).toContain('src/foo.ts');
+    expect(result).toContain('src/bar.ts');
+  });
+
+  it('should skip small files and only emit for large ones', async () => {
+    const reader = makeReader({
+      'src/foo.ts': lines(5),
+      'src/bar.ts': lines(20),
+    });
+    const spec = makeSpec({ targetFiles: ['src/foo.ts', 'src/bar.ts'] });
+    const result = await buildEditRegionDirective(spec, reader);
+    expect(result).not.toContain('src/foo.ts');
+    expect(result).toContain('src/bar.ts');
+  });
+});
+
+
+===== FILE: ts-agentic-code-runner/src/core/execution/editRegion.test.ts =====
+import { resolve } from 'node:path';
+
+import

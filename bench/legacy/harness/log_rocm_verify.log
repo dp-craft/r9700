@@ -1,0 +1,7 @@
+### dpm=auto, build=/home/dev/work/dippe/amd/bench/llamacpp ###
+version: 1 (049326a)
+>>> fin35_rocm (ROCm/HIP $LC)
+{"model": "35B-A3B", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "f16", "ub": 2048, "batch": 8192, "flash_attn": "on", "ngl": 99, "backend": "ROCm-b1295", "mtp": false, "dpm": "auto", "runtime": "llamacpp", "label": "fin35_rocm", "prefill_tok_s": 1926.9, "decode_tok_s": 78.4, "prompt_tokens": 6987, "vram_used_mb": 22877}
+>>> fin27_rocm (ROCm/HIP $LC)
+{"model": "27B-MTP", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "f16", "ub": 2048, "batch": 8192, "flash_attn": "on", "ngl": 99, "backend": "ROCm-b1295", "mtp": false, "dpm": "auto", "runtime": "llamacpp", "label": "fin27_rocm", "prefill_tok_s": 888.3, "decode_tok_s": 29.0, "prompt_tokens": 6991, "vram_used_mb": 21020}
+=== rocm verify done ===

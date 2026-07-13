@@ -1,0 +1,25 @@
+WARNING: radv is not a conformant Vulkan implementation, testing use only.
+0.02.085.728 I cmn  common_param: common_params_print_info: verbosity = 3 (adjust with the `-lv N` CLI arg)
+0.02.087.198 I srv          init: The UI is disabled
+0.02.087.200 I srv          init: Use --ui/--no-ui (or deprecated --webui/--no-webui) to enable/disable
+0.02.088.908 I srv    load_model: loading model '/home/dev/models/gguf/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf'
+2.14.376.872 I srv    load_model: initializing, n_slots = 4, n_ctx_slot = 65536, kv_unified = 'true'
+2.14.437.060 I srv          init: chat template supports preserving reasoning, consider enabling it via --reasoning-preserve
+2.14.437.590 I srv  llama_server: model loaded
+2.14.437.595 I srv  llama_server: listening on http://127.0.0.1:8899
+2.15.858.201 I slot get_availabl: id  3 | task -1 | selected slot by LRU, t_last = -1
+2.15.858.247 I slot launch_slot_: id  3 | task 0 | processing task, is_child = 0
+2.21.652.036 I slot print_timing: id  3 | task 0 | n_decoded =    209, tg =  69.65 t/s, tg_3s =  69.65 t/s
+2.22.338.854 I slot print_timing: id  3 | task 0 | prompt eval time =    2792.91 ms /  6990 tokens (    0.40 ms per token,  2502.77 tokens per second)
+2.22.338.858 I slot print_timing: id  3 | task 0 |        eval time =    3687.55 ms /   256 tokens (   14.40 ms per token,    69.42 tokens per second)
+2.22.338.858 I slot print_timing: id  3 | task 0 |       total time =    6480.45 ms /  7246 tokens
+2.22.338.862 I slot print_timing: id  3 | task 0 |    graphs reused =        254
+2.22.339.025 I slot      release: id  3 | task 0 | stop processing: n_tokens = 7245, truncated = 0
+2.22.509.438 I slot get_availabl: id  2 | task -1 | selected slot by LRU, t_last = -1
+2.22.509.462 I slot launch_slot_: id  2 | task 259 | processing task, is_child = 0
+2.28.405.365 I slot print_timing: id  2 | task 259 | n_decoded =    247, tg =  82.08 t/s, tg_3s =  82.08 t/s
+2.28.501.671 I slot print_timing: id  2 | task 259 | prompt eval time =    2726.02 ms /  6990 tokens (    0.39 ms per token,  2564.18 tokens per second)
+2.28.501.676 I slot print_timing: id  2 | task 259 |        eval time =    3105.64 ms /   256 tokens (   12.13 ms per token,    82.43 tokens per second)
+2.28.501.676 I slot print_timing: id  2 | task 259 |       total time =    5831.66 ms /  7246 tokens
+2.28.501.677 I slot print_timing: id  2 | task 259 |    graphs reused =        507
+2.28.501.824 I slot      release: id  2 | task 259 | stop processing: n_tokens = 7245, truncated = 0

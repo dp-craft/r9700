@@ -1,0 +1,7 @@
+>>> vLLM vllm_35B_fp8 (kv=fp8)
+{"model": "35B-A3B-AWQ", "format": "AWQ 4-bit", "ctx": 65536, "kv_bits": "8", "gpu_mem_util": 0.92, "cudagraphs": true, "engine": "vLLM 0.19.1", "runtime": "vllm", "label": "vllm_35B_fp8", "prefill_tok_s": 545.3, "decode_tok_s": 8.6, "prompt_tokens": 6989, "vram_used_mb": 29262}
+>>> vLLM vllm_35B_fp16 (kv=fp16)
+{"model": "35B-A3B-AWQ", "format": "AWQ 4-bit", "ctx": 65536, "kv_bits": "16", "gpu_mem_util": 0.92, "cudagraphs": true, "engine": "vLLM 0.19.1", "runtime": "vllm", "label": "vllm_35B_fp16", "prefill_tok_s": 1048.0, "decode_tok_s": 19.7, "prompt_tokens": 6989, "vram_used_mb": 29202}
+>>> vLLM vllm_27B_fp8 (kv=fp8)
+  LOAD FAIL vllm_27B_fp8: (APIServer pid=1)   Value error, Quantization method specified in the model config (compressed-tensors) does not match the quantization method specified in the 
+=== vLLM phase done ===

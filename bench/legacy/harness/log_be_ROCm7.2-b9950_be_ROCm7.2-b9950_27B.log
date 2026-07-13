@@ -1,0 +1,10 @@
+0.00.033.068 I cmn  common_param: common_params_print_info: verbosity = 3 (adjust with the `-lv N` CLI arg)
+0.00.033.972 I srv          init: The UI is disabled
+0.00.033.975 I srv          init: Use --ui/--no-ui (or deprecated --webui/--no-webui) to enable/disable
+0.00.035.886 I srv    load_model: loading model '/home/dev/models/gguf/Qwen3.6-27B-Q4_K_S.gguf'
+0.51.906.472 I srv    load_model: initializing, n_slots = 4, n_ctx_slot = 65536, kv_unified = 'true'
+0.51.941.348 I srv          init: chat template supports preserving reasoning, consider enabling it via --reasoning-preserve
+0.51.942.023 I srv  llama_server: model loaded
+0.51.942.028 I srv  llama_server: listening on http://127.0.0.1:8899
+0.54.375.318 I slot get_availabl: id  3 | task -1 | selected slot by LRU, t_last = -1
+0.54.375.353 I slot launch_slot_: id  3 | task 0 | processing task, is_child = 0

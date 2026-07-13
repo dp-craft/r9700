@@ -1,0 +1,30 @@
+{"config": "jr-rb512", "task_id": "review-concurrency", "rep": 0, "correctness": 4, "depth": 4.5, "clarity": 4.5, "anchors_hit": [1, 2, 4]}
+{"config": "un-rb2048", "task_id": "review-concurrency", "rep": 0, "correctness": 5, "depth": 5, "clarity": 5, "anchors_hit": [1, 2, 3, 4]}
+{"config": "un-rb1024", "task_id": "review-concurrency", "rep": 0, "correctness": 5, "depth": 5, "clarity": 4.5, "anchors_hit": [1, 2, 3, 4]}
+{"config": "jr-rb0", "task_id": "review-concurrency", "rep": 0, "correctness": 4, "depth": 4, "clarity": 4.5, "anchors_hit": [1, 2, 4]}
+{"config": "un-pmin05", "task_id": "review-concurrency", "rep": 0, "correctness": 5, "depth": 4.5, "clarity": 4.5, "anchors_hit": [1, 2, 3, 4]}
+{"config": "un-nmax5", "task_id": "review-concurrency", "rep": 0, "correctness": 4, "depth": 4.5, "clarity": 4.5, "anchors_hit": [1, 2, 4]}
+{"config": "un-rb512", "task_id": "review-concurrency", "rep": 0, "correctness": 4.5, "depth": 3, "clarity": 4.5, "anchors_hit": [1, 2, 3, 4]}
+{"config": "un-pmin075", "task_id": "review-concurrency", "rep": 0, "correctness": 5, "depth": 5, "clarity": 4.5, "anchors_hit": [1, 2, 3, 4]}
+{"config": "jr-rb2048", "task_id": "review-concurrency", "rep": 0, "correctness": 5, "depth": 4.5, "clarity": 4.5, "anchors_hit": [1, 2, 3, 4]}
+{"config": "jr-rb1024", "task_id": "review-concurrency", "rep": 0, "correctness": 5, "depth": 4, "clarity": 5, "anchors_hit": [1, 2, 3, 4]}
+{"config": "un-rb512", "task_id": "design-ratelimiter", "rep": 0, "correctness": 4, "depth": 3.5, "clarity": 4.5, "anchors_hit": [1, 2, 3, 4]}
+{"config": "jr-rb0", "task_id": "design-ratelimiter", "rep": 0, "correctness": 5, "depth": 5, "clarity": 5, "anchors_hit": [1, 2, 3, 4]}
+{"config": "un-pmin05", "task_id": "design-ratelimiter", "rep": 0, "correctness": 0, "depth": 0, "clarity": 0, "anchors_hit": []}
+{"config": "un-pmin075", "task_id": "design-ratelimiter", "rep": 0, "correctness": 3, "depth": 2, "clarity": 2, "anchors_hit": [1, 2, 3, 4]}
+{"config": "un-rb1024", "task_id": "design-ratelimiter", "rep": 0, "correctness": 5, "depth": 4.5, "clarity": 4.5, "anchors_hit": [1, 2, 3, 4]}
+{"config": "jr-rb2048", "task_id": "design-ratelimiter", "rep": 0, "correctness": 4, "depth": 4, "clarity": 4.5, "anchors_hit": [1, 2, 3, 4]}
+{"config": "un-rb2048", "task_id": "design-ratelimiter", "rep": 0, "correctness": 4, "depth": 4, "clarity": 4.5, "anchors_hit": [1, 2, 3, 4]}
+{"config": "un-nmax5", "task_id": "design-ratelimiter", "rep": 0, "correctness": 4.5, "depth": 4, "clarity": 4.5, "anchors_hit": [1, 2, 3, 4]}
+{"config": "jr-rb1024", "task_id": "design-ratelimiter", "rep": 0, "correctness": 3.5, "depth": 4, "clarity": 4.5, "anchors_hit": [1, 2, 3]}
+{"config": "jr-rb512", "task_id": "design-ratelimiter", "rep": 0, "correctness": 3, "depth": 3.5, "clarity": 4, "anchors_hit": [1, 2, 3]}
+{"config": "un-rb2048", "task_id": "agentic-plan", "rep": 0, "correctness": 5, "depth": 4.5, "clarity": 5, "anchors_hit": [1, 2, 3, 4]}
+{"config": "un-pmin075", "task_id": "agentic-plan", "rep": 0, "correctness": 5, "depth": 5, "clarity": 4.5, "anchors_hit": [1, 2, 3, 4]}
+{"config": "jr-rb1024", "task_id": "agentic-plan", "rep": 0, "correctness": 5, "depth": 5, "clarity": 5, "anchors_hit": [1, 2, 3, 4]}
+{"config": "jr-rb0", "task_id": "agentic-plan", "rep": 0, "correctness": 5, "depth": 4.5, "clarity": 4.5, "anchors_hit": [1, 2, 3, 4]}
+{"config": "un-nmax5", "task_id": "agentic-plan", "rep": 0, "correctness": 4.5, "depth": 4, "clarity": 4.5, "anchors_hit": [1, 2, 3, 4]}
+{"config": "jr-rb2048", "task_id": "agentic-plan", "rep": 0, "correctness": 4.5, "depth": 3.5, "clarity": 4, "anchors_hit": [1, 2, 3, 4]}
+{"config": "un-rb1024", "task_id": "agentic-plan", "rep": 0, "correctness": 5, "depth": 5, "clarity": 5, "anchors_hit": [1, 2, 3, 4]}
+{"config": "jr-rb512", "task_id": "agentic-plan", "rep": 0, "correctness": 4.5, "depth": 3.5, "clarity": 4, "anchors_hit": [1, 2, 3, 4]}
+{"config": "un-pmin05", "task_id": "agentic-plan", "rep": 0, "correctness": 5, "depth": 5, "clarity": 4.5, "anchors_hit": [1, 2, 3, 4]}
+{"config": "un-rb512", "task_id": "agentic-plan", "rep": 0, "correctness": 5, "depth": 4.5, "clarity": 4, "anchors_hit": [1, 2, 3, 4]}

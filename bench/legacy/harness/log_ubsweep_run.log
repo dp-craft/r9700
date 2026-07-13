@@ -1,0 +1,21 @@
+>>> llama.cpp ub_35B_512 (kv=f16 ub=512 b=2048)
+{"model": "35B-A3B", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "f16", "ub": 512, "batch": 2048, "flash_attn": "on", "ngl": 99, "backend": "ROCm/HIP", "mtp": false, "runtime": "llamacpp", "label": "ub_35B_512", "prefill_tok_s": 1434.0, "decode_tok_s": 77.3, "prompt_tokens": 6989, "vram_used_mb": 22611}
+>>> llama.cpp ub_35B_1024 (kv=f16 ub=1024 b=2048)
+{"model": "35B-A3B", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "f16", "ub": 1024, "batch": 2048, "flash_attn": "on", "ngl": 99, "backend": "ROCm/HIP", "mtp": false, "runtime": "llamacpp", "label": "ub_35B_1024", "prefill_tok_s": 1702.2, "decode_tok_s": 76.9, "prompt_tokens": 6987, "vram_used_mb": 22823}
+>>> llama.cpp ub_35B_2048 (kv=f16 ub=2048 b=2048)
+{"model": "35B-A3B", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "f16", "ub": 2048, "batch": 2048, "flash_attn": "on", "ngl": 99, "backend": "ROCm/HIP", "mtp": false, "runtime": "llamacpp", "label": "ub_35B_2048", "prefill_tok_s": 1730.9, "decode_tok_s": 76.4, "prompt_tokens": 6987, "vram_used_mb": 23084}
+>>> llama.cpp ub_35B_4096 (kv=f16 ub=4096 b=4096)
+{"model": "35B-A3B", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "f16", "ub": 4096, "batch": 4096, "flash_attn": "on", "ngl": 99, "backend": "ROCm/HIP", "mtp": false, "runtime": "llamacpp", "label": "ub_35B_4096", "prefill_tok_s": 1812.2, "decode_tok_s": 75.8, "prompt_tokens": 6987, "vram_used_mb": 23613}
+>>> llama.cpp ub_35B_8192 (kv=f16 ub=8192 b=8192)
+{"model": "35B-A3B", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "f16", "ub": 8192, "batch": 8192, "flash_attn": "on", "ngl": 99, "backend": "ROCm/HIP", "mtp": false, "runtime": "llamacpp", "label": "ub_35B_8192", "prefill_tok_s": 1599.8, "decode_tok_s": 72.2, "prompt_tokens": 6988, "vram_used_mb": 24670}
+>>> llama.cpp ub_27B_512 (kv=f16 ub=512 b=2048)
+{"model": "27B-MTP", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "f16", "ub": 512, "batch": 2048, "flash_attn": "on", "ngl": 99, "backend": "ROCm/HIP", "mtp": false, "runtime": "llamacpp", "label": "ub_27B_512", "prefill_tok_s": 834.8, "decode_tok_s": 29.0, "prompt_tokens": 6987, "vram_used_mb": 20673}
+>>> llama.cpp ub_27B_1024 (kv=f16 ub=1024 b=2048)
+{"model": "27B-MTP", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "f16", "ub": 1024, "batch": 2048, "flash_attn": "on", "ngl": 99, "backend": "ROCm/HIP", "mtp": false, "runtime": "llamacpp", "label": "ub_27B_1024", "prefill_tok_s": 857.9, "decode_tok_s": 28.9, "prompt_tokens": 6988, "vram_used_mb": 20859}
+>>> llama.cpp ub_27B_2048 (kv=f16 ub=2048 b=2048)
+{"model": "27B-MTP", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "f16", "ub": 2048, "batch": 2048, "flash_attn": "on", "ngl": 99, "backend": "ROCm/HIP", "mtp": false, "runtime": "llamacpp", "label": "ub_27B_2048", "prefill_tok_s": 865.2, "decode_tok_s": 28.8, "prompt_tokens": 6987, "vram_used_mb": 21230}
+>>> llama.cpp ub_27B_4096 (kv=f16 ub=4096 b=4096)
+{"model": "27B-MTP", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "f16", "ub": 4096, "batch": 4096, "flash_attn": "on", "ngl": 99, "backend": "ROCm/HIP", "mtp": false, "runtime": "llamacpp", "label": "ub_27B_4096", "prefill_tok_s": 839.0, "decode_tok_s": 28.8, "prompt_tokens": 6987, "vram_used_mb": 21973}
+>>> llama.cpp ub_27B_8192 (kv=f16 ub=8192 b=8192)
+{"model": "27B-MTP", "format": "GGUF Q4", "ctx": 65536, "kv_bits": "f16", "ub": 8192, "batch": 8192, "flash_attn": "on", "ngl": 99, "backend": "ROCm/HIP", "mtp": false, "runtime": "llamacpp", "label": "ub_27B_8192", "prefill_tok_s": 848.7, "decode_tok_s": 28.8, "prompt_tokens": 6988, "vram_used_mb": 23471}
+=== ub sweep done ===

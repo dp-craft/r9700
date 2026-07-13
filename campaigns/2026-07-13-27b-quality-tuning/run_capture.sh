@@ -116,4 +116,11 @@ stop_cur
 echo "=== deterministic scoring ==="
 python3 "$FT/graders/score_deterministic.py" --tasks "$TASKS" --outputs "$OUT" \
   --out "$OUTDIR/scores_deterministic.jsonl" || true
+
+echo "=== charts (make_charts.py; judge charts fill in after Phase B) ==="
+# canonical config order for palette + row order (make_charts appends any config not listed here).
+CHART_ORDER='jr-t06,jr-t10,jr-t07,jr-rb2048,jr-rb1024,jr-rb512,jr-rb0,jr-q8,un-t06,un-t10,un-t07,un-rb2048,un-rb1024,un-rb512,un-pmin05,un-pmin075,un-nmax5'
+python3 "$FT/make_charts.py" --dir "$OUTDIR" --charts "$HERE/charts" --order "$CHART_ORDER" || true
+
 echo "done. Phase B (LLM-judge of the 3 rubric tasks) + Phase C (aggregate/write-up) are Claude's — see README."
+echo "  (re-run the make_charts.py line above after Phase B writes out/judge_scores.jsonl to populate the judge charts.)"
