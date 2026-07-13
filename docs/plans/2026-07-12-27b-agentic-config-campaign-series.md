@@ -68,8 +68,15 @@ regression; hauhau ran away twice; rico fabricated + leaked thinking. **All at t
   and transfers to jackrong — re-confirmed in C2 B0). ~15–20 min + the two documented extra passes.
 - **Output → C2 input:** a frozen substrate = `{backend, kv, ub/b, cache flags, MTP-for-speed?}`.
 
-## Campaign 2 — Sampling + thinking + MTP-quality on HARD tasks  *(SCAFFOLDED, ready to run)*
+## Campaign 2 — Sampling + thinking + MTP-quality on HARD tasks  *(DONE — partial; see analysis.md)*
 `campaigns/2026-07-13-27b-quality-tuning/` · runs on **C1's frozen substrate**, both models.
+**Result (10/13 configs, temp 0.6):** `--reasoning-budget` is the master economy knob — capping costs **0%** deterministic
+accuracy and gives **0% runaway** while cutting tokens/latency 40–55%; optimum plateau **1024–2048** (`512` starves
+design tasks). **`--reasoning-budget 0` = uncapped, not no-think.** **MTP-draft tuning backfired** (uncapped → 7.1%
+runaway, 91% det); keep defaults. **unsloth-MTP** is the better substrate (2.25× decode + top quality). **The 3 skipped
+configs (temp-1.0, temp-0.7, KV-q8) were re-judged low-value and dropped** (temp 1.0 = known-bad strawman → challenge #1
+answered by inference: runaway is uncapped-thinking, not temperature; jackrong-uncapped = `jr-rb0`, already have; q8 already
+rejected in C1). **Real remaining gaps → C3/C4 below.**
 **Scaffold:** `configs.jsonl` (13 server configs × 17 sampling points), `tasks/tasks.jsonl` (14 hard
 tasks — deterministic answers verified), `run_capture.sh` (config-sweep driver reusing
 finetune-quality's `capture.py`+`graders`). Custom driver, not `gen_campaign.py` (that emits
@@ -89,21 +96,32 @@ throughput probes, not the quality/judge flow — see the campaign README).
 - **B5** KV q8_0 quality spot-check at the chosen config.
 - **Output:** the quality config = `{sampling, reasoning-budget, MTP-quality settings}` per model.
 
-## Campaign 3 — vLLM / AITER feasibility spike  *(parallel, timeboxed, high-risk)*
-Behind a hard **Gate 0**: can vLLM ROCm even load Qwen3.6-27B and emit a token at a usable rate on
-gfx1201? Expect FP8→FP32 fallback (see the vLLM/AITER research doc). If it won't load or runs <½ the
-llama.cpp-Vulkan decode rate, **STOP and document**. Only if it passes: compare AITER-off / Triton-FA
-/ unified-attn vs the llama.cpp baseline. Revisit when upstream lands gfx1201 in AITER's arch table.
+## Campaign 3 — Quality at agentic DEPTH  *(NEXT — the decision-blocker)*
+`campaigns/<date>-27b-quality-at-depth/` · the C2 knobs were tuned on ~50–100-token prompts; the real
+operating point is **10–50K context** (system rules + code). Re-measure the finalists (`un-rb1024`,
+`un-rb2048`, `jr-rb1024`) at context **{8K, 16K, 32K}** via `run_capture.sh`'s `CONTEXT_PREFIX`, with
+**`REPS=3`** (break the reps=1 noise on the budget ranking) and the **KV-q8 quality spot-check placed here**
+(where its VRAM saving is real). Answers: (a) does the optimal `--reasoning-budget` rise with depth? (b) does
+rule-following survive lost-in-the-middle? (c) q8 accuracy at depth. **Prereq tooling** (extend, don't fork):
+a `multi_constraint` grader in `score_deterministic.py` (the current one saturates at 100% → can't
+discriminate "several rules" adherence) and `min_p`/`presence_penalty` in `capture.py` (Qwen's
+anti-repetition knobs, on-target for the runaway).
 
-## Final synthesis (deliverable)
-Combine **C1 substrate + C2 quality** into one recommended launch line per model, then validate
-end-to-end on the full hard agentic eval + a real multi-turn tool-use scenario. That validated combo
-is the goal: *a good, stable config for heavy agentic coding.*
+## Campaign 4 — Multi-turn tool-use validation  *(the acceptance test / deliverable)*
+The goal says *tool use*; everything so far is single-turn. Run one realistic **read→edit→test loop**
+(5–10 turns, tool results fed back, prefix cache on) with the C3 winner: verify mid-session stability, that
+C1's 13.7× prefix-cache win holds across turns, and rule adherence throughout. Passing this = *the* stable
+agentic-coding config, per model.
 
-## Execution order (new session)
-1. `bash campaigns/2026-07-12-27b-serving-substrate/run.sh` → write up with **benchmark-results** →
-   freeze the substrate.
-2. Build the hard agentic eval; scaffold Campaign 2 with **benchmark-new-campaign** on the frozen
-   substrate; run B0–B5; write up.
-3. (Parallel) Campaign 3 Gate 0.
-4. Synthesis + end-to-end validation.
+## Campaign 5 (optional, low-priority) — vLLM / AITER feasibility spike
+**Skip unless a vLLM-ROCm env already exists** — the research doc already predicts the answer (AITER dead on
+gfx1201, FP8→FP32 fallback). If installed, a ~15-min **Gate 0** (loads + emits a token at ≥½ the llama.cpp-Vulkan
+decode rate?) is the whole spike; otherwise not worth a build-from-scratch. Revisit when upstream lands gfx1201
+in AITER's arch table.
+
+## Execution order (updated)
+1. ~~C1 substrate~~ **DONE** (frozen: Vulkan · f16 · MTP-on).
+2. ~~C2 quality knobs~~ **DONE** (cap reasoning-budget; unsloth-MTP; keep MTP-draft defaults). Skipped configs dropped as low-value.
+3. **C3 quality-at-depth** (finalists × {8K,16K,32K} × REPS=3 + q8@depth) — after the grader/capture extensions. ← next
+4. **C4 multi-turn tool-use** validation → the deliverable.
+5. (Optional) C5 vLLM Gate-0, only if already installed.
