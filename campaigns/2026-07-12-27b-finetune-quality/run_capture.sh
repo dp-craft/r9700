@@ -13,7 +13,7 @@ REPO="$(cd "$HERE/../.." && pwd)"
 SERVE="$REPO/bench/engine-bench/serve_llamacpp.sh"
 
 : "${MODELS_DIR:=/home/dev/models/gguf}"
-: "${PORT:=8081}" ; : "${CTX:=32768}" ; : "${KV:=f16}" ; : "${UB:=2048}" ; : "${B:=4096}"
+: "${PORT:=8081}" ; : "${CTX:=132768}" ; : "${KV:=f16}" ; : "${UB:=2048}" ; : "${B:=4096}"
 : "${REPS:=1}" ; : "${MAX_TOKENS:=8192}" ; : "${BACKEND:=vulkan}"   # generous: thinking models burn 1000s of tokens
 OUTDIR="$HERE/out" ; mkdir -p "$OUTDIR/done"
 OUT="$OUTDIR/outputs.jsonl" ; VRAM="$OUTDIR/vram.jsonl"

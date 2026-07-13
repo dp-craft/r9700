@@ -1,0 +1,5 @@
+{"kind": "request", "label": "hip-dec-think", "engine": "llamacpp-rocm", "rep": 0, "stream": 0, "concurrency": 1, "prefix_mode": "unique", "error": "<urlopen error [Errno 111] Connection refused>"}
+{"kind": "request", "label": "hip-dec-think", "engine": "llamacpp-rocm", "rep": 1, "stream": 0, "concurrency": 1, "prefix_mode": "unique", "error": "<urlopen error [Errno 111] Connection refused>"}
+{"kind": "request", "label": "hip-dec-think", "engine": "llamacpp-rocm", "rep": 2, "stream": 0, "concurrency": 1, "prefix_mode": "unique", "error": "<urlopen error [Errno 111] Connection refused>"}
+{"kind": "aggregate", "label": "hip-dec-think", "engine": "llamacpp-rocm", "error": "all requests failed"}
+{"kind": "gpu", "label": "hip-dec-think", "vram_used_mib_at_load": 604, "peak_vram_mib": 615, "peak_gtt_mib": 82, "avg_power_w": 12.7}

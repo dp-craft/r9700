@@ -143,6 +143,36 @@ def emit_runsh(spec):
     ad('      | tee -a "$CAMPAIGN_DIR/skipped.txt"; return 1; fi')
     ad('  return 0; }')
     ad("")
+    ad("ensure_fixtures () {  # auto-build any missing prompt fixture from its canonical recipe")
+    ad('  local WL="$ROOT/bench/workloads" name n k')
+    ad('  for name in "$@"; do')
+    ad('    [ -f "$GEN/$name" ] && continue')
+    ad('    echo ">>> building missing fixture: $name"')
+    ad('    case "$name" in')
+    ad('      codereview-*.txt)')
+    ad('        n="${name#codereview-}"; n="${n%.txt}"')
+    ad('        python3 "$WL/build_prompt.py" --task "$WL/tasks/codereview-large.task.md" \\')
+    ad('          --src "$WL/corpus/ts-agentic-code-runner" --src "$WL/corpus/py-rich" \\')
+    ad('          --target-tokens "$n" --out "$GEN/$name" ;;')
+    ad('      thinking-hard.txt)')
+    ad('        python3 "$WL/build_prompt.py" --task "$WL/tasks/thinking-hard.prompt.txt" \\')
+    ad('          --target-tokens 0 --out "$GEN/thinking-hard.txt" ;;')
+    ad('      agentic-*-v*.txt)  # variant set: build the base with enough --variants (writes v1..vK)')
+    ad('        n="${name#agentic-}"; n="${n%%-v*}"; k="${name##*-v}"; k="${k%.txt}"')
+    ad('        python3 "$WL/build_prompt.py" --task "$WL/tasks/agentic-implement.task.md" \\')
+    ad('          --src "$WL/corpus/ts-agentic-code-runner" --target-tokens "$n" \\')
+    ad('          --variants "$k" --out "$GEN/agentic-$n.txt" ;;')
+    ad('      agentic-*.txt)')
+    ad('        n="${name#agentic-}"; n="${n%.txt}"')
+    ad('        python3 "$WL/build_prompt.py" --task "$WL/tasks/agentic-implement.task.md" \\')
+    ad('          --src "$WL/corpus/ts-agentic-code-runner" --target-tokens "$n" --out "$GEN/$name" ;;')
+    ad('      *)')
+    ad('        echo "FIXTURE-UNKNOWN: no build recipe for \'$name\' — build it by hand (see" \\')
+    ad('             "bench/workloads/README.md) and re-run" >&2; exit 1 ;;')
+    ad('    esac')
+    ad('    [ -f "$GEN/$name" ] || { echo "FIXTURE-BUILD-FAILED: $name" >&2; exit 1; }')
+    ad('  done; }')
+    ad("")
     ad("run_probe () {  # slug conc reps max_tokens api prefix prompt_files...")
     ad("  local slug=$1 conc=$2 reps=$3 maxt=$4 api=$5 prefix=$6; shift 6")
     ad('  if [ -f "$CAMPAIGN_DIR/done/$slug" ]; then echo "  skip (done): $slug"; return 0; fi')
@@ -169,6 +199,11 @@ def emit_runsh(spec):
     ad('    | tee -a "$CAMPAIGN_DIR/failures.txt"; stop_server; return 1; }')
     ad('trap stop_server EXIT')
     ad("")
+    fixtures = sorted({f for srv in spec["servers"] for p in srv["probes"] for f in p["prompts"]})
+    if fixtures:
+        ad("# --- pre-flight: build any missing prompt fixtures before loading a model ---")
+        ad("ensure_fixtures " + " ".join(sh_quote(f) for f in fixtures))
+        ad("")
 
     for srv in spec["servers"]:
         pslugs = [p["slug"] for p in srv["probes"]]
@@ -230,9 +265,12 @@ Scaffolded by `bench/gen_campaign.py`. The executable driver is **`run.sh`** in 
   tuning `-ub {tune.get('ub',2048)} -b {tune.get('b',4096)} -fa {tune.get('fa','on')}` ·
   server on :{spec.get('port', BACKEND_PORT.get(spec.get('backend','vulkan'),8080))}.
 
-## Build fixtures first
-Build every prompt file referenced below into `bench/workloads/generated/` with
-`build_prompt.py` (see `docs/GUIDE.md` §2). The driver assumes they exist.
+## Fixtures (auto-built)
+`run.sh` **auto-builds any missing prompt fixture** into `bench/workloads/generated/` from its
+canonical recipe (`build_prompt.py`) as a pre-flight step, before loading any model — no manual
+step. Known patterns: `codereview-<N>.txt`, `thinking-hard.txt`, `agentic-<N>[-v<k>].txt`. An
+unrecognized filename fails loudly with a pointer to `bench/workloads/README.md` (add its recipe
+to `ensure_fixtures` in `gen_campaign.py` to support a new pattern).
 
 ## Run
 ```bash

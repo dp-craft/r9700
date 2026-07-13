@@ -77,9 +77,40 @@ them wastes tokens and tells you nothing. Structure/results live in the files ab
    Reserve the expensive model for synthesis and judgement. Keep bulk data in JSONL, not prose.
 5. **Documentation is uniform.** Reports → `docs/{research,analysis}/YYYY-MM-DD-HHMM-<slug>.md`,
    English, **summary + table first**, full detail below. Register every new file in `docs/INDEX.md`.
-6. **Use the skills, don't improvise.** `/benchmark-results` to run+document a measurement
-   (`/benchmark-new-campaign` to plan+scaffold a campaign first); `/research`
-   to gather external knowledge. They encode the deterministic output contract.
+6. **Tools & skills first — improvising is a last resort, not a shortcut.** Every recurring job in
+   this repo has a **deterministic tool or a skill** that owns it (registry below). Route the task
+   through it. **Do NOT hand-write files (drivers, spec.json, run.sh, fixtures, reports, charts) that
+   a tool/skill would produce** — that was the mistake behind *"why are you writing instead of
+   calling the proper tool?"*. Before writing any such file by hand you MUST, in order:
+   (a) **name the tool/skill** that should cover it and invoke it; (b) if it *almost* fits, run it
+   and hand-edit only the genuine gap; (c) only if nothing fits, **stop and state explicitly** —
+   "no tool covers X because Y" — and **recommend the tool/skill improvement** (e.g. "add a
+   `multi_constraint` grader to `score_deterministic.py`", "teach `gen_campaign.py` a quality track")
+   *before* proceeding to write by hand. "It was faster to write it" is not a valid reason.
+   Skills: **`/benchmark-new-campaign`** (plan+scaffold a campaign) → **`/benchmark-results`**
+   (run+document, memory column mandatory) → **`/research`** (external knowledge → `docs/research/`).
+   Legit hand-written exception (must be stated): a **quality** campaign's driver, because
+   `gen_campaign.py` only emits *throughput* probes — reuse `capture.py`+`graders/` (finetune-quality
+   pattern), don't reinvent them.
+
+## Tools — the deterministic layer (use these, never hand-roll their output)
+
+| Need | Tool (invoke, don't reimplement) | Emits |
+|------|----------------------------------|-------|
+| Scaffold a campaign (throughput matrix) | **`/benchmark-new-campaign`** → `bench/gen_campaign.py emit --spec …` | `spec.json` → resumable `run.sh` (VRAM guard + **auto-builds missing fixtures**) + README |
+| KV geometry / max-ctx / `vram` block (HYBRID-aware) | `bench/gguf_kv.py MODEL.gguf --weights-gib G` | KiB/tok f16+q8, max ctx, paste-ready guard block |
+| Quick VRAM↔ctx what-if | `bench/gen_campaign.py vram-ctx --weights-gib G --kv-kib-per-tok K --budget-mib M` | max ctx |
+| Build a prompt fixture (code/agentic/thinking, N tokens) | `bench/workloads/build_prompt.py --task … --src corpus/… --target-tokens N` | `generated/<name>.txt` (also auto-built by campaign `run.sh`) |
+| Find THE tuning optimum (one engine, bracket + KV ≤5%) | `bench/model-bench/sweep.py` | `sweep-summary.json` |
+| Probe a live server (prefill/decode/ttft/concurrency) | `bench/engine-bench/openai_probe.py` (via `run.sh`) | `results.jsonl` |
+| Launch a parameterized llama-server (BACKEND/MTP/KV/**EXTRA_ARGS**) | `bench/engine-bench/serve_llamacpp.sh` | running server + `/props` |
+| Sample VRAM/GTT/power/thermal | `bench/lib/vram_sampler.py --out CSV` | `gpu_samples.csv` |
+| Run dir → self-contained HTML report | `bench/lib/report.py` | `report.html` |
+| Quality capture (per-task replies + tokens/ttfa/flags) | `campaigns/2026-07-12-27b-finetune-quality/capture.py` | `outputs.jsonl` |
+| Grade deterministic tasks (final_match/pyexec/json_schema/constraints) | `…/finetune-quality/graders/score_deterministic.py` | `scores_deterministic.jsonl` |
+
+If one of these is missing a capability, **extend the tool** (and say so) rather than writing a
+one-off replacement. New reusable capability → propose a skill/tool change, don't fork logic.
 
 ## Where to find things (quick answers)
 

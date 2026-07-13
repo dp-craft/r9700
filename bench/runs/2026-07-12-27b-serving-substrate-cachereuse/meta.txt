@@ -1,0 +1,5 @@
+date=2026-07-13T08:30:16+02:00
+model=/home/dev/models/gguf/Qwen3.6-27B-MTP-Q4_K_M.gguf
+backend=vulkan
+tuning=ub2048 b4096 faon
+vram_budget_mib=32400

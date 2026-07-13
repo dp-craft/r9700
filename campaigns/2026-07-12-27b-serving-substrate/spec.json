@@ -1,0 +1,32 @@
+{
+  "slug": "27b-serving-substrate",
+  "date": "2026-07-12",
+  "title": "27B serving substrate — real prefill curve, KV f16/q8_0, MTP decode, cache reuse",
+  "model": "/home/dev/models/gguf/Qwen3.6-27B-MTP-Q4_K_M.gguf",
+  "backend": "vulkan",
+  "port": 8081,
+  "tuning": {"ub": 2048, "b": 4096, "fa": "on"},
+  "vram": {"weights_gib": 15.93, "kv_kib_per_tok": {"f16": 64, "q8_0": 34}, "budget_mib": 32400, "overhead_mib": 2000},
+  "notes": "Round-1 (quality-independent) substrate. Runs on the unsloth-MTP build because it uniquely carries the MTP axis; the prefill/KV/cache substrate is arch+quant-determined and transfers to jackrong (confirmed in Campaign 2 B0). All probes measure throughput/latency only (no judge). Depths 8/32/64K per user. Cache-reuse KV-shift variant + HIP spot-check are documented EXTRA_ARGS / BACKEND re-runs in the README (backend + server flags are global, not per-server).",
+  "servers": [
+    {"name": "sub-f16", "ctx": 65536, "np": 1, "kv": "f16", "mtp": 0,
+     "probes": [
+       {"slug": "pf-cr8000",     "prompts": ["codereview-8000.txt"],  "max_tokens": 256, "api": "completions", "prefix_mode": "unique", "reps": 3},
+       {"slug": "pf-cr32000",    "prompts": ["codereview-32000.txt"], "max_tokens": 256, "api": "completions", "prefix_mode": "unique", "reps": 3},
+       {"slug": "pf-cr64000",    "prompts": ["codereview-64000.txt"], "max_tokens": 256, "api": "completions", "prefix_mode": "unique", "reps": 3},
+       {"slug": "warm-cr32000",  "prompts": ["codereview-32000.txt"], "max_tokens": 256, "api": "completions", "prefix_mode": "shared", "reps": 4},
+       {"slug": "dec-think",     "prompts": ["thinking-hard.txt"],    "max_tokens": 512, "api": "chat",        "prefix_mode": "unique", "reps": 3}
+     ]},
+    {"name": "sub-q8", "ctx": 65536, "np": 1, "kv": "q8_0", "mtp": 0,
+     "probes": [
+       {"slug": "pf-cr32000-q8", "prompts": ["codereview-32000.txt"], "max_tokens": 256, "api": "completions", "prefix_mode": "unique", "reps": 3},
+       {"slug": "pf-cr64000-q8", "prompts": ["codereview-64000.txt"], "max_tokens": 256, "api": "completions", "prefix_mode": "unique", "reps": 3},
+       {"slug": "dec-think-q8",  "prompts": ["thinking-hard.txt"],    "max_tokens": 512, "api": "chat",        "prefix_mode": "unique", "reps": 3}
+     ]},
+    {"name": "sub-mtp1", "ctx": 65536, "np": 1, "kv": "f16", "mtp": 1,
+     "probes": [
+       {"slug": "pf-cr32000-mtp1", "prompts": ["codereview-32000.txt"], "max_tokens": 256, "api": "completions", "prefix_mode": "unique", "reps": 3},
+       {"slug": "dec-think-mtp1",  "prompts": ["thinking-hard.txt"],    "max_tokens": 512, "api": "chat",        "prefix_mode": "unique", "reps": 3}
+     ]}
+  ]
+}
