@@ -139,13 +139,18 @@ graded across three capability tiers (data: `calibration-hard.jsonl`):
 | task | kind | haiku | Sonnet | Opus-high | tier |
 |------|------|:---:|:---:|:---:|---------|
 | `shape-variant` | multi-file union refactor + exhaustiveness | 1.0 P | 1.0 P | 1.0 P | **rejected — too easy** |
-| `store-remove` | indirect coupling: keep a derived cache consistent | 0.812 F | 1.0 P | 1.0 P | **Sonnet-tier** (haiku fails on types) |
+| `store-remove` | indirect coupling: keep a derived cache consistent | 0.812 F | 1.0 P | 1.0 P | **Sonnet-tier** |
+| `deep-equal` | recursive structural equality over `unknown` (type-guards) | 0.792 F | 1.0 P | 0.982 P | **Sonnet-tier** |
 | `async-memo` | async dedup + don't-cache-failures + strict lint | 0.667 F | 0.625 F | **1.0 P** | **Opus-only** |
+| `expr-eval` | recursive-descent parser + Result error handling | 0.667 F | 0.667 F | **0.833 F** | **Opus-tier** (Opus clearly best; strict-lint wall even Opus doesn't fully clear one-shot) |
 
-This gives a deliberate **difficulty spread** so the 27B configs have somewhere to land at every capability
-level: easy controls (`count-words`, `shape-variant`), Sonnet-tier (`lru-cache`, `rate-limiter`,
-`store-remove`), and one Opus-only ceiling (`async-memo`). The three hard tasks are also *different in kind*
-(time+eviction, indirect cache coupling, async concurrency) so a config can't win by being good at one trick.
+This gives a deliberate **difficulty spread** so the 27B configs have somewhere to land at every level:
+easy controls (`count-words`, `shape-variant`); **Sonnet-tier** (`lru-cache`, `rate-limiter`, `store-remove`,
+`deep-equal`); and two **Opus-tier** ceilings (`async-memo`, `expr-eval`). The hard tasks are also *different
+in kind* — time+eviction, indirect cache coupling, async concurrency, recursive parsing, structural recursion
+— so a config can't win by being good at one trick. `expr-eval` is the ceiling: even Opus-high fails strict
+lint one-shot (legit rules: template-expression typing, optional-chain, boolean-compare — a clean reference
+exists), so it has resolution at the very top and is where the reasoning-budget sweep should show the most lift.
 
 Two lessons, both useful for authoring the rest of the set:
 1. **Compiler-guided refactors are easy.** Adding a variant to a discriminated union with `assertNever`
