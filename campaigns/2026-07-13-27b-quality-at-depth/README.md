@@ -13,6 +13,15 @@ Research: `docs/research/2026-07-13-1712-hard-ts-quality-benchmark-design.md`.*
   **Stress test (`selftest`) PASSES**: good=**1.0** (hard-pass) > mediocre=**0.357** (partial: tests/bdd/novj pass;
   types/lint/reuse/edge fail) > bad=**0.0** — proves *smooth ordered discrimination*, not just binary, which is what
   lets temp/reasoning-effort separate.
+- **Difficulty-floor calibration (haiku-no-think as the gate).** A task is admitted only if a weak model
+  (haiku, no extended reasoning) **fails** it — otherwise it can't discriminate configs. Measured:
+  | task | haiku score | hard-pass | verdict |
+  |------|------------:|:---------:|---------|
+  | `count-words` (easy) | 0.949 | ✅ | too easy — smoke test only |
+  | `lru-cache` (hard) | **0.536** | ❌ | **admitted** — haiku fails lint/reuse/edge; headroom above for a strong 27B |
+  `rate-limiter` authored at the same bar (clock-injected token bucket — the lazy-refill pattern models
+  struggled with in C2). **Gate rule: run `score_typescript.py response` on a haiku answer per new task; keep
+  only those with haiku hard-pass=false.** Corpus vendored: 134 sanitized `.ts` (~75k tok), secrets excluded.
 - **Research verdict (adopt-vs-author):** ADOPT Exercism-TypeScript (MIT) + type-challenges (MIT) as the base TDD/typing
   corpus (vendor offline); AUTHOR only the long-context layer (find+reuse a planted util at 64–128k depth while obeying
   top-of-prompt rules) — no existing benchmark tests that shape. Multi-objective grading (COMPASS precedent) is *the*
