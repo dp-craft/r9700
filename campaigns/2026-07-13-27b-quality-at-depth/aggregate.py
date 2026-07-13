@@ -16,7 +16,10 @@ GATES = ["types", "lint", "tests", "reuse", "edge"]
 
 
 def jl(p):
-    return [json.loads(l) for l in open(p)] if os.path.exists(p) else []
+    if not os.path.exists(p):
+        return []
+    with open(p) as fh:
+        return [json.loads(l) for l in fh if l.strip()]
 
 
 def mean(xs):
@@ -33,10 +36,10 @@ def f(x, d=1):
     return "—" if x is None else f"{x:.{d}f}"
 
 
-def load_cells(D):
+def load_cells(D, configs_path=None):
     """One aggregated record per config, keyed by configs.jsonl (authoritative depth/kv/budget/model).
     Reads only SMALL fields from outputs.jsonl (drops the huge `response`)."""
-    cfgs = {c["label"]: c for c in jl(os.path.join(HERE, "configs.jsonl"))}
+    cfgs = {c["label"]: c for c in jl(configs_path or os.path.join(HERE, "configs.jsonl"))}
     ts, jd, out = jl(f"{D}/scores_typescript.jsonl"), jl(f"{D}/judge_scores.jsonl"), jl(f"{D}/outputs.jsonl")
     vr = {v["config"]: v for v in jl(f"{D}/vram.jsonl")}
     cells = {}
@@ -69,8 +72,9 @@ def load_cells(D):
     return cells
 
 
-def calib_bands(run_task_ids):
-    rows = jl(os.path.join(HERE, "calibration.jsonl")) + jl(os.path.join(HERE, "calibration-hard.jsonl"))
+def calib_bands(run_task_ids, files=None):
+    files = files or [os.path.join(HERE, "calibration.jsonl"), os.path.join(HERE, "calibration-hard.jsonl")]
+    rows = [r for p in files for r in jl(p)]
     band = {}
     for r in rows:
         if run_task_ids and r.get("task") not in run_task_ids:
@@ -139,16 +143,7 @@ def findings(cells, bands):
     return out
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--dir", default=os.path.join(HERE, "out"))
-    ap.add_argument("--out", default="")
-    a = ap.parse_args()
-    D = a.dir
-    cells = load_cells(D)
-    run_task_ids = {r.get("task_id") for r in jl(f"{D}/scores_typescript.jsonl")}
-    bands = calib_bands(run_task_ids)
-
+def render_md(cells, bands):
     order = sorted(cells, key=lambda l: (cells[l]["model"], cells[l]["depth"] or "", cells[l]["kv"] or "", cells[l]["budget"] or 0))
     L = ["# Depth run — deterministic digest (`aggregate.py`)",
          "", "_All numbers computed in Python from out/*.jsonl. The analysis LLM writes prose from THIS "
@@ -164,11 +159,28 @@ def main():
                  f"{f(c['runaway_pct'],0)} | {c['n_fail']} |")
     L += ["", "## Findings (computed, not inferred)", ""]
     L += [f"- {s}" for s in findings(cells, bands)]
-    md = "\n".join(L) + "\n"
+    return "\n".join(L) + "\n"
 
-    outp = a.out or f"{D}/summary.md"
-    open(outp, "w").write(md)
-    json.dump({"cells": cells, "bands": bands}, open(outp.replace(".md", ".json"), "w"), indent=1)
+
+def build_digest(D, out_path=None, configs_path=None, calib_files=None):
+    cells = load_cells(D, configs_path)
+    run_task_ids = {r.get("task_id") for r in jl(f"{D}/scores_typescript.jsonl")}
+    bands = calib_bands(run_task_ids, calib_files)
+    md = render_md(cells, bands)
+    out_path = out_path or f"{D}/summary.md"
+    with open(out_path, "w") as fh:
+        fh.write(md)
+    with open(out_path.replace(".md", ".json"), "w") as fh:
+        json.dump({"cells": cells, "bands": bands}, fh, indent=1)
+    return out_path, cells, bands, md
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--dir", default=os.path.join(HERE, "out"))
+    ap.add_argument("--out", default="")
+    a = ap.parse_args()
+    outp, cells, _, _ = build_digest(a.dir, a.out or None)
     print(f"wrote {outp} ({len(cells)} cells) + {outp.replace('.md', '.json')}")
 
 

@@ -123,6 +123,10 @@ in Python** (`aggregate.py` → `out/summary.md`: per-cell table + the 4 finding
 (6) **writes `analysis.md`** by driving the **benchmark-results skill** through `claude` (via tmux) — the
 LLM reads **only the digest + charts, never the per-reply jsonl** — then reindexes `docs/INDEX.md`.
 
+The deterministic aggregator has its own test suite — **`python3 test_aggregate.py`** (stdlib
+`unittest`; 22 unit + edge-case + stress + fuzz tests, no GPU/network). Run it after touching
+`aggregate.py`; the grader has `python3 score_typescript.py selftest`.
+
 **Outputs (in `out/`):** `outputs.jsonl` (replies + token/latency/throughput), `scores_typescript.jsonl`
 (per-reply objectives + score + hard_pass), `judge_scores.jsonl` + `judge_raw.jsonl` (subjective
 design/clarity/robustness + the full judge prompt & reply), `vram.jsonl` + `gpu_*.csv`
