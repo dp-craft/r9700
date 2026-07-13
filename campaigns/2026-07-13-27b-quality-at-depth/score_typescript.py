@@ -109,7 +109,7 @@ def grade_files(files, task_dir, cid="case"):
         reuse = bool(re.search(r'\b' + re.escape(sym) + r'\b', impl_src)
                      and re.search(r'from\s+["\'][^"\']*' + re.escape(mod), impl_src))
     novj = not re.search(r'\bjest\b', test_src)
-    titles = re.findall(r'(?:\bit|\btest)\s*\(\s*["\'`](.+?)["\'`]', test_src)
+    titles = [m.group(2) for m in re.finditer(r'(?:\bit|\btest)\s*\(\s*(["\'`])(.+?)\1', test_src)]
     bdd = (sum(1 for t in titles if re.search(r'should .+ when ', t, re.I)) / len(titles)) if titles else 0.0
 
     obj = {"types": 1.0 if rc_types == 0 else 0.0, "lint": 1.0 if rc_lint == 0 else 0.0,
