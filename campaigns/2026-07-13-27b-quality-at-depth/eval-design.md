@@ -132,6 +132,28 @@ Sonnet scores clearly higher** — that gap is the band the 27B configs will lan
 - A grader bug (reuse hardcoded to one task's util) was found via the Sonnet cross-check and fixed
   (per-task `reuse.json`); it's why cross-checking with a second model is part of the method.
 
+## 5b. Harder tasks — the 3-model gradient (haiku / Sonnet / Opus-high)
+To find tasks that only a strong model *with thinking* clears, two multi/strict tasks were authored and
+graded across three capability tiers (data: `calibration-hard.jsonl`):
+
+| task | kind | haiku | Sonnet | Opus-high | outcome |
+|------|------|:---:|:---:|:---:|---------|
+| `shape-variant` | multi-file union refactor + exhaustiveness | 1.0 P | 1.0 P | 1.0 P | **rejected — too easy** |
+| `async-memo` | async dedup + don't-cache-failures + strict lint | 0.667 F | 0.625 F | **1.0 P** | **admitted — Opus-only** |
+
+Two lessons, both useful for authoring the rest of the set:
+1. **Compiler-guided refactors are easy.** Adding a variant to a discriminated union with `assertNever`
+   exhaustiveness makes `tsc` enumerate every site that needs editing — a checklist even haiku follows.
+   So a *hard* type task must be one that **still compiles but is semantically wrong** (caught by tests,
+   not the compiler) — i.e. indirect coupling, not exhaustiveness.
+2. **The discriminating axis is strict types + lint, not logic.** On `async-memo` all three tiers got the
+   async *logic* right (`edge`=1.0), but only Opus produced code that also passes strict `tsc`+`eslint`
+   one-shot. This is the "TDD + linting bottleneck" made measurable, and it means the 27B reasoning-budget
+   sweep should show its lift here (more thinking → cleaner types/lint).
+
+Note: authoring these surfaced two **test-file** lint rules that unfairly failed everyone (`require-await`,
+`no-empty-function` on mock callbacks) — now relaxed for `*.test.ts` only; strict rules stay on impl files.
+
 ## 6. The context corpus (deep-context filler)
 - **134 sanitized `.ts` files, ~75k tokens**, vendored from the user's AiChatney `src/` into
   `ts-harness/corpus/`. Every auth/crypto/secret file was **excluded** (37 skipped) and the result verified

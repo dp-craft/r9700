@@ -34,6 +34,7 @@ export default tseslint.config(
       "@typescript-eslint/no-unsafe-member-access": "off",
       "@typescript-eslint/no-unsafe-call": "off",
       "@typescript-eslint/require-await": "off",     // async mock fns in tests legitimately have no await
+      "@typescript-eslint/no-empty-function": "off", // no-op callbacks/stubs are legit in tests
       "max-lines-per-function": "off",
     },
   },
