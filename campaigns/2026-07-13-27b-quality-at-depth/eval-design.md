@@ -84,6 +84,44 @@ gate on top of the smooth score.
 - **Why it's hard:** lazy time-based refill + first-request semantics is exactly the pattern models got
   wrong in Campaign 2's rate-limiter *design* task — now measured as *working code*.
 
+### 4.4 `store-remove` — hard, multi-file (indirect coupling / derived state)
+- **Contract:** a class-based `Store` (entries + a cached per-key `total`, kept in sync by `add`); the task
+  adds `remove(key)` deleting all entries for a key AND keeping the cached totals consistent (no-op for a
+  missing key). Provided as `base/store.ts` + `base/store.test.ts` (green); the model edits + adds tests.
+- **Hidden edge:** after `remove`, `total(key)` is 0, other keys unchanged, `all()` no longer contains the key.
+- **Why it's hard:** it **compiles either way** — a naive `remove` that only touches the entry list leaves
+  the cache stale. No compiler guidance; the coupling is caught only by hidden tests on `total()`. (Tier: Sonnet.)
+
+### 4.5 `shape-variant` — REJECTED (too easy; kept as an easy multi-file control)
+- **Contract:** add a `triangle` variant to a `Shape` discriminated union used across `area`/`format`/`scale`
+  (each with `assertNever` exhaustiveness) + a cross-cutting negative-`scale` rule.
+- **Why rejected:** all three tiers score 1.0. TypeScript exhaustiveness makes `tsc` enumerate every site to
+  edit — a checklist even haiku follows. **Lesson: compiler-guided refactors don't discriminate.**
+
+### 4.6 `async-memo` — Opus-only (async concurrency + a strict-lint trap), single-file
+- **Contract:** fix a buggy async memoizer so concurrent calls dedup to one in-flight computation, a REJECTED
+  computation is not cached (later call retries), and a resolved value is cached.
+- **Hidden edge:** fn called once under 3 concurrent calls; retry after a first-call rejection; cache-hit after success.
+- **Why it's hard:** the correct cleanup (`void pending.catch(...)` to delete on rejection) is subtle, and the
+  naive delete-and-rethrow trips the strict `only-throw-error` lint rule. All tiers get the logic (edge=1.0);
+  only Opus produces strictly clean types+lint. (Tier: Opus-only.)
+
+### 4.7 `expr-eval` — Opus-tier ceiling (recursive-descent parser), single-file
+- **Contract:** `evaluate(expr): Result` for integer `+ - * /` with precedence, LEFT associativity, parens,
+  and **no-throw** error handling (returns `{ok:false,error}` on div-by-zero / unbalanced parens / bad token).
+- **Hidden edge:** precedence (`2+3*4=14`), left-assoc (`10-3-2=5`, `8/2/2=2`), parens, and three error cases.
+- **Why it's the ceiling:** recursion + precedence + the `<20`-line rule (forces tokenize/expr/term/factor
+  split) + strict lint. Everyone gets the logic (edge=1.0) but **even Opus fails strict lint one-shot**
+  (`restrict-template-expressions`, `prefer-optional-chain`, `no-unnecessary-boolean-literal-compare`); the
+  reference is clean, so it's fair. Best resolution at the very top.
+
+### 4.8 `deep-equal` — Sonnet-tier (structural recursion over `unknown`), single-file
+- **Contract:** `deepEqual(a: unknown, b: unknown): boolean` — value-equal primitives (NaN equals NaN),
+  recursive objects/arrays (same keys/length), array ≠ plain object, `null` ≠ `{}`.
+- **Hidden edge:** NaN, nested arrays, extra-key mismatch, array-vs-object, differing primitive types, null-vs-{}.
+- **Why it's hard:** `unknown` inputs force type guards (the no-`any` rule bites), and NaN / array-vs-object are
+  easy to miss. haiku fails on lint; Sonnet/Opus pass. (Tier: Sonnet.)
+
 ## 5. Test-data quality — the calibration measurements
 Method: give each task, one-shot with **no extended reasoning**, to a **weak** model (haiku, the floor)
 and a **strong** model (Sonnet, the ceiling). A task is only admitted if **haiku hard-fails it AND
@@ -185,7 +223,12 @@ Everything needed lives in-repo (harness, corpus, tasks, reference fixtures, pin
 checkout required at runtime.
 
 ## 8. Status & next
-Harness + grader + difficulty-floor method are **built and validated against a weak and a strong model**.
-Before the depth run: batch-author ~6–10 more tasks (each gated haiku-fail < Sonnet), top the corpus up to
-128k, then wire the depth driver (Phase-3a sampling-lock → `reasoning-budget × {64k-f16, 128k-f16, 128k-q8}`,
-REPS=3). See `README.md` and the plan.
+**Built & validated:** the multi-file grader, the difficulty method (3-model gradient), **8 tasks** spanning
+a full ladder — 2 easy controls, 4 Sonnet-tier, 2 Opus-tier — across 6 different problem kinds, each with a
+reference that scores 1.0 and a haiku/Sonnet/Opus tier confirmed (`calibration-hard.jsonl`). Corpus vendored
+to ~682k tokens (self-contained; secrets excluded); 128k assembly verified. `selftest` green; deps auto-install.
+
+**Next — the depth driver (the only remaining build before a run):** wire Phase-3a sampling-lock
+(temp {0.4,0.6,0.7} at 64k, freeze the winner) → the real grid `reasoning-budget × {64k-f16, 128k-f16,
+128k-q8}`, `REPS=3`, tasks assembled at depth via `build_context.py`, graded by `score_typescript.py`, then
+analyzed with the **benchmark-results** skill. See `README.md` and the plan.

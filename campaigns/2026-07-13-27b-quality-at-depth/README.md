@@ -1,7 +1,7 @@
 # Qwen3.6-27B quality AT DEPTH — integrated TS TDD+lint eval on 64–128k real-code context (R9700)
 
 *Campaign 3 of the agentic-config series (plan: `docs/plans/2026-07-12-27b-agentic-config-campaign-series.md`).
-Status: **harness + grader + 6 difficulty-calibrated tasks + 682k-tok corpus BUILT**; next = the depth driver (Phase-3a sampling-lock → reasoning-budget × {64k-f16,128k-f16,128k-q8}, REPS=3).
+Status: **harness + grader + 8 difficulty-calibrated tasks (2 easy / 4 Sonnet-tier / 2 Opus-tier) + 682k-tok corpus BUILT**; next = the depth driver (Phase-3a sampling-lock → reasoning-budget × {64k-f16,128k-f16,128k-q8}, REPS=3). Task detail + calibration: `eval-design.md`.
 Research: `docs/research/2026-07-13-1712-hard-ts-quality-benchmark-design.md`.
 **Reader's guide to the eval, every task, and test-data quality: `eval-design.md` (calibration data: `calibration.jsonl`).***
 
