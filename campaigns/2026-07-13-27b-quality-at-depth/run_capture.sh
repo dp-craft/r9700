@@ -112,15 +112,24 @@ python3 "$HERE/score_typescript.py" batch --outputs "$OUT" --tasks "$HERE/tasks.
   --out "$OUTDIR/scores_typescript.jsonl" || true
 
 # --- 4. blind LLM judge (subjective design/clarity/robustness the toolchain can't grade) ---
-# Runs only if a judge endpoint is configured. Saves the full prompt+raw reply (judge_raw.jsonl)
-# AND the parsed scores (judge_scores.jsonl) — all committable. See judge.py.
-if [ -n "${JUDGE_BASE_URL:-}" ]; then
-  echo; echo "=== blind LLM judge ($JUDGE_BASE_URL) ==="
-  python3 "$HERE/judge.py" --outputs "$OUT" --tasks "$HERE/tasks.jsonl" \
+# 27B is the strongest LOCAL model, so it can't judge itself — the judge is Claude via the `claude`
+# CLI (JUDGE_ENGINE=claude-cli), or any stronger OpenAI-compatible endpoint (JUDGE_BASE_URL). Both save
+# the full prompt+raw reply (judge_raw.jsonl) AND parsed scores (judge_scores.jsonl) — all committable.
+# The rubric a human would use is in JUDGE.md (kept in sync with judge.py).
+if [ "${JUDGE_ENGINE:-}" = "claude-cli" ]; then
+  echo; echo "=== blind judge via claude CLI (claude -p) ==="
+  python3 "$HERE/judge.py" --engine claude-cli --outputs "$OUT" --tasks "$HERE/tasks.jsonl" \
+    --model "${JUDGE_MODEL:-}" --out "$OUTDIR/judge_scores.jsonl" --raw "$OUTDIR/judge_raw.jsonl" \
+    || echo "judge step failed (is the 'claude' CLI installed + authenticated? see JUDGE.md)"
+elif [ -n "${JUDGE_BASE_URL:-}" ]; then
+  echo; echo "=== blind judge via HTTP ($JUDGE_BASE_URL) ==="
+  python3 "$HERE/judge.py" --engine http --outputs "$OUT" --tasks "$HERE/tasks.jsonl" \
     --base-url "$JUDGE_BASE_URL" --model "${JUDGE_MODEL:-}" \
     --out "$OUTDIR/judge_scores.jsonl" --raw "$OUTDIR/judge_raw.jsonl" || echo "judge step failed (see above)"
 else
-  echo; echo "=== judge SKIPPED (set JUDGE_BASE_URL=<openai-compatible /v1> to run judge.py) ==="
+  echo; echo "=== judge SKIPPED — run it later per JUDGE.md ==="
+  echo "    automatic:  JUDGE_ENGINE=claude-cli bash run_capture.sh   (needs the 'claude' CLI)"
+  echo "    or manual:  follow campaigns/.../JUDGE.md with out/outputs.jsonl"
 fi
 
 echo; echo "=== charts (reused by the benchmark-results skill) ==="

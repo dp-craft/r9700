@@ -100,9 +100,14 @@ bash run_capture.sh                              # 10 core cells × 6 tasks × R
 ONLY='un-d64*' REPS=1 bash run_capture.sh        # quick subset (labels glob-matched)
 SMOKE=1 bash run_capture.sh                       # also include the 2 easy smoke tasks
 RUN_OPTIN=1 bash run_capture.sh                   # also run the 16384-budget ceiling cell
-JUDGE_BASE_URL=https://host/v1 bash run_capture.sh  # run the blind LLM judge after grading
+JUDGE_ENGINE=claude-cli bash run_capture.sh       # blind judge via the `claude` CLI (27B can't judge itself)
+JUDGE_BASE_URL=https://host/v1 bash run_capture.sh  # ...or a stronger hosted judge (OpenAI-compatible)
 MODELS_DIR=/path/to/gguf bash run_capture.sh      # models elsewhere
 ```
+
+> **The judge is Claude, not the 27B** — a judge must be stronger than the model under test, and the
+> 27B is the best *local* model. Rubric + the three ways to run it (CLI / hosted / manual) are in
+> **`JUDGE.md`**. The judge only scores subjective quality; correctness stays the toolchain's job.
 
 The driver is **resumable** (per-cell `out/done/<label>` markers — a re-run skips finished cells) and
 **continues past a failed cell** (logged to `out/failures.txt`). For each cell it: starts one

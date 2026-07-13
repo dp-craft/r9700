@@ -6,14 +6,21 @@ adds the SUBJECTIVE axes a toolchain can't measure — design, clarity, robustne
 judge model to review each candidate. **Blind:** the prompt never reveals which config/model produced
 the answer. Works against any OpenAI-compatible endpoint (hosted API or a strong local model).
 
-Saves BOTH the parsed scores (--out judge_scores.jsonl: config/task_id/rep/design/clarity/robustness/
-notes) AND the full judge prompt+reply (--raw judge_raw.jsonl) so every input is committable + auditable.
-Resumable: (config,task_id,rep) already present in --out are skipped.
+Because the 27B under test IS the strongest LOCAL model, the judge is Claude via the `claude` CLI
+(--engine claude-cli) — or any stronger hosted model (--engine http). Human-readable rubric + run
+modes: JUDGE.md (kept in sync with this file). Saves BOTH the parsed scores (--out judge_scores.jsonl:
+config/task_id/rep/design/clarity/robustness/notes) AND the full judge prompt+reply (--raw
+judge_raw.jsonl) so every input is committable + auditable. Resumable: (config,task_id,rep) already in
+--out are skipped.
 
-  JUDGE_API_KEY=... python3 judge.py --outputs out/outputs.jsonl --tasks tasks.jsonl \
-      --base-url https://api.example/v1 --model my-judge --out out/judge_scores.jsonl --raw out/judge_raw.jsonl
+  # Claude CLI (local box, 27B is the best local model):
+  python3 judge.py --engine claude-cli --outputs out/outputs.jsonl --tasks tasks.jsonl \
+      --model opus --out out/judge_scores.jsonl --raw out/judge_raw.jsonl
+  # or a hosted OpenAI-compatible endpoint:
+  JUDGE_API_KEY=... python3 judge.py --engine http --base-url https://api.example/v1 --model my-judge \
+      --outputs out/outputs.jsonl --tasks tasks.jsonl --out out/judge_scores.jsonl --raw out/judge_raw.jsonl
 """
-import argparse, json, os, re, sys, urllib.request
+import argparse, json, os, re, subprocess, sys, urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -42,7 +49,7 @@ def judge_prompt(task_id, answer_code):
             f"[CANDIDATE SOLUTION]\n{answer_code}\n")
 
 
-def call(base, model, key, prompt, timeout=300):
+def call_http(base, model, key, prompt, timeout=300):
     payload = {"messages": [{"role": "user", "content": prompt}], "temperature": 0, "max_tokens": 512}
     if model:
         payload["model"] = model
@@ -54,6 +61,20 @@ def call(base, model, key, prompt, timeout=300):
     with urllib.request.urlopen(req, timeout=timeout) as r:
         obj = json.loads(r.read().decode())
     return obj["choices"][0]["message"]["content"]
+
+
+def call_claude_cli(model, prompt, timeout=300):
+    """Headless `claude -p` (print mode) — the judge is Claude because 27B is the strongest LOCAL model,
+    so no local endpoint can judge it. Requires the `claude` CLI installed + authenticated on the box.
+    We do NOT use tmux: `claude -p` is the designed non-interactive interface (tmux would mean scraping
+    a TTY). Prompt passed as argv (the judge prompt is small — spec + code, not the 128k context)."""
+    cmd = ["claude", "-p", prompt]
+    if model:
+        cmd += ["--model", model]
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    if r.returncode != 0:
+        raise RuntimeError((r.stderr or r.stdout or "claude cli failed")[-500:])
+    return r.stdout
 
 
 def parse_scores(text):
@@ -79,13 +100,19 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--outputs", required=True)
     ap.add_argument("--tasks", required=True)
-    ap.add_argument("--base-url", required=True)
+    ap.add_argument("--engine", choices=["http", "claude-cli"], default="http",
+                    help="http = any OpenAI-compatible endpoint; claude-cli = headless `claude -p` "
+                         "(use this when 27B is the strongest LOCAL model, so Claude must judge)")
+    ap.add_argument("--base-url", default="", help="required for --engine http")
     ap.add_argument("--model", default="")
     ap.add_argument("--out", required=True)
     ap.add_argument("--raw", default="")
     ap.add_argument("--key-env", default="JUDGE_API_KEY", help="env var holding the API key (if any)")
     a = ap.parse_args()
     key = os.environ.get(a.key_env, "")
+    if a.engine == "http" and not a.base_url:
+        sys.exit("--engine http needs --base-url (an OpenAI-compatible /v1). "
+                 "For a local box where 27B is the best model, use --engine claude-cli instead.")
 
     # matrix tasks only, and remember tiers for the score rows
     tiers = {}
@@ -115,7 +142,8 @@ def main():
         prompt = judge_prompt(tid, code)
         n += 1
         try:
-            raw = call(a.base_url, a.model, key, prompt)
+            raw = (call_claude_cli(a.model, prompt) if a.engine == "claude-cli"
+                   else call_http(a.base_url, a.model, key, prompt))
         except Exception as e:
             print(f"  [{cfg}] {tid} rep{rep}: JUDGE ERROR {e}", file=sys.stderr)
             continue

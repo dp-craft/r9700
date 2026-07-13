@@ -121,9 +121,12 @@ budget-sweep line charts). See the campaign README + `eval-design.md`.
 - **Answers:** (a) does the optimal `--reasoning-budget` rise with depth (budget curve at 64k vs 128k)?
   (b) does rule-adherence / util-reuse survive 64k→128k (lost-in-the-middle)? (c) does KV-q8 cost quality at
   128k (f16-vs-q8 A/B, ≤5% rule)? (d) where does the local 27B sit vs the haiku/Sonnet/Opus capability bands?
-- **Blind LLM judge wired:** `judge.py` scores the subjective design/clarity/robustness axes (blind, any
-  OpenAI-compatible endpoint via `JUDGE_BASE_URL`), saving both parsed scores and the full judge prompt+reply
-  for audit. Deterministic correctness stays the toolchain's job; the judge only adds what it can't measure.
+- **Blind LLM judge wired — and the judge is Claude, not the 27B** (a judge must beat the model under
+  test; the 27B is the best *local* model). `judge.py` scores the subjective design/clarity/robustness
+  axes two ways: **`JUDGE_ENGINE=claude-cli`** (headless `claude -p` — recommended, not tmux) or a stronger
+  hosted endpoint (`JUDGE_BASE_URL`). It saves both parsed scores and the full judge prompt+reply for audit.
+  The human-readable rubric + all three run modes (CLI / hosted / manual paste) live in the campaign's
+  **`JUDGE.md`**. Deterministic correctness stays the toolchain's job; the judge only adds what it can't measure.
 - **Reusable across models:** adding a model = one `configs.jsonl` line (local GGUF *or* any OpenAI-compatible
   URL, since `capture.py` speaks plain HTTP); see the campaign's `REUSE.md`.
 

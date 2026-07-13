@@ -94,12 +94,18 @@ confirm the grader still discriminates before spending GPU time.
 
 ## 5. Swap the LLM judge
 
-The blind judge (`judge.py`) is just another OpenAI-compatible client. Point it anywhere:
-`JUDGE_BASE_URL=<…/v1> JUDGE_MODEL=<name> JUDGE_API_KEY=<env> bash run_capture.sh`. It saves both the
-parsed scores (`judge_scores.jsonl`) and the **full prompt + raw reply** (`judge_raw.jsonl`), so the
-judgement is auditable and re-scoreable. Use a **strong** judge (a frontier hosted model is ideal); a
-27B judging 27B output is weak. To change what's judged, edit the rubric/axes at the top of `judge.py`
-(`AXES` + `RUBRIC`); `make_charts.py` averages whatever numeric axes it finds, so no chart change needed.
+The blind judge (`judge.py`) has two transports — pick per your environment:
+- **`--engine claude-cli`** (`JUDGE_ENGINE=claude-cli`) — headless `claude -p`; use when the model under
+  test is the strongest thing you have locally (our case: a 27B can't judge itself). Needs the `claude`
+  CLI installed + authenticated.
+- **`--engine http`** (`JUDGE_BASE_URL=<…/v1> JUDGE_MODEL=<name> JUDGE_API_KEY=<env>`) — any stronger
+  OpenAI-compatible endpoint.
+
+Either way a judge must be **stronger** than the candidate. Both save parsed scores
+(`judge_scores.jsonl`) **and** the full prompt + raw reply (`judge_raw.jsonl`), so judgements are
+auditable and re-scoreable. To change what's judged, edit `AXES` + `RUBRIC` at the top of `judge.py`
+(and mirror it in `JUDGE.md`); `make_charts.py` averages whatever numeric axes it finds — no chart change
+needed. Full rubric + a manual (no-CLI) run mode: **`JUDGE.md`**.
 
 ---
 
