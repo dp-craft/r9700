@@ -96,8 +96,14 @@ throughput probes, not the quality/judge flow — see the campaign README).
 - **B5** KV q8_0 quality spot-check at the chosen config.
 - **Output:** the quality config = `{sampling, reasoning-budget, MTP-quality settings}` per model.
 
-## Campaign 3 — Quality at agentic DEPTH  *(NEXT — the decision-blocker)*
-`campaigns/<date>-27b-quality-at-depth/` · the C2 knobs were tuned on ~50–100-token prompts; the real
+## Campaign 3 — Quality at agentic DEPTH  *(SCAFFOLDING — see campaign README)*
+`campaigns/2026-07-13-27b-quality-at-depth/` (design + `ts-harness/` skeleton laid). **Locked design:** depth×KV
+matrix **{64k-f16, 128k-f16, 128k-q8}** (thinking-mode, context filled with real AiChatney TS source, not padding);
+**one integrated TypeScript TDD task type** (model writes vitest tests + strict-typed impl obeying the user's real
+`code-logic-writer.md` rules, reusing a util planted in the deep context); multi-objective grader runs real
+`tsc`+`eslint`+`vitest` (linting is the grader's job, not model tool-calls) + static rule-checks, calibrated to ~50% pass
+so temp/reasoning-effort finally discriminate; blind LLM judge for open-ended clarity. Next build: `npm install` the
+harness, `graders/score_typescript.py`, the task set, and the depth driver. · the C2 knobs were tuned on ~50–100-token prompts; the real
 operating point is **10–50K context** (system rules + code). Re-measure the finalists (`un-rb1024`,
 `un-rb2048`, `jr-rb1024`) at context **{8K, 16K, 32K}** via `run_capture.sh`'s `CONTEXT_PREFIX`, with
 **`REPS=3`** (break the reps=1 noise on the budget ranking) and the **KV-q8 quality spot-check placed here**
