@@ -108,6 +108,8 @@ them wastes tokens and tells you nothing. Structure/results live in the files ab
 | Run dir → self-contained HTML report | `bench/lib/report.py` | `report.html` |
 | Quality capture (per-task replies + tokens/ttfa/flags) | `campaigns/2026-07-12-27b-finetune-quality/capture.py` | `outputs.jsonl` |
 | Grade deterministic tasks (final_match/pyexec/json_schema/constraints) | `…/finetune-quality/graders/score_deterministic.py` | `scores_deterministic.jsonl` |
+| Quality campaign → decision charts (theme-aware SVG + appendix.md) | `campaigns/2026-07-12-27b-finetune-quality/make_charts.py --dir out --charts charts [--order …] [+ out/sweeps.json for connected-parameter line charts]` | `charts/*.svg` + `appendix.md` |
+| Throughput run dir → interactive HTML report (Chart.js) | `bench/lib/report.py <run_dir>` (auto-run by gen_campaign's `run.sh`) | `report.html` |
 
 If one of these is missing a capability, **extend the tool** (and say so) rather than writing a
 one-off replacement. New reusable capability → propose a skill/tool change, don't fork logic.
