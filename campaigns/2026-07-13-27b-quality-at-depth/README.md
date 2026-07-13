@@ -1,7 +1,23 @@
 # Qwen3.6-27B quality AT DEPTH — integrated TS TDD+lint eval on 64–128k real-code context (R9700)
 
 *Campaign 3 of the agentic-config series (plan: `docs/plans/2026-07-12-27b-agentic-config-campaign-series.md`).
-Status: **DESIGN / scaffolding** — harness skeleton laid; grader + task-set + run.sh are the next build step.*
+Status: **harness + grader BUILT & stress-tested** (self-contained, auto-installs); next = vendor the task corpus + depth driver.
+Research: `docs/research/2026-07-13-1712-hard-ts-quality-benchmark-design.md`.*
+
+## Proven so far (this scaffold)
+- **`ts-harness/`** — self-contained, **auto-installs** (`score_typescript.py` runs `npm install` if `node_modules`
+  is absent; `package-lock.json` committed for reproducible versions). Minimal strict config; reuse-target util
+  `lib/tokenize.ts` and one sample task `tasks/count-words/` live in-repo — **any user can `python3 score_typescript.py
+  selftest` and reproduce**.
+- **`score_typescript.py`** — multi-objective grader runs real `tsc`+`eslint`+`vitest` + static rule-checks.
+  **Stress test (`selftest`) PASSES**: good=**1.0** (hard-pass) > mediocre=**0.357** (partial: tests/bdd/novj pass;
+  types/lint/reuse/edge fail) > bad=**0.0** — proves *smooth ordered discrimination*, not just binary, which is what
+  lets temp/reasoning-effort separate.
+- **Research verdict (adopt-vs-author):** ADOPT Exercism-TypeScript (MIT) + type-challenges (MIT) as the base TDD/typing
+  corpus (vendor offline); AUTHOR only the long-context layer (find+reuse a planted util at 64–128k depth while obeying
+  top-of-prompt rules) — no existing benchmark tests that shape. Multi-objective grading (COMPASS precedent) is *the*
+  reason configs will finally separate. ⚠️ Qwen3.6-27B coding scores are third-party UNVERIFIED; no official
+  effective-context curve exists → our depth sweep fills a real measurement gap.
 
 - **Date:** 2026-07-13 · **Substrate (frozen, C1):** llama.cpp Vulkan b9950 · `-ub 2048 -b 4096 -fa on` · MTP-on · prefix cache.
 - **Why this campaign:** Campaign 2 tuned the reasoning-budget knob on *toy-length* prompts where deterministic accuracy

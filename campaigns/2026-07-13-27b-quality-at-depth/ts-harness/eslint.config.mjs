@@ -24,5 +24,17 @@ export default tseslint.config(
       "@stylistic/semi": ["error", "always"],
     },
   },
-  { ignores: ["node_modules/", "**/*.config.mjs"] },
+  {
+    // tests legitimately use literals and loosely-typed matchers — relax the noisiest rules here,
+    // keep the discriminating strict rules on implementation files.
+    files: ["**/*.test.ts"],
+    rules: {
+      "no-magic-numbers": "off",
+      "@typescript-eslint/no-unsafe-assignment": "off",
+      "@typescript-eslint/no-unsafe-member-access": "off",
+      "@typescript-eslint/no-unsafe-call": "off",
+      "max-lines-per-function": "off",
+    },
+  },
+  { ignores: ["node_modules/", "**/*.config.mjs", "cases/_work/hidden.test.ts"] },
 );

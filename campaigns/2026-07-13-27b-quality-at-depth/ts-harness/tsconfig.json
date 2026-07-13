@@ -1,9 +1,9 @@
 {
-  "//": "Strict TS config for the grader's type-check objective. Mirrors code-logic-writer.md intent: no implicit any, no unchecked index access, exact optionals.",
+  "//": "Strict, grade-only (noEmit) TS config. bundler resolution so candidate files use extensionless relative imports and vitest/eslint resolve them. Mirrors code-logic-writer.md: no implicit any, no unchecked index access, exact optionals. Only lib/ + the grader's staging dir cases/ are type-checked; tasks/*.hidden.test.ts are templates (dangling ./impl import) staged into cases/ at grade time.",
   "compilerOptions": {
     "target": "ES2022",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
     "lib": ["ES2022"],
     "strict": true,
     "noUncheckedIndexedAccess": true,
@@ -14,8 +14,8 @@
     "noUnusedParameters": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
-    "types": ["node"],
+    "types": [],
     "noEmit": true
   },
-  "include": ["cases/**/*.ts", "tasks/**/*.ts"]
+  "include": ["lib/**/*.ts", "cases/**/*.ts"]
 }
