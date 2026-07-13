@@ -6,11 +6,16 @@
 # only the first task per server pays the deep prefill), stop the server. Resumable (per-cell done
 # markers), continues past a failed cell. Then batch-grade (real tsc/eslint/vitest) + make charts.
 #
-#   bash run_capture.sh                          # 10 core cells × 6 matrix tasks × REPS, then grade+judge+charts
-#   ONLY='un-d64*' REPS=1 bash run_capture.sh    # subset / quick
-#   SMOKE=1 bash run_capture.sh                  # also include the 2 easy smoke tasks (normally excluded)
-#   RUN_OPTIN=1 bash run_capture.sh              # also run the opt-in 16384-budget ceiling cell
-#   JUDGE_BASE_URL=https://host/v1 bash run_capture.sh   # run the blind LLM judge after grading (see judge.py)
+# ONE script, no human interaction: capture -> grade (tsc/eslint/vitest) -> blind LLM judge -> charts ->
+# auto-write analysis.md via the benchmark-results skill. The judge + summary run `claude` THROUGH tmux
+# (headless/background claude is restricted), so a tmux session must exist first:
+#     tmux new-session -d -s claude-run       # do this ONCE, then:
+#     bash run_capture.sh                     # 10 core cells x 6 matrix tasks x REPS=2, fully automatic
+#   ONLY='un-d64*' REPS=1 bash run_capture.sh # subset / quick
+#   SMOKE=1 bash run_capture.sh               # also include the 2 easy smoke tasks
+#   RUN_OPTIN=1 bash run_capture.sh           # also run the opt-in 16384-budget ceiling cell
+#   JUDGE_ENGINE=http JUDGE_BASE_URL=https://host/v1 bash run_capture.sh   # judge via a hosted endpoint
+#   JUDGE_ENGINE=none SUMMARY=0 bash run_capture.sh   # capture+grade+charts only (no claude, no tmux)
 #   MODELS_DIR=/home/dev/models/gguf bash run_capture.sh
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -20,8 +25,34 @@ SERVE="$REPO/bench/engine-bench/serve_llamacpp.sh"
 : "${MODELS_DIR:=/home/dev/models/gguf}"
 : "${PORT:=8081}" ; : "${REPS:=2}" ; : "${BACKEND:=vulkan}" ; : "${UB:=2048}" ; : "${B:=4096}"
 : "${WAIT:=600}"                       # 128k cold load can take ~3 min
+# claude-driven steps (default ON → one script, no human interaction). Both run THROUGH tmux.
+: "${JUDGE_ENGINE:=claude-tmux}"       # claude-tmux | http | none
+: "${JUDGE_MODEL:=opus}"               # judge must be STRONGER than the 27B under test
+: "${SUMMARY:=1}"                      # 1 = auto-write analysis.md via the benchmark-results skill
+: "${SUMMARY_MODEL:=opus}"
+: "${CLAUDE_TMUX_SESSION:=claude-run}"
+export CLAUDE_TMUX_SESSION
 OUTDIR="$HERE/out" ; mkdir -p "$OUTDIR/done"
 OUT="$OUTDIR/outputs.jsonl" ; VRAM="$OUTDIR/vram.jsonl"
+
+# --- 0. FAIL FAST: the judge/summary run claude through tmux; require the session BEFORE the long
+#        capture so we never burn hours only to fail at the judge. ---
+need_claude=0
+[ "$JUDGE_ENGINE" = "claude-tmux" ] && need_claude=1
+[ "$SUMMARY" = "1" ] && need_claude=1
+if [ "$need_claude" = 1 ] && ! tmux has-session -t "$CLAUDE_TMUX_SESSION" 2>/dev/null; then
+  {
+    echo "ERROR: the judge and final-summary run 'claude' THROUGH tmux (headless/background is"
+    echo "       restricted), but tmux session '$CLAUDE_TMUX_SESSION' does not exist."
+    echo "       Start it once, then re-run this script:"
+    echo
+    echo "         tmux new-session -d -s $CLAUDE_TMUX_SESSION"
+    echo
+    echo "       Or disable the claude steps entirely:"
+    echo "         JUDGE_ENGINE=none SUMMARY=0 bash run_capture.sh"
+  } >&2
+  exit 3
+fi
 
 # --- 1. build the per-depth task prompts once (shared corpus prefix + per-task rules/spec suffix) ---
 build_depth_tasks() {   # $1 = depth label (64k|128k), $2 = target tokens
@@ -112,34 +143,66 @@ python3 "$HERE/score_typescript.py" batch --outputs "$OUT" --tasks "$HERE/tasks.
   --out "$OUTDIR/scores_typescript.jsonl" || true
 
 # --- 4. blind LLM judge (subjective design/clarity/robustness the toolchain can't grade) ---
-# 27B is the strongest LOCAL model, so it can't judge itself — the judge is Claude via the `claude`
-# CLI (JUDGE_ENGINE=claude-cli), or any stronger OpenAI-compatible endpoint (JUDGE_BASE_URL). Both save
-# the full prompt+raw reply (judge_raw.jsonl) AND parsed scores (judge_scores.jsonl) — all committable.
-# The rubric a human would use is in JUDGE.md (kept in sync with judge.py).
-if [ "${JUDGE_ENGINE:-}" = "claude-cli" ]; then
-  echo; echo "=== blind judge via claude CLI (claude -p) ==="
-  python3 "$HERE/judge.py" --engine claude-cli --outputs "$OUT" --tasks "$HERE/tasks.jsonl" \
-    --model "${JUDGE_MODEL:-}" --out "$OUTDIR/judge_scores.jsonl" --raw "$OUTDIR/judge_raw.jsonl" \
-    || echo "judge step failed (is the 'claude' CLI installed + authenticated? see JUDGE.md)"
-elif [ -n "${JUDGE_BASE_URL:-}" ]; then
-  echo; echo "=== blind judge via HTTP ($JUDGE_BASE_URL) ==="
-  python3 "$HERE/judge.py" --engine http --outputs "$OUT" --tasks "$HERE/tasks.jsonl" \
-    --base-url "$JUDGE_BASE_URL" --model "${JUDGE_MODEL:-}" \
-    --out "$OUTDIR/judge_scores.jsonl" --raw "$OUTDIR/judge_raw.jsonl" || echo "judge step failed (see above)"
-else
-  echo; echo "=== judge SKIPPED — run it later per JUDGE.md ==="
-  echo "    automatic:  JUDGE_ENGINE=claude-cli bash run_capture.sh   (needs the 'claude' CLI)"
-  echo "    or manual:  follow campaigns/.../JUDGE.md with out/outputs.jsonl"
-fi
+# 27B is the strongest LOCAL model, so it can't judge itself — the judge is Claude via the tmux gateway
+# (JUDGE_ENGINE=claude-tmux, default), or any stronger OpenAI-compatible endpoint (JUDGE_ENGINE=http +
+# JUDGE_BASE_URL). Both save the full prompt+raw reply (judge_raw.jsonl) AND parsed scores. Rubric: JUDGE.md.
+case "$JUDGE_ENGINE" in
+  claude-tmux)
+    echo; echo "=== blind judge via claude (tmux, model=$JUDGE_MODEL) ==="
+    python3 "$HERE/judge.py" --engine claude-tmux --outputs "$OUT" --tasks "$HERE/tasks.jsonl" \
+      --model "$JUDGE_MODEL" --out "$OUTDIR/judge_scores.jsonl" --raw "$OUTDIR/judge_raw.jsonl" \
+      || echo "judge step failed (see above / JUDGE.md)" ;;
+  http)
+    echo; echo "=== blind judge via HTTP (${JUDGE_BASE_URL:-UNSET}) ==="
+    python3 "$HERE/judge.py" --engine http --outputs "$OUT" --tasks "$HERE/tasks.jsonl" \
+      --base-url "${JUDGE_BASE_URL:-}" --model "${JUDGE_MODEL:-}" \
+      --out "$OUTDIR/judge_scores.jsonl" --raw "$OUTDIR/judge_raw.jsonl" || echo "judge step failed" ;;
+  *) echo; echo "=== judge SKIPPED (JUDGE_ENGINE=$JUDGE_ENGINE) — see JUDGE.md ===" ;;
+esac
 
 echo; echo "=== charts (reused by the benchmark-results skill) ==="
+ORDER="$(python3 -c 'import json,sys;print(",".join(json.loads(l)["label"] for l in open(sys.argv[1]) if l.strip()))' "$HERE/configs.jsonl")"
 python3 "$REPO/campaigns/2026-07-12-27b-finetune-quality/make_charts.py" --dir "$OUTDIR" --charts "$HERE/charts" \
-  --order "$(python3 -c 'import json;print(",".join(json.loads(l)["label"] for l in open("'"$HERE"'/configs.jsonl") if l.strip()))')" \
-  --calibration "$HERE/calibration.jsonl,$HERE/calibration-hard.jsonl" \
+  --order "$ORDER" --calibration "$HERE/calibration.jsonl,$HERE/calibration-hard.jsonl" \
   || echo "make_charts failed (see above)"
+
+# --- 5. auto-write analysis.md via the benchmark-results skill (claude, through tmux) ---
+if [ "$SUMMARY" = "1" ]; then
+  echo; echo "=== final analysis (benchmark-results skill via claude/tmux, model=$SUMMARY_MODEL) ==="
+  sp="$OUTDIR/summary_prompt.txt"
+  cat > "$sp" <<EOF
+You are finishing benchmark Campaign 3 in this repo. Follow the repo's benchmark-results skill
+(read .claude/skills/benchmark-results/SKILL.md) and write the analysis to
+campaigns/2026-07-13-27b-quality-at-depth/analysis.md.
+
+All measured data is in campaigns/2026-07-13-27b-quality-at-depth/out/ :
+  - scores_typescript.jsonl  (per-reply objectives, score, hard_pass, tier)  [MEASURED]
+  - judge_scores.jsonl       (subjective design/clarity/robustness, blind LLM judge)
+  - vram.jsonl + gpu_*.csv    (memory/GTT/power/thermal per cell)
+  - outputs.jsonl            (tokens/latency/throughput), props_*.json (server provenance)
+  - charts/appendix.md + charts/*.svg  (already generated)
+The matrix is configs.jsonl; capability reference bands are in calibration.jsonl + calibration-hard.jsonl;
+the campaign design + glossary are in README.md and eval-design.md.
+
+Write analysis.md to the skill's contract: TL;DR + results TABLE FIRST (a memory column is MANDATORY),
+then detail. Tag every number MEASURED / INFERRED / CLAIMED — read numbers from the jsonl, do not invent
+any. Answer the 4 campaign questions: (a) does the optimal reasoning-budget rise with depth (64k vs 128k
+budget curve)? (b) does rule-adherence/util-reuse sag 64k->128k (lost-in-the-middle)? (c) does KV-q8 cost
+quality at 128k (f16-vs-q8 A/B, <=5% rule)? (d) where does the 27B sit vs haiku/Sonnet/Opus? Embed
+charts/appendix.md. Include a <!-- meta --> block as other reports do (see docs/analysis/ examples) so
+docs/reindex.py can register it. If any cell FAILED or a step was skipped, say so plainly.
+EOF
+  bash "$HERE/claude_ask.sh" --prompt "$sp" --result "$OUTDIR/summary_result.json" \
+    --cwd "$REPO" --model "$SUMMARY_MODEL" --permission-mode acceptEdits \
+    && echo "  analysis.md written by claude" \
+    || echo "  summary step failed (see $OUTDIR/summary_result.json.err)"
+  # reindex is deterministic — do it here, not via the model
+  python3 "$REPO/docs/reindex.py" 2>/dev/null && echo "  docs/INDEX.md reindexed" || echo "  (reindex skipped)"
+fi
 
 echo; echo "Depth run complete."
 echo "  replies:  $OUT"
-echo "  scores:   $OUTDIR/scores_typescript.jsonl   judge: $OUTDIR/judge_scores.jsonl (if run)"
+echo "  scores:   $OUTDIR/scores_typescript.jsonl   judge: $OUTDIR/judge_scores.jsonl"
 echo "  VRAM:     $VRAM   (gpu samples: $OUTDIR/gpu_*.csv)"
-echo "  charts:   $HERE/charts/   → hand to benchmark-results for analysis.md"
+echo "  charts:   $HERE/charts/"
+echo "  analysis: $HERE/analysis.md   (auto-written; review before committing run data)"

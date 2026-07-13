@@ -96,37 +96,37 @@ the budget rather than fix it; keep 16384 as a single opt-in confirmation, not i
 
 ```bash
 # from this directory (models default to /home/dev/models/gguf):
-bash run_capture.sh                              # 10 core cells × 6 tasks × REPS=2, then grade + judge + charts
+tmux new-session -d -s claude-run                # ONCE — the judge + summary run claude through tmux
+bash run_capture.sh                              # FULL auto: capture → grade → judge → charts → analysis.md
 ONLY='un-d64*' REPS=1 bash run_capture.sh        # quick subset (labels glob-matched)
-SMOKE=1 bash run_capture.sh                       # also include the 2 easy smoke tasks
-RUN_OPTIN=1 bash run_capture.sh                   # also run the 16384-budget ceiling cell
-JUDGE_ENGINE=claude-cli bash run_capture.sh       # blind judge via the `claude` CLI (27B can't judge itself)
-JUDGE_BASE_URL=https://host/v1 bash run_capture.sh  # ...or a stronger hosted judge (OpenAI-compatible)
-MODELS_DIR=/path/to/gguf bash run_capture.sh      # models elsewhere
+SMOKE=1 bash run_capture.sh                      # also include the 2 easy smoke tasks
+RUN_OPTIN=1 bash run_capture.sh                  # also run the 16384-budget ceiling cell
+JUDGE_ENGINE=http JUDGE_BASE_URL=https://host/v1 bash run_capture.sh   # judge via a hosted endpoint instead
+JUDGE_ENGINE=none SUMMARY=0 bash run_capture.sh  # capture+grade+charts only (no claude, no tmux needed)
+MODELS_DIR=/path/to/gguf bash run_capture.sh     # models elsewhere
 ```
 
-> **The judge is Claude, not the 27B** — a judge must be stronger than the model under test, and the
-> 27B is the best *local* model. Rubric + the three ways to run it (CLI / hosted / manual) are in
-> **`JUDGE.md`**. The judge only scores subjective quality; correctness stays the toolchain's job.
+> **One script, no human interaction.** It requires a **tmux session** first (`claude-run`) because
+> headless/background `claude` is restricted here — the judge and the final analysis run `claude`
+> *through tmux* (a real PTY). If the session is missing, the script **fails fast with the exact
+> command to start it**, before the hours-long capture. To run without any claude steps:
+> `JUDGE_ENGINE=none SUMMARY=0`.
 
 The driver is **resumable** (per-cell `out/done/<label>` markers — a re-run skips finished cells) and
-**continues past a failed cell** (logged to `out/failures.txt`). For each cell it: starts one
-llama-server on the frozen substrate with `--reasoning-budget N`; samples VRAM/GTT/power across the
-probe; sends the 6 matrix tasks (built at the cell's depth via `build_context.py`, corpus = shared
-cached prefix) through `capture.py`; stops the server. Then it **grades every reply** with the real
-toolchain (`score_typescript.py batch`), runs the **blind LLM judge** (`judge.py`, if `JUDGE_BASE_URL`
-is set), and **generates the charts** (`make_charts.py`).
+**continues past a failed cell** (logged to `out/failures.txt`). End to end it: (1) per cell, starts one
+llama-server on the frozen substrate with `--reasoning-budget N`, samples VRAM/GTT/power, sends the 6
+matrix tasks (built at the cell's depth by `build_context.py`, corpus = shared cached prefix) through
+`capture.py`, stops the server; (2) **grades** every reply with the real toolchain
+(`score_typescript.py batch`); (3) **judges** subjective quality (`judge.py --engine claude-tmux`, blind,
+via `claude_ask.sh`); (4) **charts** (`make_charts.py`); (5) **writes `analysis.md`** by driving the
+**benchmark-results skill** through `claude` (again via tmux), then reindexes `docs/INDEX.md`.
 
 **Outputs (in `out/`):** `outputs.jsonl` (replies + token/latency/throughput), `scores_typescript.jsonl`
 (per-reply objectives + score + hard_pass), `judge_scores.jsonl` + `judge_raw.jsonl` (subjective
 design/clarity/robustness + the full judge prompt & reply), `vram.jsonl` + `gpu_*.csv`
-(memory/power/thermal), `props_*.json` (per-server provenance), and `charts/*.svg` + `charts/appendix.md`.
-**All of these are committed** so the run is fully auditable/reproducible.
-
-**Then document it** with the **`benchmark-results`** skill — it reads `out/` and writes the
-co-located `analysis.md` (summary + table first, memory column mandatory), embedding
-`charts/appendix.md` directly. The runner already produced the charts, so the skill's job is analysis,
-not plumbing.
+(memory/power/thermal), `props_*.json` (per-server provenance), `charts/*.svg` + `charts/appendix.md`,
+and the co-located **`analysis.md`**. Commit the run data after eyeballing `analysis.md` (the model
+wrote it — verify the numbers trace to the jsonl before trusting it).
 
 ---
 

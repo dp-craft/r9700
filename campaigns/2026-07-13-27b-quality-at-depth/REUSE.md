@@ -95,9 +95,10 @@ confirm the grader still discriminates before spending GPU time.
 ## 5. Swap the LLM judge
 
 The blind judge (`judge.py`) has two transports — pick per your environment:
-- **`--engine claude-cli`** (`JUDGE_ENGINE=claude-cli`) — headless `claude -p`; use when the model under
-  test is the strongest thing you have locally (our case: a 27B can't judge itself). Needs the `claude`
-  CLI installed + authenticated.
+- **`--engine claude-tmux`** (`JUDGE_ENGINE=claude-tmux`, the default) — `claude` run **through tmux**
+  (`claude_ask.sh`); use when the model under test is the strongest thing you have locally (our case: a
+  27B can't judge itself). Needs the `claude` CLI authenticated **and** a tmux session (headless is
+  restricted); the runner errors with the start command if it's missing.
 - **`--engine http`** (`JUDGE_BASE_URL=<…/v1> JUDGE_MODEL=<name> JUDGE_API_KEY=<env>`) — any stronger
   OpenAI-compatible endpoint.
 

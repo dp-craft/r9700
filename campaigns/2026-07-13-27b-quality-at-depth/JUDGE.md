@@ -33,19 +33,22 @@ can change `AXES`/`RUBRIC` (here and in `judge.py`) without touching the charts.
 
 ## Three ways to run it
 
-### 1. Automatic — Claude CLI (recommended; fully hands-off)
-Requires the `claude` CLI **installed + authenticated** on the box. The runner does it for you:
+### 1. Automatic — Claude via tmux (default; fully hands-off)
+Headless/background `claude` is restricted here, so every claude call runs **through tmux** (a real
+PTY). Start the session **once**, then the runner does the rest:
 
 ```bash
-JUDGE_ENGINE=claude-cli bash run_capture.sh            # judges after grading
+tmux new-session -d -s claude-run                      # ONCE (name overridable: CLAUDE_TMUX_SESSION)
+bash run_capture.sh                                    # judges (and writes analysis.md) automatically
 # or judge an existing run without re-capturing:
-JUDGE_ENGINE=claude-cli python3 judge.py --engine claude-cli \
+python3 judge.py --engine claude-tmux --model opus \
   --outputs out/outputs.jsonl --tasks tasks.jsonl \
-  --out out/judge_scores.jsonl --raw out/judge_raw.jsonl --model opus
+  --out out/judge_scores.jsonl --raw out/judge_raw.jsonl
 ```
-Under the hood it calls `claude -p "<rubric+spec+code>"` per reply (headless print mode — **not** tmux;
-`claude -p` is the designed non-interactive interface, tmux would just scrape a TTY). Resumable: replies
-already in `out/judge_scores.jsonl` are skipped, so a re-run only fills gaps.
+Mechanism (`claude_ask.sh`): per reply, the rubric+spec+code is fed to `claude -p` **on stdin** inside a
+fresh tmux window (`--output-format json`), from a **neutral cwd** so the repo's CLAUDE.md is NOT loaded
+(the judge stays blind). If the tmux session is missing, it **errors and tells you to start it** — it
+never silently falls back to headless. Resumable: replies already in `out/judge_scores.jsonl` are skipped.
 
 ### 2. Automatic — any stronger hosted model (OpenAI-compatible)
 ```bash

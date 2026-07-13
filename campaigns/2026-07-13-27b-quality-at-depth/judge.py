@@ -6,25 +6,28 @@ adds the SUBJECTIVE axes a toolchain can't measure — design, clarity, robustne
 judge model to review each candidate. **Blind:** the prompt never reveals which config/model produced
 the answer. Works against any OpenAI-compatible endpoint (hosted API or a strong local model).
 
-Because the 27B under test IS the strongest LOCAL model, the judge is Claude via the `claude` CLI
-(--engine claude-cli) — or any stronger hosted model (--engine http). Human-readable rubric + run
-modes: JUDGE.md (kept in sync with this file). Saves BOTH the parsed scores (--out judge_scores.jsonl:
-config/task_id/rep/design/clarity/robustness/notes) AND the full judge prompt+reply (--raw
-judge_raw.jsonl) so every input is committable + auditable. Resumable: (config,task_id,rep) already in
---out are skipped.
+Because the 27B under test IS the strongest LOCAL model, the judge is Claude via the `claude` CLI, run
+THROUGH tmux (--engine claude-tmux; headless/background claude is restricted here) — or any stronger
+hosted model (--engine http). Human-readable rubric + run modes: JUDGE.md (kept in sync with this
+file). Saves BOTH the parsed scores (--out judge_scores.jsonl: config/task_id/rep/design/clarity/
+robustness/notes) AND the full judge prompt+reply (--raw judge_raw.jsonl) so every input is committable
++ auditable. Resumable: (config,task_id,rep) already in --out are skipped.
 
-  # Claude CLI (local box, 27B is the best local model):
-  python3 judge.py --engine claude-cli --outputs out/outputs.jsonl --tasks tasks.jsonl \
+  # Claude via tmux (local box, 27B is the best local model) — needs a tmux session (see claude_ask.sh):
+  python3 judge.py --engine claude-tmux --outputs out/outputs.jsonl --tasks tasks.jsonl \
       --model opus --out out/judge_scores.jsonl --raw out/judge_raw.jsonl
   # or a hosted OpenAI-compatible endpoint:
   JUDGE_API_KEY=... python3 judge.py --engine http --base-url https://api.example/v1 --model my-judge \
       --outputs out/outputs.jsonl --tasks tasks.jsonl --out out/judge_scores.jsonl --raw out/judge_raw.jsonl
 """
-import argparse, json, os, re, subprocess, sys, urllib.request
+import argparse, json, os, re, subprocess, sys, tempfile, urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from score_typescript import extract_files            # reuse the exact same code-block parser
+# a neutral cwd so `claude` does NOT auto-load the repo CLAUDE.md as context (a blind judge sees only
+# the prompt we give it — verified: cuts loaded context ~19k->4k tokens)
+NEUTRAL_CWD = tempfile.mkdtemp(prefix="judge-claude-")
 
 THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
 AXES = ["design", "clarity", "robustness"]
@@ -63,18 +66,25 @@ def call_http(base, model, key, prompt, timeout=300):
     return obj["choices"][0]["message"]["content"]
 
 
-def call_claude_cli(model, prompt, timeout=300):
-    """Headless `claude -p` (print mode) — the judge is Claude because 27B is the strongest LOCAL model,
-    so no local endpoint can judge it. Requires the `claude` CLI installed + authenticated on the box.
-    We do NOT use tmux: `claude -p` is the designed non-interactive interface (tmux would mean scraping
-    a TTY). Prompt passed as argv (the judge prompt is small — spec + code, not the 128k context)."""
-    cmd = ["claude", "-p", prompt]
+def call_claude_tmux(model, prompt, timeout=900):
+    """Run the judge prompt through the tmux gateway (claude_ask.sh) — headless/background claude is
+    restricted here, so it runs inside a tmux window (real PTY). Prompt on stdin (no argv escaping);
+    result is claude's `--output-format json` envelope; we return its `.result` text for parse_scores.
+    Runs from NEUTRAL_CWD so the repo CLAUDE.md isn't loaded (blind judge)."""
+    pf = os.path.join(NEUTRAL_CWD, "prompt.txt"); rf = os.path.join(NEUTRAL_CWD, "result.json")
+    with open(pf, "w") as f:
+        f.write(prompt)
+    cmd = [os.path.join(HERE, "claude_ask.sh"), "--prompt", pf, "--result", rf, "--cwd", NEUTRAL_CWD]
     if model:
         cmd += ["--model", model]
-    r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    env = dict(os.environ, CLAUDE_ASK_TIMEOUT=str(timeout))
+    r = subprocess.run(cmd, capture_output=True, text=True, env=env)
     if r.returncode != 0:
-        raise RuntimeError((r.stderr or r.stdout or "claude cli failed")[-500:])
-    return r.stdout
+        raise RuntimeError((r.stderr or "claude_ask.sh failed")[-600:])
+    env_json = json.load(open(rf))
+    if env_json.get("is_error"):
+        raise RuntimeError("claude is_error: " + str(env_json.get("result"))[:300])
+    return env_json.get("result", "")
 
 
 def parse_scores(text):
@@ -100,9 +110,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--outputs", required=True)
     ap.add_argument("--tasks", required=True)
-    ap.add_argument("--engine", choices=["http", "claude-cli"], default="http",
-                    help="http = any OpenAI-compatible endpoint; claude-cli = headless `claude -p` "
-                         "(use this when 27B is the strongest LOCAL model, so Claude must judge)")
+    ap.add_argument("--engine", choices=["http", "claude-tmux"], default="http",
+                    help="http = any OpenAI-compatible endpoint; claude-tmux = `claude` via the tmux "
+                         "gateway (use this when 27B is the strongest LOCAL model, so Claude must judge)")
     ap.add_argument("--base-url", default="", help="required for --engine http")
     ap.add_argument("--model", default="")
     ap.add_argument("--out", required=True)
@@ -112,7 +122,7 @@ def main():
     key = os.environ.get(a.key_env, "")
     if a.engine == "http" and not a.base_url:
         sys.exit("--engine http needs --base-url (an OpenAI-compatible /v1). "
-                 "For a local box where 27B is the best model, use --engine claude-cli instead.")
+                 "For a local box where 27B is the best model, use --engine claude-tmux instead.")
 
     # matrix tasks only, and remember tiers for the score rows
     tiers = {}
@@ -142,7 +152,7 @@ def main():
         prompt = judge_prompt(tid, code)
         n += 1
         try:
-            raw = (call_claude_cli(a.model, prompt) if a.engine == "claude-cli"
+            raw = (call_claude_tmux(a.model, prompt) if a.engine == "claude-tmux"
                    else call_http(a.base_url, a.model, key, prompt))
         except Exception as e:
             print(f"  [{cfg}] {tid} rep{rep}: JUDGE ERROR {e}", file=sys.stderr)
