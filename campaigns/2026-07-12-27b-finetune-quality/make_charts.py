@@ -102,47 +102,67 @@ def stacked_tokens(title, rows, w=720):
 
 
 def dumbbell(title, rows, w=720):
-    """rows: (label, ttft, ttfa, slot). line = think_time; left dot ttft, right dot ttfa."""
+    """rows: (label, ttft, ttfa, slot) or (label, ttft, ttfa, ttlt, slot). Solid line ttft→ttfa =
+    thinking; when ttlt (time to LAST token, the full wait) is given, a faded line ttfa→ttlt =
+    answer generation, ending in a square marker labeled with the full time."""
+    rows = [(r if len(r) == 5 else (r[0], r[1], r[2], None, r[3])) for r in rows]
     rows = [r for r in rows if isinstance(r[1], (int, float)) and isinstance(r[2], (int, float))]
     pad_l, pad_r, top, rh, gap = 168, 96, 66, 24, 16
     h = top + len(rows) * (rh + gap) + 34
-    vmax = max([r[2] for r in rows] + [1e-9]) * 1.12
+    vmax = max([(r[3] if isinstance(r[3], (int, float)) else r[2]) for r in rows] + [1e-9]) * 1.12
     plot_w = w - pad_l - pad_r
     def x(v): return pad_l + plot_w * v / vmax
+    has_ttlt = any(isinstance(r[3], (int, float)) for r in rows)
+    legend = '○ first token (ttft) — ● first ANSWER token (ttfa)' + \
+             (' — ■ LAST token (full wait)' if has_ttlt else '') + ' · all seconds'
     b = [f'<text x="20" y="26" class="t" font-size="15">{esc(title)}</text>',
-         '<text x="20" y="44" class="mut" font-size="11">○ first token (ttft) — ● first ANSWER token (ttfa) · gap = time spent thinking (s)</text>']
-    for i, (lab, ttft, ttfa, slot) in enumerate(rows):
+         f'<text x="20" y="44" class="mut" font-size="11">{legend}</text>']
+    for i, (lab, ttft, ttfa, ttlt, slot) in enumerate(rows):
         y = top + i * (rh + gap) + rh / 2
         b.append(f'<text x="{pad_l-10}" y="{y+4}" text-anchor="end" class="lab" font-size="12.5">{esc(lab)}</text>')
         b.append(f'<line x1="{x(ttft):.1f}" y1="{y}" x2="{x(ttfa):.1f}" y2="{y}" stroke="var(--s{slot+1})" stroke-width="3"/>')
+        if isinstance(ttlt, (int, float)) and ttlt > ttfa:
+            b.append(f'<line x1="{x(ttfa):.1f}" y1="{y}" x2="{x(ttlt):.1f}" y2="{y}" stroke="var(--s{slot+1})" stroke-width="3" opacity="0.4"/>')
+            b.append(f'<rect x="{x(ttlt)-5:.1f}" y="{y-5}" width="10" height="10" rx="2" fill="var(--s{slot+1})" stroke="var(--surface)" stroke-width="1.5"/>')
+            b.append(f'<text x="{x(ttlt)+10:.1f}" y="{y+4}" class="val" font-size="12">{ttlt:.0f}s</text>')
+        else:
+            b.append(f'<text x="{x(ttfa)+9:.1f}" y="{y+4}" class="val" font-size="12">{ttfa:.1f}s</text>')
         b.append(f'<circle cx="{x(ttft):.1f}" cy="{y}" r="6" fill="var(--surface)" stroke="var(--s{slot+1})" stroke-width="2.5"/>')
         b.append(f'<circle cx="{x(ttfa):.1f}" cy="{y}" r="7" fill="var(--s{slot+1})" stroke="var(--surface)" stroke-width="2"/>')
-        b.append(f'<text x="{x(ttfa)+9:.1f}" y="{y+4}" class="val" font-size="12">{ttfa:.1f}s</text>')
     return svg(w, int(h), "".join(b))
 
 
-def scatter_quality_cost(title, pts, w=720, h=470):
-    """pts: (label, cost_tokens, quality_pct, slot). Headline decision chart (up-left = best).
+def scatter_quality_cost(title, pts, w=720, h=470,
+                         xlabel="mean tokens per task (cost →)",
+                         sub="↑ better quality · ← fewer tokens · so UP-and-LEFT is the efficient choice",
+                         yrefs=None):
+    """pts: (label, x_cost, quality_pct, slot). Headline decision chart (up-left = best); the x axis
+    is any 'price' (tokens, seconds to last token, …) via xlabel/sub. yrefs: optional [(label, pct)]
+    horizontal dashed reference lines (haiku/sonnet/opus capability bands) sharing the y-scale.
     y is zoomed to the data band (padded) so near-equal configs separate; labels are decluttered
     vertically with leader lines and flip to the left of the marker near the right edge."""
     pts = [p for p in pts if isinstance(p[1], (int, float)) and isinstance(p[2], (int, float))]
     pad_l, pad_r, top, pad_b = 92, 96, 66, 58
     xmin, xmax = 0, max([p[1] for p in pts] + [1]) * 1.18
-    qs = [p[2] for p in pts] or [0, 100]
+    yrefs = [(l, v) for l, v in (yrefs or []) if isinstance(v, (int, float))]
+    qs = [p[2] for p in pts] + [v for _, v in yrefs] or [0, 100]
     ymin = max(0, (min(qs) // 10) * 10 - 5); ymax = min(100, (max(qs) // 10) * 10 + 12)
     if ymax - ymin < 20: ymax = min(100, ymin + 20)
     pw, ph = w - pad_l - pad_r, h - top - pad_b
     def X(v): return pad_l + pw * (v - xmin) / (xmax - xmin)
     def Y(v): return top + ph * (1 - (v - ymin) / (ymax - ymin))
     b = [f'<text x="20" y="26" class="t" font-size="15">{esc(title)}</text>',
-         '<text x="20" y="44" class="mut" font-size="11">↑ better quality · ← fewer tokens · so UP-and-LEFT is the efficient choice</text>']
+         f'<text x="20" y="44" class="mut" font-size="11">{esc(sub)}</text>']
+    for rlab, rval in yrefs:                             # capability bands (behind everything else)
+        b.append(f'<line x1="{pad_l}" y1="{Y(rval):.1f}" x2="{pad_l+pw}" y2="{Y(rval):.1f}" stroke="var(--muted)" stroke-width="1" stroke-dasharray="4 3"/>')
+        b.append(f'<text x="{pad_l+pw+4}" y="{Y(rval)+4:.1f}" class="mut" font-size="10">{esc(rlab)}</text>')
     step = 5 if (ymax - ymin) <= 30 else 10
     gy = int(ymin)
     while gy <= ymax:                                  # recessive gridlines + y ticks
         b.append(f'<line x1="{pad_l}" y1="{Y(gy):.1f}" x2="{pad_l+pw}" y2="{Y(gy):.1f}" stroke="var(--grid)" stroke-width="1"/>')
         b.append(f'<text x="{pad_l-10}" y="{Y(gy)+4:.1f}" text-anchor="end" class="mut" font-size="11">{gy}</text>')
         gy += step
-    b.append(f'<text x="{pad_l}" y="{h-16}" class="lab" font-size="12">mean tokens per task (cost →)</text>')
+    b.append(f'<text x="{pad_l}" y="{h-16}" class="lab" font-size="12">{esc(xlabel)}</text>')
     b.append(f'<text x="20" y="{top+ph/2}" class="lab" font-size="12" transform="rotate(-90 20 {top+ph/2:.0f})" text-anchor="middle">quality %  ↑</text>')
     for gx in range(1, 5):
         xv = xmax * gx / 4
@@ -318,6 +338,7 @@ def main():
     prefill = {c: mean(v) for c, v in by("prefill_tps").items()}
     ttft = {c: mean(v) for c, v in by("ttft_s").items()}
     ttfa = {c: mean(v) for c, v in by("ttfa_s").items()}
+    ttlt = {c: mean(v) for c, v in by("latency_s").items()}   # time to LAST token = full wall time
     def _rate(c):
         m = mean([1 if r.get("truncated_thinking") else 0 for r in outs if r.get("config") == c])
         return 100 * m if m is not None else None
@@ -370,6 +391,23 @@ def main():
     pts = [(c.replace("-mtp", "‑mtp"), tok_total.get(c), detpass.get(c), S(c)) for c in configs]
     files["quality_vs_cost.svg"] = scatter_quality_cost(
         "Quality vs token cost — the efficient frontier", pts)
+    # 1b. combined decision chart: quality vs the FULL wait (time to last token), one labeled point
+    #     per config — quality, latency and the config knob (in the label) in a single picture.
+    pts_t = [(c.replace("-mtp", "‑mtp"), ttlt.get(c), detpass.get(c), S(c)) for c in configs]
+    if any(isinstance(p[1], (int, float)) for p in pts_t):
+        files["quality_vs_time.svg"] = scatter_quality_cost(
+            "Quality vs full answer time (to LAST token)", pts_t,
+            xlabel="mean seconds until the answer is complete (wait →)",
+            sub="↑ better quality · ← shorter full wait · UP-and-LEFT wins · dashed = haiku/sonnet/opus bands",
+            yrefs=refs)
+    # 1c. per-config scorecard: the strictly-related outcomes side by side (quality · judge · full
+    #     time · memory), same row order and colors everywhere — the one-glance decision panel.
+    files["scorecard.svg"] = small_multiples("Config scorecard — quality · judge · full time · memory", [
+        ("Quality — mean TS score (%)", "%", "{:.0f}", [(c, detpass.get(c), S(c)) for c in configs]),
+        ("LLM-judge (design+clarity+robustness, /5)", "", "{:.1f}", [(c, judge_mean.get(c), S(c)) for c in configs]),
+        ("Full answer time (s to last token)", "s", "{:.0f}", [(c, ttlt.get(c), S(c)) for c in configs]),
+        ("Peak VRAM (MiB)", "", "{:.0f}", [(c, vr.get(c, {}).get("peak_vram_used_mib", vr.get(c, {}).get("vram_used_mib_at_load")), S(c)) for c in configs]),
+    ])
     # 2. deterministic pass rate
     files["quality_deterministic.svg"] = hbar(
         "Deterministic accuracy (objective, auto-graded)",
@@ -392,10 +430,10 @@ def main():
         ("Prefill tok/s (prompt ingest)", "", "{:.0f}",
          [(c, prefill.get(c), S(c)) for c in configs]),
     ])
-    # 6. latency dumbbell
+    # 6. latency dumbbell (ttft → ttfa → last token = the full wait)
     files["latency.svg"] = dumbbell(
-        "Latency — time to first token vs first ANSWER token",
-        [(c, ttft.get(c), ttfa.get(c), S(c)) for c in configs])
+        "Latency — first token → first ANSWER token → LAST token",
+        [(c, ttft.get(c), ttfa.get(c), ttlt.get(c), S(c)) for c in configs])
     # 7. memory / power / thermal small multiples
     files["memory_power.svg"] = small_multiples("Memory · power · thermal (per config)", [
         ("Peak VRAM (MiB)", "", "{:.0f}", [(c, vr.get(c, {}).get("peak_vram_used_mib", vr.get(c, {}).get("vram_used_mib_at_load")), S(c)) for c in configs]),
@@ -457,6 +495,7 @@ def main():
         "total_tokens": ("Total tokens / task", "", "{:.0f}", tok_total),
         "ttfa_s": ("Time to first ANSWER token", "s", "{:.0f}", ttfa),
         "ttft_s": ("Time to first token", "s", "{:.1f}", ttft),
+        "ttlt_s": ("Full answer time (to last token)", "s", "{:.0f}", ttlt),
         "decode_tps": ("Decode tok/s", "", "{:.0f}", decode),
         "prefill_tps": ("Prefill tok/s", "", "{:.0f}", prefill),
         "runaway_pct": ("Runaway rate", "%", "{:.0f}",
@@ -495,6 +534,8 @@ def main():
                 "each chart uses a single axis (differently-scaled metrics are separate panels). "
                 "SVGs are theme-aware (light/dark)._\n"]
     order_titles = list(sweep_appendix) + [
+        ("scorecard.svg", "Config scorecard — quality · judge · full time · memory at one glance"),
+        ("quality_vs_time.svg", "Decision: quality vs full answer time (time to LAST token)"),
         ("capability.svg", "Capability — mean TS score vs haiku/sonnet/opus reference"),
         ("hard_pass.svg", "Hard-pass rate (all gate objectives)"),
         ("objective_breakdown.svg", "Objective breakdown (where configs fail)"),
@@ -511,15 +552,48 @@ def main():
         if fn in files:
             ap_lines.append(f"\n**{ti}**\n\n![{ti}]({cbase}/{fn})\n")
     # data table (relief for low-contrast slots + color-independent record)
-    ap_lines.append("\n### Data table\n")
-    ap_lines.append("| config | TS % | hard % | det % | judge/5 | think tok | ans tok | decode t/s | ttfa s | peak VRAM | trunc % |")
-    ap_lines.append("|--------|-----:|-------:|------:|--------:|----------:|--------:|-----------:|-------:|----------:|--------:|")
     def f(x, d=0): return "—" if x is None else (f"{x:.{d}f}")
+    ap_lines.append("\n### Data table\n")
+    ap_lines.append("| config | TS % | hard % | det % | judge/5 | think tok | ans tok | decode t/s | ttfa s | full s | peak VRAM | trunc % |")
+    ap_lines.append("|--------|-----:|-------:|------:|--------:|----------:|--------:|-----------:|-------:|-------:|----------:|--------:|")
     for c in configs:
         v = vr.get(c, {})
         ap_lines.append(f"| {c} | {f(tsscore.get(c))} | {f(tshard.get(c))} | {f(detpass.get(c))} | {f(judge_mean.get(c),1)} | {f(tok_think.get(c))} | "
-                        f"{f(tok_ans.get(c))} | {f(decode.get(c),1)} | {f(ttfa.get(c),1)} | "
+                        f"{f(tok_ans.get(c))} | {f(decode.get(c),1)} | {f(ttfa.get(c),1)} | {f(ttlt.get(c),1)} | "
                         f"{f(v.get('peak_vram_used_mib', v.get('vram_used_mib_at_load')))} | {f(trunc.get(c))} |")
+
+    # --- full LLM-judge detail: every verdict, auditable (scores + the judge's own note), joined with
+    #     the deterministic grade so "what failed / what stood out" is readable in ONE table ---
+    if judg:
+        ts_idx = {(t.get("config"), t.get("task_id"), t.get("rep", 0)): t for t in tss}
+        out_idx = {(r.get("config"), r.get("task_id"), r.get("rep", 0)): r for r in outs}
+        ap_lines.append("\n### LLM-judge verdicts — full detail (one row per candidate, blind review)\n")
+        ap_lines.append("_design/clarity/robustness: 0–5 from the blind judge (opus). TS % + hard-pass and the "
+                        "**fails:** list come from the deterministic grader (tsc/eslint/vitest — objectives <1.0). "
+                        "⚠trunc = thinking hit the token budget. The note is the judge's own one-line review._\n")
+        ap_lines.append("| config | task | rep | tier | TS % | hard | design | clarity | robust | judge note · deterministic fails |")
+        ap_lines.append("|--------|------|----:|------|-----:|:----:|-------:|--------:|-------:|----------------------------------|")
+        for j in sorted(judg, key=lambda r: (slot_of(r.get("config"), order), str(r.get("task_id")), r.get("rep") or 0)):
+            k = (j.get("config"), j.get("task_id"), j.get("rep", 0))
+            t = ts_idx.get(k); o = out_idx.get(k, {})
+            failed = ", ".join(f"{n} {v:.2f}" for n, v in ((t or {}).get("objectives") or {}).items()
+                               if isinstance(v, (int, float)) and v < 1)
+            note = str(j.get("notes") or "").replace("|", "\\|").replace("\n", " ")
+            cell_note = note + (f" — **fails:** {failed}" if failed else "") \
+                             + (" ⚠trunc" if o.get("truncated_thinking") else "")
+            ap_lines.append(f"| {j.get('config')} | {j.get('task_id')} | {j.get('rep',0)} | {j.get('tier','?')} | "
+                            f"{f(100*(t.get('score') or 0)) if t else '—'} | "
+                            f"{('✓' if t.get('hard_pass') else '✗') if t else '—'} | "
+                            f"{f(j.get('design'),1)} | {f(j.get('clarity'),1)} | {f(j.get('robustness'),1)} | {cell_note} |")
+        by_task = defaultdict(list)
+        for j in judg:
+            v = jmean(j)
+            if v is not None:
+                by_task[j.get("task_id")].append(v)
+        if by_task:
+            ranked = sorted(by_task.items(), key=lambda kv: mean(kv[1]) or 0)
+            ap_lines.append("\n**Judge mean by task** (weakest first): " +
+                            " · ".join(f"`{t}` {mean(v):.1f}" for t, v in ranked))
     open(f"{cdir}/appendix.md", "w").write("\n".join(ap_lines) + "\n")
     print(f"wrote {len(files)} charts + appendix.md -> {cdir}/")
     for n in files:

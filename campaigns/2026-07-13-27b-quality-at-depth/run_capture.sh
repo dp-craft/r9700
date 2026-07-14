@@ -3,8 +3,11 @@
 # For each cell in configs.jsonl (model × depth×KV × reasoning-budget), at fixed Qwen3.6-thinking
 # sampling (temp 0.6 / top_p 0.95 / top_k 20 / min_p 0): start ONE llama-server, sample VRAM across
 # the whole probe, send every TS-TDD task via capture.py (the corpus is a shared cached prefix →
-# only the first task per server pays the deep prefill), stop the server. Resumable (per-cell done
-# markers), continues past a failed cell. Then batch-grade (real tsc/eslint/vitest) + make charts.
+# only the first task per server pays the deep prefill), stop the server. Resumable at TWO levels:
+# per-cell done markers here, AND row-level in capture.py ((config,task,rep) rows already in
+# outputs.jsonl are never re-captured or duplicated — so deleting a done marker after a partial/
+# lower-REPS run only captures what's missing). Continues past a failed cell. Then batch-grade
+# (real tsc/eslint/vitest) + make charts.
 #
 # ONE script, no human interaction: capture -> grade (tsc/eslint/vitest) -> blind LLM judge -> charts ->
 # auto-write analysis.md via the benchmark-results skill. The judge + summary run `claude` THROUGH tmux
@@ -199,7 +202,18 @@ Write analysis.md to the skill's contract: TL;DR + results TABLE FIRST (a memory
 then detail. Every number you cite comes from summary.md/appendix.md — tag them MEASURED, and mark any
 reasoning INFERRED; invent nothing. Cover the 4 campaign questions exactly as summary.md's "Findings"
 lists them: (a) budget optimum vs depth, (b) 64k->128k rule-adherence/reuse (lost-in-the-middle), (c) KV
-f16-vs-q8 @128k (<=5% rule), (d) capability vs haiku/Sonnet/Opus. Embed charts/appendix.md. Include a
+f16-vs-q8 @128k (<=5% rule), (d) capability vs haiku/Sonnet/Opus. Embed charts/appendix.md.
+
+JUDGE DETAIL (readers are architects/decision makers — they want the evidence, not just the mean):
+appendix.md ends with "LLM-judge verdicts — full detail" (every candidate's design/clarity/robustness
+points + the judge's one-line note + which deterministic objectives failed) and a "Judge mean by task"
+ranking. In analysis.md add a "Judge verdicts" section that (1) copies the per-cell judge d.c.r axis
+means from summary.md's table, (2) quotes the 3-5 most informative judge notes VERBATIM (worst-scored
+and best-scored candidates — what failed, what was unexpected or outstanding), (3) copies the
+"Judge mean by task" line, and (4) links to charts/appendix.md for the full verdict table — do NOT
+re-type the big table row by row.
+
+Include a
 <!-- meta --> block (see docs/analysis/ examples) so docs/reindex.py can register it. If summary.md's
 Health line flags failures/runaways/GTT spill, surface them.
 

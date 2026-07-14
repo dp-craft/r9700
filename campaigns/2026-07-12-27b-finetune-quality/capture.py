@@ -18,7 +18,7 @@ Streaming SSE, so TTFT/TTFA are true measurements. Stdlib only (urllib).
     python3 capture.py --config rico03-distilled --tasks tasks/tasks.jsonl --out OUT/outputs.jsonl \
         --base-url http://127.0.0.1:8081 --reps 1 --max-tokens 8192
 """
-import argparse, json, time, urllib.request, re
+import argparse, json, os, time, urllib.request, re
 
 THINK_RE = re.compile(r"<think>(.*?)</think>", re.S)
 
@@ -115,10 +115,24 @@ def main():
 
     tasks = [json.loads(l) for l in open(a.tasks) if l.strip()]
     base = a.base_url.rstrip("/")
-    n = 0
+    # row-level resume: (config, task_id, rep) rows already captured SUCCESSFULLY in --out are skipped,
+    # so a partial/single-cell run and a later full run share one outputs.jsonl without duplicates
+    # (error rows are NOT counted as done — they get retried). Bump --reps and only the new reps run.
+    done = set()
+    if os.path.exists(a.out):
+        for l in open(a.out):
+            if not l.strip():
+                continue
+            r = json.loads(l)
+            if not r.get("error") and r.get("response"):
+                done.add((r.get("config"), r.get("task_id"), r.get("rep", 0)))
+    n = skipped = 0
     with open(a.out, "a") as fout:
         for t in tasks:
             for rep in range(a.reps):
+                if (a.config, t["id"], rep) in done:
+                    skipped += 1
+                    continue
                 sampling = {"temperature": a.temp, "top_p": a.top_p, "top_k": a.top_k,
                             "seed": a.seed + rep}
                 if a.min_p is not None:
@@ -175,7 +189,7 @@ def main():
                           f"({row['think_tokens']} think/{row['answer_tokens']} ans) | "
                           f"prefill {row['prefill_tps']:.0f} decode {row['decode_tps']:.1f} t/s | "
                           f"ttft {row['ttft_s']}s ttfa {row['ttfa_s']}s | {row['finish_reason']}{trunc}")
-    print(f"captured {n} rows -> {a.out}")
+    print(f"captured {n} rows -> {a.out}" + (f" ({skipped} already present, skipped)" if skipped else ""))
 
 
 if __name__ == "__main__":

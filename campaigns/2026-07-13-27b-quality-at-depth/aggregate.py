@@ -62,8 +62,10 @@ def load_cells(D, configs_path=None):
             "hard_pct": pct([1 if r.get("hard_pass") else 0 for r in tsr]),
             "objectives": objs,
             "judge": mean([mean([r.get("design"), r.get("clarity"), r.get("robustness")]) for r in jdr]) if jdr else None,
+            "judge_axes": {ax: mean([r.get(ax) for r in jdr]) for ax in ("design", "clarity", "robustness")} if jdr else None,
             "think_tok": mean([r.get("think_tokens") for r in outr]),
             "ttfa_s": mean([r.get("ttfa_s") for r in outr]),
+            "ttlt_s": mean([r.get("latency_s") for r in outr]),
             "decode_tps": mean([r.get("decode_tps") for r in outr]),
             "runaway_pct": (100 * runaway) if runaway is not None else None,
             "peak_vram": v.get("peak_vram_used_mib", v.get("vram_used_mib_at_load")),
@@ -149,13 +151,15 @@ def render_md(cells, bands):
          "", "_All numbers computed in Python from out/*.jsonl. The analysis LLM writes prose from THIS "
          "+ charts/appendix.md — it does not read the per-reply jsonl._", "",
          "## Per-cell aggregates", "",
-         "| cell | model | depth | kv | budget | n | TS % | hard % | judge/5 | think tok | ttfa s | decode t/s | peak VRAM | peak GTT | runaway % | fails |",
-         "|------|-------|-------|----|-------:|--:|-----:|-------:|--------:|----------:|-------:|-----------:|----------:|---------:|----------:|------:|"]
+         "| cell | model | depth | kv | budget | n | TS % | hard % | judge/5 | judge d·c·r | think tok | ttfa s | full s | decode t/s | peak VRAM | peak GTT | runaway % | fails |",
+         "|------|-------|-------|----|-------:|--:|-----:|-------:|--------:|:-----------:|----------:|-------:|-------:|-----------:|----------:|---------:|----------:|------:|"]
     for l in order:
         c = cells[l]
+        ja = c.get("judge_axes") or {}
+        dcr = ("·".join(f(ja.get(ax), 1) for ax in ("design", "clarity", "robustness"))) if ja else "—"
         L.append(f"| {l} | {c['model']} | {c['depth']} | {c['kv']} | {c['budget']} | {c['n']} | "
-                 f"{f(c['ts_pct'],0)} | {f(c['hard_pct'],0)} | {f(c['judge'],1)} | {f(c['think_tok'],0)} | "
-                 f"{f(c['ttfa_s'],1)} | {f(c['decode_tps'],1)} | {f(c['peak_vram'],0)} | {f(c['peak_gtt'],0)} | "
+                 f"{f(c['ts_pct'],0)} | {f(c['hard_pct'],0)} | {f(c['judge'],1)} | {dcr} | {f(c['think_tok'],0)} | "
+                 f"{f(c['ttfa_s'],1)} | {f(c['ttlt_s'],1)} | {f(c['decode_tps'],1)} | {f(c['peak_vram'],0)} | {f(c['peak_gtt'],0)} | "
                  f"{f(c['runaway_pct'],0)} | {c['n_fail']} |")
     L += ["", "## Findings (computed, not inferred)", ""]
     L += [f"- {s}" for s in findings(cells, bands)]
