@@ -179,11 +179,107 @@ def build_digest(D, out_path=None, configs_path=None, calib_files=None):
     return out_path, cells, bands, md
 
 
+# ---------------------------------------------------------------------------
+# Per-TASK aggregation (for analysis_detailed.md): one record per (task, config),
+# joined with judge notes + per-reply timing, plus per-task calibration references.
+# Reads only SMALL fields from outputs.jsonl (drops the huge `response`). Lets the
+# analysis LLM write task-level prose + charts without touching the raw jsonl.
+# ---------------------------------------------------------------------------
+OBJ_ALL = ["types", "lint", "tests", "edge", "reuse", "bdd", "novj"]
+
+
+def calib_by_task(files=None):
+    """{task: {model: score%}} from the calibration one-shots (haiku/sonnet/opus)."""
+    files = files or [os.path.join(HERE, "calibration.jsonl"), os.path.join(HERE, "calibration-hard.jsonl")]
+    out = {}
+    for r in (row for p in files for row in jl(p)):
+        t, m, s = r.get("task"), r.get("model"), r.get("score")
+        if t is None or m is None or s is None:
+            continue
+        out.setdefault(t, {})[m] = 100 * s
+    return out
+
+
+def load_by_task(D, scores_file="scores_typescript.jsonl", configs_path=None):
+    """Per (task, config) aggregate. `scores_file` selects the grade source (e.g. the corrected
+    re-grade). Timing uses GENERATION time = (think+answer)/decode_tps — prefill-free, so the shared
+    cold-prefill outlier (~300 s on the first task of a server) does not pollute per-task cost."""
+    cfgs = {c["label"]: c for c in jl(configs_path or os.path.join(HERE, "configs.jsonl"))}
+    ts = jl(f"{D}/{scores_file}")
+    jd = jl(f"{D}/judge_scores.jsonl")
+    out = jl(f"{D}/outputs.jsonl")
+    o_idx = {}
+    for r in out:
+        o_idx.setdefault((r.get("config"), r.get("task_id")), []).append(r)
+    tasks = list(dict.fromkeys(r.get("task_id") for r in ts))          # first-seen order
+    refs = calib_by_task()
+    by = {}
+    for task in tasks:
+        tier = next((r.get("tier") for r in ts if r.get("task_id") == task and r.get("tier")), None)
+        cells = {}
+        for label, c in cfgs.items():
+            tsr = [r for r in ts if r.get("config") == label and r.get("task_id") == task]
+            if not tsr:
+                continue
+            jdr = [r for r in jd if r.get("config") == label and r.get("task_id") == task]
+            outr = o_idx.get((label, task), [])
+            objs = {k: mean([(r.get("objectives") or {}).get(k) for r in tsr]) for k in OBJ_ALL}
+            objs = {k: v for k, v in objs.items() if v is not None}
+            think = mean([r.get("think_tokens") for r in outr])
+            ans = mean([r.get("answer_tokens") for r in outr])
+            gen = mean([((r.get("think_tokens") or 0) + (r.get("answer_tokens") or 0)) / r["decode_tps"]
+                        for r in outr if r.get("decode_tps")])
+            warm = min([r.get("ttft_s") for r in outr if isinstance(r.get("ttft_s"), (int, float))], default=None)
+            cap = mean([1 if (r.get("truncated_thinking") or r.get("finish_reason") == "length") else 0 for r in outr])
+            cells[label] = {
+                "model": c.get("model", "").split(".gguf")[0], "depth": c.get("depth"), "kv": c.get("kv"),
+                "budget": c.get("budget"), "mtp": c.get("mtp"), "n": len(tsr),
+                "ts_pct": pct([r.get("score") for r in tsr]),
+                "hard_pct": pct([1 if r.get("hard_pass") else 0 for r in tsr]),
+                "objectives": objs,
+                "judge": {ax: mean([r.get(ax) for r in jdr]) for ax in ("design", "clarity", "robustness")} if jdr else None,
+                "judge_mean": mean([mean([r.get("design"), r.get("clarity"), r.get("robustness")]) for r in jdr]) if jdr else None,
+                "notes": [{"rep": r.get("rep"), "design": r.get("design"), "clarity": r.get("clarity"),
+                           "robustness": r.get("robustness"), "note": r.get("notes"),
+                           "fails": {k: v for k, v in ((next((s for s in tsr if s.get("rep") == r.get("rep")), {}) or {})
+                                     .get("objectives") or {}).items() if isinstance(v, (int, float)) and v < 1}}
+                          for r in sorted(jdr, key=lambda x: x.get("rep") or 0)],
+                "think_tok": think, "answer_tok": ans, "out_tok": (think + ans) if (think is not None and ans is not None) else None,
+                "total_tok": mean([r.get("total_tokens") for r in outr]),
+                "decode_tps": mean([r.get("decode_tps") for r in outr]),
+                "gen_s": gen, "ttft_warm_s": warm, "cap_hit_pct": (100 * cap) if cap is not None else None,
+            }
+        by[task] = {"tier": tier, "refs": refs.get(task, {}), "cells": cells}
+    return by
+
+
+def cell_ts_by_scores(D, scores_file):
+    """Per-config mean TS% for a given grade file — for the orig-vs-regrade correction table."""
+    ts = jl(f"{D}/{scores_file}")
+    labels = list(dict.fromkeys(r.get("config") for r in ts))
+    return {l: pct([r.get("score") for r in ts if r.get("config") == l]) for l in labels}, \
+           {l: pct([1 if r.get("hard_pass") else 0 for r in ts if r.get("config") == l]) for l in labels}
+
+
+def build_by_task(D, scores_file="scores_typescript.jsonl", out_json=None):
+    by = load_by_task(D, scores_file)
+    out_json = out_json or f"{D}/summary_by_task.json"
+    with open(out_json, "w") as fh:
+        json.dump({"scores_file": scores_file, "by_task": by, "refs": calib_by_task()}, fh, indent=1)
+    return out_json, by
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dir", default=os.path.join(HERE, "out"))
     ap.add_argument("--out", default="")
+    ap.add_argument("--by-task", action="store_true", help="also emit out/summary_by_task.json (per task×config)")
+    ap.add_argument("--scores", default="scores_typescript.jsonl", help="grade file to aggregate (e.g. the corrected re-grade)")
     a = ap.parse_args()
+    if a.by_task:
+        outp, by = build_by_task(a.dir, a.scores)
+        print(f"wrote {outp} ({len(by)} tasks) from {a.scores}")
+        return
     outp, cells, _, _ = build_digest(a.dir, a.out or None)
     print(f"wrote {outp} ({len(cells)} cells) + {outp.replace('.md', '.json')}")
 

@@ -2,10 +2,18 @@
 date: 2026-07-14 10:00
 slug: 27b-quality-at-depth
 title: Qwen3.6-27B quality + parameter-effects at agentic depth (64k/128k) — R9700
-takeaway: 10 cells × 6 hard TS-TDD tasks × 2 reps at 64–128k real context. Best local cell = 33% TS (64k-f16-rb4096) vs haiku 74% / Sonnet 85% / Opus 95% — the 27B is far below the calibration floor, and hard-pass is 0/120 (strict lint+edge wall). Reasoning-budget optimum FALLS with depth (64k peaks at 4096, 128k at 2048), refuting the "harder context needs more thinking" hypothesis; reuse held 1.00→1.00 (no lost-in-the-middle). KV q8_0 @128k costs −2.3% TS (within ≤5% rule) and saves 4421 MiB → accept q8_0. Judge scores design/clarity ~4/5 despite 0% hard-pass: the gap to reference is strict toolchain gates, not design sense. HEALTH: GTT host-RAM spill (>500 MiB, up to 2049) in every cell — freeze risk, flagged.
+takeaway: ⚠️ SUPERSEDED by analysis_detailed.md — the quality numbers below are CORRUPTED by a grader bug (vitest failed to execute → tests+edge=0 on all 120 replies). Corrected re-grade: TS 67-79% (not 24-33%), the 27B sits in the haiku→sonnet band, hard-pass up to 25%; real wall is strict lint/types, not logic. Timing/memory/judge numbers below remain valid. See analysis_detailed.md for the correction, per-task breakdown, and best-config guidance.
 -->
 
 # Benchmark: Qwen3.6-27B quality + parameter-effects at agentic depth (64k/128k) — R9700 (gfx1201)
+
+> ⚠️ **CORRECTION (2026-07-14): the capability numbers in this document are invalid.** A grading-harness
+> bug caused **vitest to fail silently during the run**, zeroing the `tests` and `edge` objectives on
+> **all 120 replies**. That artificially forced the scores to 24–33% and hard-pass to 0. Re-grading the
+> identical outputs recovers the real picture: **per-cell TS 67–79%**, the 27B in the **haiku→sonnet
+> band**, hard-pass up to 25%, and the genuine limiter is **strict lint/types**, not logic. **The
+> timing, memory (GTT spill), throughput, and blind-judge numbers below remain valid.** For the corrected
+> capability, per-task breakdown, and deployment guidance, read **[`analysis_detailed.md`](analysis_detailed.md)**.
 
 - **Date:** 2026-07-14 10:00 · **Track:** engine-bench (custom quality-at-depth capture + blind LLM judge; not a tuning sweep)
 - **GPU/Host:** AMD Radeon AI PRO R9700 (RDNA4, gfx1201, 32 GB / 32624 MiB) · Ryzen 5 3600 · Ubuntu 24.04 · ROCm 7.x · `HSA_OVERRIDE_GFX_VERSION=12.0.1`

@@ -1,0 +1,3525 @@
+{
+ "scores_file": "scores_typescript_regraded.jsonl",
+ "by_task": {
+  "lru-cache": {
+   "tier": "sonnet",
+   "refs": {
+    "haiku": 67.9,
+    "sonnet": 83.1
+   },
+   "cells": {
+    "un-d64-f16-rb1024": {
+     "model": "Qwen3.6-27B-MTP-Q4_K_M",
+     "depth": "64k",
+     "kv": "f16",
+     "budget": 1024,
+     "mtp": 1,
+     "n": 2,
+     "ts_pct": 57.75,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.0,
+      "lint": 0.0,
+      "tests": 0.85,
+      "edge": 0.75,
+      "reuse": 1.0,
+      "bdd": 0.28,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.0,
+      "clarity": 4.5,
+      "robustness": 4.0
+     },
+     "judge_mean": 4.166666666666666,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Clean closure-based design with lazy expiry throughout; expiry-delete logic is duplicated across get/has but tests cover the important edges.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "bdd": 0.36
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 5,
+       "robustness": 4.0,
+       "note": "Well-factored free helpers with precomputed expiresAt read very clearly; overwriting a key via set does not refresh recency, a minor unspecified edge.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "tests": 0.7,
+        "bdd": 0.2,
+        "edge": 0.5
+       }
+      }
+     ],
+     "think_tok": 1023,
+     "answer_tok": 1632,
+     "out_tok": 2655,
+     "total_tok": 68369,
+     "decode_tps": 54.26913649880932,
+     "gen_s": 48.91477549999999,
+     "ttft_warm_s": 4.924,
+     "cap_hit_pct": 0
+    },
+    "un-d64-f16-rb2048": {
+     "model": "Qwen3.6-27B-MTP-Q4_K_M",
+     "depth": "64k",
+     "kv": "f16",
+     "budget": 2048,
+     "mtp": 1,
+     "n": 2,
+     "ts_pct": 66.35,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.0,
+      "lint": 0.0,
+      "tests": 1.0,
+      "edge": 1.0,
+      "reuse": 1.0,
+      "bdd": 0.29000000000000004,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.5,
+      "clarity": 4.5,
+      "robustness": 4.5
+     },
+     "judge_mean": 4.5,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 5,
+       "note": "Correct and well-tested, but eviction via recursion instead of a loop and a size getter that mutates state are minor design blemishes.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "bdd": 0.2
+       }
+      },
+      {
+       "rep": 1,
+       "design": 5,
+       "clarity": 5,
+       "robustness": 4.0,
+       "note": "Clean, composable pure helpers with a consistent sweep-then-act pattern; slightly redundant repeated clock.now() calls but very readable.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "bdd": 0.38
+       }
+      }
+     ],
+     "think_tok": 2047,
+     "answer_tok": 1531.5,
+     "out_tok": 3578.5,
+     "total_tok": 69292.5,
+     "decode_tps": 52.83046722666863,
+     "gen_s": 67.75895,
+     "ttft_warm_s": 4.896,
+     "cap_hit_pct": 0
+    },
+    "un-d64-f16-rb4096": {
+     "model": "Qwen3.6-27B-MTP-Q4_K_M",
+     "depth": "64k",
+     "kv": "f16",
+     "budget": 4096,
+     "mtp": 1,
+     "n": 2,
+     "ts_pct": 80.75000000000001,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 1.0,
+      "lint": 0.0,
+      "tests": 1.0,
+      "edge": 1.0,
+      "reuse": 1.0,
+      "bdd": 0.31,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.0,
+      "clarity": 4.5,
+      "robustness": 4.0
+     },
+     "judge_mean": 4.166666666666666,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Well-factored closure helpers, though removeExpiredKeys re-implements the expiry check inline instead of reusing isExpired.",
+       "fails": {
+        "lint": 0.0,
+        "bdd": 0.29
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 5,
+       "robustness": 4.0,
+       "note": "Clean pure module-level helpers with a consistent now-passed-in expiry check and readonly entry fields; sweep-on-every-op is uniform and correct.",
+       "fails": {
+        "lint": 0.0,
+        "bdd": 0.33
+       }
+      }
+     ],
+     "think_tok": 4095,
+     "answer_tok": 1522,
+     "out_tok": 5617,
+     "total_tok": 71331,
+     "decode_tps": 53.25806118306622,
+     "gen_s": 105.483826,
+     "ttft_warm_s": 4.959,
+     "cap_hit_pct": 0
+    },
+    "un-d128-f16-rb1024": {
+     "model": "Qwen3.6-27B-MTP-Q4_K_M",
+     "depth": "128k",
+     "kv": "f16",
+     "budget": 1024,
+     "mtp": 1,
+     "n": 2,
+     "ts_pct": 63.949999999999996,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.0,
+      "lint": 0.0,
+      "tests": 0.8285714285714285,
+      "edge": 1.0,
+      "reuse": 1.0,
+      "bdd": 0.46499999999999997,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 3.5,
+      "clarity": 4.5,
+      "robustness": 4.0
+     },
+     "judge_mean": 4.0,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 3.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Correct, but tracks a lastAccessedAt field that is never used since recency rides on Map insertion order.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "tests": 0.8,
+        "bdd": 0.5
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 5,
+       "robustness": 4.0,
+       "note": "Clean expiresAt model with small well-named pure helpers and lazy purge; no redundant state.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "tests": 0.8571428571428571,
+        "bdd": 0.43
+       }
+      }
+     ],
+     "think_tok": 1023,
+     "answer_tok": 1838,
+     "out_tok": 2861,
+     "total_tok": 135657,
+     "decode_tps": 45.044495207058546,
+     "gen_s": 63.396339000000005,
+     "ttft_warm_s": 7.272,
+     "cap_hit_pct": 0
+    },
+    "un-d128-f16-rb2048": {
+     "model": "Qwen3.6-27B-MTP-Q4_K_M",
+     "depth": "128k",
+     "kv": "f16",
+     "budget": 2048,
+     "mtp": 1,
+     "n": 2,
+     "ts_pct": 77.85,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 1.0,
+      "lint": 0.0,
+      "tests": 0.7951388888888888,
+      "edge": 1.0,
+      "reuse": 1.0,
+      "bdd": 0.51,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.0,
+      "clarity": 4.5,
+      "robustness": 4.0
+     },
+     "judge_mean": 4.166666666666666,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Clean Map-order recency with solid TTL/eviction handling, but the stored lastAccessedAt field is written and never read (dead state).",
+       "fails": {
+        "lint": 0.0,
+        "tests": 0.7777777777777778,
+        "bdd": 0.33
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 5,
+       "robustness": 4.0,
+       "note": "Cleanly factored helpers and thoughtful edge tests (cap 0, zero TTL); set on existing key redundantly re-inserts twice.",
+       "fails": {
+        "lint": 0.0,
+        "tests": 0.8125,
+        "bdd": 0.69
+       }
+      }
+     ],
+     "think_tok": 2047,
+     "answer_tok": 1954,
+     "out_tok": 4001,
+     "total_tok": 136797,
+     "decode_tps": 44.32767931289672,
+     "gen_s": 90.24005700000001,
+     "ttft_warm_s": 299.212,
+     "cap_hit_pct": 0
+    },
+    "un-d128-f16-rb4096": {
+     "model": "Qwen3.6-27B-MTP-Q4_K_M",
+     "depth": "128k",
+     "kv": "f16",
+     "budget": 4096,
+     "mtp": 1,
+     "n": 2,
+     "ts_pct": 75.5,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.5,
+      "lint": 0.0,
+      "tests": 1.0,
+      "edge": 1.0,
+      "reuse": 1.0,
+      "bdd": 0.575,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 3.5,
+      "clarity": 4.5,
+      "robustness": 4.0
+     },
+     "judge_mean": 4.0,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 3.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Correct insertion-time TTL and Map-order recency, but the stored lastAccessedAt field is dead data never used for eviction, adding needless state.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "bdd": 0.4
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 5,
+       "robustness": 4.0,
+       "note": "Cleanly factored expiresAt-based cache with purge-before-evict; readable and cohesive though it lacks a capacity-0 edge test.",
+       "fails": {
+        "lint": 0.0,
+        "bdd": 0.75
+       }
+      }
+     ],
+     "think_tok": 4095,
+     "answer_tok": 1847,
+     "out_tok": 5942,
+     "total_tok": 138738,
+     "decode_tps": 44.31975327540391,
+     "gen_s": 134.046863,
+     "ttft_warm_s": 7.306,
+     "cap_hit_pct": 0
+    },
+    "un-d128-q8-rb2048": {
+     "model": "Qwen3.6-27B-MTP-Q4_K_M",
+     "depth": "128k",
+     "kv": "q8_0",
+     "budget": 2048,
+     "mtp": 1,
+     "n": 2,
+     "ts_pct": 46.7,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.0,
+      "lint": 0.0,
+      "tests": 0.5,
+      "edge": 0.5,
+      "reuse": 1.0,
+      "bdd": 0.54,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 3.5,
+      "clarity": 3.5,
+      "robustness": 4.0
+     },
+     "judge_mean": 3.6666666666666665,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 3.0,
+       "robustness": 4.0,
+       "note": "Elegant Map-insertion-order LRU with thorough tests, but a stray leaked </think> token pollutes the output between the two files.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "tests": 0.0,
+        "bdd": 0.5,
+        "edge": 0.0
+       }
+      },
+      {
+       "rep": 1,
+       "design": 3.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Correct and well-tested, but maintains a redundant parallel order array with O(n) splices when the Map already preserves insertion order.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "bdd": 0.58
+       }
+      }
+     ],
+     "think_tok": 2047,
+     "answer_tok": 1928,
+     "out_tok": 3975,
+     "total_tok": 136771,
+     "decode_tps": 34.921269280617025,
+     "gen_s": 113.97967499999999,
+     "ttft_warm_s": 10.806,
+     "cap_hit_pct": 0
+    },
+    "jr-d64-f16-rb2048": {
+     "model": "Qwopus3.6-27B-v1-preview-Q4_K_M",
+     "depth": "64k",
+     "kv": "f16",
+     "budget": 2048,
+     "mtp": 0,
+     "n": 2,
+     "ts_pct": 55.25,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.0,
+      "lint": 0.0,
+      "tests": 0.75,
+      "edge": 0.75,
+      "reuse": 1.0,
+      "bdd": 0.23500000000000001,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.0,
+      "clarity": 3.5,
+      "robustness": 3.5
+     },
+     "judge_mean": 3.6666666666666665,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 5,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Proper doubly-linked-list + map O(1) LRU that correctly skips expired tails and covers TTL edge cases.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "tests": 0.6,
+        "bdd": 0.07,
+        "edge": 0.5
+       }
+      },
+      {
+       "rep": 1,
+       "design": 3.0,
+       "clarity": 3.0,
+       "robustness": 3.0,
+       "note": "Array/splice O(n) approach is workable but heavier, and the top-level isExpired references generics K,V out of scope.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "tests": 0.9,
+        "bdd": 0.4
+       }
+      }
+     ],
+     "think_tok": 2047,
+     "answer_tok": 2055,
+     "out_tok": 4102,
+     "total_tok": 69817,
+     "decode_tps": 24.869029834162227,
+     "gen_s": 164.955742,
+     "ttft_warm_s": 4.592,
+     "cap_hit_pct": 0
+    },
+    "jr-d128-f16-rb2048": {
+     "model": "Qwopus3.6-27B-v1-preview-Q4_K_M",
+     "depth": "128k",
+     "kv": "f16",
+     "budget": 2048,
+     "mtp": 0,
+     "n": 2,
+     "ts_pct": 65.55,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.5,
+      "lint": 0.0,
+      "tests": 0.75,
+      "edge": 0.75,
+      "reuse": 1.0,
+      "bdd": 0.68,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 3.5,
+      "clarity": 4.0,
+      "robustness": 3.5
+     },
+     "judge_mean": 3.6666666666666665,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 3.0,
+       "note": "Elegant O(1) Map-order recency, but the eager liveSize counter goes stale on passive TTL expiry that no operation has touched.",
+       "fails": {
+        "lint": 0.0,
+        "tests": 0.7857142857142857,
+        "bdd": 0.93
+       }
+      },
+      {
+       "rep": 1,
+       "design": 3.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Well-decomposed helpers that correctly recompute live state (handling passive expiry), at the cost of O(n) scans on every operation.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "tests": 0.7142857142857143,
+        "bdd": 0.43,
+        "edge": 0.5
+       }
+      }
+     ],
+     "think_tok": 2047,
+     "answer_tok": 2205.5,
+     "out_tok": 4252.5,
+     "total_tok": 137049.5,
+     "decode_tps": 21.07283299592908,
+     "gen_s": 201.79246899999998,
+     "ttft_warm_s": 6.705,
+     "cap_hit_pct": 0
+    },
+    "jr-d128-q8-rb2048": {
+     "model": "Qwopus3.6-27B-v1-preview-Q4_K_M",
+     "depth": "128k",
+     "kv": "q8_0",
+     "budget": 2048,
+     "mtp": 0,
+     "n": 2,
+     "ts_pct": 44.699999999999996,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.0,
+      "lint": 0.0,
+      "tests": 0.7286324786324787,
+      "edge": 0.5,
+      "reuse": 0.5,
+      "bdd": 0.575,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 3.5,
+      "clarity": 3.5,
+      "robustness": 3.5
+     },
+     "judge_mean": 3.5,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 3.0,
+       "clarity": 3.0,
+       "robustness": 3.0,
+       "note": "Parallel keys-array plus manual size counter is complex and desync-prone, and the test's advanceTime helper references an out-of-scope variable.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "tests": 0.6111111111111112,
+        "bdd": 0.61
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Elegant Map-insertion-order LRU, though size:getSize exposes the function rather than a number getter and vi/buildClock imports are unused.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "tests": 0.8461538461538461,
+        "bdd": 0.54,
+        "reuse": 0.0,
+        "edge": 0.0
+       }
+      }
+     ],
+     "think_tok": 2047,
+     "answer_tok": 2104.5,
+     "out_tok": 4151.5,
+     "total_tok": 136948.5,
+     "decode_tps": 22.06564629198525,
+     "gen_s": 188.141477,
+     "ttft_warm_s": 10.224,
+     "cap_hit_pct": 0
+    }
+   }
+  },
+  "rate-limiter": {
+   "tier": "sonnet",
+   "refs": {
+    "haiku": 83.39999999999999,
+    "sonnet": 98.2
+   },
+   "cells": {
+    "un-d64-f16-rb1024": {
+     "model": "Qwen3.6-27B-MTP-Q4_K_M",
+     "depth": "64k",
+     "kv": "f16",
+     "budget": 1024,
+     "mtp": 1,
+     "n": 2,
+     "ts_pct": 63.800000000000004,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.0,
+      "lint": 0.0,
+      "tests": 0.8571428571428571,
+      "edge": 1.0,
+      "reuse": 1.0,
+      "bdd": 0.36,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.0,
+      "clarity": 3.5,
+      "robustness": 4.0
+     },
+     "judge_mean": 3.833333333333333,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Straightforward mutating bucket with lazy default-full init; tests are thorough covering custom token amounts and per-key isolation.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "tests": 0.8571428571428571,
+        "bdd": 0.43
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 3.0,
+       "robustness": 4.0,
+       "note": "Immutable-refill approach is correct but the redundant initial set plus later set is awkward, and the tests lean on unclean as-unknown-as Clock casts.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "tests": 0.8571428571428571,
+        "bdd": 0.29
+       }
+      }
+     ],
+     "think_tok": 1023,
+     "answer_tok": 1152.5,
+     "out_tok": 2175.5,
+     "total_tok": 67840.5,
+     "decode_tps": 56.02138820023855,
+     "gen_s": 38.832756999999994,
+     "ttft_warm_s": 4.731,
+     "cap_hit_pct": 0
+    },
+    "un-d64-f16-rb2048": {
+     "model": "Qwen3.6-27B-MTP-Q4_K_M",
+     "depth": "64k",
+     "kv": "f16",
+     "budget": 2048,
+     "mtp": 1,
+     "n": 2,
+     "ts_pct": 73.55000000000001,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.5,
+      "lint": 0.0,
+      "tests": 0.9,
+      "edge": 1.0,
+      "reuse": 1.0,
+      "bdd": 0.6,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.5,
+      "clarity": 4.5,
+      "robustness": 4.0
+     },
+     "judge_mean": 4.333333333333334,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 5,
+       "clarity": 5,
+       "robustness": 4.0,
+       "note": "Concise in-place token-bucket with lazy refill and clean lazy bucket creation; straightforward and easy to follow.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Correct immutable-refill token bucket, but reconstructing and re-setting bucket objects on every call is slightly more ceremony than needed.",
+       "fails": {
+        "lint": 0.0,
+        "tests": 0.8,
+        "bdd": 0.2
+       }
+      }
+     ],
+     "think_tok": 2047,
+     "answer_tok": 1022,
+     "out_tok": 3069,
+     "total_tok": 68734,
+     "decode_tps": 56.40248271171223,
+     "gen_s": 54.411489,
+     "ttft_warm_s": 4.743,
+     "cap_hit_pct": 0
+    },
+    "un-d64-f16-rb4096": {
+     "model": "Qwen3.6-27B-MTP-Q4_K_M",
+     "depth": "64k",
+     "kv": "f16",
+     "budget": 4096,
+     "mtp": 1,
+     "n": 2,
+     "ts_pct": 83.55,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 1.0,
+      "lint": 0.0,
+      "tests": 0.9,
+      "edge": 1.0,
+      "reuse": 1.0,
+      "bdd": 1.0,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.0,
+      "clarity": 4.0,
+      "robustness": 4.0
+     },
+     "judge_mean": 4.0,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 5,
+       "robustness": 4.0,
+       "note": "Named constants and a single mutating refill helper make it very readable; covers burst, refill cap, per-key isolation and custom cost.",
+       "fails": {
+        "lint": 0.0
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 3.0,
+       "robustness": 4.0,
+       "note": "Correct immutable-refill approach but dense one-liners, a magic 1000, single-letter names and a let that should be const hurt readability.",
+       "fails": {
+        "lint": 0.0,
+        "tests": 0.8
+       }
+      }
+     ],
+     "think_tok": 4095,
+     "answer_tok": 1003,
+     "out_tok": 5098,
+     "total_tok": 70763,
+     "decode_tps": 55.05706744826499,
+     "gen_s": 92.61257649999999,
+     "ttft_warm_s": 4.747,
+     "cap_hit_pct": 0
+    },
+    "un-d128-f16-rb1024": {
+     "model": "Qwen3.6-27B-MTP-Q4_K_M",
+     "depth": "128k",
+     "kv": "f16",
+     "budget": 1024,
+     "mtp": 1,
+     "n": 2,
+     "ts_pct": 67.85,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.0,
+      "lint": 0.0,
+      "tests": 1.0,
+      "edge": 1.0,
+      "reuse": 1.0,
+      "bdd": 0.5,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.0,
+      "clarity": 4.0,
+      "robustness": 4.0
+     },
+     "judge_mean": 4.0,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Compact single-method token bucket that retains partial refill on rejection; solid and clear.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "bdd": 0.67
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Clean separation via a dedicated refillBucket helper; reads well and handles capping correctly.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "bdd": 0.33
+       }
+      }
+     ],
+     "think_tok": 1023,
+     "answer_tok": 1167.5,
+     "out_tok": 2190.5,
+     "total_tok": 134937.5,
+     "decode_tps": 43.887175876125546,
+     "gen_s": 49.907799,
+     "ttft_warm_s": 7.097,
+     "cap_hit_pct": 0
+    },
+    "un-d128-f16-rb2048": {
+     "model": "Qwen3.6-27B-MTP-Q4_K_M",
+     "depth": "128k",
+     "kv": "f16",
+     "budget": 2048,
+     "mtp": 1,
+     "n": 2,
+     "ts_pct": 73.25,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.5,
+      "lint": 0.0,
+      "tests": 0.8333333333333334,
+      "edge": 1.0,
+      "reuse": 1.0,
+      "bdd": 0.75,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.0,
+      "clarity": 5,
+      "robustness": 4.0
+     },
+     "judge_mean": 4.333333333333333,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 5,
+       "robustness": 4.0,
+       "note": "Concise, well-named lazy token-bucket that correctly caps refill, isolates keys, and starts buckets full.",
+       "fails": {
+        "lint": 0.0,
+        "tests": 0.8333333333333334,
+        "bdd": 0.5
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 5,
+       "robustness": 4.0,
+       "note": "Compact, well-named token-bucket with correct lazy refill and per-key isolation; no guard for clock moving backwards but that's beyond spec.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "tests": 0.8333333333333334
+       }
+      }
+     ],
+     "think_tok": 2047,
+     "answer_tok": 1131,
+     "out_tok": 3178,
+     "total_tok": 135925,
+     "decode_tps": 45.12441810328394,
+     "gen_s": 70.4374665,
+     "ttft_warm_s": 6.986,
+     "cap_hit_pct": 0
+    },
+    "un-d128-f16-rb4096": {
+     "model": "Qwen3.6-27B-MTP-Q4_K_M",
+     "depth": "128k",
+     "kv": "f16",
+     "budget": 4096,
+     "mtp": 1,
+     "n": 2,
+     "ts_pct": 75.0,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.5,
+      "lint": 0.0,
+      "tests": 0.8333333333333334,
+      "edge": 1.0,
+      "reuse": 1.0,
+      "bdd": 1.0,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.0,
+      "clarity": 4.0,
+      "robustness": 4.0
+     },
+     "judge_mean": 4.0,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Clean separation into ensureBucket/refillBucket with correct lazy-refill capping and spec-matching relative import; tests cover burst, refill, cap, per-key, and custom tokens.",
+       "fails": {
+        "lint": 0.0,
+        "tests": 0.8333333333333334
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Tidy mutating refill with correct capacity capping and good fractional-refill test coverage, though it uses a '@/lib/clock' alias rather than the spec's relative path.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "tests": 0.8333333333333334
+       }
+      }
+     ],
+     "think_tok": 4095,
+     "answer_tok": 1162,
+     "out_tok": 5257,
+     "total_tok": 138004,
+     "decode_tps": 44.90613585718623,
+     "gen_s": 117.0714165,
+     "ttft_warm_s": 6.922,
+     "cap_hit_pct": 0
+    },
+    "un-d128-q8-rb2048": {
+     "model": "Qwen3.6-27B-MTP-Q4_K_M",
+     "depth": "128k",
+     "kv": "q8_0",
+     "budget": 2048,
+     "mtp": 1,
+     "n": 2,
+     "ts_pct": 76.4,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.5,
+      "lint": 0.0,
+      "tests": 1.0,
+      "edge": 1.0,
+      "reuse": 1.0,
+      "bdd": 0.7,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.0,
+      "clarity": 3.5,
+      "robustness": 4.0
+     },
+     "judge_mean": 3.833333333333333,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Well-factored with an extracted refill helper and named default constant; straightforward lazy-refill token bucket.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "bdd": 0.4
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 3.0,
+       "robustness": 4.0,
+       "note": "Compact and correct, but the comma-operator return trick obscures the acquire logic unnecessarily.",
+       "fails": {
+        "lint": 0.0
+       }
+      }
+     ],
+     "think_tok": 2047,
+     "answer_tok": 1018.5,
+     "out_tok": 3065.5,
+     "total_tok": 135812.5,
+     "decode_tps": 35.96164302070797,
+     "gen_s": 85.2431595,
+     "ttft_warm_s": 10.453,
+     "cap_hit_pct": 0
+    },
+    "jr-d64-f16-rb2048": {
+     "model": "Qwopus3.6-27B-v1-preview-Q4_K_M",
+     "depth": "64k",
+     "kv": "f16",
+     "budget": 2048,
+     "mtp": 0,
+     "n": 2,
+     "ts_pct": 75.55000000000001,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.5,
+      "lint": 0.0,
+      "tests": 1.0,
+      "edge": 1.0,
+      "reuse": 1.0,
+      "bdd": 0.58,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.5,
+      "clarity": 4.5,
+      "robustness": 3.5
+     },
+     "judge_mean": 4.166666666666667,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 5,
+       "clarity": 5,
+       "robustness": 4.0,
+       "note": "Clean immutable BucketState with a pure refill helper and a Math.max(0,...) guard against backward clock drift; writes back refilled state even on reject.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "bdd": 0.33
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 3.0,
+       "note": "Readable mutable-bucket approach but calls clock.now() twice on first acquire and lacks any guard against negative elapsed time.",
+       "fails": {
+        "lint": 0.0,
+        "bdd": 0.83
+       }
+      }
+     ],
+     "think_tok": 2047,
+     "answer_tok": 1156,
+     "out_tok": 3203,
+     "total_tok": 68869,
+     "decode_tps": 24.952854818466502,
+     "gen_s": 128.3621615,
+     "ttft_warm_s": 4.473,
+     "cap_hit_pct": 0
+    },
+    "jr-d128-f16-rb2048": {
+     "model": "Qwopus3.6-27B-v1-preview-Q4_K_M",
+     "depth": "128k",
+     "kv": "f16",
+     "budget": 2048,
+     "mtp": 0,
+     "n": 2,
+     "ts_pct": 81.65,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 1.0,
+      "lint": 0.0,
+      "tests": 1.0,
+      "edge": 1.0,
+      "reuse": 1.0,
+      "bdd": 0.43499999999999994,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 3.5,
+      "clarity": 4.0,
+      "robustness": 3.0
+     },
+     "judge_mean": 3.5,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Immutable bucket with continuous fractional refill matching the spec, and it correctly writes back the refilled state on failure without deducting.",
+       "fails": {
+        "lint": 0.0,
+        "bdd": 0.57
+       }
+      },
+      {
+       "rep": 1,
+       "design": 3.0,
+       "clarity": 4.0,
+       "robustness": 2.0,
+       "note": "Flooring the refill while advancing lastRefillAt each call silently discards sub-token elapsed time, so slow-refill buckets never accrue fractional progress.",
+       "fails": {
+        "lint": 0.0,
+        "bdd": 0.3
+       }
+      }
+     ],
+     "think_tok": 2047,
+     "answer_tok": 1360.5,
+     "out_tok": 3407.5,
+     "total_tok": 136155.5,
+     "decode_tps": 21.110110081154303,
+     "gen_s": 161.417999,
+     "ttft_warm_s": 6.419,
+     "cap_hit_pct": 0
+    },
+    "jr-d128-q8-rb2048": {
+     "model": "Qwopus3.6-27B-v1-preview-Q4_K_M",
+     "depth": "128k",
+     "kv": "q8_0",
+     "budget": 2048,
+     "mtp": 0,
+     "n": 2,
+     "ts_pct": 81.85,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 1.0,
+      "lint": 0.0,
+      "tests": 1.0,
+      "edge": 1.0,
+      "reuse": 1.0,
+      "bdd": 0.46499999999999997,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.5,
+      "clarity": 5,
+      "robustness": 4.0
+     },
+     "judge_mean": 4.5,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 5,
+       "clarity": 5,
+       "robustness": 4.0,
+       "note": "Clean immutable-bucket decomposition into well-named pure helpers; comprehensive tests.",
+       "fails": {
+        "lint": 0.0,
+        "bdd": 0.5
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 5,
+       "robustness": 4.0,
+       "note": "Straightforward mutable-state implementation, very readable with clear per-scenario tests.",
+       "fails": {
+        "lint": 0.0,
+        "bdd": 0.43
+       }
+      }
+     ],
+     "think_tok": 2047,
+     "answer_tok": 1275.5,
+     "out_tok": 3322.5,
+     "total_tok": 136070.5,
+     "decode_tps": 22.06773981896448,
+     "gen_s": 150.5589915,
+     "ttft_warm_s": 9.963,
+     "cap_hit_pct": 0
+    }
+   }
+  },
+  "store-remove": {
+   "tier": "sonnet",
+   "refs": {
+    "haiku": 81.2,
+    "sonnet": 100.0,
+    "opus": 100.0
+   },
+   "cells": {
+    "un-d64-f16-rb1024": {
+     "model": "Qwen3.6-27B-MTP-Q4_K_M",
+     "depth": "64k",
+     "kv": "f16",
+     "budget": 1024,
+     "mtp": 1,
+     "n": 2,
+     "ts_pct": 89.99999999999999,
+     "hard_pct": 50.0,
+     "objectives": {
+      "types": 0.5,
+      "lint": 1.0,
+      "tests": 1.0,
+      "edge": 1.0,
+      "bdd": 0.8,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.0,
+      "clarity": 3.5,
+      "robustness": 4.0
+     },
+     "judge_mean": 3.833333333333333,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Idiomatic backward-splice in-place removal plus totals.delete, with well-organized nested tests covering the no-op and isolation cases.",
+       "fails": {
+        "types": 0.0,
+        "bdd": 0.8
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 3.0,
+       "robustness": 4.0,
+       "note": "Filter-then-rebuild is algorithmically clean but the length=0-plus-spread-push dance to preserve the array reference reads more awkwardly than a direct reassignment.",
+       "fails": {
+        "bdd": 0.8
+       }
+      }
+     ],
+     "think_tok": 1023,
+     "answer_tok": 735.5,
+     "out_tok": 1758.5,
+     "total_tok": 67669.5,
+     "decode_tps": 54.91031585961754,
+     "gen_s": 32.043003,
+     "ttft_warm_s": 5.379,
+     "cap_hit_pct": 0
+    },
+    "un-d64-f16-rb2048": {
+     "model": "Qwen3.6-27B-MTP-Q4_K_M",
+     "depth": "64k",
+     "kv": "f16",
+     "budget": 2048,
+     "mtp": 1,
+     "n": 2,
+     "ts_pct": 89.60000000000001,
+     "hard_pct": 50.0,
+     "objectives": {
+      "types": 0.5,
+      "lint": 1.0,
+      "tests": 1.0,
+      "edge": 1.0,
+      "bdd": 0.75,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 3.5,
+      "clarity": 4.0,
+      "robustness": 4.0
+     },
+     "judge_mean": 3.833333333333333,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Idiomatic reverse-splice removal that keeps the total cache consistent; clean interface and adequate no-op/other-keys tests.",
+       "fails": {
+        "types": 0.0,
+        "bdd": 0.5
+       }
+      },
+      {
+       "rep": 1,
+       "design": 3.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Filter-based removal is fine but the in-place length=0/push(...spread) rebuild is needlessly awkward when the field could simply be reassigned; tests are thorough.",
+       "fails": {}
+      }
+     ],
+     "think_tok": 2047,
+     "answer_tok": 722,
+     "out_tok": 2769,
+     "total_tok": 68680,
+     "decode_tps": 55.89649576229845,
+     "gen_s": 49.5536515,
+     "ttft_warm_s": 5.393,
+     "cap_hit_pct": 0
+    },
+    "un-d64-f16-rb4096": {
+     "model": "Qwen3.6-27B-MTP-Q4_K_M",
+     "depth": "64k",
+     "kv": "f16",
+     "budget": 4096,
+     "mtp": 1,
+     "n": 2,
+     "ts_pct": 89.60000000000001,
+     "hard_pct": 50.0,
+     "objectives": {
+      "types": 0.5,
+      "lint": 1.0,
+      "tests": 1.0,
+      "edge": 1.0,
+      "bdd": 0.75,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.0,
+      "clarity": 4.0,
+      "robustness": 4.0
+     },
+     "judge_mean": 4.0,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Straightforward reverse-splice removal that correctly keeps entries and the totals cache consistent.",
+       "fails": {
+        "types": 0.0,
+        "bdd": 0.5
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Filter-with-change-guard removal is clean and well-tested via beforeEach; in-place array rebuild is a touch cleverer than necessary.",
+       "fails": {}
+      }
+     ],
+     "think_tok": 3443.5,
+     "answer_tok": 722,
+     "out_tok": 4165.5,
+     "total_tok": 70076.5,
+     "decode_tps": 55.64409944402975,
+     "gen_s": 74.9439115,
+     "ttft_warm_s": 5.455,
+     "cap_hit_pct": 0
+    },
+    "un-d128-f16-rb1024": {
+     "model": "Qwen3.6-27B-MTP-Q4_K_M",
+     "depth": "128k",
+     "kv": "f16",
+     "budget": 1024,
+     "mtp": 1,
+     "n": 2,
+     "ts_pct": 82.5,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.0,
+      "lint": 1.0,
+      "tests": 1.0,
+      "edge": 1.0,
+      "bdd": 0.9,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.0,
+      "clarity": 4.0,
+      "robustness": 3.5
+     },
+     "judge_mean": 3.833333333333333,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 3.0,
+       "note": "Clean forward-splice removal, but total(key)=0 write inserts a spurious map entry for never-seen keys, and all() leaks the internal array.",
+       "fails": {
+        "types": 0.0
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Guards the no-op with totals.has(key) avoiding spurious entries and uses idiomatic reverse-splice; only wart is all() still exposing the internal array.",
+       "fails": {
+        "types": 0.0,
+        "bdd": 0.8
+       }
+      }
+     ],
+     "think_tok": 1023,
+     "answer_tok": 776.5,
+     "out_tok": 1799.5,
+     "total_tok": 134792.5,
+     "decode_tps": 42.2352320481118,
+     "gen_s": 42.60842050000001,
+     "ttft_warm_s": 8.076,
+     "cap_hit_pct": 0
+    },
+    "un-d128-f16-rb2048": {
+     "model": "Qwen3.6-27B-MTP-Q4_K_M",
+     "depth": "128k",
+     "kv": "f16",
+     "budget": 2048,
+     "mtp": 1,
+     "n": 2,
+     "ts_pct": 88.94999999999999,
+     "hard_pct": 50.0,
+     "objectives": {
+      "types": 0.5,
+      "lint": 1.0,
+      "tests": 1.0,
+      "edge": 1.0,
+      "bdd": 0.675,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.0,
+      "clarity": 4.0,
+      "robustness": 3.0
+     },
+     "judge_mean": 3.6666666666666665,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 3.0,
+       "note": "Correct and readable, though the in-place splice-in-while loop and setting totals to 0 (vs delete) for absent keys are slightly awkward.",
+       "fails": {
+        "types": 0.0,
+        "bdd": 0.6
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 3.0,
+       "note": "Straightforward filter+reset, but remove sets total to 0 instead of deleting the key, leaving a stale map entry rather than fully consistent state.",
+       "fails": {
+        "bdd": 0.75
+       }
+      }
+     ],
+     "think_tok": 2047,
+     "answer_tok": 718.5,
+     "out_tok": 2765.5,
+     "total_tok": 135758.5,
+     "decode_tps": 43.45248803646443,
+     "gen_s": 63.691532499999994,
+     "ttft_warm_s": 8.096,
+     "cap_hit_pct": 0
+    },
+    "un-d128-f16-rb4096": {
+     "model": "Qwen3.6-27B-MTP-Q4_K_M",
+     "depth": "128k",
+     "kv": "f16",
+     "budget": 4096,
+     "mtp": 1,
+     "n": 2,
+     "ts_pct": 81.65,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.0,
+      "lint": 1.0,
+      "tests": 1.0,
+      "edge": 1.0,
+      "bdd": 0.8,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.0,
+      "clarity": 4.0,
+      "robustness": 3.5
+     },
+     "judge_mean": 3.833333333333333,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Straightforward remove keeping the totals cache consistent, with strong tests including the add-remove-add re-use cycle.",
+       "fails": {
+        "types": 0.0,
+        "bdd": 0.6
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 3.0,
+       "note": "Idiomatic reverse-splice remove but the findIndex early-return guard is redundant and tests omit the re-add-after-remove edge; leaves a stale 0 entry rather than deleting the key.",
+       "fails": {
+        "types": 0.0
+       }
+      }
+     ],
+     "think_tok": 3904.5,
+     "answer_tok": 746.5,
+     "out_tok": 4651.0,
+     "total_tok": 137644,
+     "decode_tps": 43.061447951793866,
+     "gen_s": 107.98707200000001,
+     "ttft_warm_s": 8.051,
+     "cap_hit_pct": 0
+    },
+    "un-d128-q8-rb2048": {
+     "model": "Qwen3.6-27B-MTP-Q4_K_M",
+     "depth": "128k",
+     "kv": "q8_0",
+     "budget": 2048,
+     "mtp": 1,
+     "n": 2,
+     "ts_pct": 91.64999999999999,
+     "hard_pct": 50.0,
+     "objectives": {
+      "types": 0.5,
+      "lint": 1.0,
+      "tests": 1.0,
+      "edge": 1.0,
+      "bdd": 1.0,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.0,
+      "clarity": 4.5,
+      "robustness": 4.0
+     },
+     "judge_mean": 4.166666666666666,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 5,
+       "robustness": 4.0,
+       "note": "Readable filter-and-rebuild removal with an explicit no-op guard and comprehensive tests for totals and other-key isolation.",
+       "fails": {}
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Efficient in-place reverse-splice removal, correct and well-tested though slightly less obvious than a filter.",
+       "fails": {
+        "types": 0.0
+       }
+      }
+     ],
+     "think_tok": 2047,
+     "answer_tok": 714.5,
+     "out_tok": 2761.5,
+     "total_tok": 135754.5,
+     "decode_tps": 35.305595858722285,
+     "gen_s": 78.2430305,
+     "ttft_warm_s": 11.878,
+     "cap_hit_pct": 0
+    },
+    "jr-d64-f16-rb2048": {
+     "model": "Qwopus3.6-27B-v1-preview-Q4_K_M",
+     "depth": "64k",
+     "kv": "f16",
+     "budget": 2048,
+     "mtp": 0,
+     "n": 2,
+     "ts_pct": 91.64999999999999,
+     "hard_pct": 50.0,
+     "objectives": {
+      "types": 0.5,
+      "lint": 1.0,
+      "tests": 1.0,
+      "edge": 1.0,
+      "bdd": 1.0,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.0,
+      "clarity": 4.5,
+      "robustness": 4.0
+     },
+     "judge_mean": 4.166666666666666,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Correct and well-tested; the length=0-then-push-spread mutation to preserve the readonly field works but is slightly more convoluted than a reassignment.",
+       "fails": {}
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 5,
+       "robustness": 4.0,
+       "note": "Minimal, idiomatic filter-and-reassign implementation with clear, focused tests covering the key edge cases.",
+       "fails": {
+        "types": 0.0
+       }
+      }
+     ],
+     "think_tok": 2047,
+     "answer_tok": 663.5,
+     "out_tok": 2710.5,
+     "total_tok": 68622.5,
+     "decode_tps": 24.914622087136237,
+     "gen_s": 108.791451,
+     "ttft_warm_s": 5.072,
+     "cap_hit_pct": 0
+    },
+    "jr-d128-f16-rb2048": {
+     "model": "Qwopus3.6-27B-v1-preview-Q4_K_M",
+     "depth": "128k",
+     "kv": "f16",
+     "budget": 2048,
+     "mtp": 0,
+     "n": 2,
+     "ts_pct": 82.25,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.0,
+      "lint": 1.0,
+      "tests": 1.0,
+      "edge": 1.0,
+      "bdd": 0.875,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 3.5,
+      "clarity": 4.0,
+      "robustness": 3.5
+     },
+     "judge_mean": 3.666666666666667,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 3.0,
+       "clarity": 4.0,
+       "robustness": 3.0,
+       "note": "Readable filter-based remove, but it reassigns a field declared readonly and sets the total to 0 rather than deleting the stale map key.",
+       "fails": {
+        "types": 0.0,
+        "bdd": 0.75
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Correct in-place removal via reverse-splice plus a clean map delete, respecting the readonly field and leaving no stale total behind.",
+       "fails": {
+        "types": 0.0
+       }
+      }
+     ],
+     "think_tok": 1588,
+     "answer_tok": 652,
+     "out_tok": 2240,
+     "total_tok": 135234,
+     "decode_tps": 21.085179018561,
+     "gen_s": 106.22876149999999,
+     "ttft_warm_s": 7.364,
+     "cap_hit_pct": 0
+    },
+    "jr-d128-q8-rb2048": {
+     "model": "Qwopus3.6-27B-v1-preview-Q4_K_M",
+     "depth": "128k",
+     "kv": "q8_0",
+     "budget": 2048,
+     "mtp": 0,
+     "n": 2,
+     "ts_pct": 99.15,
+     "hard_pct": 100,
+     "objectives": {
+      "types": 1.0,
+      "lint": 1.0,
+      "tests": 1.0,
+      "edge": 1.0,
+      "bdd": 0.9,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 3.5,
+      "clarity": 4.5,
+      "robustness": 3.5
+     },
+     "judge_mean": 3.8333333333333335,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 5,
+       "robustness": 5,
+       "note": "Correct has()-based guard and a test explicitly covering the amounts-cancel-to-zero edge case.",
+       "fails": {
+        "bdd": 0.8
+       }
+      },
+      {
+       "rep": 1,
+       "design": 3.0,
+       "clarity": 4.0,
+       "robustness": 2.0,
+       "note": "Guarding on total===0 conflates an empty key with a key whose amounts cancel out, so such keys are wrongly skipped.",
+       "fails": {}
+      }
+     ],
+     "think_tok": 2035,
+     "answer_tok": 752,
+     "out_tok": 2787,
+     "total_tok": 135781,
+     "decode_tps": 22.08392426979031,
+     "gen_s": 126.20137600000001,
+     "ttft_warm_s": 11.292,
+     "cap_hit_pct": 0
+    }
+   }
+  },
+  "deep-equal": {
+   "tier": "sonnet",
+   "refs": {
+    "haiku": 79.2,
+    "sonnet": 100.0,
+    "opus": 98.2
+   },
+   "cells": {
+    "un-d64-f16-rb1024": {
+     "model": "Qwen3.6-27B-MTP-Q4_K_M",
+     "depth": "64k",
+     "kv": "f16",
+     "budget": 1024,
+     "mtp": 1,
+     "n": 2,
+     "ts_pct": 81.05,
+     "hard_pct": 50.0,
+     "objectives": {
+      "types": 0.5,
+      "lint": 0.5,
+      "tests": 0.9090909090909092,
+      "edge": 1.0,
+      "bdd": 1.0,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.0,
+      "clarity": 4.0,
+      "robustness": 3.5
+     },
+     "judge_mean": 3.833333333333333,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Correct ordering of guards with an explicit key-in-b presence check, so objects with equal key counts but different keys are handled properly.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "tests": 0.8181818181818182
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 3.0,
+       "note": "Concise with a clean non-object short-circuit, but relying only on key count without a key-presence check means differently-keyed objects with undefined values could falsely match.",
+       "fails": {}
+      }
+     ],
+     "think_tok": 1023,
+     "answer_tok": 866,
+     "out_tok": 1889,
+     "total_tok": 67430,
+     "decode_tps": 55.18841777451091,
+     "gen_s": 34.220947499999994,
+     "ttft_warm_s": 4.467,
+     "cap_hit_pct": 0
+    },
+    "un-d64-f16-rb2048": {
+     "model": "Qwen3.6-27B-MTP-Q4_K_M",
+     "depth": "64k",
+     "kv": "f16",
+     "budget": 2048,
+     "mtp": 1,
+     "n": 2,
+     "ts_pct": 91.64999999999999,
+     "hard_pct": 50.0,
+     "objectives": {
+      "types": 0.5,
+      "lint": 1.0,
+      "tests": 1.0,
+      "edge": 1.0,
+      "bdd": 1.0,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.0,
+      "clarity": 4.0,
+      "robustness": 3.5
+     },
+     "judge_mean": 3.833333333333333,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Correct type-guarded recursion with the key-in-b check that handles undefined-valued keys; sensible ordering of the NaN and null cases.",
+       "fails": {
+        "types": 0.0
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 3.0,
+       "note": "Cleaner narrowing with .every, but comparing values without a key-existence check misses cases like {a:undefined} vs {b:undefined}.",
+       "fails": {}
+      }
+     ],
+     "think_tok": 2047,
+     "answer_tok": 845.5,
+     "out_tok": 2892.5,
+     "total_tok": 68433.5,
+     "decode_tps": 56.032987148250825,
+     "gen_s": 51.62179800000001,
+     "ttft_warm_s": 4.498,
+     "cap_hit_pct": 0
+    },
+    "un-d64-f16-rb4096": {
+     "model": "Qwen3.6-27B-MTP-Q4_K_M",
+     "depth": "64k",
+     "kv": "f16",
+     "budget": 4096,
+     "mtp": 1,
+     "n": 2,
+     "ts_pct": 91.64999999999999,
+     "hard_pct": 50.0,
+     "objectives": {
+      "types": 0.5,
+      "lint": 1.0,
+      "tests": 1.0,
+      "edge": 1.0,
+      "bdd": 1.0,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.0,
+      "clarity": 4.5,
+      "robustness": 4.0
+     },
+     "judge_mean": 4.166666666666666,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Handles NaN, null and array-vs-object; the explicit key-in-b check guards the mismatched-key/undefined-value edge well.",
+       "fails": {
+        "types": 0.0
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 5,
+       "robustness": 4.0,
+       "note": "Adds an explicit non-object guard (handles functions/symbols) and reads cleanly, but drops the key-in-b check so undefined-valued disjoint keys can slip through.",
+       "fails": {}
+      }
+     ],
+     "think_tok": 4095,
+     "answer_tok": 732,
+     "out_tok": 4827,
+     "total_tok": 70368,
+     "decode_tps": 55.029212623561605,
+     "gen_s": 87.717671,
+     "ttft_warm_s": 4.481,
+     "cap_hit_pct": 0
+    },
+    "un-d128-f16-rb1024": {
+     "model": "Qwen3.6-27B-MTP-Q4_K_M",
+     "depth": "128k",
+     "kv": "f16",
+     "budget": 1024,
+     "mtp": 1,
+     "n": 2,
+     "ts_pct": 86.4,
+     "hard_pct": 50.0,
+     "objectives": {
+      "types": 1.0,
+      "lint": 0.5,
+      "tests": 1.0,
+      "edge": 1.0,
+      "bdd": 0.37,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.0,
+      "clarity": 4.0,
+      "robustness": 4.0
+     },
+     "judge_mean": 4.0,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Well-factored with array/object helpers and correct type guards; the a!==a NaN trick is terse but sound and edge cases are well covered.",
+       "fails": {
+        "bdd": 0.74
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Clean isObject guard with explicit Number.isNaN handling and thorough tests including undefined-vs-missing-key cases.",
+       "fails": {
+        "lint": 0.0,
+        "bdd": 0.0
+       }
+      }
+     ],
+     "think_tok": 1023,
+     "answer_tok": 1747.5,
+     "out_tok": 2770.5,
+     "total_tok": 135393.5,
+     "decode_tps": 43.97159472402855,
+     "gen_s": 62.994772,
+     "ttft_warm_s": 6.503,
+     "cap_hit_pct": 0
+    },
+    "un-d128-f16-rb2048": {
+     "model": "Qwen3.6-27B-MTP-Q4_K_M",
+     "depth": "128k",
+     "kv": "f16",
+     "budget": 2048,
+     "mtp": 1,
+     "n": 2,
+     "ts_pct": 88.3,
+     "hard_pct": 50.0,
+     "objectives": {
+      "types": 1.0,
+      "lint": 0.5,
+      "tests": 1.0,
+      "edge": 1.0,
+      "bdd": 0.6000000000000001,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.5,
+      "clarity": 5,
+      "robustness": 4.0
+     },
+     "judge_mean": 4.5,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 5,
+       "clarity": 5,
+       "robustness": 4.0,
+       "note": "Well-factored with proper unknown-narrowing type guards and correct NaN/null/array-vs-object handling; doesn't cover Date/Map/symbol keys but those are out of spec.",
+       "fails": {
+        "bdd": 0.93
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 5,
+       "robustness": 4.0,
+       "note": "Well-separated array/object comparators with proper unknown narrowing and NaN/array-vs-object handling; no special handling for Date/Map but spec limits scope to plain structures.",
+       "fails": {
+        "lint": 0.0,
+        "bdd": 0.27
+       }
+      }
+     ],
+     "think_tok": 2047,
+     "answer_tok": 1827,
+     "out_tok": 3874,
+     "total_tok": 136497,
+     "decode_tps": 45.2906379200705,
+     "gen_s": 85.676642,
+     "ttft_warm_s": 6.508,
+     "cap_hit_pct": 0
+    },
+    "un-d128-f16-rb4096": {
+     "model": "Qwen3.6-27B-MTP-Q4_K_M",
+     "depth": "128k",
+     "kv": "f16",
+     "budget": 4096,
+     "mtp": 1,
+     "n": 2,
+     "ts_pct": 80.2,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.5,
+      "lint": 0.5,
+      "tests": 1.0,
+      "edge": 1.0,
+      "bdd": 0.625,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.0,
+      "clarity": 4.5,
+      "robustness": 4.5
+     },
+     "judge_mean": 4.333333333333333,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 5,
+       "note": "Compact recursive structure with exhaustive, well-organized tests covering NaN, array-vs-object, null, undefined and nested cases, though the 'a!==a && b!==b' NaN check is slightly cryptic.",
+       "fails": {
+        "types": 0.0
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 5,
+       "robustness": 4.0,
+       "note": "Very readable with an explicit isObject guard and Number.isNaN, clean helper decomposition; test coverage is solid but less exhaustive than the edge cases it could hit.",
+       "fails": {
+        "lint": 0.0,
+        "bdd": 0.25
+       }
+      }
+     ],
+     "think_tok": 3144,
+     "answer_tok": 1373,
+     "out_tok": 4517,
+     "total_tok": 137140,
+     "decode_tps": 44.552485465028454,
+     "gen_s": 101.563118,
+     "ttft_warm_s": 6.513,
+     "cap_hit_pct": 0
+    },
+    "un-d128-q8-rb2048": {
+     "model": "Qwen3.6-27B-MTP-Q4_K_M",
+     "depth": "128k",
+     "kv": "q8_0",
+     "budget": 2048,
+     "mtp": 1,
+     "n": 2,
+     "ts_pct": 90.6,
+     "hard_pct": 50.0,
+     "objectives": {
+      "types": 1.0,
+      "lint": 0.5,
+      "tests": 1.0,
+      "edge": 1.0,
+      "bdd": 0.875,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 5,
+      "clarity": 5,
+      "robustness": 4.0
+     },
+     "judge_mean": 4.666666666666667,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 5,
+       "clarity": 5,
+       "robustness": 4.0,
+       "note": "Clean helper-split with correct type guards, NaN and array-vs-object handling; solid within spec scope.",
+       "fails": {
+        "bdd": 0.75
+       }
+      },
+      {
+       "rep": 1,
+       "design": 5,
+       "clarity": 5,
+       "robustness": 4.0,
+       "note": "Compact and readable with .every helpers and correct guard ordering; covers the specified edge cases well.",
+       "fails": {
+        "lint": 0.0
+       }
+      }
+     ],
+     "think_tok": 2021.5,
+     "answer_tok": 1018.5,
+     "out_tok": 3040.0,
+     "total_tok": 135663,
+     "decode_tps": 36.06831057724578,
+     "gen_s": 84.28604250000001,
+     "ttft_warm_s": 9.879,
+     "cap_hit_pct": 0
+    },
+    "jr-d64-f16-rb2048": {
+     "model": "Qwopus3.6-27B-v1-preview-Q4_K_M",
+     "depth": "64k",
+     "kv": "f16",
+     "budget": 2048,
+     "mtp": 0,
+     "n": 2,
+     "ts_pct": 67.39999999999999,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.5,
+      "lint": 0.0,
+      "tests": 0.9615384615384616,
+      "edge": 0.915,
+      "bdd": 0.46,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.5,
+      "clarity": 4.5,
+      "robustness": 3.5
+     },
+     "judge_mean": 4.166666666666667,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 3.0,
+       "note": "Solid narrowing and thorough tests, but omits an 'in' check so distinct same-count key sets with undefined values could falsely compare equal.",
+       "fails": {
+        "lint": 0.0,
+        "tests": 0.9230769230769231,
+        "bdd": 0.92,
+        "edge": 0.83
+       }
+      },
+      {
+       "rep": 1,
+       "design": 5,
+       "clarity": 5,
+       "robustness": 4.0,
+       "note": "Elegant use of Object.is (handles NaN/-0) plus a 'key in b' guard for correctness; test coverage is comparatively thin.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "bdd": 0.0
+       }
+      }
+     ],
+     "think_tok": 2047,
+     "answer_tok": 791.5,
+     "out_tok": 2838.5,
+     "total_tok": 68380.5,
+     "decode_tps": 24.908015820671775,
+     "gen_s": 113.952066,
+     "ttft_warm_s": 4.219,
+     "cap_hit_pct": 0
+    },
+    "jr-d128-f16-rb2048": {
+     "model": "Qwopus3.6-27B-v1-preview-Q4_K_M",
+     "depth": "128k",
+     "kv": "f16",
+     "budget": 2048,
+     "mtp": 0,
+     "n": 2,
+     "ts_pct": 73.85,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.0,
+      "lint": 0.5,
+      "tests": 1.0,
+      "edge": 1.0,
+      "bdd": 0.865,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.0,
+      "clarity": 4.5,
+      "robustness": 4.0
+     },
+     "judge_mean": 4.166666666666666,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 5,
+       "robustness": 4.0,
+       "note": "Clean extracted arrayEqual/objectEqual helpers with correct type guards; the redundant keysB.includes alongside the length check is a minor wart.",
+       "fails": {
+        "types": 0.0,
+        "bdd": 0.88
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Correct and readable but leans on inline type assertions and ends with an unreachable trailing return.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "bdd": 0.85
+       }
+      }
+     ],
+     "think_tok": 2047,
+     "answer_tok": 1544.5,
+     "out_tok": 3591.5,
+     "total_tok": 136215.5,
+     "decode_tps": 21.126420247546626,
+     "gen_s": 170.0009415,
+     "ttft_warm_s": 6.046,
+     "cap_hit_pct": 0
+    },
+    "jr-d128-q8-rb2048": {
+     "model": "Qwopus3.6-27B-v1-preview-Q4_K_M",
+     "depth": "128k",
+     "kv": "q8_0",
+     "budget": 2048,
+     "mtp": 0,
+     "n": 2,
+     "ts_pct": 85.45,
+     "hard_pct": 50.0,
+     "objectives": {
+      "types": 0.5,
+      "lint": 1.0,
+      "tests": 1.0,
+      "edge": 1.0,
+      "bdd": 0.255,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 5,
+      "clarity": 5,
+      "robustness": 5
+     },
+     "judge_mean": 5,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 5,
+       "clarity": 5,
+       "robustness": 5,
+       "note": "Well-ordered guards, clean helper split, and thorough tests covering NaN, null, and array-vs-object cases.",
+       "fails": {
+        "bdd": 0.07
+       }
+      },
+      {
+       "rep": 1,
+       "design": 5,
+       "clarity": 5,
+       "robustness": 5,
+       "note": "Concise, correct guard ordering with modern Object.hasOwn and solid edge-case coverage.",
+       "fails": {
+        "types": 0.0,
+        "bdd": 0.44
+       }
+      }
+     ],
+     "think_tok": 425.5,
+     "answer_tok": 1393,
+     "out_tok": 1818.5,
+     "total_tok": 134442.5,
+     "decode_tps": 22.126870076130068,
+     "gen_s": 82.19107000000001,
+     "ttft_warm_s": 9.408,
+     "cap_hit_pct": 0
+    }
+   }
+  },
+  "async-memo": {
+   "tier": "opus",
+   "refs": {
+    "haiku": 66.7,
+    "sonnet": 62.5,
+    "opus": 100.0
+   },
+   "cells": {
+    "un-d64-f16-rb1024": {
+     "model": "Qwen3.6-27B-MTP-Q4_K_M",
+     "depth": "64k",
+     "kv": "f16",
+     "budget": 1024,
+     "mtp": 1,
+     "n": 2,
+     "ts_pct": 59.20000000000001,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.5,
+      "lint": 0.5,
+      "tests": 0.3,
+      "edge": 1.0,
+      "bdd": 0.2,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.5,
+      "clarity": 4.0,
+      "robustness": 3.5
+     },
+     "judge_mean": 4.0,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 5,
+       "clarity": 5,
+       "robustness": 4.0,
+       "note": "Idiomatic wrapper promise that deletes-on-reject and rethrows, cleanly satisfying dedup/no-cache-failure/cache-success.",
+       "fails": {
+        "tests": 0.0,
+        "bdd": 0.0
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 3.0,
+       "robustness": 3.0,
+       "note": "Floating-catch eviction works but is less explicit, and the test file includes an incoherent dead cacheSpy() stub asserted against a nonsensical value.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "tests": 0.6,
+        "bdd": 0.4
+       }
+      }
+     ],
+     "think_tok": 1023,
+     "answer_tok": 460,
+     "out_tok": 1483,
+     "total_tok": 67131,
+     "decode_tps": 50.72498513531451,
+     "gen_s": 29.21741,
+     "ttft_warm_s": 4.719,
+     "cap_hit_pct": 0
+    },
+    "un-d64-f16-rb2048": {
+     "model": "Qwen3.6-27B-MTP-Q4_K_M",
+     "depth": "64k",
+     "kv": "f16",
+     "budget": 2048,
+     "mtp": 1,
+     "n": 2,
+     "ts_pct": 66.7,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.0,
+      "lint": 0.0,
+      "tests": 1.0,
+      "edge": 1.0,
+      "bdd": 1.0,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.0,
+      "clarity": 4.0,
+      "robustness": 4.0
+     },
+     "judge_mean": 4.0,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Caches a single catch-chained promise that self-evicts on rejection and rethrows, cleanly satisfying dedup/retry/cache-success semantics.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Correct and concise; the side-branch p.catch that evicts on failure is slightly less explicit than chaining but works fine.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0
+       }
+      }
+     ],
+     "think_tok": 2047,
+     "answer_tok": 551.5,
+     "out_tok": 2598.5,
+     "total_tok": 68246.5,
+     "decode_tps": 51.600130932340505,
+     "gen_s": 50.3597295,
+     "ttft_warm_s": 4.73,
+     "cap_hit_pct": 0
+    },
+    "un-d64-f16-rb4096": {
+     "model": "Qwen3.6-27B-MTP-Q4_K_M",
+     "depth": "64k",
+     "kv": "f16",
+     "budget": 4096,
+     "mtp": 1,
+     "n": 2,
+     "ts_pct": 66.7,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.0,
+      "lint": 0.0,
+      "tests": 1.0,
+      "edge": 1.0,
+      "bdd": 1.0,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.0,
+      "clarity": 4.0,
+      "robustness": 3.5
+     },
+     "judge_mean": 3.833333333333333,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Deliberate tracked-promise that deletes-and-rethrows on rejection; clean and explicit.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 3.0,
+       "note": "Correct but the detached fire-and-forget p.catch(() => delete) is a slightly subtle side-channel.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0
+       }
+      }
+     ],
+     "think_tok": 4095,
+     "answer_tok": 530.5,
+     "out_tok": 4625.5,
+     "total_tok": 70273.5,
+     "decode_tps": 51.57960800932015,
+     "gen_s": 89.68889899999999,
+     "ttft_warm_s": 4.725,
+     "cap_hit_pct": 0
+    },
+    "un-d128-f16-rb1024": {
+     "model": "Qwen3.6-27B-MTP-Q4_K_M",
+     "depth": "128k",
+     "kv": "f16",
+     "budget": 1024,
+     "mtp": 1,
+     "n": 2,
+     "ts_pct": 66.7,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.0,
+      "lint": 0.0,
+      "tests": 1.0,
+      "edge": 1.0,
+      "bdd": 1.0,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.5,
+      "clarity": 4.5,
+      "robustness": 4.0
+     },
+     "judge_mean": 4.333333333333334,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Correct dedup/retry via then-with-reject-handler; re-storing Promise.resolve(value) on success is slightly redundant but harmless, and tests cover all three requirements.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0
+       }
+      },
+      {
+       "rep": 1,
+       "design": 5,
+       "clarity": 5,
+       "robustness": 4.0,
+       "note": "Minimal, elegant fix caching the in-flight promise and evicting on rejection via a single catch; the clearest expression of the required behavior.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0
+       }
+      }
+     ],
+     "think_tok": 1023,
+     "answer_tok": 623.5,
+     "out_tok": 1646.5,
+     "total_tok": 134376.5,
+     "decode_tps": 42.379131304091764,
+     "gen_s": 38.858878000000004,
+     "ttft_warm_s": 6.889,
+     "cap_hit_pct": 0
+    },
+    "un-d128-f16-rb2048": {
+     "model": "Qwen3.6-27B-MTP-Q4_K_M",
+     "depth": "128k",
+     "kv": "f16",
+     "budget": 2048,
+     "mtp": 1,
+     "n": 2,
+     "ts_pct": 66.7,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.0,
+      "lint": 0.0,
+      "tests": 1.0,
+      "edge": 1.0,
+      "bdd": 1.0,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.5,
+      "clarity": 5,
+      "robustness": 4.0
+     },
+     "judge_mean": 4.5,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 5,
+       "robustness": 4.0,
+       "note": "Minimal, correct fix that dedups in-flight promises and evicts on rejection while caching successes.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0
+       }
+      },
+      {
+       "rep": 1,
+       "design": 5,
+       "clarity": 5,
+       "robustness": 4.0,
+       "note": "Minimal, exactly-right fix: caches the in-flight promise and evicts on rejection so failures retry while successes stick.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0
+       }
+      }
+     ],
+     "think_tok": 2047,
+     "answer_tok": 624.5,
+     "out_tok": 2671.5,
+     "total_tok": 135401.5,
+     "decode_tps": 43.96182324326973,
+     "gen_s": 60.75912249999999,
+     "ttft_warm_s": 7.106,
+     "cap_hit_pct": 0
+    },
+    "un-d128-f16-rb4096": {
+     "model": "Qwen3.6-27B-MTP-Q4_K_M",
+     "depth": "128k",
+     "kv": "f16",
+     "budget": 4096,
+     "mtp": 1,
+     "n": 2,
+     "ts_pct": 66.7,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.0,
+      "lint": 0.0,
+      "tests": 1.0,
+      "edge": 1.0,
+      "bdd": 1.0,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.0,
+      "clarity": 4.0,
+      "robustness": 4.0
+     },
+     "judge_mean": 4.0,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Caches the catch-chained promise so rejection cleanup and re-throw ordering are clean; tests clearly cover dedup, retry-after-reject, and success caching.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Concise, correct standard pattern with a side-channel catch for cache eviction; covers all three required behaviors in tight tests.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0
+       }
+      }
+     ],
+     "think_tok": 4095,
+     "answer_tok": 623.5,
+     "out_tok": 4718.5,
+     "total_tok": 137448.5,
+     "decode_tps": 43.56431137629195,
+     "gen_s": 108.30890799999999,
+     "ttft_warm_s": 7.188,
+     "cap_hit_pct": 0
+    },
+    "un-d128-q8-rb2048": {
+     "model": "Qwen3.6-27B-MTP-Q4_K_M",
+     "depth": "128k",
+     "kv": "q8_0",
+     "budget": 2048,
+     "mtp": 1,
+     "n": 2,
+     "ts_pct": 66.7,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.0,
+      "lint": 0.0,
+      "tests": 1.0,
+      "edge": 1.0,
+      "bdd": 1.0,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.5,
+      "clarity": 4.5,
+      "robustness": 4.0
+     },
+     "judge_mean": 4.333333333333334,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 5,
+       "clarity": 5,
+       "robustness": 4.0,
+       "note": "Elegant chained .catch that evicts and rethrows, giving clean dedup plus retry-on-failure semantics.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Works via a side-attached .catch that deletes on rejection, slightly less tidy than chaining the caught promise.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0
+       }
+      }
+     ],
+     "think_tok": 2047,
+     "answer_tok": 547,
+     "out_tok": 2594,
+     "total_tok": 135324,
+     "decode_tps": 34.64623667555,
+     "gen_s": 74.9163955,
+     "ttft_warm_s": 10.581,
+     "cap_hit_pct": 0
+    },
+    "jr-d64-f16-rb2048": {
+     "model": "Qwopus3.6-27B-v1-preview-Q4_K_M",
+     "depth": "64k",
+     "kv": "f16",
+     "budget": 2048,
+     "mtp": 0,
+     "n": 2,
+     "ts_pct": 75.0,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.0,
+      "lint": 0.5,
+      "tests": 1.0,
+      "edge": 1.0,
+      "bdd": 1.0,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.5,
+      "clarity": 4.5,
+      "robustness": 4.0
+     },
+     "judge_mean": 4.333333333333334,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Correct dedup/retry with an eviction .catch, though attaching it as a side branch on the original promise is slightly less clean than caching the wrapped one.",
+       "fails": {
+        "types": 0.0
+       }
+      },
+      {
+       "rep": 1,
+       "design": 5,
+       "clarity": 5,
+       "robustness": 4.0,
+       "note": "Caches the catch-wrapped promise that deletes-then-rethrows, keeping the returned and cached promise identical; clean and well-tested.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0
+       }
+      }
+     ],
+     "think_tok": 2047,
+     "answer_tok": 541.5,
+     "out_tok": 2588.5,
+     "total_tok": 68237.5,
+     "decode_tps": 24.899716684908046,
+     "gen_s": 103.95644549999999,
+     "ttft_warm_s": 4.503,
+     "cap_hit_pct": 0
+    },
+    "jr-d128-f16-rb2048": {
+     "model": "Qwopus3.6-27B-v1-preview-Q4_K_M",
+     "depth": "128k",
+     "kv": "f16",
+     "budget": 2048,
+     "mtp": 0,
+     "n": 2,
+     "ts_pct": 38.2,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.0,
+      "lint": 0.0,
+      "tests": 0.5,
+      "edge": 0.5,
+      "bdd": 0.585,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.0,
+      "clarity": 4.0,
+      "robustness": 4.0
+     },
+     "judge_mean": 4.0,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 3.0,
+       "robustness": 4.0,
+       "note": "Sound dedup/retry logic, but stray markdown code fences leak into the file body, hurting the deliverable's cleanliness.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "tests": 0.0,
+        "bdd": 0.17,
+        "edge": 0.0
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 5,
+       "robustness": 4.0,
+       "note": "Minimal idiomatic fix with focused tests covering dedup, no-cache-on-failure, and cache-on-success.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0
+       }
+      }
+     ],
+     "think_tok": 2047,
+     "answer_tok": 821.5,
+     "out_tok": 2868.5,
+     "total_tok": 135599.5,
+     "decode_tps": 21.158960488049264,
+     "gen_s": 135.570988,
+     "ttft_warm_s": 6.413,
+     "cap_hit_pct": 0
+    },
+    "jr-d128-q8-rb2048": {
+     "model": "Qwopus3.6-27B-v1-preview-Q4_K_M",
+     "depth": "128k",
+     "kv": "q8_0",
+     "budget": 2048,
+     "mtp": 0,
+     "n": 2,
+     "ts_pct": 66.7,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.0,
+      "lint": 0.0,
+      "tests": 1.0,
+      "edge": 1.0,
+      "bdd": 1.0,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.5,
+      "clarity": 5,
+      "robustness": 4.0
+     },
+     "judge_mean": 4.5,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 5,
+       "robustness": 4.0,
+       "note": "Minimal fix attaching a catch to evict on rejection; clear and well-tested including concurrent-failure retry.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0
+       }
+      },
+      {
+       "rep": 1,
+       "design": 5,
+       "clarity": 5,
+       "robustness": 4.0,
+       "note": "Elegant .then(onFulfilled,onRejected) that evicts on failure and rethrows, clearly expressing the no-cache-on-failure intent.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0
+       }
+      }
+     ],
+     "think_tok": 1971,
+     "answer_tok": 855,
+     "out_tok": 2826,
+     "total_tok": 135557,
+     "decode_tps": 22.08124353823734,
+     "gen_s": 127.97904750000001,
+     "ttft_warm_s": 9.934,
+     "cap_hit_pct": 0
+    }
+   }
+  },
+  "expr-eval": {
+   "tier": "opus",
+   "refs": {
+    "haiku": 66.7,
+    "sonnet": 66.7,
+    "opus": 83.3
+   },
+   "cells": {
+    "un-d64-f16-rb1024": {
+     "model": "Qwen3.6-27B-MTP-Q4_K_M",
+     "depth": "64k",
+     "kv": "f16",
+     "budget": 1024,
+     "mtp": 1,
+     "n": 2,
+     "ts_pct": 54.85,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.0,
+      "lint": 0.0,
+      "tests": 0.8465909090909092,
+      "edge": 1.0,
+      "bdd": 0.045,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.5,
+      "clarity": 4.0,
+      "robustness": 5
+     },
+     "judge_mean": 4.5,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 5,
+       "clarity": 4.0,
+       "robustness": 5,
+       "note": "Clean class-based recursive-descent parser with thorough error handling, dinged only for an unused peek() method and a garbled test assertion.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "tests": 0.875,
+        "bdd": 0.0
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 5,
+       "note": "Solid Result-threading recursive-descent parser with good edge coverage, slightly marred by a redundant s.error mutation that is never read.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "tests": 0.8181818181818182,
+        "bdd": 0.09
+       }
+      }
+     ],
+     "think_tok": 1023,
+     "answer_tok": 1549.5,
+     "out_tok": 2572.5,
+     "total_tok": 68205.5,
+     "decode_tps": 55.225385269314344,
+     "gen_s": 46.6712815,
+     "ttft_warm_s": 4.698,
+     "cap_hit_pct": 0
+    },
+    "un-d64-f16-rb2048": {
+     "model": "Qwen3.6-27B-MTP-Q4_K_M",
+     "depth": "64k",
+     "kv": "f16",
+     "budget": 2048,
+     "mtp": 1,
+     "n": 2,
+     "ts_pct": 60.9,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.0,
+      "lint": 0.0,
+      "tests": 0.96875,
+      "edge": 1.0,
+      "bdd": 0.4,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.0,
+      "clarity": 4.0,
+      "robustness": 4.5
+     },
+     "judge_mean": 4.166666666666666,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 5,
+       "note": "Well-structured class-based recursive-descent parser with internal throw/catch mapped to Result, and an unusually thorough edge-case test suite.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "bdd": 0.74
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Clean exception-free Result-threading recursive descent with precise error messages; the state.error field is written but never read, a minor dead-code smell.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "tests": 0.9375,
+        "bdd": 0.06
+       }
+      }
+     ],
+     "think_tok": 2047,
+     "answer_tok": 1569.5,
+     "out_tok": 3616.5,
+     "total_tok": 69249.5,
+     "decode_tps": 55.77340414401994,
+     "gen_s": 64.89095499999999,
+     "ttft_warm_s": 4.752,
+     "cap_hit_pct": 0
+    },
+    "un-d64-f16-rb4096": {
+     "model": "Qwen3.6-27B-MTP-Q4_K_M",
+     "depth": "64k",
+     "kv": "f16",
+     "budget": 4096,
+     "mtp": 1,
+     "n": 2,
+     "ts_pct": 64.2,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.0,
+      "lint": 0.0,
+      "tests": 0.9,
+      "edge": 1.0,
+      "bdd": 1.0,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 3.5,
+      "clarity": 4.0,
+      "robustness": 4.0
+     },
+     "judge_mean": 3.833333333333333,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 5,
+       "robustness": 4.0,
+       "note": "Idiomatic class-based recursive-descent parser with exceptions caught at the boundary; very readable.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0
+       }
+      },
+      {
+       "rep": 1,
+       "design": 3.0,
+       "clarity": 3.0,
+       "robustness": 4.0,
+       "note": "Result-threading parser works but is verbose and carries a never-read state.error field (dead mutation).",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "tests": 0.8
+       }
+      }
+     ],
+     "think_tok": 4095,
+     "answer_tok": 1405.5,
+     "out_tok": 5500.5,
+     "total_tok": 71133.5,
+     "decode_tps": 54.97892724025046,
+     "gen_s": 100.0632775,
+     "ttft_warm_s": 4.701,
+     "cap_hit_pct": 0
+    },
+    "un-d128-f16-rb1024": {
+     "model": "Qwen3.6-27B-MTP-Q4_K_M",
+     "depth": "128k",
+     "kv": "f16",
+     "budget": 1024,
+     "mtp": 1,
+     "n": 2,
+     "ts_pct": 41.099999999999994,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.0,
+      "lint": 0.0,
+      "tests": 0.5833333333333334,
+      "edge": 0.715,
+      "bdd": 0.04,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.0,
+      "clarity": 4.5,
+      "robustness": 3.5
+     },
+     "judge_mean": 4.0,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 3.0,
+       "note": "Solid tokenizer+recursive-descent with a typed token union, but error messages are generic (null-threaded) and several test assertions (.ok.toBe) are malformed.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "tests": 0.16666666666666666,
+        "bdd": 0.08,
+        "edge": 0.43
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 5,
+       "robustness": 4.0,
+       "note": "Readable Result-threaded recursive descent with specific error messages, unary handling, and a defensive try/catch; anticipates whitespace-only and unbalanced-paren cases well.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "bdd": 0.0
+       }
+      }
+     ],
+     "think_tok": 1023,
+     "answer_tok": 1666,
+     "out_tok": 2689,
+     "total_tok": 135404,
+     "decode_tps": 44.202814637290174,
+     "gen_s": 60.834907,
+     "ttft_warm_s": 6.888,
+     "cap_hit_pct": 0
+    },
+    "un-d128-f16-rb2048": {
+     "model": "Qwen3.6-27B-MTP-Q4_K_M",
+     "depth": "128k",
+     "kv": "f16",
+     "budget": 2048,
+     "mtp": 1,
+     "n": 2,
+     "ts_pct": 45.35,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.0,
+      "lint": 0.0,
+      "tests": 0.38235294117647056,
+      "edge": 0.9299999999999999,
+      "bdd": 0.5,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.0,
+      "clarity": 4.0,
+      "robustness": 4.0
+     },
+     "judge_mean": 4.0,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 3.0,
+       "clarity": 3.0,
+       "robustness": 3.0,
+       "note": "Sound tokenizer/recursive-descent shape undermined by a side-effecting parseFactor() call inside the divide-by-zero condition that double-consumes tokens, plus the ops record rebuilt every loop iteration.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "tests": 0.7647058823529411,
+        "bdd": 0.0,
+        "edge": 0.86
+       }
+      },
+      {
+       "rep": 1,
+       "design": 5,
+       "clarity": 5,
+       "robustness": 5,
+       "note": "Clean recursive-descent parser threading a Result through every level, handling unary signs, parens, div-by-zero and trailing garbage, with a try/catch backstop.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "tests": 0.0
+       }
+      }
+     ],
+     "think_tok": 2047,
+     "answer_tok": 5088,
+     "out_tok": 7135,
+     "total_tok": 139850,
+     "decode_tps": 44.85753730248639,
+     "gen_s": 159.20257350000003,
+     "ttft_warm_s": 6.849,
+     "cap_hit_pct": 50.0
+    },
+    "un-d128-f16-rb4096": {
+     "model": "Qwen3.6-27B-MTP-Q4_K_M",
+     "depth": "128k",
+     "kv": "f16",
+     "budget": 4096,
+     "mtp": 1,
+     "n": 2,
+     "ts_pct": 57.599999999999994,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.0,
+      "lint": 0.0,
+      "tests": 0.9583333333333333,
+      "edge": 1.0,
+      "bdd": 0.04,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.0,
+      "clarity": 4.0,
+      "robustness": 4.5
+     },
+     "judge_mean": 4.166666666666666,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Clean tokenizer plus recursive-descent parser with EOF sentinel; mixes internal throw/catch with the Result API and omits unary handling.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "bdd": 0.0
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 5,
+       "note": "Consistent Result-threading with no real exceptions, plus unary +/- and truncated integer division beyond the literal spec.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "tests": 0.9166666666666666,
+        "bdd": 0.08
+       }
+      }
+     ],
+     "think_tok": 4095,
+     "answer_tok": 1499,
+     "out_tok": 5594,
+     "total_tok": 138309,
+     "decode_tps": 45.160938163476615,
+     "gen_s": 123.8659155,
+     "ttft_warm_s": 6.85,
+     "cap_hit_pct": 0
+    },
+    "un-d128-q8-rb2048": {
+     "model": "Qwen3.6-27B-MTP-Q4_K_M",
+     "depth": "128k",
+     "kv": "q8_0",
+     "budget": 2048,
+     "mtp": 1,
+     "n": 2,
+     "ts_pct": 56.89999999999999,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.0,
+      "lint": 0.0,
+      "tests": 0.9411764705882353,
+      "edge": 1.0,
+      "bdd": 0.0,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.0,
+      "clarity": 3.5,
+      "robustness": 3.5
+     },
+     "judge_mean": 3.6666666666666665,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 3.0,
+       "robustness": 4.0,
+       "note": "Handles unary minus and integer truncation, but the repeated `if (c.err) return 0` sentinel threading is noisy.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "tests": 0.9411764705882353,
+        "bdd": 0.0
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 3.0,
+       "note": "Clean immutable recursive-descent, but omits unary minus and uses non-truncating division despite the integer-arithmetic spec.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "tests": 0.9411764705882353,
+        "bdd": 0.0
+       }
+      }
+     ],
+     "think_tok": 2047,
+     "answer_tok": 1868.5,
+     "out_tok": 3915.5,
+     "total_tok": 136630.5,
+     "decode_tps": 35.200528296993255,
+     "gen_s": 111.2228815,
+     "ttft_warm_s": 10.323,
+     "cap_hit_pct": 0
+    },
+    "jr-d64-f16-rb2048": {
+     "model": "Qwopus3.6-27B-v1-preview-Q4_K_M",
+     "depth": "64k",
+     "kv": "f16",
+     "budget": 2048,
+     "mtp": 0,
+     "n": 2,
+     "ts_pct": 68.65,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.0,
+      "lint": 0.5,
+      "tests": 0.9130434782608696,
+      "edge": 1.0,
+      "bdd": 0.5,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.0,
+      "clarity": 3.5,
+      "robustness": 4.0
+     },
+     "judge_mean": 3.833333333333333,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Clean recursive-descent parser with a tidy try/catch-to-Result boundary and thorough tests; the boxed [number] index cursor is a slightly unusual mutation choice.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "tests": 0.8260869565217391,
+        "bdd": 0.91
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 3.0,
+       "robustness": 4.0,
+       "note": "Result-threading parser adds unary minus but packs logic into dense one-liners and mislabels empty input as 'Unexpected character'.",
+       "fails": {
+        "types": 0.0,
+        "bdd": 0.09
+       }
+      }
+     ],
+     "think_tok": 1918.5,
+     "answer_tok": 2020,
+     "out_tok": 3938.5,
+     "total_tok": 69572.5,
+     "decode_tps": 24.887930882949323,
+     "gen_s": 158.2432735,
+     "ttft_warm_s": 4.442,
+     "cap_hit_pct": 0
+    },
+    "jr-d128-f16-rb2048": {
+     "model": "Qwopus3.6-27B-v1-preview-Q4_K_M",
+     "depth": "128k",
+     "kv": "f16",
+     "budget": 2048,
+     "mtp": 0,
+     "n": 2,
+     "ts_pct": 58.050000000000004,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.0,
+      "lint": 0.0,
+      "tests": 0.984375,
+      "edge": 1.0,
+      "bdd": 0.015,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.5,
+      "clarity": 4.5,
+      "robustness": 5
+     },
+     "judge_mean": 4.666666666666666,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 5,
+       "note": "Thorough tokenizer plus recursive descent with exhaustive error handling; the number|string error channel and identity bad() are small warts.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "tests": 0.96875,
+        "bdd": 0.03
+       }
+      },
+      {
+       "rep": 1,
+       "design": 5,
+       "clarity": 5,
+       "robustness": 5,
+       "note": "Elegant Result-threaded recursive descent that even supports unary minus, with helpful positional error messages.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "bdd": 0.0
+       }
+      }
+     ],
+     "think_tok": 2047,
+     "answer_tok": 2344,
+     "out_tok": 4391,
+     "total_tok": 137107,
+     "decode_tps": 21.114748292394378,
+     "gen_s": 207.9676105,
+     "ttft_warm_s": 6.352,
+     "cap_hit_pct": 0
+    },
+    "jr-d128-q8-rb2048": {
+     "model": "Qwopus3.6-27B-v1-preview-Q4_K_M",
+     "depth": "128k",
+     "kv": "q8_0",
+     "budget": 2048,
+     "mtp": 0,
+     "n": 2,
+     "ts_pct": 22.55,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.0,
+      "lint": 0.0,
+      "tests": 0.0,
+      "edge": 0.5700000000000001,
+      "bdd": 0.0,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 3.0,
+      "clarity": 4.0,
+      "robustness": 3.0
+     },
+     "judge_mean": 3.333333333333333,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 2.0,
+       "clarity": 3.0,
+       "robustness": 2.0,
+       "note": "Recursive-descent parser never threads position back to callers and hardcodes tokens[pos+1+1] for parens, a fragile design papered over with a find() hack in evaluate.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "tests": 0.0,
+        "bdd": 0.0,
+        "edge": 0.14
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 5,
+       "robustness": 4.0,
+       "note": "Clean recursive descent with a mutable parser threading position correctly, map-based tokenizer, and throw-to-Result conversion; well-factored and readable.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "tests": 0.0,
+        "bdd": 0.0
+       }
+      }
+     ],
+     "think_tok": 2047,
+     "answer_tok": 1894.5,
+     "out_tok": 3941.5,
+     "total_tok": 136657.5,
+     "decode_tps": 22.045395089652644,
+     "gen_s": 178.8421355,
+     "ttft_warm_s": 9.851,
+     "cap_hit_pct": 0
+    }
+   }
+  }
+ },
+ "refs": {
+  "count-words": {
+   "haiku": 94.89999999999999
+  },
+  "lru-cache": {
+   "haiku": 67.9,
+   "sonnet": 83.1
+  },
+  "rate-limiter": {
+   "haiku": 83.39999999999999,
+   "sonnet": 98.2
+  },
+  "shape-variant": {
+   "haiku": 100.0,
+   "sonnet": 100.0,
+   "opus": 100.0
+  },
+  "async-memo": {
+   "haiku": 66.7,
+   "sonnet": 62.5,
+   "opus": 100.0
+  },
+  "store-remove": {
+   "haiku": 81.2,
+   "sonnet": 100.0,
+   "opus": 100.0
+  },
+  "expr-eval": {
+   "haiku": 66.7,
+   "sonnet": 66.7,
+   "opus": 83.3
+  },
+  "deep-equal": {
+   "haiku": 79.2,
+   "sonnet": 100.0,
+   "opus": 98.2
+  }
+ }
+}
