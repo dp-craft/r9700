@@ -1,0 +1,1 @@
+{"design":3,"clarity":4,"robustness":4,"notes":"Correct insertion-time TTL and Map-order recency, but the stored lastAccessedAt field is dead data never used for eviction, adding needless state."}

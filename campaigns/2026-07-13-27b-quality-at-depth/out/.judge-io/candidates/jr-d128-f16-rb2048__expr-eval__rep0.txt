@@ -1,0 +1,310 @@
+// FILE: impl.ts
+export type Result =
+  | { readonly ok: true; readonly value: number }
+  | { readonly ok: false; readonly error: string };
+
+type NumToken = { readonly kind: 'num'; readonly value: number };
+type OpToken = { readonly kind: 'op'; readonly value: '+' | '-' | '*' | '/' };
+type LpToken = { readonly kind: 'lparen' };
+type RpToken = { readonly kind: 'rparen' };
+type ErrToken = { readonly kind: 'error'; readonly value: string };
+type Token = NumToken | OpToken | LpToken | RpToken | ErrToken;
+
+const WS = new Set([' ', '\t', '\n', '\r']);
+
+function tokenize(expr: string): readonly Token[] {
+  const out: Token[] = [];
+  let i = 0;
+  const len = expr.length;
+
+  while (i < len) {
+    const ch = expr[i];
+
+    if (WS.has(ch)) { i++; continue; }
+
+    if (ch >= '0' && ch <= '9') {
+      let n = 0;
+      while (i < len && expr[i] >= '0' && expr[i] <= '9') {
+        n = n * 10 + (expr.charCodeAt(i) - 48);
+        i++;
+      }
+      out.push({ kind: 'num', value: n });
+      continue;
+    }
+
+    if (ch === '+') { out.push({ kind: 'op', value: '+' }); i++; continue; }
+    if (ch === '-') { out.push({ kind: 'op', value: '-' }); i++; continue; }
+    if (ch === '*') { out.push({ kind: 'op', value: '*' }); i++; continue; }
+    if (ch === '/') { out.push({ kind: 'op', value: '/' }); i++; continue; }
+    if (ch === '(') { out.push({ kind: 'lparen' }); i++; continue; }
+    if (ch === ')') { out.push({ kind: 'rparen' }); i++; continue; }
+
+    out.push({ kind: 'error', value: ch });
+    break;
+  }
+
+  return out;
+}
+
+function bad(msg: string): string { return msg; }
+
+function evaluate(expr: string): Result {
+  const tokens = tokenize(expr);
+
+  if (tokens.length === 0) {
+    return { ok: false, error: 'empty expression' };
+  }
+
+  const first = tokens[0];
+  if (first.kind === 'error') {
+    return { ok: false, error: `invalid character '${first.value}'` };
+  }
+
+  let pos = 0;
+
+  function peek(): Token | undefined { return tokens[pos]; }
+  function consume(): Token { return tokens[pos++]; }
+
+  function isAddSub(): boolean {
+    const t = peek();
+    return t?.kind === 'op' && (t.value === '+' || t.value === '-');
+  }
+
+  function isMulDiv(): boolean {
+    const t = peek();
+    return t?.kind === 'op' && (t.value === '*' || t.value === '/');
+  }
+
+  function parseExpr(): number | string {
+    let left = parseTerm();
+    if (typeof left === 'string') return left;
+
+    while (isAddSub()) {
+      const op = consume().value;
+      const right = parseTerm();
+      if (typeof right === 'string') return right;
+      left = op === '+' ? left + right : left - right;
+    }
+
+    return left;
+  }
+
+  function parseTerm(): number | string {
+    let left = parseFactor();
+    if (typeof left === 'string') return left;
+
+    while (isMulDiv()) {
+      const op = consume().value;
+      const right = parseFactor();
+      if (typeof right === 'string') return right;
+      if (op === '/' && right === 0) return bad('division by zero');
+      left = op === '*' ? left * right : left / right;
+    }
+
+    return left;
+  }
+
+  function parseFactor(): number | string {
+    const t = peek();
+
+    if (t?.kind === 'num') {
+      consume();
+      return t.value;
+    }
+
+    if (t?.kind === 'lparen') {
+      consume();
+      const inner = parseExpr();
+      if (typeof inner === 'string') return inner;
+      const closing = peek();
+      if (closing?.kind !== 'rparen') return bad('missing closing parenthesis');
+      consume();
+      return inner;
+    }
+
+    if (t?.kind === 'rparen') return bad('unexpected closing parenthesis');
+    if (t?.kind === 'op') return bad('missing operand');
+
+    return bad('unexpected token');
+  }
+
+  const result = parseExpr();
+
+  if (typeof result === 'string') return { ok: false, error: result };
+
+  if (pos < tokens.length) {
+    return { ok: false, error: 'unexpected token after expression' };
+  }
+
+  return { ok: true, value: result };
+}
+
+export { Result, evaluate };
+
+// FILE: impl.test.ts
+import { describe, expect, it } from 'vitest';
+
+import { evaluate } from './impl';
+
+describe('evaluate', () => {
+  it('should return the number when given a plain integer', () => {
+    const result = evaluate('42');
+    expect(result).toEqual({ ok: true, value: 42 });
+  });
+
+  it('should evaluate addition of two numbers', () => {
+    const result = evaluate('3 + 4');
+    expect(result).toEqual({ ok: true, value: 7 });
+  });
+
+  it('should evaluate subtraction of two numbers', () => {
+    const result = evaluate('10 - 3');
+    expect(result).toEqual({ ok: true, value: 7 });
+  });
+
+  it('should evaluate multiplication of two numbers', () => {
+    const result = evaluate('6 * 7');
+    expect(result).toEqual({ ok: true, value: 42 });
+  });
+
+  it('should evaluate division of two numbers', () => {
+    const result = evaluate('20 / 5');
+    expect(result).toEqual({ ok: true, value: 4 });
+  });
+
+  it('should respect multiplication precedence over addition', () => {
+    const result = evaluate('2 + 3 * 4');
+    expect(result).toEqual({ ok: true, value: 14 });
+  });
+
+  it('should respect division precedence over subtraction', () => {
+    const result = evaluate('10 - 8 / 2');
+    expect(result).toEqual({ ok: true, value: 6 });
+  });
+
+  it('should evaluate left-associative subtraction (10-3-2 = 5)', () => {
+    const result = evaluate('10 - 3 - 2');
+    expect(result).toEqual({ ok: true, value: 5 });
+  });
+
+  it('should evaluate left-associative division (8/2/2 = 2)', () => {
+    const result = evaluate('8 / 2 / 2');
+    expect(result).toEqual({ ok: true, value: 2 });
+  });
+
+  it('should evaluate left-associative multiplication (2*3*4 = 24)', () => {
+    const result = evaluate('2 * 3 * 4');
+    expect(result).toEqual({ ok: true, value: 24 });
+  });
+
+  it('should evaluate parentheses overriding precedence', () => {
+    const result = evaluate('(2 + 3) * 4');
+    expect(result).toEqual({ ok: true, value: 20 });
+  });
+
+  it('should evaluate nested parentheses', () => {
+    const result = evaluate('((2 + 3) * 4) / 2');
+    expect(result).toEqual({ ok: true, value: 10 });
+  });
+
+  it('should handle arbitrary whitespace around tokens', () => {
+    const result = evaluate('  3   +   4  ');
+    expect(result).toEqual({ ok: true, value: 7 });
+  });
+
+  it('should handle whitespace inside parentheses', () => {
+    const result = evaluate('( 3 + 4 ) * 2');
+    expect(result).toEqual({ ok: true, value: 14 });
+  });
+
+  it('should return error on division by zero', () => {
+    const result = evaluate('10 / 0');
+    expect(result.ok).toBe(false);
+    expect(result.ok === false && result.error).toBe('division by zero');
+  });
+
+  it('should return error on unbalanced open parenthesis', () => {
+    const result = evaluate('(3 + 4');
+    expect(result.ok).toBe(false);
+  });
+
+  it('should return error on unbalanced close parenthesis', () => {
+    const result = evaluate('3 + 4)');
+    expect(result.ok).toBe(false);
+  });
+
+  it('should return error on empty expression', () => {
+    const result = evaluate('');
+    expect(result.ok).toBe(false);
+  });
+
+  it('should return error on whitespace-only expression', () => {
+    const result = evaluate('   ');
+    expect(result.ok).toBe(false);
+  });
+
+  it('should return error on invalid character', () => {
+    const result = evaluate('3 + x');
+    expect(result.ok).toBe(false);
+  });
+
+  it('should return error on missing right operand for operator', () => {
+    const result = evaluate('3 +');
+    expect(result.ok).toBe(false);
+  });
+
+  it('should return error on missing left operand for operator', () => {
+    const result = evaluate('+ 3');
+    expect(result.ok).toBe(false);
+  });
+
+  it('should return error on consecutive operators', () => {
+    const result = evaluate('3 + * 4');
+    expect(result.ok).toBe(false);
+  });
+
+  it('should return error on consecutive numbers without operator', () => {
+    const result = evaluate('3 4');
+    expect(result.ok).toBe(false);
+  });
+
+  it('should evaluate a complex mixed-precedence expression', () => {
+    const result = evaluate('2 + 3 * 4 - 6 / 2');
+    expect(result).toEqual({ ok: true, value: 12 });
+  });
+
+  it('should evaluate expression with multiple parenthesized groups', () => {
+    const result = evaluate('(1 + 2) * (3 + 4)');
+    expect(result).toEqual({ ok: true, value: 21 });
+  });
+
+  it('should evaluate deeply nested parentheses', () => {
+    const result = evaluate('(((1 + 2)))');
+    expect(result).toEqual({ ok: true, value: 3 });
+  });
+
+  it('should evaluate large integer', () => {
+    const result = evaluate('999999 + 1');
+    expect(result).toEqual({ ok: true, value: 1_000_000 });
+  });
+
+  it('should return error on unexpected token after expression', () => {
+    const result = evaluate('3 + 4 5');
+    expect(result.ok).toBe(false);
+  });
+
+  it('should return error on missing operand inside parentheses', () => {
+    const result = evaluate('(3 +)');
+    expect(result.ok).toBe(false);
+  });
+
+  it('should return error on operator inside empty parentheses', () => {
+    const result = evaluate('(+)');
+    expect(result.ok).toBe(false);
+  });
+
+  it('should return error on unexpected closing parenthesis alone', () => {
+    const result = evaluate(')');
+    expect(result.ok).toBe(false);
+  });
+});

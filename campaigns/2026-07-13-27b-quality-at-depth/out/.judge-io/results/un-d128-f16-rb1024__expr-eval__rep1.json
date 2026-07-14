@@ -1,0 +1,1 @@
+{"design":4,"clarity":5,"robustness":4,"notes":"Readable Result-threaded recursive descent with specific error messages, unary handling, and a defensive try/catch; anticipates whitespace-only and unbalanced-paren cases well."}

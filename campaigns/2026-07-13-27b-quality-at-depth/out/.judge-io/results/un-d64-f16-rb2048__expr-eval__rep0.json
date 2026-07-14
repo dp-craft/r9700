@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":5,"notes":"Well-structured class-based recursive-descent parser with internal throw/catch mapped to Result, and an unusually thorough edge-case test suite."}

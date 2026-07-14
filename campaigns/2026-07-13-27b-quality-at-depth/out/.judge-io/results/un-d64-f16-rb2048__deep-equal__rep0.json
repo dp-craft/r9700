@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Correct type-guarded recursion with the key-in-b check that handles undefined-valued keys; sensible ordering of the NaN and null cases."}

@@ -1,0 +1,1 @@
+{"design":4,"clarity":5,"robustness":4,"notes":"Clean expiresAt model with small well-named pure helpers and lazy purge; no redundant state."}

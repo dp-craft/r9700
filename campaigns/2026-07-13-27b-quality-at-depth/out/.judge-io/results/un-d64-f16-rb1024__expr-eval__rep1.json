@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":5,"notes":"Solid Result-threading recursive-descent parser with good edge coverage, slightly marred by a redundant s.error mutation that is never read."}

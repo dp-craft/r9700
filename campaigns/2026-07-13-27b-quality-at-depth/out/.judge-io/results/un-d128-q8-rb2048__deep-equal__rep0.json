@@ -1,0 +1,1 @@
+{"design":5,"clarity":5,"robustness":4,"notes":"Clean helper-split with correct type guards, NaN and array-vs-object handling; solid within spec scope."}

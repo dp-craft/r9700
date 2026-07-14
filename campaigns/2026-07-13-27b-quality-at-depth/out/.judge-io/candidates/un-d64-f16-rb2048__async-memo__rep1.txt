@@ -1,0 +1,65 @@
+// FILE: impl.ts
+export function createAsyncMemo<K, V>(fn: (key: K) => Promise<V>): (key: K) => Promise<V> {
+  const cache = new Map<K, Promise<V>>();
+  
+  return (key: K): Promise<V> => {
+    const existing = cache.get(key);
+    if (existing !== undefined) return existing;
+    
+    const p = fn(key);
+    cache.set(key, p);
+    
+    p.catch(() => cache.delete(key));
+    return p;
+  };
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it, vi } from 'vitest';
+
+import { createAsyncMemo } from './impl';
+
+describe('createAsyncMemo', () => {
+  it('should share one in-flight computation when concurrent calls target the same key', async () => {
+    const fn = vi.fn(async (key: string) => {
+      await new Promise(resolve => setTimeout(resolve, 10));
+      return `value-${key}`;
+    });
+    
+    const memoized = createAsyncMemo(fn);
+    const [res1, res2] = await Promise.all([memoized('a'), memoized('a')]);
+    
+    expect(res1).toBe('value-a');
+    expect(res2).toBe('value-a');
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it('should retry fn when the previous computation rejects', async () => {
+    let callCount = 0;
+    const fn = vi.fn(async (_key: string) => {
+      callCount++;
+      if (callCount === 1) throw new Error('transient-fail');
+      return 'recovered-value';
+    });
+    
+    const memoized = createAsyncMemo(fn);
+    
+    await expect(memoized('b')).rejects.toThrow('transient-fail');
+    const res = await memoized('b');
+    
+    expect(res).toBe('recovered-value');
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+
+  it('should reuse cached value when the computation succeeds', async () => {
+    const fn = vi.fn(async (key: string) => `cached-${key}`);
+    const memoized = createAsyncMemo(fn);
+    
+    const first = await memoized('c');
+    const second = await memoized('c');
+    
+    expect(first).toBe('cached-c');
+    expect(second).toBe('cached-c');
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+});

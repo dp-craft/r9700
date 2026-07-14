@@ -1,0 +1,1 @@
+{"design":4,"clarity":5,"robustness":4,"notes":"Minimal idiomatic fix with focused tests covering dedup, no-cache-on-failure, and cache-on-success."}

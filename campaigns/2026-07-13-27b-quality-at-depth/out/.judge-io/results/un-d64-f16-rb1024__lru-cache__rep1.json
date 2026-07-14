@@ -1,0 +1,1 @@
+{"design":4,"clarity":5,"robustness":4,"notes":"Well-factored free helpers with precomputed expiresAt read very clearly; overwriting a key via set does not refresh recency, a minor unspecified edge."}

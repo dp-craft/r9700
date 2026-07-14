@@ -1,0 +1,153 @@
+// FILE: impl.ts
+type Result =
+  | { readonly ok: true; readonly value: number }
+  | { readonly ok: false; readonly error: string };
+
+interface Ctx {
+  readonly tokens: readonly Token[];
+  index: number;
+}
+
+type Token =
+  | { readonly type: 'number'; readonly value: number }
+  | { readonly type: 'op'; readonly value: '+' | '-' | '*' | '/' }
+  | { readonly type: 'paren'; readonly value: '(' | ')' };
+
+function tokenize(input: string): readonly Token[] {
+  const tokens: Token[] = [];
+  let i = 0;
+  while (i < input.length) {
+    const ch = input[i];
+    if (ch === ' ' || ch === '\t' || ch === '\n') { i++; continue; }
+    if (ch === '(' || ch === ')') { tokens.push({ type: 'paren', value: ch }); i++; continue; }
+    if (ch === '+' || ch === '-' || ch === '*' || ch === '/') { tokens.push({ type: 'op', value: ch }); i++; continue; }
+    if (ch >= '0' && ch <= '9') {
+      let num = 0;
+      while (i < input.length && input[i] >= '0' && input[i] <= '9') { num = num * 10 + Number(input[i]); i++; }
+      tokens.push({ type: 'number', value: num });
+      continue;
+    }
+    return [];
+  }
+  return tokens;
+}
+
+function isBinOp(tok: Token, a: string, b: string): boolean {
+  return tok.type === 'op' && (tok.value === a || tok.value === b);
+}
+
+function evaluate(expr: string): Result {
+  const tokens = tokenize(expr);
+  if (tokens.length === 0) return { ok: false, error: 'Unexpected character' };
+  const ctx: Ctx = { tokens, index: 0 };
+  const res = parseExpression(ctx);
+  if (!res.ok) return res;
+  if (ctx.index < ctx.tokens.length) return { ok: false, error: 'Unexpected token after expression' };
+  return res;
+}
+
+function parseExpression(ctx: Ctx): Result {
+  let res = parseTerm(ctx);
+  if (!res.ok) return res;
+  while (ctx.index < ctx.tokens.length && isBinOp(ctx.tokens[ctx.index], '+', '-')) {
+    const op = ctx.tokens[ctx.index].value;
+    ctx.index++;
+    const right = parseTerm(ctx);
+    if (!right.ok) return right;
+    res = { ok: true, value: op === '+' ? res.value + right.value : res.value - right.value };
+  }
+  return res;
+}
+
+function parseTerm(ctx: Ctx): Result {
+  let res = parseFactor(ctx);
+  if (!res.ok) return res;
+  while (ctx.index < ctx.tokens.length && isBinOp(ctx.tokens[ctx.index], '*', '/')) {
+    const op = ctx.tokens[ctx.index].value;
+    ctx.index++;
+    const right = parseFactor(ctx);
+    if (!right.ok) return right;
+    if (op === '/' && right.value === 0) return { ok: false, error: 'Division by zero' };
+    res = { ok: true, value: op === '*' ? res.value * right.value : Math.trunc(res.value / right.value) };
+  }
+  return res;
+}
+
+function parseFactor(ctx: Ctx): Result {
+  if (ctx.index >= ctx.tokens.length) return { ok: false, error: 'Missing operand' };
+  const tok = ctx.tokens[ctx.index];
+  if (tok.type === 'number') { ctx.index++; return { ok: true, value: tok.value }; }
+  if (tok.type === 'paren' && tok.value === '(') {
+    ctx.index++;
+    const res = parseExpression(ctx);
+    if (!res.ok) return res;
+    if (ctx.index >= ctx.tokens.length || ctx.tokens[ctx.index].type !== 'paren' || ctx.tokens[ctx.index].value !== ')') {
+      return { ok: false, error: 'Unbalanced parentheses' };
+    }
+    ctx.index++;
+    return res;
+  }
+  if (tok.type === 'op' && tok.value === '-') { ctx.index++; const res = parseFactor(ctx); return res.ok ? { ok: true, value: -res.value } : res; }
+  return { ok: false, error: 'Unexpected token' };
+}
+
+export { evaluate, Result };
+
+// FILE: impl.test.ts
+import { describe, expect, it } from 'vitest';
+import { evaluate, Result } from './impl';
+
+describe('evaluate', () => {
+  it('should evaluate single number when given a plain integer', () => {
+    const res: Result = evaluate('42');
+    expect(res).toEqual({ ok: true, value: 42 });
+  });
+
+  it('should evaluate addition and subtraction with left-associativity', () => {
+    expect(evaluate('10-3-2')).toEqual({ ok: true, value: 5 });
+    expect(evaluate('5+3-2')).toEqual({ ok: true, value: 6 });
+  });
+
+  it('should evaluate multiplication and division with left-associativity', () => {
+    expect(evaluate('8/2/2')).toEqual({ ok: true, value: 2 });
+    expect(evaluate('3*2*4')).toEqual({ ok: true, value: 24 });
+  });
+
+  it('should respect standard precedence (* / before + -)', () => {
+    expect(evaluate('2+3*4')).toEqual({ ok: true, value: 14 });
+    expect(evaluate('10-2*3')).toEqual({ ok: true, value: 4 });
+  });
+
+  it('should evaluate expressions with parentheses', () => {
+    expect(evaluate('(2+3)*4')).toEqual({ ok: true, value: 20 });
+    expect(evaluate('10/(5-3)')).toEqual({ ok: true, value: 5 });
+  });
+
+  it('should evaluate unary minus', () => {
+    expect(evaluate('-5+3')).toEqual({ ok: true, value: -2 });
+    expect(evaluate('3*-2')).toEqual({ ok: true, value: -6 });
+  });
+
+  it('should handle arbitrary whitespace', () => {
+    expect(evaluate('  2 + 3 * 4  ')).toEqual({ ok: true, value: 14 });
+    expect(evaluate('( 2 + 3 ) * 4')).toEqual({ ok: true, value: 20 });
+  });
+
+  it('should return error on division by zero', () => {
+    expect(evaluate('10/0')).toEqual({ ok: false, error: 'Division by zero' });
+  });
+
+  it('should return error on unbalanced parentheses', () => {
+    expect(evaluate('(2+3')).toEqual({ ok: false, error: 'Unbalanced parentheses' });
+    expect(evaluate('2+3)')).toEqual({ ok: false, error: 'Unexpected token after expression' });
+  });
+
+  it('should return error on missing operand', () => {
+    expect(evaluate('10+')).toEqual({ ok: false, error: 'Missing operand' });
+    expect(evaluate('*2')).toEqual({ ok: false, error: 'Unexpected token' });
+  });
+
+  it('should return error on unexpected character', () => {
+    expect(evaluate('10+3a')).toEqual({ ok: false, error: 'Unexpected character' });
+  });
+});

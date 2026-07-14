@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Correct ordering of guards with an explicit key-in-b presence check, so objects with equal key counts but different keys are handled properly."}

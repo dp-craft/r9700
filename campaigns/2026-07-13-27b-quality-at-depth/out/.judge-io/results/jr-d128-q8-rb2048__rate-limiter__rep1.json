@@ -1,0 +1,1 @@
+{"design":4,"clarity":5,"robustness":4,"notes":"Straightforward mutable-state implementation, very readable with clear per-scenario tests."}

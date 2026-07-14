@@ -1,0 +1,1 @@
+{"design":3,"clarity":3,"robustness":3,"notes":"Array/splice O(n) approach is workable but heavier, and the top-level isExpired references generics K,V out of scope."}

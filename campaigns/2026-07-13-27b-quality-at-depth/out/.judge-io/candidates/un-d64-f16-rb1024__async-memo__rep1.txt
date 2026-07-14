@@ -1,0 +1,95 @@
+// FILE: impl.ts
+export function createAsyncMemo<K, V>(fn: (key: K) => Promise<V>): (key: K) => Promise<V> {
+  const cache = new Map<K, Promise<V>>();
+
+  return (key: K): Promise<V> => {
+    const cached = cache.get(key);
+    if (cached !== undefined) return cached;
+
+    const p = fn(key);
+    cache.set(key, p);
+
+    p.catch(() => cache.delete(key));
+
+    return p;
+  };
+}
+
+// FILE: impl.test.ts
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { createAsyncMemo } from './impl';
+
+describe('createAsyncMemo', () => {
+  let fnSpy: ReturnType<typeof vi.fn>;
+  let memoized: ReturnType<typeof createAsyncMemo<string, string>>;
+
+  beforeEach(() => {
+    fnSpy = vi.fn(async (key: string) => `value-${key}`);
+    memoized = createAsyncMemo(fnSpy);
+  });
+
+  it('should cache successes when resolved', async () => {
+    const result1 = await memoized('a');
+    const result2 = await memoized('a');
+
+    expect(result1).toBe('value-a');
+    expect(result2).toBe('value-a');
+    expect(fnSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('should dedup concurrent calls for the same key', async () => {
+    const p1 = memoized('b');
+    const p2 = memoized('b');
+    const p3 = memoized('b');
+
+    const [r1, r2, r3] = await Promise.all([p1, p2, p3]);
+
+    expect(r1).toBe('value-b');
+    expect(r2).toBe('value-b');
+    expect(r3).toBe('value-b');
+    expect(fnSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('should not cache failures when rejected', async () => {
+    fnSpy.mockRejectedValueOnce(new Error('fail'));
+
+    await expect(memoized('c')).rejects.toThrow('fail');
+    expect(fnSpy).toHaveBeenCalledTimes(1);
+    expect(cacheSpy()).toBe(false);
+
+    fnSpy.mockResolvedValueOnce('recovered');
+    const result = await memoized('c');
+    expect(result).toBe('recovered');
+    expect(fnSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('should retry fn after rejection', async () => {
+    fnSpy.mockRejectedValueOnce(new Error('net error'));
+    await expect(memoized('d')).rejects.toThrow('net error');
+
+    fnSpy.mockResolvedValueOnce('ok');
+    const r = await memoized('d');
+    expect(r).toBe('ok');
+    expect(fnSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('should handle mixed success and failure keys independently', async () => {
+    fnSpy.mockImplementation(async (key: string) => {
+      if (key === 'fail') throw new Error('boom');
+      return `val-${key}`;
+    });
+
+    await expect(memoized('fail')).rejects.toThrow('boom');
+    const success = await memoized('ok');
+    expect(success).toBe('val-ok');
+
+    const cached = await memoized('ok');
+    expect(cached).toBe('val-ok');
+    expect(fnSpy).toHaveBeenCalledTimes(3);
+  });
+});
+
+function cacheSpy(): boolean {
+  return true;
+}

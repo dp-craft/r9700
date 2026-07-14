@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Filter-with-change-guard removal is clean and well-tested via beforeEach; in-place array rebuild is a touch cleverer than necessary."}

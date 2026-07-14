@@ -1,1 +1,1 @@
-{"design":4,"clarity":4,"robustness":5,"notes":"ok"}
+{"design":4,"clarity":4,"robustness":4,"notes":"Clean closure-based design with lazy expiry throughout; expiry-delete logic is duplicated across get/has but tests cover the important edges."}

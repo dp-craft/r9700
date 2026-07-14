@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":3,"notes":"Correct but the detached fire-and-forget p.catch(() => delete) is a slightly subtle side-channel."}

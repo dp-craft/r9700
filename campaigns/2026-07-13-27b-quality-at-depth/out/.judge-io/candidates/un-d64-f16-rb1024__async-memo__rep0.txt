@@ -1,0 +1,16 @@
+// FILE: impl.ts
+export function createAsyncMemo<K, V>(fn: (key: K) => Promise<V>): (key: K) => Promise<V> {
+  const cache = new Map<K, Promise<V>>();
+  return (key: K): Promise<V> => {
+    const existing = cache.get(key);
+    if (existing !== undefined) return existing;
+
+    const p = fn(key);
+    const memoized = p.catch((error: unknown) => {
+      cache.delete(key);
+      throw error;
+    });
+    cache.set(key, memoized);
+    return memoized;
+  };
+}

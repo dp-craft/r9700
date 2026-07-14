@@ -1,0 +1,1 @@
+{"design":4,"clarity":5,"robustness":4,"notes":"Minimal fix attaching a catch to evict on rejection; clear and well-tested including concurrent-failure retry."}

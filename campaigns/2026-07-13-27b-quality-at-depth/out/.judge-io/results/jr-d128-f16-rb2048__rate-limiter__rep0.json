@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Immutable bucket with continuous fractional refill matching the spec, and it correctly writes back the refilled state on failure without deducting."}

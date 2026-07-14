@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Correct and concise; the side-branch p.catch that evicts on failure is slightly less explicit than chaining but works fine."}

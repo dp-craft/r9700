@@ -1,0 +1,1 @@
+{"design":2,"clarity":3,"robustness":2,"notes":"Recursive-descent parser never threads position back to callers and hardcodes tokens[pos+1+1] for parens, a fragile design papered over with a find() hack in evaluate."}

@@ -1,0 +1,98 @@
+// FILE: impl.ts
+function compareArrays(a: unknown[], b: unknown[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (!deepEqual(a[i], b[i])) return false;
+  }
+  return true;
+}
+
+function compareObjects(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
+  const keysA = Object.keys(a);
+  const keysB = Object.keys(b);
+  if (keysA.length !== keysB.length) return false;
+  for (const key of keysA) {
+    if (!Object.hasOwn(b, key)) return false;
+    if (!deepEqual(a[key], b[key])) return false;
+  }
+  return true;
+}
+
+export function deepEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (a === null || b === null) return false;
+  if (typeof a !== typeof b) return false;
+  if (typeof a !== 'object') return Number.isNaN(a) && Number.isNaN(b);
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a)) return compareArrays(a, b as unknown[]);
+  return compareObjects(a as Record<string, unknown>, b as Record<string, unknown>);
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it } from 'vitest';
+
+import { deepEqual } from './impl';
+
+describe('deepEqual', () => {
+  it('should return true when both values are NaN', () => {
+    expect(deepEqual(NaN, NaN)).toBe(true);
+  });
+
+  it('should return true when primitives are equal by value', () => {
+    expect(deepEqual(1, 1)).toBe(true);
+    expect(deepEqual('hello', 'hello')).toBe(true);
+    expect(deepEqual(true, true)).toBe(true);
+    expect(deepEqual(null, null)).toBe(true);
+    expect(deepEqual(undefined, undefined)).toBe(true);
+  });
+
+  it('should return false when primitives differ in value', () => {
+    expect(deepEqual(1, 2)).toBe(false);
+    expect(deepEqual('a', 'b')).toBe(false);
+    expect(deepEqual(true, false)).toBe(false);
+  });
+
+  it('should return true for nested structures with matching values', () => {
+    const a = { x: [1, { y: 'z' }], w: true };
+    const b = { x: [1, { y: 'z' }], w: true };
+    expect(deepEqual(a, b)).toBe(true);
+  });
+
+  it('should return false when nested values differ', () => {
+    const a = { x: [1, { y: 'z' }] };
+    const b = { x: [1, { y: 'w' }] };
+    expect(deepEqual(a, b)).toBe(false);
+  });
+
+  it('should return false when object key counts mismatch', () => {
+    const a = { x: 1, y: 2 };
+    const b = { x: 1 };
+    expect(deepEqual(a, b)).toBe(false);
+  });
+
+  it('should return false when comparing array to plain object with matching indices', () => {
+    const arr = [1, 2, 3];
+    const obj = { 0: 1, 1: 2, 2: 3 };
+    expect(deepEqual(arr, obj)).toBe(false);
+  });
+
+  it('should return false when null is compared to empty object', () => {
+    expect(deepEqual(null, {})).toBe(false);
+  });
+
+  it('should return true for empty arrays', () => {
+    expect(deepEqual([], [])).toBe(true);
+  });
+
+  it('should return true for empty objects', () => {
+    expect(deepEqual({}, {})).toBe(true);
+  });
+
+  it('should return false when array lengths differ', () => {
+    expect(deepEqual([1, 2], [1, 2, 3])).toBe(false);
+  });
+
+  it('should return false when comparing object to array', () => {
+    expect(deepEqual({ 0: 1 }, [1])).toBe(false);
+  });
+});

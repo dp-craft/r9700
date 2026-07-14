@@ -1,0 +1,1 @@
+{"design":5,"clarity":5,"robustness":4,"notes":"Idiomatic wrapper promise that deletes-on-reject and rethrows, cleanly satisfying dedup/no-cache-failure/cache-success."}

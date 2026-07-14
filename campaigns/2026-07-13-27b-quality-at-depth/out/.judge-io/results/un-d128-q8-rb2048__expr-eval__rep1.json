@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":3,"notes":"Clean immutable recursive-descent, but omits unary minus and uses non-truncating division despite the integer-arithmetic spec."}

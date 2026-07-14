@@ -1,0 +1,126 @@
+// FILE: impl.ts
+export function createAsyncMemo<K, V>(fn: (key: K) => Promise<V>): (key: K) => Promise<V> {
+  const cache = new Map<K, Promise<V>>();
+  return (key: K): Promise<V> => {
+    const cached = cache.get(key);
+    if (cached !== undefined) {
+      return cached;
+    }
+    const p = fn(key).catch((error: unknown): never => {
+      cache.delete(key);
+      throw error;
+    });
+    cache.set(key, p);
+    return p;
+  };
+}
+```
+
+```ts
+
+// FILE: impl.test.ts
+import { describe, expect, it, vi } from 'vitest';
+
+import { createAsyncMemo } from './impl';
+
+describe('createAsyncMemo', () => {
+  describe('concurrent dedup', () => {
+    it('should call fn only once when multiple concurrent calls use the same key', async () => {
+      const fn = vi.fn<(key: string) => Promise<string>>();
+      fn.mockImplementation(async (key: string) => {
+        await new Promise((resolve: (v: void) => void) => setTimeout(resolve, 10));
+        return key;
+      });
+
+      const memoized = createAsyncMemo(fn);
+
+      const p1 = memoized('a');
+      const p2 = memoized('a');
+
+      const [v1, v2] = await Promise.all([p1, p2]);
+
+      expect(fn).toHaveBeenCalledTimes(1);
+      expect(v1).toBe('a');
+      expect(v2).toBe('a');
+    });
+  });
+
+  describe('cache-hit-after-success', () => {
+    it('should reuse the cached value on subsequent calls after a successful resolution', async () => {
+      const fn = vi.fn<(key: string) => Promise<string>>();
+      fn.mockResolvedValue('ok');
+
+      const memoized = createAsyncMemo(fn);
+
+      const r1 = await memoized('a');
+      const r2 = await memoized('a');
+
+      expect(fn).toHaveBeenCalledTimes(1);
+      expect(r1).toBe('ok');
+      expect(r2).toBe('ok');
+    });
+
+    it('should cache different keys independently', async () => {
+      const fn = vi.fn<(key: string) => Promise<string>>();
+      fn.mockResolvedValue('ok');
+
+      const memoized = createAsyncMemo(fn);
+
+      await memoized('a');
+      await memoized('b');
+
+      expect(fn).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('retry-after-rejection', () => {
+    it('should retry fn on a subsequent call after the previous call rejected', async () => {
+      const fn = vi.fn<(key: string) => Promise<string>>();
+      fn.mockRejectedValue(new Error('fail'));
+
+      const memoized = createAsyncMemo(fn);
+
+      await expect(memoized('a')).rejects.toThrow('fail');
+
+      fn.mockResolvedValue('ok');
+
+      const result = await memoized('a');
+
+      expect(fn).toHaveBeenCalledTimes(2);
+      expect(result).toBe('ok');
+    });
+
+    it('should not cache the rejected promise — a later call is not permanently blocked', async () => {
+      const fn = vi.fn<(key: string) => Promise<string>>();
+      fn.mockRejectedValue(new Error('fail'));
+
+      const memoized = createAsyncMemo(fn);
+
+      await expect(memoized('a')).rejects.toThrow('fail');
+
+      fn.mockResolvedValue('recovered');
+
+      const result = await memoized('a');
+
+      expect(result).toBe('recovered');
+    });
+
+    it('should still cache a successful result after a prior failure for the same key', async () => {
+      const fn = vi.fn<(key: string) => Promise<string>>();
+      fn.mockRejectedValue(new Error('fail'));
+
+      const memoized = createAsyncMemo(fn);
+
+      await expect(memoized('a')).rejects.toThrow('fail');
+
+      fn.mockResolvedValue('ok');
+
+      await memoized('a');
+
+      // fn was called twice (first failure, then success) — third call should be cached
+      await memoized('a');
+
+      expect(fn).toHaveBeenCalledTimes(2);
+    });
+  });
+});

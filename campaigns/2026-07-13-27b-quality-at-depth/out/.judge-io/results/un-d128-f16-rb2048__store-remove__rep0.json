@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":3,"notes":"Correct and readable, though the in-place splice-in-while loop and setting totals to 0 (vs delete) for absent keys are slightly awkward."}

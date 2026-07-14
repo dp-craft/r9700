@@ -1,0 +1,1 @@
+{"design":3,"clarity":3,"robustness":3,"notes":"Sound tokenizer/recursive-descent shape undermined by a side-effecting parseFactor() call inside the divide-by-zero condition that double-consumes tokens, plus the ops record rebuilt every loop iteration."}

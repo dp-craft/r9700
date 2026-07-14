@@ -1,1 +1,1 @@
-{"design":4,"clarity":4,"robustness":5,"notes":"ok"}
+{"design":4,"clarity":4,"robustness":4,"notes":"Well-factored closure helpers, though removeExpiredKeys re-implements the expiry check inline instead of reusing isExpired."}

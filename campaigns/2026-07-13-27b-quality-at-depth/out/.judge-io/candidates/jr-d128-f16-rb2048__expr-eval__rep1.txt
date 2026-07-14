@@ -1,0 +1,249 @@
+// FILE: impl.ts
+type Result =
+  | { readonly ok: true; readonly value: number }
+  | { readonly ok: false; readonly error: string };
+
+interface Parser {
+  readonly input: string;
+  pos: number;
+}
+
+function makeParser(input: string): Parser {
+  return { input, pos: 0 };
+}
+
+function peek(p: Parser): string | undefined {
+  return p.input[p.pos];
+}
+
+function advance(p: Parser): string | undefined {
+  return p.input[p.pos++];
+}
+
+function skipWhitespace(p: Parser): void {
+  while (p.pos < p.input.length && /\s/.test(p.input[p.pos])) {
+    p.pos++;
+  }
+}
+
+function parseNumber(p: Parser): Result {
+  const start = p.pos;
+  while (p.pos < p.input.length && /\d/.test(p.input[p.pos])) {
+    p.pos++;
+  }
+  if (start === p.pos) {
+    return { ok: false, error: `Expected number at position ${p.pos}` };
+  }
+  const value = parseInt(p.input.slice(start, p.pos), 10);
+  return { ok: true, value };
+}
+
+function parseFactor(p: Parser): Result {
+  skipWhitespace(p);
+  if (peek(p) === '-') {
+    advance(p);
+    const result = parseFactor(p);
+    if (!result.ok) return result;
+    return { ok: true, value: -result.value };
+  }
+  if (peek(p) === '(') {
+    advance(p);
+    const result = parseExpr(p);
+    if (!result.ok) return result;
+    skipWhitespace(p);
+    if (peek(p) !== ')') {
+      return { ok: false, error: `Expected closing parenthesis at position ${p.pos}` };
+    }
+    advance(p);
+    return result;
+  }
+  return parseNumber(p);
+}
+
+function applyMulDiv(
+  left: number,
+  op: string,
+  right: number,
+  pos: number
+): Result {
+  if (op === '/' && right === 0) {
+    return { ok: false, error: `Division by zero at position ${pos}` };
+  }
+  const value = op === '*' ? left * right : left / right;
+  return { ok: true, value };
+}
+
+function parseTerm(p: Parser): Result {
+  let result = parseFactor(p);
+  if (!result.ok) return result;
+  while (true) {
+    skipWhitespace(p);
+    const op = peek(p);
+    if (op !== '*' && op !== '/') break;
+    advance(p);
+    const right = parseFactor(p);
+    if (!right.ok) return right;
+    result = applyMulDiv(result.value, op, right.value, p.pos);
+  }
+  return result;
+}
+
+function parseExpr(p: Parser): Result {
+  let result = parseTerm(p);
+  if (!result.ok) return result;
+  while (true) {
+    skipWhitespace(p);
+    const op = peek(p);
+    if (op !== '+' && op !== '-') break;
+    advance(p);
+    const right = parseTerm(p);
+    if (!right.ok) return right;
+    result = { ok: true, value: op === '+' ? result.value + right.value : result.value - right.value };
+  }
+  return result;
+}
+
+function evaluate(expr: string): Result {
+  const p = makeParser(expr);
+  const result = parseExpr(p);
+  if (!result.ok) return result;
+  skipWhitespace(p);
+  if (p.pos < p.input.length) {
+    return { ok: false, error: `Unexpected character at position ${p.pos}` };
+  }
+  return result;
+}
+
+export { evaluate };
+export type { Result };
+
+// FILE: impl.test.ts
+import { describe, expect, it } from 'vitest';
+
+import { evaluate } from './impl';
+
+describe('evaluate', () => {
+  describe('single number', () => {
+    it('should evaluate a single integer', () => {
+      const result = evaluate('42');
+      expect(result).toEqual({ ok: true, value: 42 });
+    });
+  });
+
+  describe('addition and subtraction', () => {
+    it('should evaluate addition', () => {
+      const result = evaluate('1 + 2');
+      expect(result).toEqual({ ok: true, value: 3 });
+    });
+
+    it('should evaluate subtraction', () => {
+      const result = evaluate('5 - 3');
+      expect(result).toEqual({ ok: true, value: 2 });
+    });
+  });
+
+  describe('multiplication and division', () => {
+    it('should evaluate multiplication', () => {
+      const result = evaluate('3 * 4');
+      expect(result).toEqual({ ok: true, value: 12 });
+    });
+
+    it('should evaluate division', () => {
+      const result = evaluate('10 / 2');
+      expect(result).toEqual({ ok: true, value: 5 });
+    });
+  });
+
+  describe('operator precedence', () => {
+    it('should evaluate multiplication before addition', () => {
+      const result = evaluate('2 + 3 * 4');
+      expect(result).toEqual({ ok: true, value: 14 });
+    });
+
+    it('should evaluate division before subtraction', () => {
+      const result = evaluate('10 - 6 / 2');
+      expect(result).toEqual({ ok: true, value: 7 });
+    });
+  });
+
+  describe('left associativity', () => {
+    it('should evaluate subtraction left-to-right (10-3-2 is 5)', () => {
+      const result = evaluate('10 - 3 - 2');
+      expect(result).toEqual({ ok: true, value: 5 });
+    });
+
+    it('should evaluate division left-to-right (8/2/2 is 2)', () => {
+      const result = evaluate('8 / 2 / 2');
+      expect(result).toEqual({ ok: true, value: 2 });
+    });
+  });
+
+  describe('parentheses', () => {
+    it('should evaluate parenthesized sub-expressions', () => {
+      const result = evaluate('(1 + 2) * 3');
+      expect(result).toEqual({ ok: true, value: 9 });
+    });
+
+    it('should evaluate nested parentheses', () => {
+      const result = evaluate('((2 + 3) * 4) - 1');
+      expect(result).toEqual({ ok: true, value: 19 });
+    });
+  });
+
+  describe('negative numbers', () => {
+    it('should evaluate a negative number', () => {
+      const result = evaluate('-5');
+      expect(result).toEqual({ ok: true, value: -5 });
+    });
+
+    it('should evaluate negative in expression', () => {
+      const result = evaluate('3 + -2');
+      expect(result).toEqual({ ok: true, value: 1 });
+    });
+  });
+
+  describe('whitespace handling', () => {
+    it('should ignore arbitrary whitespace between tokens', () => {
+      const result = evaluate('  1   +   2  ');
+      expect(result).toEqual({ ok: true, value: 3 });
+    });
+  });
+
+  describe('error cases', () => {
+    it('should return error for division by zero', () => {
+      const result = evaluate('1 / 0');
+      expect(result.ok).toBe(false);
+      expect(result.ok === false ? result.error : undefined).toContain('Division by zero');
+    });
+
+    it('should return error for unbalanced opening parenthesis', () => {
+      const result = evaluate('(1 + 2');
+      expect(result.ok).toBe(false);
+    });
+
+    it('should return error for unbalanced closing parenthesis', () => {
+      const result = evaluate('1 + 2)');
+      expect(result.ok).toBe(false);
+    });
+
+    it('should return error for unexpected character', () => {
+      const result = evaluate('1 + 2 x');
+      expect(result.ok).toBe(false);
+    });
+
+    it('should return error for missing operand after operator', () => {
+      const result = evaluate('1 +');
+      expect(result.ok).toBe(false);
+    });
+
+    it('should return error for empty input', () => {
+      const result = evaluate('');
+      expect(result.ok).toBe(false);
+    });
+
+    it('should return error for whitespace-only input', () => {
+      const result = evaluate('   ');
+      expect(result.ok).toBe(false);
+    });
+  });
+});

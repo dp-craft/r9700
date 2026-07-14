@@ -1,0 +1,1 @@
+{"design":5,"clarity":5,"robustness":4,"notes":"Elegant chained .catch that evicts and rethrows, giving clean dedup plus retry-on-failure semantics."}

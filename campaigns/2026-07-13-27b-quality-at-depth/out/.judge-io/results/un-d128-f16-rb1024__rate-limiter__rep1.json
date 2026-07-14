@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Clean separation via a dedicated refillBucket helper; reads well and handles capping correctly."}

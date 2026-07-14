@@ -1,0 +1,1 @@
+{"design":5,"clarity":5,"robustness":4,"notes":"Elegant use of Object.is (handles NaN/-0) plus a 'key in b' guard for correctness; test coverage is comparatively thin."}

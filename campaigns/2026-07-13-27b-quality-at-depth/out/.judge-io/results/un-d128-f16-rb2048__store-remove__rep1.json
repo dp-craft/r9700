@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":3,"notes":"Straightforward filter+reset, but remove sets total to 0 instead of deleting the key, leaving a stale map entry rather than fully consistent state."}

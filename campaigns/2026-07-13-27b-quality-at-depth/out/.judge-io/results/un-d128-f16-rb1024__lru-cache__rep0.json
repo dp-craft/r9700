@@ -1,0 +1,1 @@
+{"design":3,"clarity":4,"robustness":4,"notes":"Correct, but tracks a lastAccessedAt field that is never used since recency rides on Map insertion order."}

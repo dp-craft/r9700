@@ -1,2 +1,145 @@
-// FILE: src/expr-eval.ts
-export const v8=8
+// FILE: impl.ts
+export type Result =
+  | { readonly ok: true; readonly value: number }
+  | { readonly ok: false; readonly error: string };
+
+type Token =
+  | { readonly type: 'NUM'; readonly value: number }
+  | { readonly type: 'PLUS' } | { readonly type: 'MINUS' }
+  | { readonly type: 'MULT' } | { readonly type: 'DIV' }
+  | { readonly type: 'LPAREN' } | { readonly type: 'RPAREN' }
+  | { readonly type: 'EOF' };
+
+const tokenize = (s: string): { readonly tokens: readonly Token[]; readonly error: string | null } => {
+  const out: Token[] = [];
+  let i = 0;
+  while (i < s.length) {
+    const c = s[i];
+    if (c === ' ' || c === '\t' || c === '\n') { i++; continue; }
+    if (c >= '0' && c <= '9') {
+      let n = '';
+      while (i < s.length && s[i] >= '0' && s[i] <= '9') { n += s[i]; i++; }
+      out.push({ type: 'NUM', value: Number(n) });
+    } else if ('+-*/()'.includes(c)) {
+      out.push({ type: c as Token['type'] });
+      i++;
+    } else {
+      return { tokens: [], error: `Unexpected character: '${c}'` };
+    }
+  }
+  out.push({ type: 'EOF' });
+  return { tokens: out, error: null };
+};
+
+const parseExpr = (tokens: readonly Token[], idx: number): { readonly value: number; readonly next: number } | null => {
+  let res = parseTerm(tokens, idx);
+  if (!res) return null;
+  let cur = res.next;
+  while (tokens[cur]?.type === 'PLUS' || tokens[cur]?.type === 'MINUS') {
+    const op = tokens[cur].type;
+    const right = parseTerm(tokens, cur + 1);
+    if (!right) return null;
+    res = { value: op === 'PLUS' ? res.value + right.value : res.value - right.value, next: right.next };
+    cur = res.next;
+  }
+  return res;
+};
+
+const parseTerm = (tokens: readonly Token[], idx: number): { readonly value: number; readonly next: number } | null => {
+  let res = parseFactor(tokens, idx);
+  if (!res) return null;
+  let cur = res.next;
+  while (tokens[cur]?.type === 'MULT' || tokens[cur]?.type === 'DIV') {
+    const op = tokens[cur].type;
+    const right = parseFactor(tokens, cur + 1);
+    if (!right) return null;
+    if (op === 'DIV' && right.value === 0) return null;
+    res = { value: op === 'MULT' ? res.value * right.value : Math.trunc(res.value / right.value), next: right.next };
+    cur = res.next;
+  }
+  return res;
+};
+
+const parseFactor = (tokens: readonly Token[], idx: number): { readonly value: number; readonly next: number } | null => {
+  const tok = tokens[idx];
+  if (!tok) return null;
+  if (tok.type === 'NUM') return { value: tok.value, next: idx + 1 };
+  if (tok.type === 'LPAREN') {
+    const inner = parseExpr(tokens, idx + 1);
+    if (!inner || tokens[inner.next]?.type !== 'RPAREN') return null;
+    return { value: inner.value, next: inner.next + 1 };
+  }
+  return null;
+};
+
+export const evaluate = (expr: string): Result => {
+  const { tokens, error } = tokenize(expr);
+  if (error) return { ok: false, error };
+  const res = parseExpr(tokens, 0);
+  if (!res || res.next !== tokens.length - 1) return { ok: false, error: 'Malformed expression' };
+  return { ok: true, value: res.value };
+};
+
+// FILE: impl.test.ts
+import { describe, expect, it } from 'vitest';
+import { evaluate } from './impl';
+
+describe('evaluate', () => {
+  it('should return correct value when input is a simple number', () => {
+    const res = evaluate('42');
+    expect(res).toEqual({ ok: true, value: 42 });
+  });
+
+  it('should handle addition and subtraction with left associativity', () => {
+    expect(evaluate('10 - 3 - 2')).toEqual({ ok: true, value: 5 });
+    expect(evaluate('2 + 3 + 4')).toEqual({ ok: true, value: 9 });
+  });
+
+  it('should handle multiplication and division with higher precedence', () => {
+    expect(evaluate('2 + 3 * 4')).toEqual({ ok: true, value: 14 });
+    expect(evaluate('10 - 2 * 3')).toEqual({ ok: true, value: 4 });
+  });
+
+  it('should handle division with left associativity', () => {
+    expect(evaluate('8 / 2 / 2')).toEqual({ ok: true, value: 2 });
+  });
+
+  it('should handle parentheses correctly', () => {
+    expect(evaluate('(2 + 3) * 4')).toEqual({ ok: true, value: 20 });
+    expect(evaluate('((10 - 2) / 2)')).toEqual({ ok: true, value: 4 });
+  });
+
+  it('should ignore arbitrary whitespace', () => {
+    expect(evaluate('  2 +   3  ')).toEqual({ ok: true, value: 5 });
+    expect(evaluate('\t\n2*\t3\n')).toEqual({ ok: true, value: 6 });
+  });
+
+  it('should return error on division by zero', () => {
+    const res = evaluate('10 / 0');
+    expect(res.ok).toBe(false);
+    expect(res.error).toBeDefined();
+  });
+
+  it('should return error on unbalanced parentheses', () => {
+    expect(evaluate('(2 + 3')).ok.toBe(false);
+    expect(evaluate('2 + 3)')).ok.toBe(false);
+  });
+
+  it('should return error on missing operand', () => {
+    expect(evaluate('2 + * 3')).ok.toBe(false);
+    expect(evaluate('2 +')).ok.toBe(false);
+  });
+
+  it('should return error on unexpected character', () => {
+    expect(evaluate('2 + a')).ok.toBe(false);
+    expect(evaluate('2!')).ok.toBe(false);
+  });
+
+  it('should return error on empty string', () => {
+    expect(evaluate('')).ok.toBe(false);
+  });
+
+  it('should handle complex mixed precedence expression', () => {
+    expect(evaluate('1 + 2 * 3 - 4 / 2')).toEqual({ ok: true, value: 5 });
+  });
+});

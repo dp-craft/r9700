@@ -1,0 +1,1 @@
+{"design":4,"clarity":3,"robustness":3,"notes":"Floating-catch eviction works but is less explicit, and the test file includes an incoherent dead cacheSpy() stub asserted against a nonsensical value."}

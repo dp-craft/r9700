@@ -1,0 +1,1 @@
+{"design":4,"clarity":3,"robustness":4,"notes":"Elegant Map-insertion-order LRU with thorough tests, but a stray leaked </think> token pollutes the output between the two files."}

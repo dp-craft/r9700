@@ -1,0 +1,1 @@
+{"design":4,"clarity":3,"robustness":4,"notes":"Handles unary minus and integer truncation, but the repeated `if (c.err) return 0` sentinel threading is noisy."}

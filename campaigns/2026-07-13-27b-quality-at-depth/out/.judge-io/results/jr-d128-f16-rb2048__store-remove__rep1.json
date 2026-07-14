@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Correct in-place removal via reverse-splice plus a clean map delete, respecting the readonly field and leaving no stale total behind."}

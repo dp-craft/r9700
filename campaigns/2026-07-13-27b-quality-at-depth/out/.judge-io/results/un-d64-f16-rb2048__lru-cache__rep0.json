@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":5,"notes":"Correct and well-tested, but eviction via recursion instead of a loop and a size getter that mutates state are minor design blemishes."}

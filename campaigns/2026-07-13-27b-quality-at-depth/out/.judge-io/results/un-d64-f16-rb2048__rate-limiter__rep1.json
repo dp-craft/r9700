@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Correct immutable-refill token bucket, but reconstructing and re-setting bucket objects on every call is slightly more ceremony than needed."}

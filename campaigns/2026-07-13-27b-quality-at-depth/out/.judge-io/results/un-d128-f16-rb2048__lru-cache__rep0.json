@@ -1,1 +1,1 @@
-{"design":4,"clarity":4,"robustness":5,"notes":"ok"}
+{"design":4,"clarity":4,"robustness":4,"notes":"Clean Map-order recency with solid TTL/eviction handling, but the stored lastAccessedAt field is written and never read (dead state)."}

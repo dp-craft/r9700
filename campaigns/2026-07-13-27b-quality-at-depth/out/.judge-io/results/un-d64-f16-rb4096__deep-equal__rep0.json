@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Handles NaN, null and array-vs-object; the explicit key-in-b check guards the mismatched-key/undefined-value edge well."}

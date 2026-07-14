@@ -1,0 +1,140 @@
+// FILE: impl.ts
+export function createAsyncMemo<K, V>(fn: (key: K) => Promise<V>): (key: K) => Promise<V> {
+  const cache = new Map<K, Promise<V>>();
+  return (key: K): Promise<V> => {
+    const existing = cache.get(key);
+    if (existing !== undefined) {
+      return existing;
+    }
+    const p = fn(key);
+    cache.set(key, p);
+    p.catch(() => {
+      cache.delete(key);
+    });
+    return p;
+  };
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it, vi } from 'vitest';
+
+import { createAsyncMemo } from './impl';
+
+describe('createAsyncMemo', () => {
+  describe('concurrent dedup', () => {
+    it('should dedup concurrent calls when multiple callers request the same key', async () => {
+      let callCount = 0;
+      const fn = async (key: string): Promise<string> => {
+        callCount += 1;
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        return `value-${key}`;
+      };
+      const memo = createAsyncMemo(fn);
+
+      const [a, b, c] = await Promise.all([
+        memo('key1'),
+        memo('key1'),
+        memo('key1'),
+      ]);
+
+      expect(callCount).toBe(1);
+      expect(a).toBe('value-key1');
+      expect(b).toBe('value-key1');
+      expect(c).toBe('value-key1');
+    });
+
+    it('should not dedup across different keys when concurrent calls use distinct keys', async () => {
+      let callCount = 0;
+      const fn = async (key: string): Promise<string> => {
+        callCount += 1;
+        return `value-${key}`;
+      };
+      const memo = createAsyncMemo(fn);
+
+      const [a, b] = await Promise.all([memo('key1'), memo('key2')]);
+
+      expect(callCount).toBe(2);
+      expect(a).toBe('value-key1');
+      expect(b).toBe('value-key2');
+    });
+  });
+
+  describe('retry-after-rejection', () => {
+    it('should retry after rejection when a prior call fails', async () => {
+      let callCount = 0;
+      const fn = async (key: string): Promise<string> => {
+        callCount += 1;
+        if (callCount === 1) {
+          throw new Error('fail');
+        }
+        return `value-${key}`;
+      };
+      const memo = createAsyncMemo(fn);
+
+      await expect(memo('key1')).rejects.toThrow('fail');
+
+      const result = await memo('key1');
+
+      expect(callCount).toBe(2);
+      expect(result).toBe('value-key1');
+    });
+
+    it('should retry after rejection when concurrent callers share the failed promise', async () => {
+      let callCount = 0;
+      const fn = async (key: string): Promise<string> => {
+        callCount += 1;
+        if (callCount === 1) {
+          throw new Error('fail');
+        }
+        return `value-${key}`;
+      };
+      const memo = createAsyncMemo(fn);
+
+      const [a, b] = await Promise.allSettled([memo('key1'), memo('key1')]);
+
+      expect(a.status).toBe('rejected');
+      expect(b.status).toBe('rejected');
+      expect(callCount).toBe(1);
+
+      const result = await memo('key1');
+
+      expect(callCount).toBe(2);
+      expect(result).toBe('value-key1');
+    });
+  });
+
+  describe('cache-hit-after-success', () => {
+    it('should cache successful results when a prior call succeeds', async () => {
+      let callCount = 0;
+      const fn = async (key: string): Promise<string> => {
+        callCount += 1;
+        return `value-${key}`;
+      };
+      const memo = createAsyncMemo(fn);
+
+      const a = await memo('key1');
+      const b = await memo('key1');
+
+      expect(callCount).toBe(1);
+      expect(a).toBe('value-key1');
+      expect(b).toBe('value-key1');
+    });
+
+    it('should cache resolved values across many subsequent calls when the key remains stable', async () => {
+      let callCount = 0;
+      const fn = async (key: string): Promise<string> => {
+        callCount += 1;
+        return `value-${key}`;
+      };
+      const memo = createAsyncMemo(fn);
+
+      await memo('key1');
+      for (let i = 0; i < 100; i += 1) {
+        const result = await memo('key1');
+        expect(result).toBe('value-key1');
+      }
+
+      expect(callCount).toBe(1);
+    });
+  });
+});

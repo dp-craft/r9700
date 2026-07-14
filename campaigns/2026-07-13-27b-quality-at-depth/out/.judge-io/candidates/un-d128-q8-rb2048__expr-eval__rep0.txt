@@ -1,0 +1,187 @@
+// FILE: impl.ts
+type Result =
+  | { readonly ok: true; readonly value: number }
+  | { readonly ok: false; readonly error: string };
+
+interface Ctx {
+  readonly tokens: Array<{ readonly t: string; readonly v?: number }>;
+  pos: number;
+  err?: string;
+}
+
+function parseExpr(c: Ctx): number {
+  let res = parseTerm(c);
+  if (c.err) return 0;
+  while (c.tokens[c.pos]?.t === '+' || c.tokens[c.pos]?.t === '-') {
+    const op = c.tokens[c.pos].t;
+    c.pos++;
+    const right = parseTerm(c);
+    if (c.err) return 0;
+    res = op === '+' ? res + right : res - right;
+  }
+  return res;
+}
+
+function parseTerm(c: Ctx): number {
+  let res = parseFactor(c);
+  if (c.err) return 0;
+  while (c.tokens[c.pos]?.t === '*' || c.tokens[c.pos]?.t === '/') {
+    const op = c.tokens[c.pos].t;
+    c.pos++;
+    const right = parseFactor(c);
+    if (c.err) return 0;
+    if (op === '/' && right === 0) { c.err = 'Division by zero'; return 0; }
+    res = op === '*' ? res * right : Math.trunc(res / right);
+  }
+  return res;
+}
+
+function parseFactor(c: Ctx): number {
+  const tok = c.tokens[c.pos];
+  if (!tok) { c.err = 'Unexpected end of input'; return 0; }
+  if (tok.t === 'NUM') { c.pos++; return tok.v ?? 0; }
+  if (tok.t === '-') { c.pos++; return -parseFactor(c); }
+  if (tok.t === '(') {
+    c.pos++;
+    const res = parseExpr(c);
+    if (c.err) return 0;
+    if (c.tokens[c.pos]?.t !== ')') { c.err = 'Missing closing parenthesis'; return 0; }
+    c.pos++;
+    return res;
+  }
+  c.err = `Unexpected token: "${tok.t}"`;
+  return 0;
+}
+
+function tokenize(input: string): Ctx | null {
+  const tokens: Array<{ readonly t: string; readonly v?: number }> = [];
+  let i = 0;
+  while (i < input.length) {
+    const ch = input[i];
+    if (ch === ' ' || ch === '\t' || ch === '\n') { i++; continue; }
+    if (ch >= '0' && ch <= '9') {
+      let val = 0;
+      while (i < input.length && input[i] >= '0' && input[i] <= '9') {
+        val = val * 10 + (input.charCodeAt(i) - 48);
+        i++;
+      }
+      tokens.push({ t: 'NUM', v: val });
+      continue;
+    }
+    if ('+-*/()'.includes(ch)) {
+      tokens.push({ t: ch });
+      i++;
+      continue;
+    }
+    return null;
+  }
+  tokens.push({ t: 'EOF' });
+  return { tokens, pos: 0 };
+}
+
+export function evaluate(expr: string): Result {
+  const ctx = tokenize(expr);
+  if (!ctx) return { ok: false, error: 'Invalid characters in expression' };
+  const value = parseExpr(ctx);
+  if (ctx.err) return { ok: false, error: ctx.err };
+  if (ctx.pos < ctx.tokens.length - 1) {
+    return { ok: false, error: 'Unexpected trailing tokens' };
+  }
+  return { ok: true, value };
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it } from 'vitest';
+import { evaluate } from './impl';
+
+describe('evaluate', () => {
+  it('should return correct value for simple addition', () => {
+    const result = evaluate('2 + 3');
+    expect(result).toEqual({ ok: true, value: 5 });
+  });
+
+  it('should return correct value for simple subtraction', () => {
+    const result = evaluate('10 - 4');
+    expect(result).toEqual({ ok: true, value: 6 });
+  });
+
+  it('should return correct value for multiplication', () => {
+    const result = evaluate('3 * 4');
+    expect(result).toEqual({ ok: true, value: 12 });
+  });
+
+  it('should return correct value for division', () => {
+    const result = evaluate('10 / 2');
+    expect(result).toEqual({ ok: true, value: 5 });
+  });
+
+  it('should respect operator precedence (* / before + -)', () => {
+    const result = evaluate('2 + 3 * 4');
+    expect(result).toEqual({ ok: true, value: 14 });
+  });
+
+  it('should handle left associativity for subtraction', () => {
+    const result = evaluate('10 - 3 - 2');
+    expect(result).toEqual({ ok: true, value: 5 });
+  });
+
+  it('should handle left associativity for division', () => {
+    const result = evaluate('8 / 2 / 2');
+    expect(result).toEqual({ ok: true, value: 2 });
+  });
+
+  it('should handle parentheses correctly', () => {
+    const result = evaluate('(2 + 3) * 4');
+    expect(result).toEqual({ ok: true, value: 20 });
+  });
+
+  it('should handle nested parentheses', () => {
+    const result = evaluate('((2 + 3) * (4 - 1))');
+    expect(result).toEqual({ ok: true, value: 15 });
+  });
+
+  it('should handle unary minus', () => {
+    const result = evaluate('-5 + 3');
+    expect(result).toEqual({ ok: true, value: -2 });
+  });
+
+  it('should handle arbitrary whitespace', () => {
+    const result = evaluate('  10   +   20  ');
+    expect(result).toEqual({ ok: true, value: 30 });
+  });
+
+  it('should return error for division by zero', () => {
+    const result = evaluate('10 / 0');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toBe('Division by zero');
+  });
+
+  it('should return error for unbalanced parentheses', () => {
+    const result = evaluate('(2 + 3');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toBe('Missing closing parenthesis');
+  });
+
+  it('should return error for unexpected characters', () => {
+    const result = evaluate('2 + a');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toBe('Invalid characters in expression');
+  });
+
+  it('should return error for missing operand', () => {
+    const result = evaluate('2 +');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toBe('Unexpected end of input');
+  });
+
+  it('should return error for trailing tokens', () => {
+    const result = evaluate('2 + 3 4');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toBe('Unexpected trailing tokens');
+  });
+
+  it('should handle complex mixed expression', () => {
+    const result = evaluate('10 - 2 * 3 + 4 / 2');
+    expect(result).toEqual({ ok: true, value: 6 });
+  });
+});

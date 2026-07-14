@@ -1,0 +1,88 @@
+// FILE: impl.ts
+export function createAsyncMemo<K, V>(fn: (key: K) => Promise<V>): (key: K) => Promise<V> {
+  const cache = new Map<K, Promise<V>>();
+
+  return (key: K): Promise<V> => {
+    const existing = cache.get(key);
+    if (existing !== undefined) return existing;
+
+    const base = fn(key);
+    const wrapped = base.then(
+      (value: V) => {
+        cache.set(key, Promise.resolve(value));
+        return value;
+      },
+      (error: unknown) => {
+        cache.delete(key);
+        throw error;
+      }
+    );
+
+    cache.set(key, wrapped);
+    return wrapped;
+  };
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it, vi } from 'vitest';
+
+import { createAsyncMemo } from './impl';
+
+describe('createAsyncMemo', () => {
+  describe('concurrent dedup', () => {
+    it('should share one in-flight computation when concurrent calls use the same key', async () => {
+      const fn = vi.fn<(key: string) => Promise<string>>(async (key: string) => {
+        await new Promise<void>(resolve => setTimeout(resolve, 10));
+        return `result-${key}`;
+      });
+
+      const memoized = createAsyncMemo(fn);
+
+      const [a, b, c] = await Promise.all([
+        memoized('x'),
+        memoized('x'),
+        memoized('x'),
+      ]);
+
+      expect(a).toBe('result-x');
+      expect(b).toBe('result-x');
+      expect(c).toBe('result-x');
+      expect(fn).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('cache-hit-after-success', () => {
+    it('should reuse the resolved value and not call fn again when a prior call succeeded', async () => {
+      const fn = vi.fn<(key: string) => Promise<string>>(async () => 'cached-value');
+
+      const memoized = createAsyncMemo(fn);
+
+      await memoized('k');
+      expect(fn).toHaveBeenCalledTimes(1);
+
+      const result = await memoized('k');
+      expect(result).toBe('cached-value');
+      expect(fn).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('retry-after-rejection', () => {
+    it('should not cache the rejection and retry fn when a later call uses the same key', async () => {
+      let callCount = 0;
+      const fn = vi.fn<(key: string) => Promise<string>>(async () => {
+        callCount++;
+        if (callCount === 1) throw new Error('fail');
+        return 'recovered';
+      });
+
+      const memoized = createAsyncMemo(fn);
+
+      await expect(memoized('k')).rejects.toThrow('fail');
+      expect(callCount).toBe(1);
+
+      const result = await memoized('k');
+      expect(result).toBe('recovered');
+      expect(callCount).toBe(2);
+    });
+  });
+});

@@ -1,0 +1,1 @@
+{"design":5,"clarity":5,"robustness":4,"notes":"Minimal, elegant fix caching the in-flight promise and evicting on rejection via a single catch; the clearest expression of the required behavior."}

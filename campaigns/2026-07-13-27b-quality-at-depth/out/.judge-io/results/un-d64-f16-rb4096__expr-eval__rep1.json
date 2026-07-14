@@ -1,0 +1,1 @@
+{"design":3,"clarity":3,"robustness":4,"notes":"Result-threading parser works but is verbose and carries a never-read state.error field (dead mutation)."}

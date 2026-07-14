@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Clean isObject guard with explicit Number.isNaN handling and thorough tests including undefined-vs-missing-key cases."}

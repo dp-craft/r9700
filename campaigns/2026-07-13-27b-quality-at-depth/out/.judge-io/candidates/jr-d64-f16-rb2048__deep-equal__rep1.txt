@@ -1,0 +1,56 @@
+// FILE: impl.ts
+export function deepEqual(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true;
+  if (typeof a !== 'object' || typeof b !== 'object') return false;
+  if (a === null || b === null) return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a)) {
+    if (a.length !== b.length) return false;
+    return a.every((val, i) => deepEqual(val, (b as unknown[])[i]));
+  }
+  const keysA = Object.keys(a as Record<string, unknown>);
+  const keysB = Object.keys(b as Record<string, unknown>);
+  if (keysA.length !== keysB.length) return false;
+  return keysA.every(key => key in b && deepEqual((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key]));
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it } from 'vitest';
+import { deepEqual } from './impl';
+
+describe('deepEqual', () => {
+  it('should return true for equal primitives', () => {
+    expect(deepEqual(1, 1)).toBe(true);
+    expect(deepEqual('hello', 'hello')).toBe(true);
+    expect(deepEqual(true, true)).toBe(true);
+    expect(deepEqual(undefined, undefined)).toBe(true);
+  });
+
+  it('should return true for NaN equals NaN', () => {
+    expect(deepEqual(NaN, NaN)).toBe(true);
+  });
+
+  it('should return false for null vs empty object', () => {
+    expect(deepEqual(null, {})).toBe(false);
+  });
+
+  it('should return false for array vs object with matching indices', () => {
+    expect(deepEqual([1], { 0: 1 })).toBe(false);
+  });
+
+  it('should return true for deeply equal nested objects', () => {
+    expect(deepEqual({ a: { b: 1 } }, { a: { b: 1 } })).toBe(true);
+  });
+
+  it('should return false for key-count mismatch', () => {
+    expect(deepEqual({ a: 1 }, { a: 1, b: 2 })).toBe(false);
+  });
+
+  it('should return true for deeply equal nested arrays', () => {
+    expect(deepEqual([[1, 2]], [[1, 2]])).toBe(true);
+  });
+
+  it('should return false for mismatched array lengths', () => {
+    expect(deepEqual([1, 2], [1])).toBe(false);
+  });
+});

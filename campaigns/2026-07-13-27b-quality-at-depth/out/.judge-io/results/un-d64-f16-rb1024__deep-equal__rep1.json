@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":3,"notes":"Concise with a clean non-object short-circuit, but relying only on key count without a key-presence check means differently-keyed objects with undefined values could falsely match."}

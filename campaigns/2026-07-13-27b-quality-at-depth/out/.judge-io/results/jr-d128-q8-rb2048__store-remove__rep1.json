@@ -1,0 +1,1 @@
+{"design":3,"clarity":4,"robustness":2,"notes":"Guarding on total===0 conflates an empty key with a key whose amounts cancel out, so such keys are wrongly skipped."}

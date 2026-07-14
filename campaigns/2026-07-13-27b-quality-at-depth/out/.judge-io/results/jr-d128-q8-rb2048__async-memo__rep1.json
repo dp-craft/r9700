@@ -1,0 +1,1 @@
+{"design":5,"clarity":5,"robustness":4,"notes":"Elegant .then(onFulfilled,onRejected) that evicts on failure and rethrows, clearly expressing the no-cache-on-failure intent."}

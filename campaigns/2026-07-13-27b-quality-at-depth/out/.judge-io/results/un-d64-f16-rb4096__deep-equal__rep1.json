@@ -1,0 +1,1 @@
+{"design":4,"clarity":5,"robustness":4,"notes":"Adds an explicit non-object guard (handles functions/symbols) and reads cleanly, but drops the key-in-b check so undefined-valued disjoint keys can slip through."}

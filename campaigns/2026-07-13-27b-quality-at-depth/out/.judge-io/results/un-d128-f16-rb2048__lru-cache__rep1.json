@@ -1,0 +1,1 @@
+{"design":4,"clarity":5,"robustness":4,"notes":"Cleanly factored helpers and thoughtful edge tests (cap 0, zero TTL); set on existing key redundantly re-inserts twice."}

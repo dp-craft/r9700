@@ -1,1 +1,1 @@
-{"design":4,"clarity":4,"robustness":5,"notes":"ok"}
+{"design":5,"clarity":4,"robustness":5,"notes":"Clean class-based recursive-descent parser with thorough error handling, dinged only for an unused peek() method and a garbled test assertion."}

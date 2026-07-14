@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Caches a single catch-chained promise that self-evicts on rejection and rethrows, cleanly satisfying dedup/retry/cache-success semantics."}

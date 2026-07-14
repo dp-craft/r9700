@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Well-factored with array/object helpers and correct type guards; the a!==a NaN trick is terse but sound and edge cases are well covered."}

@@ -1,1 +1,1 @@
-{"design":4,"clarity":4,"robustness":5,"notes":"ok"}
+{"design":4,"clarity":5,"robustness":4,"notes":"Minimal, correct fix that dedups in-flight promises and evicts on rejection while caching successes."}

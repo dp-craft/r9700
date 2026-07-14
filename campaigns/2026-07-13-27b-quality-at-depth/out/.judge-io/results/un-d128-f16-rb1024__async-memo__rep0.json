@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Correct dedup/retry via then-with-reject-handler; re-storing Promise.resolve(value) on success is slightly redundant but harmless, and tests cover all three requirements."}

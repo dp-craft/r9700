@@ -1,0 +1,1 @@
+{"design":4,"clarity":5,"robustness":4,"notes":"Readable filter-and-rebuild removal with an explicit no-op guard and comprehensive tests for totals and other-key isolation."}

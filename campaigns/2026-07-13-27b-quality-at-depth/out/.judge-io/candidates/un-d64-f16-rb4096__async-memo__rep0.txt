@@ -1,0 +1,64 @@
+// FILE: impl.ts
+export function createAsyncMemo<K, V>(fn: (key: K) => Promise<V>): (key: K) => Promise<V> {
+  const cache = new Map<K, Promise<V>>();
+  return (key: K): Promise<V> => {
+    const existing = cache.get(key);
+    if (existing !== undefined) return existing;
+
+    const p = fn(key);
+    const tracked = p.catch((err: unknown): never => {
+      cache.delete(key);
+      throw err;
+    });
+    cache.set(key, tracked);
+    return tracked;
+  };
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it, vi } from 'vitest';
+
+import { createAsyncMemo } from './impl';
+
+describe('createAsyncMemo', () => {
+  it('should deduplicate concurrent calls when the same key is requested', async () => {
+    const fn = vi.fn(async (key: string): Promise<string> => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 10));
+      return `value-${key}`;
+    });
+    const memoized = createAsyncMemo(fn);
+
+    const [res1, res2] = await Promise.all([memoized('a'), memoized('a')]);
+
+    expect(res1).toBe('value-a');
+    expect(res2).toBe('value-a');
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it('should retry computation when the previous call rejects', async () => {
+    const fn = vi.fn(async (_key: string): Promise<string> => {
+      throw new Error('fail');
+    });
+    const memoized = createAsyncMemo(fn);
+
+    await expect(memoized('b')).rejects.toThrow('fail');
+    expect(fn).toHaveBeenCalledTimes(1);
+
+    fn.mockResolvedValueOnce('success');
+    const res = await memoized('b');
+    expect(res).toBe('success');
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+
+  it('should cache successful results when the same key is requested again', async () => {
+    const fn = vi.fn(async (key: string): Promise<string> => `cached-${key}`);
+    const memoized = createAsyncMemo(fn);
+
+    await memoized('c');
+    expect(fn).toHaveBeenCalledTimes(1);
+
+    const res = await memoized('c');
+    expect(res).toBe('cached-c');
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+});

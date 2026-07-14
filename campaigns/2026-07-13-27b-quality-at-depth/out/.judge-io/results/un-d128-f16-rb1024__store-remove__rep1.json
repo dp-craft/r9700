@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Guards the no-op with totals.has(key) avoiding spurious entries and uses idiomatic reverse-splice; only wart is all() still exposing the internal array."}

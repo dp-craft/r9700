@@ -1,1 +1,1 @@
-{"design":4,"clarity":4,"robustness":5,"notes":"ok"}
+{"design":4,"clarity":4,"robustness":3,"notes":"Solid tokenizer+recursive-descent with a typed token union, but error messages are generic (null-threaded) and several test assertions (.ok.toBe) are malformed."}

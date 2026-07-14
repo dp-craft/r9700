@@ -1,1 +1,1 @@
-{"design":4,"clarity":4,"robustness":5,"notes":"ok"}
+{"design":4,"clarity":3,"robustness":4,"notes":"Filter-then-rebuild is algorithmically clean but the length=0-plus-spread-push dance to preserve the array reference reads more awkwardly than a direct reassignment."}

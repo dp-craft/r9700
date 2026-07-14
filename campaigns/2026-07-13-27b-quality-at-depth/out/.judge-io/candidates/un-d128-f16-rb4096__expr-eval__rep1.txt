@@ -1,0 +1,168 @@
+// FILE: impl.ts
+export type Result =
+  | { readonly ok: true; readonly value: number }
+  | { readonly ok: false; readonly error: string };
+
+const err = (msg: string): Result => ({ ok: false, error: msg });
+const ok = (val: number): Result => ({ ok: true, value: val });
+
+interface Parser {
+  readonly src: string;
+  pos: number;
+}
+
+function skipWhitespace(p: Parser): void {
+  while (p.pos < p.src.length && /\s/.test(p.src[p.pos])) {
+    p.pos++;
+  }
+}
+
+function peek(p: Parser): string | undefined {
+  return p.pos < p.src.length ? p.src[p.pos] : undefined;
+}
+
+function advance(p: Parser): string | undefined {
+  return p.pos < p.src.length ? p.src[p.pos++] : undefined;
+}
+
+function parseNumber(p: Parser): Result {
+  if (p.pos >= p.src.length || !/\d/.test(p.src[p.pos])) {
+    return err('Missing operand');
+  }
+  let num = '';
+  while (p.pos < p.src.length && /\d/.test(p.src[p.pos])) {
+    num += p.src[p.pos++];
+  }
+  return ok(Number(num));
+}
+
+function parseFactor(p: Parser): Result {
+  skipWhitespace(p);
+  const ch = peek(p);
+  if (ch === '(') {
+    advance(p);
+    const res = parseExpr(p);
+    if (!res.ok) return res;
+    skipWhitespace(p);
+    if (peek(p) !== ')') return err('Unbalanced parentheses');
+    advance(p);
+    return res;
+  }
+  if (ch === '-' || ch === '+') {
+    advance(p);
+    const res = parseFactor(p);
+    if (!res.ok) return res;
+    return ok(ch === '-' ? -res.value : res.value);
+  }
+  return parseNumber(p);
+}
+
+function parseTerm(p: Parser): Result {
+  let res = parseFactor(p);
+  if (!res.ok) return res;
+  while (true) {
+    skipWhitespace(p);
+    const op = peek(p);
+    if (op !== '*' && op !== '/') break;
+    advance(p);
+    const right = parseFactor(p);
+    if (!right.ok) return right;
+    if (op === '/' && right.value === 0) return err('Division by zero');
+    res = ok(op === '/' ? Math.trunc(res.value / right.value) : res.value * right.value);
+  }
+  return res;
+}
+
+function parseExpr(p: Parser): Result {
+  let res = parseTerm(p);
+  if (!res.ok) return res;
+  while (true) {
+    skipWhitespace(p);
+    const op = peek(p);
+    if (op !== '+' && op !== '-') break;
+    advance(p);
+    const right = parseTerm(p);
+    if (!right.ok) return right;
+    res = ok(op === '-' ? res.value - right.value : res.value + right.value);
+  }
+  return res;
+}
+
+export function evaluate(expr: string): Result {
+  try {
+    const p: Parser = { src: expr, pos: 0 };
+    const res = parseExpr(p);
+    if (!res.ok) return res;
+    skipWhitespace(p);
+    if (p.pos < p.src.length) return err('Unexpected character');
+    return res;
+  } catch (e: unknown) {
+    return err(e instanceof Error ? e.message : 'Evaluation failed');
+  }
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it } from 'vitest';
+import { evaluate } from './impl';
+
+describe('evaluate', () => {
+  it('should return correct value for simple addition', () => {
+    const res = evaluate('2 + 2');
+    expect(res).toEqual({ ok: true, value: 4 });
+  });
+
+  it('should respect operator precedence when mixing multiply and add', () => {
+    const res = evaluate('2 + 3 * 4');
+    expect(res).toEqual({ ok: true, value: 14 });
+  });
+
+  it('should evaluate left-associative subtraction correctly', () => {
+    const res = evaluate('10 - 3 - 2');
+    expect(res).toEqual({ ok: true, value: 5 });
+  });
+
+  it('should evaluate left-associative division correctly', () => {
+    const res = evaluate('8 / 2 / 2');
+    expect(res).toEqual({ ok: true, value: 2 });
+  });
+
+  it('should handle parentheses correctly', () => {
+    const res = evaluate('(2 + 3) * 4');
+    expect(res).toEqual({ ok: true, value: 20 });
+  });
+
+  it('should ignore arbitrary whitespace', () => {
+    const res = evaluate('  2   +   3  ');
+    expect(res).toEqual({ ok: true, value: 5 });
+  });
+
+  it('should return error on division by zero', () => {
+    const res = evaluate('10 / 0');
+    expect(res).toEqual({ ok: false, error: 'Division by zero' });
+  });
+
+  it('should return error on unbalanced parentheses', () => {
+    const res = evaluate('(2 + 3');
+    expect(res).toEqual({ ok: false, error: 'Unbalanced parentheses' });
+  });
+
+  it('should return error on missing operand', () => {
+    const res = evaluate('2 +');
+    expect(res).toEqual({ ok: false, error: 'Missing operand' });
+  });
+
+  it('should return error on unexpected character', () => {
+    const res = evaluate('2 + a');
+    expect(res).toEqual({ ok: false, error: 'Unexpected character' });
+  });
+
+  it('should handle unary minus correctly', () => {
+    const res = evaluate('-5 + 3');
+    expect(res).toEqual({ ok: true, value: -2 });
+  });
+
+  it('should handle nested parentheses correctly', () => {
+    const res = evaluate('((2 + 3) * (4 - 1))');
+    expect(res).toEqual({ ok: true, value: 15 });
+  });
+});

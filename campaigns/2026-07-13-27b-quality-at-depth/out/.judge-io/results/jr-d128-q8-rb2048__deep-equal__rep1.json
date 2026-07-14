@@ -1,0 +1,1 @@
+{"design":5,"clarity":5,"robustness":5,"notes":"Concise, correct guard ordering with modern Object.hasOwn and solid edge-case coverage."}

@@ -1,0 +1,1 @@
+{"design":4,"clarity":5,"robustness":4,"notes":"Clean pure module-level helpers with a consistent now-passed-in expiry check and readonly entry fields; sweep-on-every-op is uniform and correct."}

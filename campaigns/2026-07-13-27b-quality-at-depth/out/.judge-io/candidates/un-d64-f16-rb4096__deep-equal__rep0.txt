@@ -1,0 +1,63 @@
+// FILE: impl.ts
+export function deepEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (typeof a !== typeof b) return false;
+  if (typeof a === 'number') return Number.isNaN(a) && Number.isNaN(b);
+  if (a === null || b === null) return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a)) {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) if (!deepEqual(a[i], (b as unknown[])[i])) return false;
+    return true;
+  }
+  const keysA = Object.keys(a as object);
+  const keysB = Object.keys(b as object);
+  if (keysA.length !== keysB.length) return false;
+  for (const key of keysA) {
+    if (!(key in (b as object)) || !deepEqual((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key])) return false;
+  }
+  return true;
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it } from 'vitest';
+
+import { deepEqual } from './impl';
+
+describe('deepEqual', () => {
+  it('should return true when primitives are equal', () => {
+    expect(deepEqual(1, 1)).toBe(true);
+    expect(deepEqual('hello', 'hello')).toBe(true);
+    expect(deepEqual(true, true)).toBe(true);
+  });
+
+  it('should return true when both values are NaN', () => {
+    expect(deepEqual(NaN, NaN)).toBe(true);
+  });
+
+  it('should return false when one is NaN and the other is not', () => {
+    expect(deepEqual(NaN, 1)).toBe(false);
+  });
+
+  it('should return true when nested structures are deeply equal', () => {
+    const a = { x: 1, y: { z: [2, 3] } };
+    const b = { x: 1, y: { z: [2, 3] } };
+    expect(deepEqual(a, b)).toBe(true);
+  });
+
+  it('should return false when object key-count mismatches', () => {
+    expect(deepEqual({ a: 1 }, { a: 1, b: 2 })).toBe(false);
+  });
+
+  it('should return false when comparing array to object with matching indices', () => {
+    expect(deepEqual([1, 2], { 0: 1, 1: 2 })).toBe(false);
+  });
+
+  it('should return false when null is compared to empty object', () => {
+    expect(deepEqual(null, {})).toBe(false);
+  });
+
+  it('should return false when types differ', () => {
+    expect(deepEqual(1, '1')).toBe(false);
+  });
+});

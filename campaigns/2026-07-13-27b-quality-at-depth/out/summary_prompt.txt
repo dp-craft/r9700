@@ -1,0 +1,32 @@
+You are finishing benchmark Campaign 3 in this repo. Follow the repo's benchmark-results skill
+(read .claude/skills/benchmark-results/SKILL.md) and write the analysis to
+campaigns/2026-07-13-27b-quality-at-depth/analysis.md.
+
+ALL the numbers are ALREADY aggregated deterministically — read ONLY these two files:
+  - campaigns/2026-07-13-27b-quality-at-depth/out/summary.md   (per-cell table + the 4 findings, computed in Python)
+  - campaigns/2026-07-13-27b-quality-at-depth/charts/appendix.md  (charts to embed + a data table)
+DO NOT read outputs.jsonl / scores_typescript.jsonl / judge_scores.jsonl — they are large per-reply logs
+and everything you need is already in summary.md. For design context/glossary you may skim README.md and
+eval-design.md.
+
+Write analysis.md to the skill's contract: TL;DR + results TABLE FIRST (a memory column is MANDATORY),
+then detail. Every number you cite comes from summary.md/appendix.md — tag them MEASURED, and mark any
+reasoning INFERRED; invent nothing. Cover the 4 campaign questions exactly as summary.md's "Findings"
+lists them: (a) budget optimum vs depth, (b) 64k->128k rule-adherence/reuse (lost-in-the-middle), (c) KV
+f16-vs-q8 @128k (<=5% rule), (d) capability vs haiku/Sonnet/Opus. Embed charts/appendix.md.
+
+JUDGE DETAIL (readers are architects/decision makers — they want the evidence, not just the mean):
+appendix.md ends with "LLM-judge verdicts — full detail" (every candidate's design/clarity/robustness
+points + the judge's one-line note + which deterministic objectives failed) and a "Judge mean by task"
+ranking. In analysis.md add a "Judge verdicts" section that (1) copies the per-cell judge d.c.r axis
+means from summary.md's table, (2) quotes the 3-5 most informative judge notes VERBATIM (worst-scored
+and best-scored candidates — what failed, what was unexpected or outstanding), (3) copies the
+"Judge mean by task" line, and (4) links to charts/appendix.md for the full verdict table — do NOT
+re-type the big table row by row.
+
+Include a
+<!-- meta --> block (see docs/analysis/ examples) so docs/reindex.py can register it. If summary.md's
+Health line flags failures/runaways/GTT spill, surface them.
+
+This task is complete once analysis.md is fully written. Your final answer (the result file the harness
+asks for) is just a one-line confirmation, e.g. "analysis.md written (N cells)".

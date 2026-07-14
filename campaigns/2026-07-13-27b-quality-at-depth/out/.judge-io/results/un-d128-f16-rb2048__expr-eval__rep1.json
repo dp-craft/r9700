@@ -1,0 +1,1 @@
+{"design":5,"clarity":5,"robustness":5,"notes":"Clean recursive-descent parser threading a Result through every level, handling unary signs, parens, div-by-zero and trailing garbage, with a try/catch backstop."}

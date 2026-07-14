@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Clean exception-free Result-threading recursive descent with precise error messages; the state.error field is written but never read, a minor dead-code smell."}

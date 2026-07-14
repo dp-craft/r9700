@@ -1,0 +1,319 @@
+{
+ "cells": {
+  "un-d64-f16-rb1024": {
+   "model": "Qwen3.6-27B-MTP-Q4_K_M",
+   "depth": "64k",
+   "kv": "f16",
+   "budget": 1024,
+   "n": 12,
+   "n_fail": 0,
+   "ts_pct": 26.03333333333333,
+   "hard_pct": 0,
+   "objectives": {
+    "types": 0.25,
+    "lint": 0.3333333333333333,
+    "tests": 0.0,
+    "reuse": 1.0,
+    "edge": 0.0
+   },
+   "judge": 4.027777777777778,
+   "judge_axes": {
+    "design": 4.166666666666667,
+    "clarity": 3.9166666666666665,
+    "robustness": 4.0
+   },
+   "think_tok": 1023,
+   "ttfa_s": 33.77725,
+   "ttlt_s": 52.36366666666667,
+   "decode_tps": 54.38993812296753,
+   "runaway_pct": 0,
+   "peak_vram": 25178,
+   "peak_gtt": 1383,
+   "avg_power_w": 208.6
+  },
+  "un-d64-f16-rb2048": {
+   "model": "Qwen3.6-27B-MTP-Q4_K_M",
+   "depth": "64k",
+   "kv": "f16",
+   "budget": 2048,
+   "n": 12,
+   "n_fail": 0,
+   "ts_pct": 27.658333333333335,
+   "hard_pct": 0,
+   "objectives": {
+    "types": 0.25,
+    "lint": 0.3333333333333333,
+    "tests": 0.0,
+    "reuse": 1.0,
+    "edge": 0.0
+   },
+   "judge": 4.111111111111111,
+   "judge_axes": {
+    "design": 4.083333333333333,
+    "clarity": 4.166666666666667,
+    "robustness": 4.083333333333333
+   },
+   "think_tok": 2047,
+   "ttfa_s": 52.996833333333335,
+   "ttlt_s": 70.58666666666667,
+   "decode_tps": 54.7559946542151,
+   "runaway_pct": 0,
+   "peak_vram": 24988,
+   "peak_gtt": 1369,
+   "avg_power_w": 208.3
+  },
+  "un-d64-f16-rb4096": {
+   "model": "Qwen3.6-27B-MTP-Q4_K_M",
+   "depth": "64k",
+   "kv": "f16",
+   "budget": 4096,
+   "n": 12,
+   "n_fail": 0,
+   "ts_pct": 32.58333333333333,
+   "hard_pct": 0,
+   "objectives": {
+    "types": 0.5,
+    "lint": 0.3333333333333333,
+    "tests": 0.0,
+    "reuse": 1.0,
+    "edge": 0.0
+   },
+   "judge": 4.0,
+   "judge_axes": {
+    "design": 3.9166666666666665,
+    "clarity": 4.166666666666667,
+    "robustness": 3.9166666666666665
+   },
+   "think_tok": 3986.4166666666665,
+   "ttfa_s": 89.61275,
+   "ttlt_s": 105.93408333333333,
+   "decode_tps": 54.25782932474886,
+   "runaway_pct": 0,
+   "peak_vram": 25058,
+   "peak_gtt": 1386,
+   "avg_power_w": 209.4
+  },
+  "un-d128-f16-rb1024": {
+   "model": "Qwen3.6-27B-MTP-Q4_K_M",
+   "depth": "128k",
+   "kv": "f16",
+   "budget": 1024,
+   "n": 12,
+   "n_fail": 0,
+   "ts_pct": 24.0,
+   "hard_pct": 0,
+   "objectives": {
+    "types": 0.16666666666666666,
+    "lint": 0.25,
+    "tests": 0.0,
+    "reuse": 1.0,
+    "edge": 0.0
+   },
+   "judge": 4.027777777777778,
+   "judge_axes": {
+    "design": 4.0,
+    "clarity": 4.25,
+    "robustness": 3.8333333333333335
+   },
+   "think_tok": 1023,
+   "ttfa_s": 56.663833333333336,
+   "ttlt_s": 84.7925,
+   "decode_tps": 43.62007396611773,
+   "runaway_pct": 0,
+   "peak_vram": 29940,
+   "peak_gtt": 2028,
+   "avg_power_w": 208.1
+  },
+  "un-d128-f16-rb2048": {
+   "model": "Qwen3.6-27B-MTP-Q4_K_M",
+   "depth": "128k",
+   "kv": "f16",
+   "budget": 2048,
+   "n": 12,
+   "n_fail": 0,
+   "ts_pct": 29.96666666666667,
+   "hard_pct": 0,
+   "objectives": {
+    "types": 0.5,
+    "lint": 0.25,
+    "tests": 0.0,
+    "reuse": 1.0,
+    "edge": 0.0
+   },
+   "judge": 4.194444444444445,
+   "judge_axes": {
+    "design": 4.166666666666667,
+    "clarity": 4.583333333333333,
+    "robustness": 3.8333333333333335
+   },
+   "think_tok": 2047,
+   "ttfa_s": 128.61483333333334,
+   "ttlt_s": 168.91025,
+   "decode_tps": 44.50243065307862,
+   "runaway_pct": 0,
+   "peak_vram": 30301,
+   "peak_gtt": 2017,
+   "avg_power_w": 207.4
+  },
+  "un-d128-f16-rb4096": {
+   "model": "Qwen3.6-27B-MTP-Q4_K_M",
+   "depth": "128k",
+   "kv": "f16",
+   "budget": 4096,
+   "n": 12,
+   "n_fail": 0,
+   "ts_pct": 25.94166666666667,
+   "hard_pct": 0,
+   "objectives": {
+    "types": 0.25,
+    "lint": 0.25,
+    "tests": 0.0,
+    "reuse": 1.0,
+    "edge": 0.0
+   },
+   "judge": 4.055555555555555,
+   "judge_axes": {
+    "design": 3.9166666666666665,
+    "clarity": 4.166666666666667,
+    "robustness": 4.083333333333333
+   },
+   "think_tok": 3904.75,
+   "ttfa_s": 122.67133333333334,
+   "ttlt_s": 147.23358333333334,
+   "decode_tps": 44.26084534819684,
+   "runaway_pct": 0,
+   "peak_vram": 30509,
+   "peak_gtt": 2049,
+   "avg_power_w": 207.9
+  },
+  "un-d128-q8-rb2048": {
+   "model": "Qwen3.6-27B-MTP-Q4_K_M",
+   "depth": "128k",
+   "kv": "q8_0",
+   "budget": 2048,
+   "n": 12,
+   "n_fail": 0,
+   "ts_pct": 27.691666666666663,
+   "hard_pct": 0,
+   "objectives": {
+    "types": 0.3333333333333333,
+    "lint": 0.25,
+    "tests": 0.0,
+    "reuse": 1.0,
+    "edge": 0.0
+   },
+   "judge": 4.055555555555555,
+   "judge_axes": {
+    "design": 4.166666666666667,
+    "clarity": 4.083333333333333,
+    "robustness": 3.9166666666666665
+   },
+   "think_tok": 2042.75,
+   "ttfa_s": 105.13933333333333,
+   "ttlt_s": 135.75566666666666,
+   "decode_tps": 35.35059728497272,
+   "runaway_pct": 0,
+   "peak_vram": 25880,
+   "peak_gtt": 2035,
+   "avg_power_w": 207.7
+  },
+  "jr-d64-f16-rb2048": {
+   "model": "Qwopus3.6-27B-v1-preview-Q4_K_M",
+   "depth": "64k",
+   "kv": "f16",
+   "budget": 2048,
+   "n": 12,
+   "n_fail": 0,
+   "ts_pct": 27.3,
+   "hard_pct": 0,
+   "objectives": {
+    "types": 0.25,
+    "lint": 0.3333333333333333,
+    "tests": 0.0,
+    "reuse": 1.0,
+    "edge": 0.0
+   },
+   "judge": 4.055555555555555,
+   "judge_axes": {
+    "design": 4.25,
+    "clarity": 4.166666666666667,
+    "robustness": 3.75
+   },
+   "think_tok": 2025.5833333333333,
+   "ttfa_s": 94.74258333333333,
+   "ttlt_s": 143.1375,
+   "decode_tps": 24.90536168804902,
+   "runaway_pct": 0,
+   "peak_vram": 23361,
+   "peak_gtt": 785,
+   "avg_power_w": 209.7
+  },
+  "jr-d128-f16-rb2048": {
+   "model": "Qwopus3.6-27B-v1-preview-Q4_K_M",
+   "depth": "128k",
+   "kv": "f16",
+   "budget": 2048,
+   "n": 12,
+   "n_fail": 0,
+   "ts_pct": 25.008333333333333,
+   "hard_pct": 0,
+   "objectives": {
+    "types": 0.25,
+    "lint": 0.25,
+    "tests": 0.0,
+    "reuse": 1.0,
+    "edge": 0.0
+   },
+   "judge": 3.944444444444444,
+   "judge_axes": {
+    "design": 3.8333333333333335,
+    "clarity": 4.166666666666667,
+    "robustness": 3.8333333333333335
+   },
+   "think_tok": 1970.5,
+   "ttfa_s": 123.07141666666666,
+   "ttlt_s": 193.62366666666668,
+   "decode_tps": 21.11137518727244,
+   "runaway_pct": 0,
+   "peak_vram": 28187,
+   "peak_gtt": 1001,
+   "avg_power_w": 209.7
+  },
+  "jr-d128-q8-rb2048": {
+   "model": "Qwopus3.6-27B-v1-preview-Q4_K_M",
+   "depth": "128k",
+   "kv": "q8_0",
+   "budget": 2048,
+   "n": 12,
+   "n_fail": 0,
+   "ts_pct": 27.85,
+   "hard_pct": 0,
+   "objectives": {
+    "types": 0.4166666666666667,
+    "lint": 0.3333333333333333,
+    "tests": 0.0,
+    "reuse": 0.75,
+    "edge": 0.0
+   },
+   "judge": 4.111111111111111,
+   "judge_axes": {
+    "design": 4.0,
+    "clarity": 4.5,
+    "robustness": 3.8333333333333335
+   },
+   "think_tok": 1762.0833333333333,
+   "ttfa_s": 122.18641666666667,
+   "ttlt_s": 184.723,
+   "decode_tps": 22.078469847460017,
+   "runaway_pct": 0,
+   "peak_vram": 22779,
+   "peak_gtt": 974,
+   "avg_power_w": 209.6
+  }
+ },
+ "bands": {
+  "haiku": 74.18333333333334,
+  "sonnet": 85.08333333333333,
+  "opus": 95.375
+ }
+}

@@ -1,0 +1,1 @@
+{"design":3,"clarity":4,"robustness":4,"notes":"Well-decomposed helpers that correctly recompute live state (handling passive expiry), at the cost of O(n) scans on every operation."}

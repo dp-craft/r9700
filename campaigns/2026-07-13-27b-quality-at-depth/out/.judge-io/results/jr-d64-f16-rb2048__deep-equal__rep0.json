@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":3,"notes":"Solid narrowing and thorough tests, but omits an 'in' check so distinct same-count key sets with undefined values could falsely compare equal."}

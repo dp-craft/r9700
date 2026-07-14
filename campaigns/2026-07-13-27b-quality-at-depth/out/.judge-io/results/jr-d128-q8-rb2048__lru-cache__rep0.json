@@ -1,0 +1,1 @@
+{"design":3,"clarity":3,"robustness":3,"notes":"Parallel keys-array plus manual size counter is complex and desync-prone, and the test's advanceTime helper references an out-of-scope variable."}

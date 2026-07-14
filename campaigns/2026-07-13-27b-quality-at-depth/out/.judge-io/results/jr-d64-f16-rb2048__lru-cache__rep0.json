@@ -1,0 +1,1 @@
+{"design":5,"clarity":4,"robustness":4,"notes":"Proper doubly-linked-list + map O(1) LRU that correctly skips expired tails and covers TTL edge cases."}

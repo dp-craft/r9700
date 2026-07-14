@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":3,"notes":"Idiomatic reverse-splice remove but the findIndex early-return guard is redundant and tests omit the re-add-after-remove edge; leaves a stale 0 entry rather than deleting the key."}

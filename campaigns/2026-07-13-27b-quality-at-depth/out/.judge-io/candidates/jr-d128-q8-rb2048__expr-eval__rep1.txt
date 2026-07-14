@@ -1,0 +1,140 @@
+// FILE: impl.ts
+export type Result =
+  | { readonly ok: true; readonly value: number }
+  | { readonly ok: false; readonly error: string };
+
+type Token =
+  | { readonly type: 'NUMBER'; readonly value: number }
+  | { readonly type: 'PLUS' }
+  | { readonly type: 'MINUS' }
+  | { readonly type: 'MUL' }
+  | { readonly type: 'DIV' }
+  | { readonly type: 'LPAREN' }
+  | { readonly type: 'RPAREN' };
+
+function isWhitespace(ch: string): boolean {
+  return ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r';
+}
+
+function readNumber(input: string, start: number): { readonly value: number; readonly end: number } {
+  let num = 0;
+  let i = start;
+  while (i < input.length && input[i] >= '0' && input[i] <= '9') {
+    num = num * 10 + (input.charCodeAt(i) - 48);
+    i++;
+  }
+  return { value: num, end: i };
+}
+
+function readToken(input: string, i: number): { readonly token: Token; readonly next: number } {
+  const ch = input[i];
+  if (ch >= '0' && ch <= '9') {
+    const { value, end } = readNumber(input, i);
+    return { token: { type: 'NUMBER', value }, next: end };
+  }
+  const map: Record<string, Token> = {
+    '+': { type: 'PLUS' },
+    '-': { type: 'MINUS' },
+    '*': { type: 'MUL' },
+    '/': { type: 'DIV' },
+    '(': { type: 'LPAREN' },
+    ')': { type: 'RPAREN' },
+  };
+  if (ch in map) {
+    return { token: map[ch], next: i + 1 };
+  }
+  throw new Error(`Unexpected character: ${ch}`);
+}
+
+function tokenize(input: string): readonly Token[] {
+  const tokens: Token[] = [];
+  let i = 0;
+  while (i < input.length) {
+    if (isWhitespace(input[i])) {
+      i++;
+      continue;
+    }
+    const { token, next } = readToken(input, i);
+    tokens.push(token);
+    i = next;
+  }
+  return tokens;
+}
+
+interface Parser {
+  readonly tokens: readonly Token[];
+  pos: number;
+}
+
+function makeParser(tokens: readonly Token[]): Parser {
+  return { tokens, pos: 0 };
+}
+
+function parseExpr(p: Parser): number {
+  let result = parseTerm(p);
+  while (p.pos < p.tokens.length && isAddSub(p.tokens[p.pos])) {
+    const op = p.tokens[p.pos++];
+    const right = parseTerm(p);
+    result = op.type === 'PLUS' ? result + right : result - right;
+  }
+  return result;
+}
+
+function isAddSub(t: Token): boolean {
+  return t.type === 'PLUS' || t.type === 'MINUS';
+}
+
+function parseTerm(p: Parser): number {
+  let result = parseFactor(p);
+  while (p.pos < p.tokens.length && isMulDiv(p.tokens[p.pos])) {
+    const op = p.tokens[p.pos++];
+    const right = parseFactor(p);
+    if (op.type === 'MUL') {
+      result = result * right;
+    } else if (right === 0) {
+      throw new Error('Division by zero');
+    } else {
+      result = result / right;
+    }
+  }
+  return result;
+}
+
+function isMulDiv(t: Token): boolean {
+  return t.type === 'MUL' || t.type === 'DIV';
+}
+
+function parseFactor(p: Parser): number {
+  if (p.pos >= p.tokens.length) {
+    throw new Error('Unexpected end of expression');
+  }
+  const token = p.tokens[p.pos];
+  if (token.type === 'NUMBER') {
+    p.pos++;
+    return token.value;
+  }
+  if (token.type === 'LPAREN') {
+    p.pos++;
+    const result = parseExpr(p);
+    if (p.pos >= p.tokens.length || p.tokens[p.pos].type !== 'RPAREN') {
+      throw new Error('Missing closing parenthesis');
+    }
+    p.pos++;
+    return result;
+  }
+  throw new Error(`Unexpected token: ${token.type}`);
+}
+
+export function evaluate(expr: string): Result {
+  try {
+    const tokens = tokenize(expr);
+    const p = makeParser(tokens);
+    const value = parseExpr(p);
+    if (p.pos < p.tokens.length) {
+      return { ok: false, error: 'Unexpected token after expression' };
+    }
+    return { ok: true, value };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Unknown error' };
+  }
+}

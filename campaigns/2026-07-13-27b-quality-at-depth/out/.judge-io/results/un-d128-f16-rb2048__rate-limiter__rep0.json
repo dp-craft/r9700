@@ -1,0 +1,1 @@
+{"design":4,"clarity":5,"robustness":4,"notes":"Concise, well-named lazy token-bucket that correctly caps refill, isolates keys, and starts buckets full."}

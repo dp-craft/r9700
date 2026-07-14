@@ -1,0 +1,1 @@
+{"design":5,"clarity":5,"robustness":4,"notes":"Well-factored with proper unknown-narrowing type guards and correct NaN/null/array-vs-object handling; doesn't cover Date/Map/symbol keys but those are out of spec."}

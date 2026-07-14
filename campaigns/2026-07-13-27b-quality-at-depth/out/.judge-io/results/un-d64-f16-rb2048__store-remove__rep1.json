@@ -1,0 +1,1 @@
+{"design":3,"clarity":4,"robustness":4,"notes":"Filter-based removal is fine but the in-place length=0/push(...spread) rebuild is needlessly awkward when the field could simply be reassigned; tests are thorough."}

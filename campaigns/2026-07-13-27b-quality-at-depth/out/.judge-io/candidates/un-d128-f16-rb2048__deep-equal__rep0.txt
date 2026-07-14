@@ -1,0 +1,249 @@
+// FILE: impl.ts
+function isArray(value: unknown): value is unknown[] {
+  return Array.isArray(value);
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function compareArrays(a: unknown[], b: unknown[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (!deepEqual(a[i], b[i])) return false;
+  }
+  return true;
+}
+
+function compareObjects(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
+  const keysA = Object.keys(a);
+  const keysB = Object.keys(b);
+  if (keysA.length !== keysB.length) return false;
+  for (const key of keysA) {
+    if (!Object.hasOwn(b, key)) return false;
+    if (!deepEqual(a[key], b[key])) return false;
+  }
+  return true;
+}
+
+export function deepEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (a === null || b === null) return false;
+  if (typeof a !== typeof b) return false;
+  if (typeof a !== 'object') return a !== a && b !== b;
+
+  if (isArray(a) && isArray(b)) return compareArrays(a, b);
+  if (isPlainObject(a) && isPlainObject(b)) return compareObjects(a, b);
+  return false;
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it } from 'vitest';
+
+import { deepEqual } from './impl';
+
+describe('deepEqual', () => {
+  describe('primitives', () => {
+    it('should return true when both values are the same number', () => {
+      expect(deepEqual(42, 42)).toBe(true);
+    });
+
+    it('should return false when numbers differ', () => {
+      expect(deepEqual(1, 2)).toBe(false);
+    });
+
+    it('should return true when NaN equals NaN', () => {
+      expect(deepEqual(NaN, NaN)).toBe(true);
+    });
+
+    it('should return false when NaN is compared to a number', () => {
+      expect(deepEqual(NaN, 0)).toBe(false);
+    });
+
+    it('should return true when both strings are identical', () => {
+      expect(deepEqual('hello', 'hello')).toBe(true);
+    });
+
+    it('should return false when strings differ', () => {
+      expect(deepEqual('hello', 'world')).toBe(false);
+    });
+
+    it('should return true when both booleans are true', () => {
+      expect(deepEqual(true, true)).toBe(true);
+    });
+
+    it('should return false when booleans differ', () => {
+      expect(deepEqual(true, false)).toBe(false);
+    });
+
+    it('should return true when both are undefined', () => {
+      expect(deepEqual(undefined, undefined)).toBe(true);
+    });
+
+    it('should return false when one is undefined and the other is null', () => {
+      expect(deepEqual(undefined, null)).toBe(false);
+    });
+  });
+
+  describe('null and empty object', () => {
+    it('should return false when null is compared to an empty object', () => {
+      expect(deepEqual(null, {})).toBe(false);
+    });
+
+    it('should return false when an empty object is compared to null', () => {
+      expect(deepEqual({}, null)).toBe(false);
+    });
+
+    it('should return true when both are null', () => {
+      expect(deepEqual(null, null)).toBe(true);
+    });
+  });
+
+  describe('type mismatch', () => {
+    it('should return false when array is compared to plain object with matching indices', () => {
+      expect(deepEqual([1, 2], { 0: 1, 1: 2 })).toBe(false);
+    });
+
+    it('should return false when plain object is compared to array', () => {
+      expect(deepEqual({ 0: 1, 1: 2 }, [1, 2])).toBe(false);
+    });
+
+    it('should return false when number is compared to string', () => {
+      expect(deepEqual(42, '42')).toBe(false);
+    });
+
+    it('should return false when boolean is compared to number', () => {
+      expect(deepEqual(true, 1)).toBe(false);
+    });
+  });
+
+  describe('arrays', () => {
+    it('should return true when both arrays are empty', () => {
+      expect(deepEqual([], [])).toBe(true);
+    });
+
+    it('should return true when both arrays contain equal primitives', () => {
+      expect(deepEqual([1, 2, 3], [1, 2, 3])).toBe(true);
+    });
+
+    it('should return false when arrays differ in length', () => {
+      expect(deepEqual([1, 2], [1, 2, 3])).toBe(false);
+    });
+
+    it('should return false when arrays contain different values', () => {
+      expect(deepEqual([1, 2], [1, 3])).toBe(false);
+    });
+
+    it('should return true when arrays contain equal nested arrays', () => {
+      expect(deepEqual([[1, 2], [3]], [[1, 2], [3]])).toBe(true);
+    });
+
+    it('should return false when nested arrays differ', () => {
+      expect(deepEqual([[1, 2]], [[1, 3]])).toBe(false);
+    });
+
+    it('should return true when arrays contain NaN at the same index', () => {
+      expect(deepEqual([NaN, 2], [NaN, 2])).toBe(true);
+    });
+  });
+
+  describe('objects', () => {
+    it('should return true when both objects are empty', () => {
+      expect(deepEqual({}, {})).toBe(true);
+    });
+
+    it('should return true when both objects have equal key-value pairs', () => {
+      expect(deepEqual({ a: 1, b: 2 }, { a: 1, b: 2 })).toBe(true);
+    });
+
+    it('should return false when objects have a key-count mismatch', () => {
+      expect(deepEqual({ a: 1 }, { a: 1, b: 2 })).toBe(false);
+    });
+
+    it('should return false when objects share keys but values differ', () => {
+      expect(deepEqual({ a: 1 }, { a: 2 })).toBe(false);
+    });
+
+    it('should return false when one object has an extra key', () => {
+      expect(deepEqual({ a: 1 }, { a: 1, b: 2 })).toBe(false);
+    });
+
+    it('should return true when objects contain equal nested objects', () => {
+      expect(deepEqual({ a: { b: 1 } }, { a: { b: 1 } })).toBe(true);
+    });
+
+    it('should return false when nested objects differ', () => {
+      expect(deepEqual({ a: { b: 1 } }, { a: { b: 2 } })).toBe(false);
+    });
+
+    it('should return true for deeply nested structures', () => {
+      const a = { x: { y: [1, { z: 'hello' }] } };
+      const b = { x: { y: [1, { z: 'hello' }] } };
+      expect(deepEqual(a, b)).toBe(true);
+    });
+
+    it('should return false for deeply nested structures that differ', () => {
+      const a = { x: { y: [1, { z: 'hello' }] } };
+      const b = { x: { y: [1, { z: 'world' }] } };
+      expect(deepEqual(a, b)).toBe(false);
+    });
+  });
+
+  describe('mixed nested structures', () => {
+    it('should return true when object contains equal array values', () => {
+      expect(deepEqual({ arr: [1, 2] }, { arr: [1, 2] })).toBe(true);
+    });
+
+    it('should return false when array values inside object differ', () => {
+      expect(deepEqual({ arr: [1, 2] }, { arr: [1, 3] })).toBe(false);
+    });
+
+    it('should return true when array contains equal object values', () => {
+      expect(deepEqual([{ a: 1 }], [{ a: 1 }])).toBe(true);
+    });
+
+    it('should return false when object values inside array differ', () => {
+      expect(deepEqual([{ a: 1 }], [{ a: 2 }])).toBe(false);
+    });
+
+    it('should return true for complex nested mix of arrays and objects', () => {
+      const a = { items: [{ id: 1, tags: ['x', 'y'] }] };
+      const b = { items: [{ id: 1, tags: ['x', 'y'] }] };
+      expect(deepEqual(a, b)).toBe(true);
+    });
+
+    it('should return false when nested array-vs-object mismatch occurs', () => {
+      const a = { data: [1, 2] };
+      const b = { data: { 0: 1, 1: 2 } };
+      expect(deepEqual(a, b)).toBe(false);
+    });
+  });
+
+  describe('edge cases', () => {
+    it('should return true when comparing an object to itself', () => {
+      const obj = { a: 1 };
+      expect(deepEqual(obj, obj)).toBe(true);
+    });
+
+    it('should return true when comparing an array to itself', () => {
+      const arr = [1, 2];
+      expect(deepEqual(arr, arr)).toBe(true);
+    });
+
+    it('should return true when both objects contain NaN values', () => {
+      expect(deepEqual({ a: NaN }, { a: NaN })).toBe(true);
+    });
+
+    it('should return false when one object has NaN and the other has a number', () => {
+      expect(deepEqual({ a: NaN }, { a: 0 })).toBe(false);
+    });
+
+    it('should return true when objects have null values', () => {
+      expect(deepEqual({ a: null }, { a: null })).toBe(true);
+    });
+
+    it('should return false when one value is null and the other is an object', () => {
+      expect(deepEqual({ a: null }, { a: {} })).toBe(false);
+    });
+  });
+});

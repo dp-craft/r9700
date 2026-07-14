@@ -1,0 +1,8 @@
+{"id": "un-d64-f16-rb2048__store-remove__rep0", "spec": "ts-harness/tasks/store-remove/spec.md", "code": "out/.judge-io/candidates/un-d64-f16-rb2048__store-remove__rep0.txt"}
+{"id": "un-d64-f16-rb2048__store-remove__rep1", "spec": "ts-harness/tasks/store-remove/spec.md", "code": "out/.judge-io/candidates/un-d64-f16-rb2048__store-remove__rep1.txt"}
+{"id": "un-d64-f16-rb2048__deep-equal__rep0", "spec": "ts-harness/tasks/deep-equal/spec.md", "code": "out/.judge-io/candidates/un-d64-f16-rb2048__deep-equal__rep0.txt"}
+{"id": "un-d64-f16-rb2048__deep-equal__rep1", "spec": "ts-harness/tasks/deep-equal/spec.md", "code": "out/.judge-io/candidates/un-d64-f16-rb2048__deep-equal__rep1.txt"}
+{"id": "un-d64-f16-rb2048__async-memo__rep0", "spec": "ts-harness/tasks/async-memo/spec.md", "code": "out/.judge-io/candidates/un-d64-f16-rb2048__async-memo__rep0.txt"}
+{"id": "un-d64-f16-rb2048__async-memo__rep1", "spec": "ts-harness/tasks/async-memo/spec.md", "code": "out/.judge-io/candidates/un-d64-f16-rb2048__async-memo__rep1.txt"}
+{"id": "un-d64-f16-rb2048__expr-eval__rep0", "spec": "ts-harness/tasks/expr-eval/spec.md", "code": "out/.judge-io/candidates/un-d64-f16-rb2048__expr-eval__rep0.txt"}
+{"id": "un-d64-f16-rb2048__expr-eval__rep1", "spec": "ts-harness/tasks/expr-eval/spec.md", "code": "out/.judge-io/candidates/un-d64-f16-rb2048__expr-eval__rep1.txt"}

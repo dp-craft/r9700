@@ -1,0 +1,206 @@
+// FILE: impl.ts
+export type Result =
+  | { readonly ok: true; readonly value: number }
+  | { readonly ok: false; readonly error: string };
+
+class Parser {
+  private pos = 0;
+  private readonly input: string;
+
+  constructor(input: string) {
+    this.input = input;
+  }
+
+  parse(): Result {
+    try {
+      const val = this.expr();
+      this.skipWhitespace();
+      if (this.pos < this.input.length) {
+        return { ok: false, error: 'Unexpected character' };
+      }
+      return { ok: true, value: val };
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : 'Parse error' };
+    }
+  }
+
+  private skipWhitespace(): void {
+    while (this.pos < this.input.length && /\s/.test(this.input[this.pos])) {
+      this.pos++;
+    }
+  }
+
+  private consume(expected?: string): string {
+    this.skipWhitespace();
+    const ch = this.input[this.pos];
+    if (expected !== undefined && ch !== expected) {
+      throw new Error(`Expected '${expected}', got '${ch}'`);
+    }
+    if (ch === undefined) throw new Error('Unexpected end of input');
+    this.pos++;
+    return ch;
+  }
+
+  private expr(): number {
+    let result = this.term();
+    while (true) {
+      this.skipWhitespace();
+      const op = this.input[this.pos];
+      if (op !== '+' && op !== '-') break;
+      this.pos++;
+      result = op === '+' ? result + this.term() : result - this.term();
+    }
+    return result;
+  }
+
+  private term(): number {
+    let result = this.factor();
+    while (true) {
+      this.skipWhitespace();
+      const op = this.input[this.pos];
+      if (op !== '*' && op !== '/') break;
+      this.pos++;
+      const right = this.factor();
+      if (op === '/') {
+        if (right === 0) throw new Error('Division by zero');
+        result = result / right;
+      } else {
+        result = result * right;
+      }
+    }
+    return result;
+  }
+
+  private factor(): number {
+    this.skipWhitespace();
+    if (this.input[this.pos] === '(') {
+      this.pos++;
+      const val = this.expr();
+      this.consume(')');
+      return val;
+    }
+    return this.number();
+  }
+
+  private number(): number {
+    this.skipWhitespace();
+    const start = this.pos;
+    if (this.input[this.pos] === '-' || this.input[this.pos] === '+') {
+      this.pos++;
+    }
+    if (!/^\d/.test(this.input[this.pos] ?? '')) {
+      throw new Error('Expected number');
+    }
+    while (/\d/.test(this.input[this.pos] ?? '')) {
+      this.pos++;
+    }
+    const val = Number.parseInt(this.input.slice(start, this.pos), 10);
+    if (Number.isNaN(val)) throw new Error('Invalid number');
+    return val;
+  }
+}
+
+export function evaluate(expr: string): Result {
+  return new Parser(expr).parse();
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it } from 'vitest';
+import { evaluate } from './impl';
+
+describe('evaluate', () => {
+  it('should return correct value when given a simple addition', () => {
+    const result = evaluate('2 + 3');
+    expect(result).toEqual({ ok: true, value: 5 });
+  });
+
+  it('should return correct value when given a simple subtraction', () => {
+    const result = evaluate('10 - 4');
+    expect(result).toEqual({ ok: true, value: 6 });
+  });
+
+  it('should return correct value when given a simple multiplication', () => {
+    const result = evaluate('3 * 4');
+    expect(result).toEqual({ ok: true, value: 12 });
+  });
+
+  it('should return correct value when given a simple division', () => {
+    const result = evaluate('10 / 2');
+    expect(result).toEqual({ ok: true, value: 5 });
+  });
+
+  it('should respect operator precedence when mixing + and *', () => {
+    const result = evaluate('2 + 3 * 4');
+    expect(result).toEqual({ ok: true, value: 14 });
+  });
+
+  it('should respect operator precedence when mixing - and /', () => {
+    const result = evaluate('10 - 8 / 2');
+    expect(result).toEqual({ ok: true, value: 6 });
+  });
+
+  it('should evaluate left-associative subtraction correctly', () => {
+    const result = evaluate('10 - 3 - 2');
+    expect(result).toEqual({ ok: true, value: 5 });
+  });
+
+  it('should evaluate left-associative division correctly', () => {
+    const result = evaluate('8 / 2 / 2');
+    expect(result).toEqual({ ok: true, value: 2 });
+  });
+
+  it('should evaluate parentheses correctly', () => {
+    const result = evaluate('(2 + 3) * 4');
+    expect(result).toEqual({ ok: true, value: 20 });
+  });
+
+  it('should handle nested parentheses correctly', () => {
+    const result = evaluate('((2 + 3) * (4 - 1)) / 5');
+    expect(result).toEqual({ ok: true, value: 3 });
+  });
+
+  it('should ignore arbitrary whitespace around tokens', () => {
+    const result = evaluate('  10   +   20  ');
+    expect(result).toEqual({ ok: true, value: 30 });
+  });
+
+  it('should return error when division by zero occurs', () => {
+    const result = evaluate('10 / 0');
+    expect(result).toEqual({ ok: false, error: 'Division by zero' });
+  });
+
+  it('should return error when parentheses are unbalanced (missing closing)', () => {
+    const result = evaluate('(2 + 3');
+    expect(result.ok).toBe(false);
+  });
+
+  it('should return error when parentheses are unbalanced (missing opening)', () => {
+    const result = evaluate('2 + 3)');
+    expect(result.ok).toBe(false);
+  });
+
+  it('should return error when operand is missing after operator', () => {
+    const result = evaluate('5 +');
+    expect(result.ok).toBe(false);
+  });
+
+  it('should return error when unexpected character is present', () => {
+    const result = evaluate('10 a 5');
+    expect(result.ok).toBe(false);
+  });
+
+  it('should return error when expression is empty', () => {
+    const result = evaluate('');
+    expect(result.ok).toBe(false);
+  });
+
+  it('should return error when only whitespace is provided', () => {
+    const result = evaluate('   ');
+    expect(result.ok).toBe(false);
+  });
+
+  it('should return error when only operators are provided', () => {
+    const result = evaluate('+ - *');
+    expect(result.ok).toBe(false);
+  });
+});

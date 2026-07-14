@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":3,"notes":"Clean forward-splice removal, but total(key)=0 write inserts a spurious map entry for never-seen keys, and all() leaks the internal array."}

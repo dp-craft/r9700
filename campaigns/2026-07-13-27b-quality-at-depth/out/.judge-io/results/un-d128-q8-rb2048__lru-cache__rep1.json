@@ -1,0 +1,1 @@
+{"design":3,"clarity":4,"robustness":4,"notes":"Correct and well-tested, but maintains a redundant parallel order array with O(n) splices when the Map already preserves insertion order."}

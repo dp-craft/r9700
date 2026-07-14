@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Compact single-method token bucket that retains partial refill on rejection; solid and clear."}

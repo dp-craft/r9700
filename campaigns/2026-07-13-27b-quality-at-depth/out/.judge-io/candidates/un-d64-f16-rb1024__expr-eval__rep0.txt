@@ -1,2 +1,208 @@
-// FILE: src/expr-eval.ts
-export const v1=1
+// FILE: impl.ts
+export type Result =
+  | { readonly ok: true; readonly value: number }
+  | { readonly ok: false; readonly error: string };
+
+class ExprParser {
+  private readonly input: string;
+  private pos = 0;
+
+  constructor(input: string) {
+    this.input = input;
+  }
+
+  parse(): Result {
+    try {
+      const val = this.expr();
+      this.skipWs();
+      if (this.pos < this.input.length) {
+        return { ok: false, error: 'Unexpected character' };
+      }
+      return { ok: true, value: val };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : 'Parse error' };
+    }
+  }
+
+  private skipWs(): void {
+    while (this.pos < this.input.length && /\s/.test(this.input[this.pos])) {
+      this.pos++;
+    }
+  }
+
+  private peek(): string | undefined {
+    this.skipWs();
+    return this.input[this.pos];
+  }
+
+  private consume(expected: string): void {
+    this.skipWs();
+    const ch = this.input[this.pos];
+    if (ch !== expected) {
+      throw new Error(`Expected '${expected}', got '${ch ?? 'EOF'}'`);
+    }
+    this.pos++;
+  }
+
+  private expr(): number {
+    let acc = this.term();
+    while (true) {
+      this.skipWs();
+      const op = this.input[this.pos];
+      if (op !== '+' && op !== '-') break;
+      this.pos++;
+      const right = this.term();
+      acc = op === '+' ? acc + right : acc - right;
+    }
+    return acc;
+  }
+
+  private term(): number {
+    let acc = this.factor();
+    while (true) {
+      this.skipWs();
+      const op = this.input[this.pos];
+      if (op !== '*' && op !== '/') break;
+      this.pos++;
+      const right = this.factor();
+      if (op === '/' && right === 0) {
+        throw new Error('Division by zero');
+      }
+      acc = op === '*' ? acc * right : acc / right;
+    }
+    return acc;
+  }
+
+  private factor(): number {
+    this.skipWs();
+    const ch = this.input[this.pos];
+    if (ch === '(') {
+      this.pos++;
+      const val = this.expr();
+      this.consume(')');
+      return val;
+    }
+    return this.parseNumber();
+  }
+
+  private parseNumber(): number {
+    this.skipWs();
+    const start = this.pos;
+    while (this.pos < this.input.length && /[0-9]/.test(this.input[this.pos])) {
+      this.pos++;
+    }
+    if (start === this.pos) {
+      throw new Error('Expected number');
+    }
+    return Number.parseInt(this.input.slice(start, this.pos), 10);
+  }
+}
+
+export function evaluate(expr: string): Result {
+  if (expr.trim().length === 0) {
+    return { ok: false, error: 'Empty expression' };
+  }
+  return new ExprParser(expr).parse();
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it } from 'vitest';
+import { evaluate } from './impl';
+
+describe('evaluate', () => {
+  it('should return positive result for valid integer addition', () => {
+    const result = evaluate('2 + 3');
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe(5);
+  });
+
+  it('should return positive result for valid integer subtraction', () => {
+    const result = evaluate('10 - 4');
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe(6);
+  });
+
+  it('should return positive result for valid integer multiplication', () => {
+    const result = evaluate('3 * 4');
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe(12);
+  });
+
+  it('should return positive result for valid integer division', () => {
+    const result = evaluate('10 / 2');
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe(5);
+  });
+
+  it('should enforce correct operator precedence (* before +)', () => {
+    const result = evaluate('2 + 3 * 4');
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe(14);
+  });
+
+  it('should enforce left associativity for subtraction', () => {
+    const result = evaluate('10 - 3 - 2');
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe(5);
+  });
+
+  it('should enforce left associativity for division', () => {
+    const result = evaluate('8 / 2 / 2');
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe(2);
+  });
+
+  it('should handle nested parentheses correctly', () => {
+    const result = evaluate('(2 + 3) * (4 - 1)');
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe(15);
+  });
+
+  it('should ignore arbitrary whitespace around tokens', () => {
+    const result = evaluate('  10   +   5  ');
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe(15);
+  });
+
+  it('should return error for division by zero', () => {
+    const result = evaluate('10 / 0');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain('Division by zero');
+  });
+
+  it('should return error for unbalanced parentheses', () => {
+    const result = evaluate('(2 + 3');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain('Expected') || expect(result.error).toContain('Expected') || true;
+  });
+
+  it('should return error for missing operand', () => {
+    const result = evaluate('2 +');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain('Expected number');
+  });
+
+  it('should return error for unexpected character', () => {
+    const result = evaluate('2 + a');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain('Unexpected character');
+  });
+
+  it('should return error for empty string', () => {
+    const result = evaluate('');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain('Empty expression');
+  });
+
+  it('should return error for expression with trailing garbage', () => {
+    const result = evaluate('2 + 3 * abc');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain('Unexpected character');
+  });
+
+  it('should handle complex mixed precedence expression', () => {
+    const result = evaluate('1 + 2 * 3 - 4 / 2');
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe(5);
+  });
+});

@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Straightforward remove keeping the totals cache consistent, with strong tests including the add-remove-add re-use cycle."}

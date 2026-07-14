@@ -1,0 +1,127 @@
+// FILE: impl.ts
+import type { Clock } from '../../lib/clock';
+
+interface Bucket {
+  readonly tokens: number;
+  readonly lastRefillAt: number;
+}
+
+export interface RateLimiter {
+  readonly tryAcquire: (key: string, tokens?: number) => boolean;
+}
+
+const DEFAULT_TOKENS = 1;
+
+function refillBucket(
+  bucket: Bucket,
+  capacity: number,
+  refillPerSec: number,
+  clock: Clock
+): Bucket {
+  const now = clock.now();
+  const elapsedSeconds = (now - bucket.lastRefillAt) / 1000;
+  const refilledTokens = bucket.tokens + elapsedSeconds * refillPerSec;
+  const newTokens = Math.min(refilledTokens, capacity);
+  return { tokens: newTokens, lastRefillAt: now };
+}
+
+export function createRateLimiter(
+  capacity: number,
+  refillPerSec: number,
+  clock: Clock
+): RateLimiter {
+  const buckets = new Map<string, Bucket>();
+
+  return {
+    tryAcquire(key: string, requestedTokens = DEFAULT_TOKENS): boolean {
+      const now = clock.now();
+      let bucket = buckets.get(key) ?? { tokens: capacity, lastRefillAt: now };
+      bucket = refillBucket(bucket, capacity, refillPerSec, clock);
+
+      if (bucket.tokens >= requestedTokens) {
+        buckets.set(key, { ...bucket, tokens: bucket.tokens - requestedTokens });
+        return true;
+      }
+
+      buckets.set(key, bucket);
+      return false;
+    },
+  };
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it, beforeEach } from 'vitest';
+import type { Clock } from '../../lib/clock';
+import { createRateLimiter } from './impl';
+
+function createFakeClock(initialTime = 0): Clock & { tick: (ms: number) => void } {
+  let now = initialTime;
+  return {
+    now: () => now,
+    tick: (ms: number) => { now += ms; },
+  };
+}
+
+describe('createRateLimiter', () => {
+  let clock: Clock & { tick: (ms: number) => void };
+
+  beforeEach(() => {
+    clock = createFakeClock(0);
+  });
+
+  describe('tryAcquire', () => {
+    it('should return true when bucket has enough tokens on first call', () => {
+      const limiter = createRateLimiter(10, 1, clock);
+      expect(limiter.tryAcquire('key1')).toBe(true);
+    });
+
+    it('should return false when bucket is empty', () => {
+      const limiter = createRateLimiter(2, 1, clock);
+      expect(limiter.tryAcquire('key1')).toBe(true);
+      expect(limiter.tryAcquire('key1')).toBe(true);
+      expect(limiter.tryAcquire('key1')).toBe(false);
+    });
+
+    it('should deduct multiple tokens when requested', () => {
+      const limiter = createRateLimiter(10, 1, clock);
+      expect(limiter.tryAcquire('key1', 5)).toBe(true);
+      expect(limiter.tryAcquire('key1', 5)).toBe(true);
+      expect(limiter.tryAcquire('key1', 1)).toBe(false);
+    });
+
+    it('should not deduct tokens when acquire fails', () => {
+      const limiter = createRateLimiter(2, 1, clock);
+      expect(limiter.tryAcquire('key1', 5)).toBe(false);
+      expect(limiter.tryAcquire('key1')).toBe(true);
+      expect(limiter.tryAcquire('key1')).toBe(true);
+      expect(limiter.tryAcquire('key1')).toBe(false);
+    });
+
+    it('should refill tokens lazily based on elapsed time', () => {
+      const limiter = createRateLimiter(2, 2, clock);
+      expect(limiter.tryAcquire('key1')).toBe(true);
+      expect(limiter.tryAcquire('key1')).toBe(true);
+      expect(limiter.tryAcquire('key1')).toBe(false);
+
+      clock.tick(500);
+      expect(limiter.tryAcquire('key1')).toBe(true);
+    });
+
+    it('should cap refilled tokens at capacity', () => {
+      const limiter = createRateLimiter(2, 100, clock);
+      expect(limiter.tryAcquire('key1')).toBe(true);
+
+      clock.tick(1000);
+      expect(limiter.tryAcquire('key1')).toBe(true);
+      expect(limiter.tryAcquire('key1')).toBe(true);
+      expect(limiter.tryAcquire('key1')).toBe(false);
+    });
+
+    it('should isolate buckets for different keys', () => {
+      const limiter = createRateLimiter(1, 1, clock);
+      expect(limiter.tryAcquire('keyA')).toBe(true);
+      expect(limiter.tryAcquire('keyA')).toBe(false);
+      expect(limiter.tryAcquire('keyB')).toBe(true);
+    });
+  });
+});

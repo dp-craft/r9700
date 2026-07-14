@@ -1,0 +1,1 @@
+{"design":4,"clarity":5,"robustness":4,"notes":"Named constants and a single mutating refill helper make it very readable; covers burst, refill cap, per-key isolation and custom cost."}

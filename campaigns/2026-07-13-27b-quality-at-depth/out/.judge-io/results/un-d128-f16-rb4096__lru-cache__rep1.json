@@ -1,0 +1,1 @@
+{"design":4,"clarity":5,"robustness":4,"notes":"Cleanly factored expiresAt-based cache with purge-before-evict; readable and cohesive though it lacks a capacity-0 edge test."}

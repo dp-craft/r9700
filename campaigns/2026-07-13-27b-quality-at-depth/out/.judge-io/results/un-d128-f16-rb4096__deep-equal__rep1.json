@@ -1,1 +1,1 @@
-{"design":4,"clarity":4,"robustness":5,"notes":"ok"}
+{"design":4,"clarity":5,"robustness":4,"notes":"Very readable with an explicit isObject guard and Number.isNaN, clean helper decomposition; test coverage is solid but less exhaustive than the edge cases it could hit."}

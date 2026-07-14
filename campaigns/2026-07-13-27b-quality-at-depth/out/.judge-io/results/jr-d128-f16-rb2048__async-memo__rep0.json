@@ -1,0 +1,1 @@
+{"design":4,"clarity":3,"robustness":4,"notes":"Sound dedup/retry logic, but stray markdown code fences leak into the file body, hurting the deliverable's cleanliness."}

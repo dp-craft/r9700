@@ -1,0 +1,261 @@
+// FILE: impl.ts
+export type Result =
+  | { readonly ok: true; readonly value: number }
+  | { readonly ok: false; readonly error: string };
+
+type TokenType = 'NUM' | 'PLUS' | 'MINUS' | 'MUL' | 'DIV' | 'LPAREN' | 'RPAREN';
+
+type Token = { readonly type: TokenType; readonly value?: number };
+
+function tokenize(input: string): readonly Token[] {
+  const tokens: Token[] = [];
+  let i = 0;
+
+  while (i < input.length) {
+    const char = input[i];
+
+    if (/\s/.test(char)) {
+      i++;
+      continue;
+    }
+
+    if (/[0-9]/.test(char)) {
+      let numStr = '';
+      while (i < input.length && /[0-9]/.test(input[i])) {
+        numStr += input[i];
+        i++;
+      }
+      tokens.push({ type: 'NUM', value: Number(numStr) });
+      continue;
+    }
+
+    switch (char) {
+      case '+': tokens.push({ type: 'PLUS' }); break;
+      case '-': tokens.push({ type: 'MINUS' }); break;
+      case '*': tokens.push({ type: 'MUL' }); break;
+      case '/': tokens.push({ type: 'DIV' }); break;
+      case '(': tokens.push({ type: 'LPAREN' }); break;
+      case ')': tokens.push({ type: 'RPAREN' }); break;
+      default: throw new Error(`Unexpected character: ${char}`);
+    }
+    i++;
+  }
+
+  return tokens;
+}
+
+function expectToken(tokens: readonly Token[], idx: [number], type: TokenType): Token {
+  if (idx[0] >= tokens.length) {
+    throw new Error('Unexpected end of expression');
+  }
+  const token = tokens[idx[0]];
+  if (token.type !== type) {
+    throw new Error(`Expected ${type}, got ${token.type}`);
+  }
+  idx[0]++;
+  return token;
+}
+
+function parseExpression(tokens: readonly Token[], idx: [number]): number {
+  let left = parseTerm(tokens, idx);
+
+  while (idx[0] < tokens.length && (tokens[idx[0]].type === 'PLUS' || tokens[idx[0]].type === 'MINUS')) {
+    const op = tokens[idx[0]].type;
+    idx[0]++;
+    const right = parseTerm(tokens, idx);
+    left = op === 'PLUS' ? left + right : left - right;
+  }
+
+  return left;
+}
+
+function parseTerm(tokens: readonly Token[], idx: [number]): number {
+  let left = parseFactor(tokens, idx);
+
+  while (idx[0] < tokens.length && (tokens[idx[0]].type === 'MUL' || tokens[idx[0]].type === 'DIV')) {
+    const op = tokens[idx[0]].type;
+    idx[0]++;
+    const right = parseFactor(tokens, idx);
+    if (op === 'DIV' && right === 0) {
+      throw new Error('Division by zero');
+    }
+    left = op === 'MUL' ? left * right : left / right;
+  }
+
+  return left;
+}
+
+function parseFactor(tokens: readonly Token[], idx: [number]): number {
+  const token = tokens[idx[0]];
+
+  if (token.type === 'NUM') {
+    idx[0]++;
+    return token.value as number;
+  }
+
+  if (token.type === 'LPAREN') {
+    idx[0]++;
+    const val = parseExpression(tokens, idx);
+    expectToken(tokens, idx, 'RPAREN');
+    return val;
+  }
+
+  throw new Error(`Unexpected token: ${token.type}`);
+}
+
+export function evaluate(expr: string): Result {
+  try {
+    const tokens = tokenize(expr);
+    const idx: [number] = [0];
+    const value = parseExpression(tokens, idx);
+
+    if (idx[0] < tokens.length) {
+      throw new Error('Unexpected tokens after expression');
+    }
+
+    return { ok: true, value };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Unknown error' };
+  }
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it } from 'vitest';
+
+import { evaluate } from './impl';
+
+describe('evaluate', () => {
+  describe('basic arithmetic', () => {
+    it('should evaluate a single number when given a valid integer', () => {
+      const result = evaluate('42');
+      expect(result).toEqual({ ok: true, value: 42 });
+    });
+
+    it('should evaluate addition when given a plus expression', () => {
+      const result = evaluate('2 + 3');
+      expect(result).toEqual({ ok: true, value: 5 });
+    });
+
+    it('should evaluate subtraction when given a minus expression', () => {
+      const result = evaluate('10 - 4');
+      expect(result).toEqual({ ok: true, value: 6 });
+    });
+
+    it('should evaluate multiplication when given a multiply expression', () => {
+      const result = evaluate('3 * 7');
+      expect(result).toEqual({ ok: true, value: 21 });
+    });
+
+    it('should evaluate division when given a divide expression', () => {
+      const result = evaluate('20 / 5');
+      expect(result).toEqual({ ok: true, value: 4 });
+    });
+  });
+
+  describe('precedence', () => {
+    it('should evaluate multiplication before addition when mixed', () => {
+      const result = evaluate('2 + 3 * 4');
+      expect(result).toEqual({ ok: true, value: 14 });
+    });
+
+    it('should evaluate division before subtraction when mixed', () => {
+      const result = evaluate('10 - 8 / 2');
+      expect(result).toEqual({ ok: true, value: 6 });
+    });
+
+    it('should evaluate multiplication and division before addition and subtraction', () => {
+      const result = evaluate('1 + 2 * 3 - 4 / 2');
+      expect(result).toEqual({ ok: true, value: 7 });
+    });
+  });
+
+  describe('left-associativity', () => {
+    it('should evaluate subtraction left-to-right when chained', () => {
+      const result = evaluate('10 - 3 - 2');
+      expect(result).toEqual({ ok: true, value: 5 });
+    });
+
+    it('should evaluate division left-to-right when chained', () => {
+      const result = evaluate('8 / 2 / 2');
+      expect(result).toEqual({ ok: true, value: 2 });
+    });
+
+    it('should evaluate mixed operators left-to-right within same precedence', () => {
+      const result = evaluate('2 * 3 / 2');
+      expect(result).toEqual({ ok: true, value: 3 });
+    });
+  });
+
+  describe('parentheses', () => {
+    it('should evaluate parentheses first when overriding precedence', () => {
+      const result = evaluate('2 + (3 * 4)');
+      expect(result).toEqual({ ok: true, value: 14 });
+    });
+
+    it('should evaluate nested parentheses when given deeply nested expressions', () => {
+      const result = evaluate('(2 + (3 * 4)) / 2');
+      expect(result).toEqual({ ok: true, value: 7 });
+    });
+
+    it('should evaluate parentheses correctly when overriding left-associativity', () => {
+      const result = evaluate('10 - (3 - 2)');
+      expect(result).toEqual({ ok: true, value: 9 });
+    });
+  });
+
+  describe('whitespace', () => {
+    it('should ignore arbitrary whitespace when given a spaced expression', () => {
+      const result = evaluate('  2   +   3   ');
+      expect(result).toEqual({ ok: true, value: 5 });
+    });
+
+    it('should handle newlines and tabs when given a multiline expression', () => {
+      const result = evaluate('2\n+\t3');
+      expect(result).toEqual({ ok: true, value: 5 });
+    });
+  });
+
+  describe('error handling', () => {
+    it('should return an error when given an unexpected character', () => {
+      const result = evaluate('2 + 3 &');
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain('Unexpected character');
+    });
+
+    it('should return an error when given unbalanced opening parentheses', () => {
+      const result = evaluate('(2 + 3');
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain('RPAREN');
+    });
+
+    it('should return an error when given unbalanced closing parentheses', () => {
+      const result = evaluate('2 + 3)');
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain('Unexpected token');
+    });
+
+    it('should return an error when given a missing operand', () => {
+      const result = evaluate('2 + * 3');
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain('NUM');
+    });
+
+    it('should return an error when given division by zero', () => {
+      const result = evaluate('10 / 0');
+      expect(result.ok).toBe(false);
+      expect(result.error).toBe('Division by zero');
+    });
+
+    it('should return an error when given trailing tokens after a valid expression', () => {
+      const result = evaluate('2 + 3 4');
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain('Unexpected tokens');
+    });
+
+    it('should return an error when given an empty string', () => {
+      const result = evaluate('');
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain('Unexpected end');
+    });
+  });
+});

@@ -1,2 +1,95 @@
-// FILE: src/async-memo.ts
-export const v2=2
+// FILE: impl.ts
+export function createAsyncMemo<K, V>(fn: (key: K) => Promise<V>): (key: K) => Promise<V> {
+  const cache = new Map<K, Promise<V>>();
+
+  return (key: K): Promise<V> => {
+    const existing = cache.get(key);
+    if (existing !== undefined) return existing;
+
+    const p = fn(key);
+    const memoized = p.then(
+      (value: V) => value,
+      (error: unknown) => {
+        cache.delete(key);
+        throw error;
+      }
+    );
+
+    cache.set(key, memoized);
+    return memoized;
+  };
+}
+
+// FILE: impl.test.ts
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { createAsyncMemo } from './impl';
+
+describe('createAsyncMemo', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe('concurrent dedup', () => {
+    it('should invoke fn once when multiple concurrent calls share the same key', async () => {
+      let callCount = 0;
+      const fn = vi.fn(async (): Promise<string> => {
+        callCount++;
+        await new Promise(resolve => setTimeout(resolve, 10));
+        return 'value';
+      });
+
+      const memoized = createAsyncMemo(fn);
+
+      const [r1, r2, r3] = await Promise.all([
+        memoized('key'),
+        memoized('key'),
+        memoized('key'),
+      ]);
+
+      expect(callCount).toBe(1);
+      expect(r1).toBe('value');
+      expect(r2).toBe('value');
+      expect(r3).toBe('value');
+    });
+  });
+
+  describe('retry-after-rejection', () => {
+    it('should retry fn when a previous call rejected for the same key', async () => {
+      let callCount = 0;
+      const fn = vi.fn(async (): Promise<string> => {
+        callCount++;
+        if (callCount === 1) throw new Error('fail');
+        return 'recovered';
+      });
+
+      const memoized = createAsyncMemo(fn);
+
+      await expect(memoized('key')).rejects.toThrow('fail');
+
+      const result = await memoized('key');
+
+      expect(callCount).toBe(2);
+      expect(result).toBe('recovered');
+    });
+  });
+
+  describe('cache-hit-after-success', () => {
+    it('should reuse cached value when fn resolves successfully for the same key', async () => {
+      let callCount = 0;
+      const fn = vi.fn(async (): Promise<string> => {
+        callCount++;
+        return 'cached';
+      });
+
+      const memoized = createAsyncMemo(fn);
+
+      const first = await memoized('key');
+      const second = await memoized('key');
+
+      expect(callCount).toBe(1);
+      expect(first).toBe('cached');
+      expect(second).toBe('cached');
+    });
+  });
+});

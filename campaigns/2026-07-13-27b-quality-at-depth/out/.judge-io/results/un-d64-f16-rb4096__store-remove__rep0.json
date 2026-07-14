@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Straightforward reverse-splice removal that correctly keeps entries and the totals cache consistent."}

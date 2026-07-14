@@ -1,0 +1,1 @@
+{"design":3,"clarity":4,"robustness":3,"notes":"Readable filter-based remove, but it reassigns a field declared readonly and sets the total to 0 rather than deleting the stale map key."}

@@ -1,0 +1,22 @@
+You are orchestrating a BLIND TypeScript code-review judging pass. Do NOT review any code
+yourself — your ONLY job is to fan out subagents and make sure every verdict file gets written.
+
+Paths (relative to the current directory):
+  out/.judge-io/rubric.txt        the scoring rubric (0-5 on design, clarity, robustness)
+  out/.judge-io/batches/*.jsonl   15 batch files; each line is one candidate: {"id":..., "spec":<path>, "code":<path>}
+  out/.judge-io/results/          write verdicts here, one <id>.json per candidate
+
+For EACH of the 15 batch files, launch ONE subagent with the Task tool (model "opus", subagent_type
+"general-purpose"), all in parallel. Instruct each subagent to do exactly this for its one batch file:
+
+  1. Read out/.judge-io/rubric.txt.
+  2. For EVERY candidate line in its batch file:
+     - if out/.judge-io/results/<id>.json already exists and is non-empty, skip that candidate;
+     - otherwise read the candidate's `spec` file and `code` file, score it per the rubric, and write
+       ONLY a JSON object {"design":N,"clarity":N,"robustness":N,"notes":"<=1 sentence"} to
+       out/.judge-io/results/<id>.json  (<id> is that candidate's id). Write nothing else to that file.
+  3. The review is BLIND: it sees only the spec and the code, never which model/config produced it.
+
+When all subagents have finished, verify out/.judge-io/results/ holds one <id>.json for every candidate
+id across all batch files; re-dispatch a subagent for any that are missing. Then write a one-line
+confirmation ("judged <count> candidates") as your final answer — that is what the harness collects.

@@ -1,0 +1,1 @@
+{"design":4,"clarity":5,"robustness":4,"notes":"Well-separated array/object comparators with proper unknown narrowing and NaN/array-vs-object handling; no special handling for Date/Map but spec limits scope to plain structures."}

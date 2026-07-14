@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Tidy mutating refill with correct capacity capping and good fractional-refill test coverage, though it uses a '@/lib/clock' alias rather than the spec's relative path."}

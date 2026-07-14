@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Clean recursive-descent parser with a tidy try/catch-to-Result boundary and thorough tests; the boxed [number] index cursor is a slightly unusual mutation choice."}

@@ -1,0 +1,61 @@
+// FILE: impl.ts
+export function createAsyncMemo<K, V>(fn: (key: K) => Promise<V>): (key: K) => Promise<V> {
+  const cache = new Map<K, Promise<V>>();
+  return (key: K): Promise<V> => {
+    const existing = cache.get(key);
+    if (existing !== undefined) return existing;
+    const p = fn(key);
+    p.catch(() => cache.delete(key));
+    cache.set(key, p);
+    return p;
+  };
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it, vi } from 'vitest';
+
+import { createAsyncMemo } from './impl';
+
+describe('createAsyncMemo', () => {
+  it('should dedup concurrent calls so fn runs exactly once when the same key is requested simultaneously', async () => {
+    const fn = vi.fn(async (key: string) => {
+      await new Promise(resolve => setTimeout(resolve, 50));
+      return `value-${key}`;
+    });
+
+    const memoized = createAsyncMemo(fn);
+    const [res1, res2] = await Promise.all([memoized('a'), memoized('a')]);
+
+    expect(fn).toHaveBeenCalledTimes(1);
+    expect(res1).toBe('value-a');
+    expect(res2).toBe('value-a');
+  });
+
+  it('should retry fn when a prior call rejects and the key is requested again', async () => {
+    let callCount = 0;
+    const fn = vi.fn(async (key: string) => {
+      callCount++;
+      if (callCount === 1) throw new Error('first fail');
+      return `value-${key}`;
+    });
+
+    const memoized = createAsyncMemo(fn);
+    await expect(memoized('b')).rejects.toThrow('first fail');
+    expect(callCount).toBe(1);
+
+    const res = await memoized('b');
+    expect(callCount).toBe(2);
+    expect(res).toBe('value-b');
+  });
+
+  it('should cache successes so fn is not called again when the same key is requested after resolution', async () => {
+    const fn = vi.fn(async (key: string) => `cached-${key}`);
+    const memoized = createAsyncMemo(fn);
+
+    await memoized('c');
+    expect(fn).toHaveBeenCalledTimes(1);
+
+    await memoized('c');
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+});

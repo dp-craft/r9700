@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Correct dedup/retry with an eviction .catch, though attaching it as a side branch on the original promise is slightly less clean than caching the wrapped one."}

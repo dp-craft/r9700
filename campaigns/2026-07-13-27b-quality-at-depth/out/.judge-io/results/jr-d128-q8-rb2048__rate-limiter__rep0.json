@@ -1,0 +1,1 @@
+{"design":5,"clarity":5,"robustness":4,"notes":"Clean immutable-bucket decomposition into well-named pure helpers; comprehensive tests."}

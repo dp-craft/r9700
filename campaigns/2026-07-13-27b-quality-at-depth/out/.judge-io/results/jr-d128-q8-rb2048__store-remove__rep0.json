@@ -1,0 +1,1 @@
+{"design":4,"clarity":5,"robustness":5,"notes":"Correct has()-based guard and a test explicitly covering the amounts-cancel-to-zero edge case."}

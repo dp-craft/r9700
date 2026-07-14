@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":5,"notes":"Compact recursive structure with exhaustive, well-organized tests covering NaN, array-vs-object, null, undefined and nested cases, though the 'a!==a && b!==b' NaN check is slightly cryptic."}

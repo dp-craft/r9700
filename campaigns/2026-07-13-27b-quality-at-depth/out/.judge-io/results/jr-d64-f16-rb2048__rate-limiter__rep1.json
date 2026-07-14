@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":3,"notes":"Readable mutable-bucket approach but calls clock.now() twice on first acquire and lacks any guard against negative elapsed time."}

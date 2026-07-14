@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Caches the catch-chained promise so rejection cleanup and re-throw ordering are clean; tests clearly cover dedup, retry-after-reject, and success caching."}

@@ -1,1 +1,1 @@
-{"design":4,"clarity":4,"robustness":5,"notes":"ok"}
+{"design":5,"clarity":5,"robustness":4,"notes":"Clean immutable BucketState with a pure refill helper and a Math.max(0,...) guard against backward clock drift; writes back refilled state even on reject."}

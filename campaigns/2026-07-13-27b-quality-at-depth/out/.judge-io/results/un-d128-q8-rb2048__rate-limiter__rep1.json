@@ -1,0 +1,1 @@
+{"design":4,"clarity":3,"robustness":4,"notes":"Compact and correct, but the comma-operator return trick obscures the acquire logic unnecessarily."}

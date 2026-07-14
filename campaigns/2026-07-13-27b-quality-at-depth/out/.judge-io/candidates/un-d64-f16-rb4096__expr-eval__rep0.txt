@@ -1,0 +1,172 @@
+// FILE: impl.ts
+export type Result =
+  | { readonly ok: true; readonly value: number }
+  | { readonly ok: false; readonly error: string };
+
+class Parser {
+  private pos = 0;
+  private readonly input: string;
+
+  constructor(input: string) {
+    this.input = input;
+  }
+
+  parse(): Result {
+    try {
+      const val = this.expr();
+      this.skipWhitespace();
+      if (this.pos < this.input.length) {
+        return { ok: false, error: 'Unexpected character' };
+      }
+      return { ok: true, value: val };
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : 'Parse error' };
+    }
+  }
+
+  private skipWhitespace(): void {
+    while (this.pos < this.input.length && /\s/.test(this.input[this.pos])) {
+      this.pos++;
+    }
+  }
+
+  private consume(expected: string): void {
+    this.skipWhitespace();
+    const ch = this.input[this.pos];
+    if (ch !== expected) {
+      throw new Error(`Expected '${expected}', got '${ch}'`);
+    }
+    this.pos++;
+  }
+
+  private expr(): number {
+    let result = this.term();
+    while (true) {
+      this.skipWhitespace();
+      const op = this.input[this.pos];
+      if (op !== '+' && op !== '-') break;
+      this.pos++;
+      result = op === '+' ? result + this.term() : result - this.term();
+    }
+    return result;
+  }
+
+  private term(): number {
+    let result = this.factor();
+    while (true) {
+      this.skipWhitespace();
+      const op = this.input[this.pos];
+      if (op !== '*' && op !== '/') break;
+      this.pos++;
+      const right = this.factor();
+      if (op === '/') {
+        if (right === 0) throw new Error('Division by zero');
+        result = result / right;
+      } else {
+        result = result * right;
+      }
+    }
+    return result;
+  }
+
+  private factor(): number {
+    this.skipWhitespace();
+    if (this.input[this.pos] === '(') {
+      this.pos++;
+      const val = this.expr();
+      this.consume(')');
+      return val;
+    }
+    return this.number();
+  }
+
+  private number(): number {
+    this.skipWhitespace();
+    const start = this.pos;
+    if (!/^\d/.test(this.input[this.pos] ?? '')) {
+      throw new Error('Expected number');
+    }
+    while (/\d/.test(this.input[this.pos] ?? '')) {
+      this.pos++;
+    }
+    const val = Number.parseInt(this.input.slice(start, this.pos), 10);
+    if (Number.isNaN(val)) throw new Error('Invalid number');
+    return val;
+  }
+}
+
+export function evaluate(expr: string): Result {
+  return new Parser(expr).parse();
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it } from 'vitest';
+import { evaluate } from './impl';
+
+describe('evaluate', () => {
+  it('should return correct value for simple addition when given valid expression', () => {
+    const result = evaluate('2 + 3');
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe(5);
+  });
+
+  it('should respect operator precedence when mixing + and *', () => {
+    const result = evaluate('2 + 3 * 4');
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe(14);
+  });
+
+  it('should evaluate left-associatively when subtracting multiple times', () => {
+    const result = evaluate('10 - 3 - 2');
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe(5);
+  });
+
+  it('should evaluate left-associatively when dividing multiple times', () => {
+    const result = evaluate('8 / 2 / 2');
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe(2);
+  });
+
+  it('should evaluate parentheses correctly when overriding precedence', () => {
+    const result = evaluate('(2 + 3) * 4');
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe(20);
+  });
+
+  it('should ignore arbitrary whitespace when parsing expression', () => {
+    const result = evaluate('  10  +  20  ');
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe(30);
+  });
+
+  it('should return error on division by zero when divisor is 0', () => {
+    const result = evaluate('10 / 0');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toBe('Division by zero');
+  });
+
+  it('should return error on unbalanced parentheses when missing closing paren', () => {
+    const result = evaluate('(2 + 3');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain('Expected');
+  });
+
+  it('should return error on missing operand when operator is at end', () => {
+    const result = evaluate('2 +');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain('Expected');
+  });
+
+  it('should return error on unexpected character when given invalid input', () => {
+    const result = evaluate('2 + a');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain('Expected');
+  });
+
+  it('should return error on empty string when input is empty', () => {
+    const result = evaluate('');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain('Expected');
+  });
+});

@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Well-factored with an extracted refill helper and named default constant; straightforward lazy-refill token bucket."}

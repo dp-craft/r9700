@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Concise, correct standard pattern with a side-channel catch for cache eviction; covers all three required behaviors in tight tests."}

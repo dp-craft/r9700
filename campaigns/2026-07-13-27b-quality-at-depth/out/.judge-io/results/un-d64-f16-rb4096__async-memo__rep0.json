@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Deliberate tracked-promise that deletes-and-rethrows on rejection; clean and explicit."}

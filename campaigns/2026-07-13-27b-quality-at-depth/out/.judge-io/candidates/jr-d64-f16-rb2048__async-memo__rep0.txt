@@ -1,0 +1,50 @@
+// FILE: impl.ts
+export function createAsyncMemo<K, V>(fn: (key: K) => Promise<V>): (key: K) => Promise<V> {
+  const cache = new Map<K, Promise<V>>();
+  return (key: K): Promise<V> => {
+    const cached = cache.get(key);
+    if (cached !== undefined) return cached;
+    const p = fn(key);
+    cache.set(key, p);
+    p.catch(() => cache.delete(key));
+    return p;
+  };
+}
+
+// FILE: impl.test.ts
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { createAsyncMemo } from './impl';
+
+describe('createAsyncMemo', () => {
+  let fnMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fnMock = vi.fn(async (key: string) => `value-${key}`);
+  });
+
+  it('should dedup concurrent calls when same key is requested', async () => {
+    const memoized = createAsyncMemo(fnMock);
+    const p1 = memoized('a');
+    const p2 = memoized('a');
+    const result = await p1;
+    expect(result).toBe('value-a');
+    expect(p1).toBe(p2);
+    expect(fnMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('should retry fn when previous call rejects', async () => {
+    fnMock.mockRejectedValueOnce(new Error('fail'));
+    const memoized = createAsyncMemo(fnMock);
+    await expect(memoized('a')).rejects.toThrow('fail');
+    await expect(memoized('a')).resolves.toBe('value-a');
+    expect(fnMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('should cache successes when fn resolves', async () => {
+    const memoized = createAsyncMemo(fnMock);
+    await memoized('a');
+    await memoized('a');
+    expect(fnMock).toHaveBeenCalledTimes(1);
+  });
+});

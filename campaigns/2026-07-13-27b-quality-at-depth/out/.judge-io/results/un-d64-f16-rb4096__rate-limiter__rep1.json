@@ -1,0 +1,1 @@
+{"design":4,"clarity":3,"robustness":4,"notes":"Correct immutable-refill approach but dense one-liners, a magic 1000, single-letter names and a let that should be const hurt readability."}

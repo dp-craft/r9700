@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Elegant Map-insertion-order LRU, though size:getSize exposes the function rather than a number getter and vi/buildClock imports are unused."}

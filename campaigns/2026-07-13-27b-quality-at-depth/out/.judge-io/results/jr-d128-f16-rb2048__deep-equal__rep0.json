@@ -1,0 +1,1 @@
+{"design":4,"clarity":5,"robustness":4,"notes":"Clean extracted arrayEqual/objectEqual helpers with correct type guards; the redundant keysB.includes alongside the length check is a minor wart."}

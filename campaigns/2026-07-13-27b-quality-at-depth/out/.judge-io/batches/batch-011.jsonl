@@ -1,0 +1,8 @@
+{"id": "jr-d64-f16-rb2048__expr-eval__rep0", "spec": "ts-harness/tasks/expr-eval/spec.md", "code": "out/.judge-io/candidates/jr-d64-f16-rb2048__expr-eval__rep0.txt"}
+{"id": "jr-d64-f16-rb2048__expr-eval__rep1", "spec": "ts-harness/tasks/expr-eval/spec.md", "code": "out/.judge-io/candidates/jr-d64-f16-rb2048__expr-eval__rep1.txt"}
+{"id": "jr-d128-f16-rb2048__lru-cache__rep0", "spec": "ts-harness/tasks/lru-cache/spec.md", "code": "out/.judge-io/candidates/jr-d128-f16-rb2048__lru-cache__rep0.txt"}
+{"id": "jr-d128-f16-rb2048__lru-cache__rep1", "spec": "ts-harness/tasks/lru-cache/spec.md", "code": "out/.judge-io/candidates/jr-d128-f16-rb2048__lru-cache__rep1.txt"}
+{"id": "jr-d128-f16-rb2048__rate-limiter__rep0", "spec": "ts-harness/tasks/rate-limiter/spec.md", "code": "out/.judge-io/candidates/jr-d128-f16-rb2048__rate-limiter__rep0.txt"}
+{"id": "jr-d128-f16-rb2048__rate-limiter__rep1", "spec": "ts-harness/tasks/rate-limiter/spec.md", "code": "out/.judge-io/candidates/jr-d128-f16-rb2048__rate-limiter__rep1.txt"}
+{"id": "jr-d128-f16-rb2048__store-remove__rep0", "spec": "ts-harness/tasks/store-remove/spec.md", "code": "out/.judge-io/candidates/jr-d128-f16-rb2048__store-remove__rep0.txt"}
+{"id": "jr-d128-f16-rb2048__store-remove__rep1", "spec": "ts-harness/tasks/store-remove/spec.md", "code": "out/.judge-io/candidates/jr-d128-f16-rb2048__store-remove__rep1.txt"}

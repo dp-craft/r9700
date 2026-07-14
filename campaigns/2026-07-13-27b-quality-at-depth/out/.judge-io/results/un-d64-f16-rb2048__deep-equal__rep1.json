@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":3,"notes":"Cleaner narrowing with .every, but comparing values without a key-existence check misses cases like {a:undefined} vs {b:undefined}."}

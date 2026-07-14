@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Clean tokenizer plus recursive-descent parser with EOF sentinel; mixes internal throw/catch with the Result API and omits unary handling."}

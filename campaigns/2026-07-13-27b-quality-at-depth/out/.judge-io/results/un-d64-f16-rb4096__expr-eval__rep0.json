@@ -1,0 +1,1 @@
+{"design":4,"clarity":5,"robustness":4,"notes":"Idiomatic class-based recursive-descent parser with exceptions caught at the boundary; very readable."}

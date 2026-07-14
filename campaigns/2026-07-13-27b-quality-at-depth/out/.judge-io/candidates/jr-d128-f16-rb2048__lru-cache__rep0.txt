@@ -1,0 +1,251 @@
+// FILE: impl.ts
+import type { Clock } from '../../lib/clock';
+
+interface Entry<V> {
+  readonly value: V;
+  readonly expiresAt: number;
+}
+
+interface CacheState<K, V> {
+  readonly map: Map<K, Entry<V>>;
+  readonly capacity: number;
+  readonly ttlMs: number;
+  readonly clock: Clock;
+  liveSize: number;
+}
+
+function isExpired<V>(entry: Entry<V>, clock: Clock): boolean {
+  return clock.now() >= entry.expiresAt;
+}
+
+function evictLru<K, V>(state: CacheState<K, V>): void {
+  const firstKey = state.map.keys().next().value;
+  if (firstKey === undefined) return;
+
+  const firstEntry = state.map.get(firstKey);
+  if (firstEntry !== undefined && !isExpired(firstEntry, state.clock)) {
+    state.liveSize -= 1;
+  }
+  state.map.delete(firstKey);
+}
+
+export interface LruCache<K, V> {
+  get(key: K): V | undefined;
+  set(key: K, value: V): void;
+  has(key: K): boolean;
+  readonly size: number;
+}
+
+export function createLruCache<K, V>(
+  capacity: number,
+  ttlMs: number,
+  clock: Clock
+): LruCache<K, V> {
+  const state: CacheState<K, V> = {
+    map: new Map(),
+    capacity,
+    ttlMs,
+    clock,
+    liveSize: 0,
+  };
+
+  return {
+    get(key: K): V | undefined {
+      const entry = state.map.get(key);
+      if (entry === undefined) return undefined;
+
+      if (isExpired(entry, state.clock)) {
+        state.map.delete(key);
+        state.liveSize -= 1;
+        return undefined;
+      }
+
+      state.map.delete(key);
+      state.map.set(key, entry);
+      return entry.value;
+    },
+
+    set(key: K, value: V): void {
+      const existing = state.map.get(key);
+      const now = state.clock.now();
+
+      if (existing !== undefined) {
+        if (isExpired(existing, state.clock)) {
+          state.liveSize -= 1;
+        }
+      } else {
+        state.liveSize += 1;
+      }
+
+      state.map.set(key, { value, expiresAt: now + state.ttlMs });
+
+      while (state.liveSize > state.capacity) {
+        evictLru(state);
+      }
+    },
+
+    has(key: K): boolean {
+      const entry = state.map.get(key);
+      if (entry === undefined) return false;
+
+      if (isExpired(entry, state.clock)) {
+        state.map.delete(key);
+        state.liveSize -= 1;
+        return false;
+      }
+
+      return true;
+    },
+
+    get size(): number {
+      return state.liveSize;
+    },
+  };
+}
+
+// FILE: impl.test.ts
+import { beforeEach, describe, expect, it } from 'vitest';
+
+import type { Clock } from '../../lib/clock';
+import { createLruCache } from './impl';
+
+const buildFakeClock = (now: number = 0): Clock & { tick: (ms: number) => void } => {
+  let current = now;
+  return {
+    now: () => current,
+    tick: (ms: number) => { current += ms; },
+  };
+};
+
+describe('createLruCache', () => {
+  let clock: Clock & { tick: (ms: number) => void };
+  let cache: ReturnType<typeof createLruCache<string, number>>;
+
+  beforeEach(() => {
+    clock = buildFakeClock();
+    cache = createLruCache(2, 100, clock);
+  });
+
+  describe('get', () => {
+    it('should return undefined when key is absent', () => {
+      expect(cache.get('a')).toBeUndefined();
+    });
+
+    it('should return value and refresh recency when key is present', () => {
+      cache.set('a', 1);
+      cache.set('b', 2);
+
+      const val = cache.get('a');
+      expect(val).toBe(1);
+
+      cache.set('c', 3);
+      expect(cache.get('a')).toBe(1);
+      expect(cache.get('b')).toBeUndefined();
+    });
+
+    it('should return undefined and remove entry when key is expired', () => {
+      cache.set('a', 1);
+      clock.tick(100);
+
+      expect(cache.get('a')).toBeUndefined();
+      expect(cache.size).toBe(0);
+    });
+  });
+
+  describe('has', () => {
+    it('should return false when key is absent', () => {
+      expect(cache.has('a')).toBe(false);
+    });
+
+    it('should return true when key is present', () => {
+      cache.set('a', 1);
+      expect(cache.has('a')).toBe(true);
+    });
+
+    it('should return false and remove entry when key is expired', () => {
+      cache.set('a', 1);
+      clock.tick(100);
+
+      expect(cache.has('a')).toBe(false);
+      expect(cache.size).toBe(0);
+    });
+  });
+
+  describe('size', () => {
+    it('should return 0 when empty', () => {
+      expect(cache.size).toBe(0);
+    });
+
+    it('should return 1 when one live entry', () => {
+      cache.set('a', 1);
+      expect(cache.size).toBe(1);
+    });
+
+    it('should return 0 when entry is expired', () => {
+      cache.set('a', 1);
+      clock.tick(100);
+      expect(cache.size).toBe(0);
+    });
+  });
+
+  describe('set', () => {
+    it('should evict LRU live entry when capacity is exceeded', () => {
+      cache.set('a', 1);
+      cache.set('b', 2);
+      cache.set('c', 3);
+
+      expect(cache.size).toBe(2);
+      expect(cache.get('a')).toBeUndefined();
+      expect(cache.get('b')).toBe(2);
+      expect(cache.get('c')).toBe(3);
+    });
+
+    it('should evict expired entry from front before live entry when capacity is exceeded', () => {
+      cache.set('a', 1);
+      clock.tick(100);
+
+      cache.set('b', 2);
+      cache.set('c', 3);
+
+      expect(cache.size).toBe(2);
+      expect(cache.get('b')).toBe(2);
+      expect(cache.get('c')).toBe(3);
+    });
+
+    it('should update entry and refresh recency when set is called on existing key', () => {
+      cache.set('a', 1);
+      cache.set('b', 2);
+      cache.set('a', 10);
+
+      expect(cache.get('a')).toBe(10);
+      cache.set('c', 3);
+      expect(cache.get('b')).toBeUndefined();
+      expect(cache.get('a')).toBe(10);
+      expect(cache.get('c')).toBe(3);
+    });
+
+    it('should update entry and increment size when existing key was expired', () => {
+      cache.set('a', 1);
+      clock.tick(100);
+
+      cache.set('b', 2);
+      cache.set('a', 10);
+
+      expect(cache.size).toBe(2);
+      expect(cache.get('a')).toBe(10);
+      expect(cache.get('b')).toBe(2);
+    });
+  });
+
+  describe('capacity edge', () => {
+    it('should handle capacity of 1', () => {
+      const singleCache = createLruCache(1, 100, clock);
+      singleCache.set('a', 1);
+      singleCache.set('b', 2);
+
+      expect(singleCache.size).toBe(1);
+      expect(singleCache.get('a')).toBeUndefined();
+      expect(singleCache.get('b')).toBe(2);
+    });
+  });
+});

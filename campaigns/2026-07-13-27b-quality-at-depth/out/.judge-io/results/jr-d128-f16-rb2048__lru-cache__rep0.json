@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":3,"notes":"Elegant O(1) Map-order recency, but the eager liveSize counter goes stale on passive TTL expiry that no operation has touched."}

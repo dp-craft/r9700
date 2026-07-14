@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Efficient in-place reverse-splice removal, correct and well-tested though slightly less obvious than a filter."}

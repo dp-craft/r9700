@@ -1,0 +1,96 @@
+// FILE: store.ts
+export interface Entry {
+  readonly key: string;
+  readonly amount: number;
+}
+
+export interface Store {
+  add(entry: Entry): void;
+  total(key: string): number;
+  all(): readonly Entry[];
+  remove(key: string): void;
+}
+
+class StoreImpl implements Store {
+  private readonly entries: Entry[] = [];
+  private readonly totals = new Map<string, number>();
+
+  add(entry: Entry): void {
+    this.entries.push(entry);
+    this.totals.set(entry.key, (this.totals.get(entry.key) ?? 0) + entry.amount);
+  }
+
+  total(key: string): number {
+    return this.totals.get(key) ?? 0;
+  }
+
+  all(): readonly Entry[] {
+    return this.entries;
+  }
+
+  remove(key: string): void {
+    for (let i = this.entries.length - 1; i >= 0; i--) {
+      if (this.entries[i].key === key) {
+        this.entries.splice(i, 1);
+      }
+    }
+    this.totals.delete(key);
+  }
+}
+
+export function createStore(): Store {
+  return new StoreImpl();
+}
+
+// FILE: store.test.ts
+import { describe, it, expect } from "vitest";
+import { createStore } from "./store";
+
+describe("createStore", () => {
+  it("should accumulate the cached total when entries share a key", () => {
+    const s = createStore();
+    s.add({ key: "a", amount: 2 });
+    s.add({ key: "a", amount: 3 });
+    expect(s.total("a")).toBe(5);
+  });
+
+  describe("remove", () => {
+    it("should delete all entries with the given key when they exist", () => {
+      const s = createStore();
+      s.add({ key: "a", amount: 2 });
+      s.add({ key: "a", amount: 3 });
+      s.add({ key: "b", amount: 5 });
+      s.remove("a");
+
+      expect(s.total("a")).toBe(0);
+      expect(s.all().length).toBe(1);
+      expect(s.all()[0]?.key).toBe("b");
+    });
+
+    it("should leave other keys' totals unchanged when removing a key", () => {
+      const s = createStore();
+      s.add({ key: "a", amount: 2 });
+      s.add({ key: "b", amount: 5 });
+      s.remove("a");
+
+      expect(s.total("b")).toBe(5);
+    });
+
+    it("should be a no-op when removing a key that has no entries", () => {
+      const s = createStore();
+      s.add({ key: "a", amount: 2 });
+      s.remove("z");
+
+      expect(s.total("a")).toBe(2);
+      expect(s.all().length).toBe(1);
+    });
+
+    it("should return 0 for the removed key's total after removal", () => {
+      const s = createStore();
+      s.add({ key: "x", amount: 10 });
+      s.remove("x");
+
+      expect(s.total("x")).toBe(0);
+    });
+  });
+});

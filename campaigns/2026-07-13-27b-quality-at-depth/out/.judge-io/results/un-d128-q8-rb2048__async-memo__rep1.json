@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Works via a side-attached .catch that deletes on rejection, slightly less tidy than chaining the caught promise."}

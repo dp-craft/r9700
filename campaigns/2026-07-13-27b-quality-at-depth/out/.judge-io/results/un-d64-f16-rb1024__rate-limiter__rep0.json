@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Straightforward mutating bucket with lazy default-full init; tests are thorough covering custom token amounts and per-key isolation."}

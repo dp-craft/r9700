@@ -1,0 +1,135 @@
+// FILE: impl.ts
+type Token =
+  | { readonly kind: 'NUMBER'; readonly value: number }
+  | { readonly kind: 'PLUS' }
+  | { readonly kind: 'MINUS' }
+  | { readonly kind: 'STAR' }
+  | { readonly kind: 'SLASH' }
+  | { readonly kind: 'LPAREN' }
+  | { readonly kind: 'RPAREN' }
+  | { readonly kind: 'ERROR'; readonly message: string }
+  | { readonly kind: 'EOF' };
+
+type Result =
+  | { readonly ok: true; readonly value: number }
+  | { readonly ok: false; readonly error: string };
+
+function fail(msg: string): Result {
+  return { ok: false, error: msg };
+}
+
+function ok(val: number): Result {
+  return { ok: true, value: val };
+}
+
+function tokenize(input: string): readonly Token[] {
+  const tokens: Token[] = [];
+  let i = 0;
+  while (i < input.length) {
+    const ch = input[i];
+    if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r') {
+      i++;
+      continue;
+    }
+    if (ch >= '0' && ch <= '9') {
+      let num = 0;
+      while (i < input.length && input[i] >= '0' && input[i] <= '9') {
+        num = num * 10 + (input.charCodeAt(i) - '0'.charCodeAt(0));
+        i++;
+      }
+      tokens.push({ kind: 'NUMBER', value: num });
+      continue;
+    }
+    if (ch === '+') { tokens.push({ kind: 'PLUS' }); i++; continue; }
+    if (ch === '-') { tokens.push({ kind: 'MINUS' }); i++; continue; }
+    if (ch === '*') { tokens.push({ kind: 'STAR' }); i++; continue; }
+    if (ch === '/') { tokens.push({ kind: 'SLASH' }); i++; continue; }
+    if (ch === '(') { tokens.push({ kind: 'LPAREN' }); i++; continue; }
+    if (ch === ')') { tokens.push({ kind: 'RPAREN' }); i++; continue; }
+    tokens.push({ kind: 'ERROR', message: `Unexpected character: ${ch}` });
+    break;
+  }
+  tokens.push({ kind: 'EOF' });
+  return tokens;
+}
+
+function parseExpr(
+  tokens: readonly Token[],
+  pos: number,
+): Result {
+  let left = parseTerm(tokens, pos);
+  if (!left.ok) return left;
+  let curPos = pos;
+  let curToken = tokens[curPos];
+  while (curToken.kind === 'PLUS' || curToken.kind === 'MINUS') {
+    curPos++;
+    const right = parseTerm(tokens, curPos);
+    if (!right.ok) return right;
+    if (curToken.kind === 'PLUS') {
+      left = ok(left.value + right.value);
+    } else {
+      left = ok(left.value - right.value);
+    }
+    curToken = tokens[curPos];
+  }
+  return left;
+}
+
+function parseTerm(
+  tokens: readonly Token[],
+  pos: number,
+): Result {
+  let left = parseFactor(tokens, pos);
+  if (!left.ok) return left;
+  let curPos = pos;
+  let curToken = tokens[curPos];
+  while (curToken.kind === 'STAR' || curToken.kind === 'SLASH') {
+    curPos++;
+    const right = parseFactor(tokens, curPos);
+    if (!right.ok) return right;
+    if (curToken.kind === 'STAR') {
+      left = ok(left.value * right.value);
+    } else {
+      if (right.value === 0) return fail('Division by zero');
+      left = ok(left.value / right.value);
+    }
+    curToken = tokens[curPos];
+  }
+  return left;
+}
+
+function parseFactor(
+  tokens: readonly Token[],
+  pos: number,
+): Result {
+  const token = tokens[pos];
+  if (token.kind === 'ERROR') return fail(token.message);
+  if (token.kind === 'NUMBER') return ok(token.value);
+  if (token.kind === 'PLUS') return parseFactor(tokens, pos + 1);
+  if (token.kind === 'MINUS') {
+    const inner = parseFactor(tokens, pos + 1);
+    if (!inner.ok) return inner;
+    return ok(-inner.value);
+  }
+  if (token.kind === 'LPAREN') {
+    const inner = parseExpr(tokens, pos + 1);
+    if (!inner.ok) return inner;
+    const close = tokens[pos + 1 + 1];
+    if (close.kind !== 'RPAREN') return fail('Unbalanced parentheses');
+    return inner;
+  }
+  if (token.kind === 'EOF') return fail('Missing operand');
+  return fail('Unexpected token');
+}
+
+function evaluate(expr: string): Result {
+  if (expr.trim().length === 0) return fail('Empty expression');
+  const tokens = tokenize(expr);
+  const result = parseExpr(tokens, 0);
+  if (!result.ok) return result;
+  const nextToken = tokens.find(t => t.kind !== 'NUMBER' && t.kind !== 'PLUS' && t.kind !== 'MINUS' && t.kind !== 'STAR' && t.kind !== 'SLASH' && t.kind !== 'LPAREN' && t.kind !== 'RPAREN');
+  if (nextToken && nextToken.kind !== 'EOF') return fail('Unexpected token after expression');
+  return result;
+}
+
+export { type Result, evaluate };

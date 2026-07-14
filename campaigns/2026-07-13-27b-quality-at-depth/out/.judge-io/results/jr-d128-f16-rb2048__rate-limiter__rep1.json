@@ -1,0 +1,1 @@
+{"design":3,"clarity":4,"robustness":2,"notes":"Flooring the refill while advancing lastRefillAt each call silently discards sub-token elapsed time, so slow-refill buckets never accrue fractional progress."}

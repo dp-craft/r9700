@@ -1,1 +1,1 @@
-{"design":4,"clarity":4,"robustness":5,"notes":"ok"}
+{"design":5,"clarity":5,"robustness":4,"notes":"Minimal, exactly-right fix: caches the in-flight promise and evicts on rejection so failures retry while successes stick."}

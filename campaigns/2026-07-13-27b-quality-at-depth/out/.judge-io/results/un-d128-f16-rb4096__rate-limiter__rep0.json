@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Clean separation into ensureBucket/refillBucket with correct lazy-refill capping and spec-matching relative import; tests cover burst, refill, cap, per-key, and custom tokens."}

@@ -1,0 +1,82 @@
+// FILE: impl.ts
+export function createAsyncMemo<K, V>(fn: (key: K) => Promise<V>): (key: K) => Promise<V> {
+  const cache = new Map<K, Promise<V>>();
+
+  return (key: K): Promise<V> => {
+    const cached = cache.get(key);
+    if (cached !== undefined) {
+      return cached;
+    }
+
+    const p = fn(key).catch((err: unknown) => {
+      cache.delete(key);
+      throw err;
+    });
+
+    cache.set(key, p);
+    return p;
+  };
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it, vi } from 'vitest';
+import { createAsyncMemo } from './impl';
+
+describe('createAsyncMemo', () => {
+  it('should dedup concurrent calls when key is the same', async () => {
+    let callCount = 0;
+    const fn = vi.fn(async (key: string) => {
+      callCount += 1;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      return `value-${key}`;
+    });
+
+    const memoized = createAsyncMemo(fn);
+
+    const [a, b, c] = await Promise.all([
+      memoized('x'),
+      memoized('x'),
+      memoized('x'),
+    ]);
+
+    expect(a).toBe('value-x');
+    expect(b).toBe('value-x');
+    expect(c).toBe('value-x');
+    expect(callCount).toBe(1);
+  });
+
+  it('should retry fn after rejection when key is the same', async () => {
+    let callCount = 0;
+    const fn = vi.fn(async (key: string) => {
+      callCount += 1;
+      if (callCount === 1) throw new Error('fail');
+      return `value-${key}`;
+    });
+
+    const memoized = createAsyncMemo(fn);
+
+    await expect(memoized('x')).rejects.toThrow('fail');
+    expect(callCount).toBe(1);
+
+    const result = await memoized('x');
+    expect(result).toBe('value-x');
+    expect(callCount).toBe(2);
+  });
+
+  it('should cache successes when key is the same', async () => {
+    let callCount = 0;
+    const fn = vi.fn(async (key: string) => {
+      callCount += 1;
+      return `value-${key}`;
+    });
+
+    const memoized = createAsyncMemo(fn);
+
+    const a = await memoized('x');
+    const b = await memoized('x');
+
+    expect(a).toBe('value-x');
+    expect(b).toBe('value-x');
+    expect(callCount).toBe(1);
+  });
+});

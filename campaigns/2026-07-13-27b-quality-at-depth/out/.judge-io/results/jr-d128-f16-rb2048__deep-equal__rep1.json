@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Correct and readable but leans on inline type assertions and ends with an unreachable trailing return."}

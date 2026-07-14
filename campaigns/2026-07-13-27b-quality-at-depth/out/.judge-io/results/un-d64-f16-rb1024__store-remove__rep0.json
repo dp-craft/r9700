@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Idiomatic backward-splice in-place removal plus totals.delete, with well-organized nested tests covering the no-op and isolation cases."}

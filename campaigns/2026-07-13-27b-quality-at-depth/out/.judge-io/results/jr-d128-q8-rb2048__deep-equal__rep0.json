@@ -1,1 +1,1 @@
-{"design":4,"clarity":4,"robustness":5,"notes":"ok"}
+{"design":5,"clarity":5,"robustness":5,"notes":"Well-ordered guards, clean helper split, and thorough tests covering NaN, null, and array-vs-object cases."}
