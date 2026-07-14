@@ -207,7 +207,7 @@ This task is complete once analysis.md is fully written. Your final answer (the 
 asks for) is just a one-line confirmation, e.g. "analysis.md written (N cells)".
 EOF
   bash "$HERE/claude_ask.sh" --prompt "$sp" --result "$OUTDIR/summary_result.txt" \
-    --cwd "$REPO" --model "$SUMMARY_MODEL" --permission-mode acceptEdits \
+    --cwd "$REPO" --model "$SUMMARY_MODEL" --permission-mode bypassPermissions \
     && echo "  analysis.md written by claude" \
     || echo "  summary step failed (see $OUTDIR/summary_result.txt.err)"
   # reindex is deterministic — do it here, not via the model

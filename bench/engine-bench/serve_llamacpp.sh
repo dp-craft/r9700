@@ -67,6 +67,20 @@ fi
 [ -x "$LLAMA_SERVER" ] || { echo "llama-server not found/executable: $LLAMA_SERVER" >&2; exit 1; }
 [ -f "$MODEL" ] || { echo "model not found: $MODEL" >&2; exit 1; }
 
+# GUARD: refuse to start if a FOREIGN process is already serving this port. Our pidfile check above
+# only knows about servers WE launched; a stale/hand-started llama-server (or anything answering
+# /health) would otherwise make the health-wait below exit 0 on its first poll — so we'd think WE
+# came up while our real server silently died on the bind, and every request would hit the wrong
+# model. (This exact incident: a 35B server left on :8081 answered for a whole 27B run.)
+if curl -sf -m 2 "http://localhost:$PORT/health" >/dev/null 2>&1; then
+  FOREIGN=$(curl -sf -m 5 "http://localhost:$PORT/props" 2>/dev/null \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin).get("model_path",""))' 2>/dev/null)
+  echo "port $PORT is ALREADY serving (foreign process) model: ${FOREIGN:-unknown}" >&2
+  echo "  refusing to start — free the port first:  ss -ltnp | grep :$PORT  → kill that pid" >&2
+  echo "  (or run on another port with PORT=...)" >&2
+  exit 1
+fi
+
 CMD=("$LLAMA_SERVER" -m "$MODEL" -c "$CTX" -np "$NP" -ngl "$NGL" -fa "$FA"
      -ub "$UB" -b "$B" -ctk "$KV" -ctv "$KV" --host 127.0.0.1 --port "$PORT")
 if [ "$MTP" = "1" ]; then CMD+=(--spec-type draft-mtp); fi
@@ -78,16 +92,24 @@ echo $! > "$PIDFILE"
 echo "starting on :$PORT (pid $(cat "$PIDFILE")) — log: $LOGFILE"
 
 for i in $(seq "$WAIT"); do
-  if curl -sf -m 2 "http://localhost:$PORT/health" >/dev/null 2>&1; then
-    BUILD=$(curl -sf -m 5 "http://localhost:$PORT/props" 2>/dev/null \
-      | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("build_info",""))' 2>/dev/null || true)
-    echo "up after ${i}s — build: ${BUILD:-unknown}"
-    echo "cmdline: $(cat "$CMDFILE")"
-    exit 0
-  fi
+  # check OUR pid FIRST — if the server we launched died (e.g. bind failure), fail now instead of
+  # possibly reading /health from some other process that holds the port.
   if ! kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
     echo "server DIED during startup — last log lines:" >&2
     tail -5 "$LOGFILE" >&2; rm -f "$PIDFILE"; exit 1
+  fi
+  if curl -sf -m 2 "http://localhost:$PORT/health" >/dev/null 2>&1; then
+    PROPS=$(curl -sf -m 5 "http://localhost:$PORT/props" 2>/dev/null)
+    SERVED=$(printf '%s' "$PROPS" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("model_path",""))' 2>/dev/null)
+    # confirm it is OUR model answering, not a foreign server that grabbed the port during the race
+    if [ -n "$SERVED" ] && [ "$(basename "$SERVED")" != "$(basename "$MODEL")" ]; then
+      echo "port $PORT is serving the WRONG model: $SERVED (expected $MODEL) — aborting" >&2
+      kill "$(cat "$PIDFILE")" 2>/dev/null || true; rm -f "$PIDFILE"; exit 1
+    fi
+    BUILD=$(printf '%s' "$PROPS" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("build_info",""))' 2>/dev/null || true)
+    echo "up after ${i}s — model: $(basename "${SERVED:-?}") — build: ${BUILD:-unknown}"
+    echo "cmdline: $(cat "$CMDFILE")"
+    exit 0
   fi
   sleep 1
 done

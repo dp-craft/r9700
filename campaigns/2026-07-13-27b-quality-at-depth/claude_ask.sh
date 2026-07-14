@@ -10,22 +10,26 @@
 # request that references it, so nothing large or multi-line is ever sent through the keyboard (a newline
 # would submit early). Completion is detected by watching RESULT_FILE settle — claude writes it with its
 # Write tool. Keep PROMPT_FILE/RESULT_FILE inside the repo tree and --cwd inside the repo so the session
-# lands in an already-trusted project (no folder-trust dialog) and RESULT_FILE is an in-workspace edit
-# that --permission-mode acceptEdits auto-approves.
+# lands in an already-trusted project (no folder-trust dialog). The session runs in bypassPermissions
+# mode so it can use Bash/Task/Write with NO approval prompts — these are UNATTENDED runs, and
+# acceptEdits only auto-approves file edits: it leaves Bash/tool calls waiting on a "1/2" prompt that
+# never comes, hanging the whole run (that is exactly how the first judge+summary pass timed out).
 #
 # Requires a pre-existing tmux session (default: claude-run); errors with the start command if absent —
 # it will NOT fall back to headless. Env knobs:
-#   CLAUDE_TMUX_SESSION   session to open the window in            (default claude-run)
-#   CLAUDE_ASK_TIMEOUT    seconds to wait for the answer file      (default 900)
-#   CLAUDE_ASK_STARTUP    seconds to let claude boot before typing (default 8)
-#   CLAUDE_ASK_STABLE     seconds RESULT_FILE size must hold steady to count as done (default 3)
+#   CLAUDE_TMUX_SESSION      session to open the window in            (default claude-run)
+#   CLAUDE_PERMISSION_MODE   permission mode (default bypassPermissions — unattended)
+#   CLAUDE_ASK_TIMEOUT       seconds to wait for the answer file      (default 900)
+#   CLAUDE_ASK_STARTUP       seconds to let claude boot before typing (default 8)
+#   CLAUDE_ASK_STABLE        seconds RESULT_FILE size must hold steady to count as done (default 3)
 set -uo pipefail
 : "${CLAUDE_TMUX_SESSION:=claude-run}"
+: "${CLAUDE_PERMISSION_MODE:=bypassPermissions}"
 : "${CLAUDE_ASK_TIMEOUT:=900}"
 : "${CLAUDE_ASK_STARTUP:=8}"
 : "${CLAUDE_ASK_STABLE:=3}"
 
-prompt="" result="" cwd="$PWD" model="" pmode="acceptEdits"
+prompt="" result="" cwd="$PWD" model="" pmode="$CLAUDE_PERMISSION_MODE"
 while [ $# -gt 0 ]; do
   case "$1" in
     --prompt) prompt="$2"; shift 2;;
