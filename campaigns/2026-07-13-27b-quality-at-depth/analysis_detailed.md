@@ -1,37 +1,36 @@
 <!-- meta
 date: 2026-07-14 19:30
 slug: 27b-quality-at-depth-detailed
-title: Qwen3.6-27B quality-at-depth — per-task deep dive + grader-bug correction (R9700)
-takeaway: DATA-CORRECTION report. The original run's headline (27B ≈ below-haiku, 0% hard-pass) was a HARNESS BUG — vitest failed to execute during grading, zeroing tests+edge on all 120 replies. Re-grading the identical outputs recovers the truth: per-cell TS 67-79% (was 24-33%), the 27B sits in the haiku->sonnet band and hard-passes up to 25%. Per-task: it writes correct, well-tested logic (tests 0.89, edge 0.95); the REAL wall is strict eslint/tsc (lint 0.29, types 0.32). Budget helps at 64k, saturates at 128k. KV q8 ~fine on average but tanks lru-cache and destabilizes output at 128k (think-tag leaks/truncation). Fastest-good config: un-d64-f16-rb2048.
+title: Qwen3.6-27B quality-at-depth — per-task deep dive (R9700)
+takeaway: Per-task deep dive. The 27B sits in the haiku->sonnet band (best cells 92-99% on deep-equal/store-remove); the REAL wall is strict eslint/tsc (lint 0.29, types 0.32), NOT logic (tests 0.89, edge 0.95). Reasoning budget helps at 64k, saturates at 128k (model never early-stops). KV q8 fine on average but tanks lru-cache and destabilises output at 128k (think-tag leaks/truncation). Fastest-good config: un-d64-f16-rb2048. DATA VALIDITY: the run's original grade was voided by a vitest execution fault (tests+edge=0 on all 120) — EXCLUDED from all analysis here; every number uses a clean CPU-only re-grade of the same saved answers. Harness fix + rerun steps in §1.
 -->
 
 # Qwen3.6-27B — quality at depth, **per-task deep dive** (R9700, gfx1201)
 
-> **Companion to [`analysis.md`](analysis.md).** That summary was written from the original run's
-> digest — which we now know was **corrupted by a grader bug**. This document (a) explains and
-> corrects the bug, and (b) breaks the results down **per task**, with parameter effects, every
-> blind-judge comment, best-config-per-task, and external research. **All numbers here use the
-> corrected re-grade** unless labelled "original".
+> **Companion to [`analysis.md`](analysis.md).** This is the per-task breakdown: parameter effects,
+> every blind-judge comment, best-config-per-task, and external research.
+>
+> **One dataset, stated up front.** The benchmark run's *original* grade was voided by a measurement
+> fault — the grader's `vitest` step failed to execute (see **[§1](#1-data-validity--one-voided-measurement)**).
+> **Every number, table, chart, and conclusion in this document uses a single clean dataset:** a
+> CPU-only re-grade of the *same saved model answers*. The voided grade is **excluded from all
+> analysis** and appears only once, as an auditable incident record in §1.4.
 
 - **Date:** 2026-07-14 · **Track:** engine-bench (quality-at-depth capture + blind judge) · **Reps:** 2
 - **Models:** `Qwen3.6-27B-MTP-Q4_K_M` (unsloth, `un-*`, MTP-on) · `Qwopus3.6-27B-v1-preview-Q4_K_M` (jackrong, `jr-*`, no MTP)
 - **Substrate (frozen, C1):** llama.cpp **Vulkan b9950**, `-ub 2048 -b 4096 -fa on`, prefix cache
 - **Tasks:** 6 TypeScript-TDD tasks × 10 configs × 2 reps = **120 graded replies**, inside **64k–128k tokens of real TypeScript**
-- **Data:** `out/` — original grade `scores_typescript.orig.jsonl`, **corrected** `scores_typescript_regraded.jsonl`, per-task digest `summary_by_task.json`; charts `charts/detailed/`
+- **Data (this analysis):** `out/scores_typescript_regraded.jsonl` (clean re-grade) → per-task digest `out/summary_by_task.json` → charts `charts/detailed/`. Voided run kept at `out/scores_typescript.orig.jsonl` (incident only, §1.4).
 - **Provenance:** `MEASURED` = our `out/*.jsonl` (re-graded with the repo grader); `CLAIMED` = external (cited); `INFERRED` = reasoning, marked as such.
 
 ---
 
 ## TL;DR (read this first)
 
-- 🛠️ **The original scores were wrong — a test-harness failure, not the model.** During the run,
-  **vitest never executed**, so the `tests` and `edge` objectives were **0.0 on all 120 replies**
-  (zero variance). Those two carry ~46% of the score weight and are hard-gate objectives → the run
-  reported the 27B at **24–33%** and **0% hard-pass**. *(MEASURED)*
-- ✅ **Re-grading the identical outputs recovers the truth.** `tests` 0.0→**0.89**, `edge` 0.0→**0.95**.
-  Per-cell **TS jumps to 67–79%** (+39 to +47 points). Best single reply = **100%**; the model
-  **hard-passes up to 25%** of a cell. *(MEASURED — see [§1](#1-the-test-harness-failure-and-the-fix))*
-- 📈 **Real capability: the 27B lives in the haiku→sonnet band.** Best cell **79%** vs haiku **74** /
+> ⚠️ **Data note:** all figures below come from the clean re-grade; the run's original grade was
+> voided by a grader fault and is excluded from the analysis (**[§1](#1-data-validity--one-voided-measurement)**).
+
+- 📈 **The 27B lives in the haiku→sonnet band.** Best cell **79%** vs haiku **74** /
   sonnet **85** / opus **95**. On the easier structural tasks (`deep-equal`, `store-remove`) it
   reaches **92–99%** and matches sonnet. *(MEASURED)*
 - 🎯 **The genuine bottleneck is strict lint + types, not logic.** The model writes correct,
@@ -65,96 +64,110 @@ takeaway: DATA-CORRECTION report. The original run's headline (27B ≈ below-hai
 
 ---
 
-## 1. The test-harness failure — and the fix
+## 1. Data validity — one voided measurement
 
-**You (the reader) were right to be suspicious: a capable 27B "below haiku" was too weak to be real.**
-It wasn't real. Here is exactly what happened, with proof.
+**Read this first, because it defines the dataset.** The benchmark run's *original* grade is
+**invalid and excluded from this entire document.** It is recorded below as an incident — not used in
+any calculation, chart, or conclusion. Everything from §2 onward uses a single clean re-grade.
 
-### 1.1 The signature: a zero with no variance
+### 1.1 What happened (fact)
 
-Across all 120 replies, the objective values looked like this *(MEASURED, original grade)*:
+- Grading runs three tools per answer: `tsc` (→ `types`), `eslint` (→ `lint`), and **`vitest`**
+  (→ `tests` on the model's own tests, `edge` on the hidden suite).
+- During the run, **`vitest` failed to execute** — so `tests` and `edge` were recorded as **0.0 on
+  all 120 answers** (perfect zero, no variance), while every non-vitest check showed normal variance
+  (`types` 38 pass/82 fail, `lint` 35/85, `bdd` a smooth 0→1).
+- `tests`+`edge` carry ~46% of the score weight **and** are hard-gate objectives, so this alone
+  pinned the reported scores to 24–33% and hard-pass to 0. **That is a measurement fault, not model
+  behaviour** — a metric identically 0 across 120 diverse answers is not measuring the model. *(MEASURED.)*
 
-| objective | what it runs | value distribution (120 replies) | verdict |
-|-----------|--------------|----------------------------------|---------|
-| `types` | strict `tsc` | 38 pass / 82 fail | normal variance ✅ |
-| `lint` | strict `eslint` | 35 pass / 85 fail | normal variance ✅ |
-| `bdd` | regex on test titles | smooth 0.0 → 1.0 | normal variance ✅ |
-| `reuse` | import detection | 39 / 40 | normal variance ✅ |
-| **`tests`** | **`vitest` (own tests)** | **120 × 0.0** | **zero variance 🚩** |
-| **`edge`** | **`vitest` (hidden tests)** | **120 × 0.0** | **zero variance 🚩** |
+### 1.2 What "re-grading" is (and what it is **not**)
 
-- Every **static** check (compiler, linter, regex, import-scan) behaved normally.
-- The two **execution** checks — both driven by **vitest** — were **exactly 0.000 for all 120**.
-- A real capability metric has variance. A metric that is *identically* zero across 120 diverse
-  replies (including ones the judge calls *"thorough, well-tested, covers all edges"*) is not
-  measuring the model — **it is measuring a broken step.** *(INFERRED from the distribution above.)*
+The benchmark runs in **two independent stages**, and only the second failed:
 
-### 1.2 The proof: re-grade the identical outputs
+1. **Capture — the expensive GPU stage.** Each model reads a task and writes its answer (an `impl.ts`
+   + a test file, as raw text). **All 120 answers were saved verbatim** to `out/outputs.jsonl` during
+   the run. *This stage is never repeated — the answers are frozen.*
+2. **Grade — a cheap, deterministic CPU stage.** `score_typescript.py` takes each *saved* answer,
+   extracts the code files from it, drops them into the `ts-harness/` project, and runs the real
+   toolchain against them (`tsc`, `eslint`, `vitest` on the model's own tests + the hidden edge tests).
+   It writes one score row per answer. **No model, no GPU.**
 
-We re-ran the **unchanged** repo grader (`score_typescript.py`) on the **unchanged** captured replies.
-One example — the *same* `deep-equal` reply, clean-compiling, judge-praised:
+> **Re-grading = re-running stage 2 only, on the same saved stage-1 answers.** The model's code does
+> not change — only the *measurement* is redone. Because the answers were fine and only `vitest` had
+> failed, running the grader again (with a working `vitest`) produces the scores that *should* have
+> been recorded the first time. It took ~15 min on CPU.
 
-| | `tests` | `edge` | hard-pass | TS % |
-|---|:---:|:---:|:---:|:---:|
-| **original run** | 0.0 | 0.0 | ✗ | 49 |
-| **re-grade (now)** | **45/45 = 1.0** | **1.0** | **✓** | **99** |
+**What re-grading is NOT:** it does **not** fix, edit, retry, or "solve" any task. When a cell moves
+from 0% to 92%, that is **the identical, frozen answer finally being measured correctly** — the model
+did not get better and did not run again. Re-grading only replaces a broken *ruler*, not the work.
 
-This is systematic. Across every task, model, depth, KV and budget, re-grading recovers real pass
-rates — and the grader **still discriminates** (the hard Opus-tier tasks still miss the lint gate):
+### 1.3 Decision: the voided grade is excluded from all analysis
 
-![Data correction — original broken grade vs corrected re-grade](charts/detailed/d9_correction.svg)
+- **§2 onward uses one clean dataset:** `scores_typescript_regraded.jsonl` (the CPU re-grade). No
+  old/new values are mixed anywhere in the analysis, and **every analytical chart (d1–d8) is built
+  from it.**
+- The original grade is preserved as `scores_typescript.orig.jsonl` **only** as an incident record,
+  shown once in §1.4.
+- Untouched by the bug and used as-is: the **blind-judge** scores (the judge read raw answers, never
+  the grader) and every **timing / token / memory / throughput** number.
 
-*Per-cell correction (MEASURED):* every cell gains **+39 to +47 points**.
+### 1.4 Incident record (fact, not analysis)
 
-| cell | original TS% | corrected TS% |
+The **same 120 frozen answers**, measured twice — the voided run vs the clean re-grade. Shown so the
+incident is auditable; **used nowhere else.**
+
+![Incident record — voided grade vs clean re-grade (this chart is the ONLY place the voided numbers appear)](charts/detailed/d9_correction.svg)
+
+| cell | voided grade TS% | clean re-grade TS% |
 |------|:---:|:---:|
-| un-d64-f16-rb1024 | 26 | **68** |
-| un-d64-f16-rb2048 | 28 | **75** |
-| un-d64-f16-rb4096 | 33 | **79** |
-| un-d128-f16-rb1024 | 24 | **68** |
-| un-d128-f16-rb2048 | 30 | **73** |
-| un-d128-f16-rb4096 | 26 | **73** |
-| un-d128-q8-rb2048 | 28 | **71** |
-| jr-d64-f16-rb2048 | 27 | **72** |
-| jr-d128-f16-rb2048 | 25 | **67** |
-| jr-d128-q8-rb2048 | 28 | **67** |
+| un-d64-f16-rb1024 | 26 | 68 |
+| un-d64-f16-rb2048 | 28 | 75 |
+| un-d64-f16-rb4096 | 33 | 79 |
+| un-d128-f16-rb1024 | 24 | 68 |
+| un-d128-f16-rb2048 | 30 | 73 |
+| un-d128-f16-rb4096 | 26 | 73 |
+| un-d128-q8-rb2048 | 28 | 71 |
+| jr-d64-f16-rb2048 | 27 | 72 |
+| jr-d128-f16-rb2048 | 25 | 67 |
+| jr-d128-q8-rb2048 | 28 | 67 |
 
-### 1.3 Root cause
+### 1.5 Interesting findings from the incident
 
-- The grader parses vitest's `Tests N failed | M passed` summary line. If vitest **never runs a test**
-  (worker/transform/cache failure), no summary line is emitted → the parser returns `(0, 0)` →
-  `tests = edge = 0.0`. *(MEASURED code path: `score_typescript.py:_vitest_counts`.)*
-- **Why vitest specifically?** `tsc` and `eslint` are single-process and ran fine. **vitest spawns
-  worker processes and does esbuild transforms** — the one step that fails under a bad
-  environment (worker spawn / temp-cache / memory pressure). The batch grade ran right after 128k
-  inference on a 31 GB, no-swap box with ~2 GB spilled into host RAM. *(INFERRED — the exact trigger
-  wasn't logged; what is proven is that vitest produced zero counts then and runs cleanly now.)*
-- **Not** a parsing bug (it parses correctly now), **not** an extraction bug (`bdd` proves the test
-  files were extracted with real titles), **not** model output format.
+- 🔁 **A broken measurement costs no GPU to fix.** Because raw answers are saved, the whole run was
+  recovered by a **CPU-only re-grade in ~15 min** — no re-inference. *Practical rule: always keep
+  `outputs.jsonl`; grading is cheap and repeatable.*
+- 🧊 **The failure is itself a deployment signal.** `vitest` spawns worker processes + does esbuild
+  transforms; single-process `tsc`/`eslint` survived. It failed under the **same memory pressure**
+  that spilled ~2 GB into host RAM (GTT) on this 32 GB, no-swap box. *Lesson: don't run a
+  worker-spawning test toolchain on a box still saturated by the model.* *(INFERRED — exact trigger
+  unlogged; proven: vitest produced zero counts then, runs cleanly now.)*
+- 🔎 **Re-grading cleanly separates artifact from real failure.** The artifact was *uniform* (every
+  reply exactly 0). The failures that **survive** the re-grade are *specific and varied* — q8 at 128k
+  leaking a `</think>` token (`lru-cache`), `expr-eval` answers truncating at the token cap. Those are
+  **kept as genuine findings** (§3.3, §7), not scrubbed.
 
-### 1.4 What this means for the original `analysis.md`
+### 1.6 Fix the harness, then re-run later *(recommendation)*
 
-- Its headline — *"27B far below the calibration floor, 0/120 hard-pass, capability gated by the
-  strict wall"* — is **half right for the wrong reason.** The strict **lint/types** wall is real;
-  the **"below haiku / nothing passes"** part is a grading artifact.
-- Everything **not** dependent on `tests`/`edge` still holds: the **judge scores** (the judge read raw
-  replies), the **timing/memory/throughput** numbers, and the **GTT-spill health flag**.
-- ✅ **Action taken:** original grade preserved as `scores_typescript.orig.jsonl`; corrected grade in
-  `scores_typescript_regraded.jsonl`; this document supersedes `analysis.md`'s capability claims.
-
-### 1.5 Fix the harness so this can't recur *(recommendation)*
-
-- **Fail loudly, don't score 0.** In `score_typescript.py`, when vitest emits no parseable summary,
+- **Fail loudly, don't score 0.** In `score_typescript.py`, when `vitest` emits no parseable summary,
   record a `grade_error` (harness failure) instead of `tests=0.0` — a silent 0 is indistinguishable
-  from "all tests failed". *(This is the single highest-value fix.)*
-- Add a **grader self-check** to `run_capture.sh`: after batch grading, assert that at least the
-  reference fixtures still pass vitest; abort + alert if not.
-- Consider `vitest run --pool=forks --poolOptions.forks.singleFork=true` (or `--no-file-parallelism`)
-  to remove worker-spawn as a failure mode under memory pressure.
+  from "all tests failed". *(Single highest-value fix — it would have caught this at run time.)*
+- **Grader self-check** in `run_capture.sh`: after grading, assert the reference fixtures still pass
+  `vitest`; abort + alert if not.
+- Optionally `vitest run --pool=forks --poolOptions.forks.singleFork=true` to remove worker-spawn as a
+  failure mode under memory pressure.
+- **Re-run later — CPU only, no GPU, ~15 min:**
+  ```
+  python3 score_typescript.py batch --outputs out/outputs.jsonl --tasks tasks.jsonl \
+    --out out/scores_typescript_regraded.jsonl          # re-measure the saved answers
+  python3 aggregate.py --by-task --scores scores_typescript_regraded.jsonl
+  python3 make_charts_detailed.py --dir out --charts charts/detailed \
+    --scores scores_typescript_regraded.jsonl --orig scores_typescript.orig.jsonl
+  ```
 
 ---
 
-## 2. Corrected capability — per task vs the haiku/sonnet/opus ladder
+## 2. Capability — per task vs the haiku/sonnet/opus ladder
 
 ![Capability per task — 27B vs haiku/sonnet/opus](charts/detailed/d1_capability_by_task.svg)
 
@@ -251,7 +264,7 @@ At 128k, budget 2048 *(MEASURED)*:
 
 ![Objective heatmap — where each task fails](charts/detailed/d8_objective_by_task.svg)
 
-Mean objective across all configs *(MEASURED, corrected)*:
+Mean objective across all configs *(MEASURED)*:
 
 | objective | mean | reading |
 |-----------|:---:|---------|
@@ -313,7 +326,7 @@ per-session fixed cost, reported in `analysis.md`.)*
 
 ## 6. External validation (research)
 
-The corrected findings line up with the published literature *(all CLAIMED — external)*:
+The findings line up with the published literature *(all CLAIMED — external)*:
 
 - **Overthinking / diminishing returns of thinking tokens** — matches our §3.1 (budget helps to a
   knee, then flat/negative; the knee is lower on easier/shallower work). The 27B's lack of early-stop
@@ -339,20 +352,20 @@ The corrected findings line up with the published literature *(all CLAIMED — e
 
 ## 7. Per-task deep dives
 
-Each task below: what it tests, corrected numbers, the strengths/weaknesses the blind judge saw, the
+Each task below: what it tests, its scores, the strengths/weaknesses the blind judge saw, the
 best config, and **every** verdict (expandable). Judge notes are the judge's own words; the `fails:`
-list is the **corrected** grade.
+list is from the clean re-grade.
 
 ### `deep-equal` — structural recursion over `unknown` (sonnet-tier)
 - **Contract:** value-equal primitives (NaN=NaN), recursive objects/arrays, array ≠ object, null ≠ {}.
-- **Corrected:** avg **84%**, best **92%** (un·64k·b2k), several reps hit **100% / hard-pass**. Beats haiku (79), short of sonnet (100).
+- **Scores:** avg **84%**, best **92%** (un·64k·b2k), several reps hit **100% / hard-pass**. Beats haiku (79), short of sonnet (100).
 - **Strengths (judge):** "proper unknown-narrowing type guards", "correct NaN/null/array-vs-object handling", "well-factored helpers", thorough tests.
 - **Weaknesses:** the split is between reps — one rep hard-passes, the other trips **strict `tsc`** (`types 0.00`) on a `noUncheckedIndexedAccess`/`exactOptionalPropertyTypes` corner, or drops the `key-in-b` presence check (a real correctness gap on `{a:undefined}` vs `{b:undefined}`).
 - **Best:** `un-d64-f16-rb2048` (92%, 52 s).
 
 <details><summary><b>deep-equal</b> — all 20 blind-judge verdicts (click to expand)</summary>
 
-| config | rep | TS% | hard | d·c·r | judge note · **corrected fails** |
+| config | rep | TS% | hard | d·c·r | judge note · **fails** |
 |--------|:---:|----:|:----:|:-----:|-----------------------------------|
 | `un-d64-f16-rb1024` | 0 | 62 | — | 4·4·4 | Correct ordering of guards with an explicit key-in-b presence check, so objects with equal key counts but different keys are handled properly. — **fails:** types 0.00, lint 0.00, tests 0.82 |
 | `un-d64-f16-rb1024` | 1 | 100 | ✅ | 4·4·3 | Concise with a clean non-object short-circuit, but relying only on key count without a key-presence check means differently-keyed objects with undefined values could falsely match. — **all gates clean** |
@@ -379,14 +392,14 @@ list is the **corrected** grade.
 
 ### `store-remove` — indirect cache coupling, multi-file (sonnet-tier)
 - **Contract:** add `remove(key)` that deletes entries **and** keeps a cached per-key `total` consistent (compiles either way — only hidden tests catch a stale cache).
-- **Corrected:** avg **89%**, best **99%** (jr·128k·q8), multiple **hard-passes**. Matches sonnet at its best.
+- **Scores:** avg **89%**, best **99%** (jr·128k·q8), multiple **hard-passes**. Matches sonnet at its best.
 - **Strengths:** "keeps the totals cache consistent", "explicit no-op guard", "comprehensive tests for totals and other-key isolation".
 - **Weaknesses:** recurring **`types 0.00`** on strict tsc; a few leave a **stale `0` map entry** instead of deleting the key (caught as a design nit, not always a test fail); `bdd` naming often <1.
 - **Best:** `un-d64-f16-rb2048` for value (90%, 50 s); `jr-d128-q8` for peak (99%).
 
 <details><summary><b>store-remove</b> — all 20 blind-judge verdicts (click to expand)</summary>
 
-| config | rep | TS% | hard | d·c·r | judge note · **corrected fails** |
+| config | rep | TS% | hard | d·c·r | judge note · **fails** |
 |--------|:---:|----:|:----:|:-----:|-----------------------------------|
 | `un-d64-f16-rb1024` | 0 | 82 | — | 4·4·4 | Idiomatic backward-splice in-place removal plus totals.delete, with well-organized nested tests covering the no-op and isolation cases. — **fails:** types 0.00, bdd 0.80 |
 | `un-d64-f16-rb1024` | 1 | 98 | ✅ | 4·3·4 | Filter-then-rebuild is algorithmically clean but the length=0-plus-spread-push dance to preserve the array reference reads more awkwardly than a direct reassignment. — **fails:** bdd 0.80 |
@@ -413,14 +426,14 @@ list is the **corrected** grade.
 
 ### `rate-limiter` — lazy token-bucket refill (sonnet-tier)
 - **Contract:** per-key buckets, lazy time-based refill (no timer), deduct only on success.
-- **Corrected:** avg **75%**, best **84%** (un·64k·b4k). ≈ haiku (83), short of sonnet (98).
+- **Scores:** avg **75%**, best **84%** (un·64k·b4k). ≈ haiku (83), short of sonnet (98).
 - **Strengths:** "concise lazy token-bucket, correctly caps refill, isolates keys, starts full", "clean pure refill helper", good burst/refill/isolation tests.
 - **Weaknesses:** **`lint 0.00` on nearly every reply** — this is the lint wall (magic numbers, `let`→`const`, dense one-liners). One jackrong rep has a **real bug**: "flooring the refill while advancing `lastRefillAt` discards sub-token elapsed time" (slow refills never accrue).
 - **Best:** `un-d64-f16-rb4096` (84%, 93 s) — the one task where budget 4096 clearly pays.
 
 <details><summary><b>rate-limiter</b> — all 20 blind-judge verdicts (click to expand)</summary>
 
-| config | rep | TS% | hard | d·c·r | judge note · **corrected fails** |
+| config | rep | TS% | hard | d·c·r | judge note · **fails** |
 |--------|:---:|----:|:----:|:-----:|-----------------------------------|
 | `un-d64-f16-rb1024` | 0 | 64 | — | 4·4·4 | Straightforward mutating bucket with lazy default-full init; tests are thorough covering custom token amounts and per-key isolation. — **fails:** types 0.00, lint 0.00, tests 0.86, bdd 0.43 |
 | `un-d64-f16-rb1024` | 1 | 63 | — | 4·3·4 | Immutable-refill approach is correct but the redundant initial set plus later set is awkward, and the tests lean on unclean as-unknown-as Clock casts. — **fails:** types 0.00, lint 0.00, tests 0.86, bdd 0.29 |
@@ -447,14 +460,14 @@ list is the **corrected** grade.
 
 ### `lru-cache` — generics + TTL + eviction (sonnet-tier, hardest)
 - **Contract:** capacity eviction + per-entry TTL + recency refresh, under strict generics and the `<20`-line rule.
-- **Corrected:** avg **63%**, best **81%** (un·64k·b4k). ≈ haiku (68). **q8 tanks it** (un 78→47, jr 66→45).
+- **Scores:** avg **63%**, best **81%** (un·64k·b4k). ≈ haiku (68). **q8 tanks it** (un 78→47, jr 66→45).
 - **Strengths:** "O(1) Map-order recency", "clean expiresAt model", "pure module-level helpers", thoughtful cap-0/zero-TTL edge tests.
 - **Weaknesses:** the **q8 instability** shows here — one q8 rep "leaks a stray `</think>` token into the output" (→ tests 0, edge 0); another has "a redundant parallel order array". Plus the usual `lint 0.00` and dead `lastAccessedAt` state.
 - **Best:** `un-d64-f16-rb4096` (81%, 105 s). **Do not use q8 for this task.**
 
 <details><summary><b>lru-cache</b> — all 20 blind-judge verdicts (click to expand)</summary>
 
-| config | rep | TS% | hard | d·c·r | judge note · **corrected fails** |
+| config | rep | TS% | hard | d·c·r | judge note · **fails** |
 |--------|:---:|----:|:----:|:-----:|-----------------------------------|
 | `un-d64-f16-rb1024` | 0 | 67 | — | 4·4·4 | Clean closure-based design with lazy expiry throughout; expiry-delete logic is duplicated across get/has but tests cover the important edges. — **fails:** types 0.00, lint 0.00, bdd 0.36 |
 | `un-d64-f16-rb1024` | 1 | 49 | — | 4·5·4 | Well-factored free helpers with precomputed expiresAt read very clearly; overwriting a key via set does not refresh recency, a minor unspecified edge. — **fails:** types 0.00, lint 0.00, tests 0.70, bdd 0.20, edge 0.50 |
@@ -481,14 +494,14 @@ list is the **corrected** grade.
 
 ### `async-memo` — async dedup + don't-cache-failures + strict-lint trap (opus-only)
 - **Contract:** concurrent calls dedup to one in-flight promise; a rejected computation is not cached; resolved values are cached. The clean fix trips `only-throw-error`.
-- **Corrected:** avg **64%**, best **75%** (jr·64k). ≈ haiku/sonnet, far below opus (100) — **by design** (only Opus writes it strict-clean).
+- **Scores:** avg **64%**, best **75%** (jr·64k). ≈ haiku/sonnet, far below opus (100) — **by design** (only Opus writes it strict-clean).
 - **Strengths:** the **logic is consistently right** — "minimal, exactly-right fix: caches the in-flight promise and evicts on rejection"; edge tests pass broadly.
 - **Weaknesses:** **`types 0.00, lint 0.00` on almost every reply** — the designed strict-lint trap. Genuine misses: one rep has "an incoherent dead `cacheSpy()` stub"; one jackrong-128k rep "leaks stray markdown fences into the file body" (→ tests 0).
 - **Best:** `un-d64-f16-rb2048` for value (67%, 50 s); jackrong 64k for peak (75%).
 
 <details><summary><b>async-memo</b> — all 20 blind-judge verdicts (click to expand)</summary>
 
-| config | rep | TS% | hard | d·c·r | judge note · **corrected fails** |
+| config | rep | TS% | hard | d·c·r | judge note · **fails** |
 |--------|:---:|----:|:----:|:-----:|-----------------------------------|
 | `un-d64-f16-rb1024` | 0 | 67 | — | 5·5·4 | Idiomatic wrapper promise that deletes-on-reject and rethrows, cleanly satisfying dedup/no-cache-failure/cache-success. — **fails:** tests 0.00, bdd 0.00 |
 | `un-d64-f16-rb1024` | 1 | 52 | — | 4·3·3 | Floating-catch eviction works but is less explicit, and the test file includes an incoherent dead cacheSpy() stub asserted against a nonsensical value. — **fails:** types 0.00, lint 0.00, tests 0.60, bdd 0.40 |
@@ -515,14 +528,14 @@ list is the **corrected** grade.
 
 ### `expr-eval` — recursive-descent parser + Result errors (opus-tier ceiling)
 - **Contract:** integer `+ - * /` with precedence, left-assoc, parens, no-throw error handling.
-- **Corrected:** avg **53%**, best **69%** (jr·64k). ≈ haiku/sonnet, below opus (83). **128k hurts** (answer runaways, truncation); **q8 on jackrong collapses** (23%).
+- **Scores:** avg **53%**, best **69%** (jr·64k). ≈ haiku/sonnet, below opus (83). **128k hurts** (answer runaways, truncation); **q8 on jackrong collapses** (23%).
 - **Strengths:** "clean recursive-descent threading a Result through every level", "unary signs, parens, div-by-zero, trailing garbage", "helpful positional error messages" — the judge gives 5·5·5 to several.
 - **Weaknesses:** **`types 0.00, lint 0.00` everywhere** (the ceiling wall even Opus hits); at 128k the answer sometimes **runs to the token cap** and truncates the tests (→ tests 0). Worst rep: jackrong-q8 "never threads position back to callers, hardcodes `tokens[pos+1+1]`, papered over with a `find()` hack" (12%).
 - **Best:** `jr-d64-f16-rb2048` (69%, 158 s) or `un-d64-f16-rb4096` (64%, 100 s). Keep it at **64k**.
 
 <details><summary><b>expr-eval</b> — all 20 blind-judge verdicts (click to expand)</summary>
 
-| config | rep | TS% | hard | d·c·r | judge note · **corrected fails** |
+| config | rep | TS% | hard | d·c·r | judge note · **fails** |
 |--------|:---:|----:|:----:|:-----:|-----------------------------------|
 | `un-d64-f16-rb1024` | 0 | 55 | — | 5·4·5 | Clean class-based recursive-descent parser with thorough error handling, dinged only for an unused peek() method and a garbled test assertion. — **fails:** types 0.00, lint 0.00, tests 0.88, bdd 0.00 |
 | `un-d64-f16-rb1024` | 1 | 55 | — | 4·4·5 | Solid Result-threading recursive-descent parser with good edge coverage, slightly marred by a redundant s.error mutation that is never read. — **fails:** types 0.00, lint 0.00, tests 0.82, bdd 0.09 |
@@ -551,8 +564,9 @@ list is the **corrected** grade.
 
 ## 8. Threats to validity & caveats
 
-- ✅ **Grader bug — found & corrected** (§1). The corrected grade is the basis for this doc; the
-  original is preserved. **Open:** the exact run-time trigger for the vitest failure wasn't logged
+- ✅ **Grader fault — the original grade was voided & excluded** (§1). This doc rests entirely on the
+  clean re-grade; the voided grade is preserved only as an incident record. **Open:** the exact
+  run-time trigger for the vitest failure wasn't logged
   (§1.5 recommends making it fail loudly so it can't silently recur).
 - **Reps = 2.** Per-rep variance is real (e.g. `deep-equal` 62% vs 100% between reps — usually one
   strict-tsc corner). Treat single-cell deltas < ~5 points as noise; the per-task **means** are the
