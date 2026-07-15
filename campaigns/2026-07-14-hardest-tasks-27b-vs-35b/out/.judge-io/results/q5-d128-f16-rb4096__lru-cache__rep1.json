@@ -1,0 +1,1 @@
+{"design": 4, "clarity": 4, "robustness": 4, "notes": "Idiomatic evict-after-insert ordering with purgeExpired and TTL reset on re-set; tracks recency twice (insertion-order touch plus an accessed timestamp) where either alone would do."}

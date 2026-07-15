@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Minimal, well-targeted fix that keeps promise identity and attaches the eviction catch without swallowing the caller's rejection; the retry test asserts toHaveBeenCalledTimes on a plain function rather than a spy."}

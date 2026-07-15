@@ -1,0 +1,25 @@
+{
+  "id": "opus-rate-limiter-rep1",
+  "score": 0.971,
+  "hard_pass": false,
+  "objectives": {
+    "types": 1.0,
+    "lint": 0.8,
+    "tests": 1.0,
+    "bdd": 1.0,
+    "novj": 1.0,
+    "reuse": 1.0,
+    "edge": 1.0
+  },
+  "test_counts": {
+    "own": [
+      8,
+      8
+    ]
+  },
+  "files": [
+    "impl.test.ts",
+    "impl.ts"
+  ],
+  "grader": "fractional-2026-07-15"
+}

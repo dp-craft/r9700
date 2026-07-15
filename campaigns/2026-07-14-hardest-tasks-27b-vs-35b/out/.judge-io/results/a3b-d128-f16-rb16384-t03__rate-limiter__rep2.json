@@ -1,0 +1,1 @@
+{"design":2,"clarity":4,"robustness":2,"notes":"Well-named and legible, but the new-bucket branch returns true without deducting tokens or validating the request size, contradicting its own burst tests."}

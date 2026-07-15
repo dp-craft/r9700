@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Uses then(identity, onRejected) where a plain catch would read better, but the per-key and repeated-rejection test coverage is the most thorough of the set."}

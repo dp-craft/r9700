@@ -1,0 +1,1 @@
+{"design":3,"clarity":4,"robustness":3,"notes":"Straightforward mutable bucket with readable refill and good tests covering over-capacity requests; the interface is declared after its use and the `added > 0` guard is an unnecessary special case."}

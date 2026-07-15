@@ -1,0 +1,1 @@
+{"design":3,"clarity":4,"robustness":3,"notes":"A fire-and-forget side catch caches the raw promise, which works but leaves eviction implicit, and the three tests skip distinct-key and repeated-rejection coverage."}

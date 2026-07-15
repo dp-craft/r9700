@@ -1,0 +1,1 @@
+{"design":4,"clarity":5,"robustness":4,"notes":"Minimal, idiomatic catch-and-evict fix with well-named tests covering each spec clause, though it relies on promise truthiness rather than an explicit has() check."}

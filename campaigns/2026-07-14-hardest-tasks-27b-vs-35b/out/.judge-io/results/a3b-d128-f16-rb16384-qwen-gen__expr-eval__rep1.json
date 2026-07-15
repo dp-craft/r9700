@@ -1,0 +1,1 @@
+{"design":1,"clarity":1,"robustness":1,"notes":"Incoherent: an `interface` declared as a union, a tokenizer that never emits parens while the parser branches on them, and a tokenize return type union that forces `'error' in tokens` sniffing."}

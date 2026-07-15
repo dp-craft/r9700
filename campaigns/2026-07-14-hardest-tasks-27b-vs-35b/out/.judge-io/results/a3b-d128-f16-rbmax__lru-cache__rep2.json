@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Honest generic Map<K,V> with an explicit recency counter and a uniform removeExpired sweep on every operation; tests reach capacity-1, reference identity and non-resurrection edges."}

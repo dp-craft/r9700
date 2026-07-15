@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":3,"notes":"Minimal and readable fix, though only the first caller receives the catch-wrapped promise while later callers get the raw one, and the settled-result test reads .value without narrowing."}

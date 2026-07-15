@@ -1,0 +1,104 @@
+tasks : lru-cache rate-limiter async-memo expr-eval pricing-deferred
+models: haiku sonnet opus
+reps  : 3
+
+answers to collect: 31 (existing are skipped)
+
+skip (done): haiku lru-cache rep0
+skip (done): haiku lru-cache rep1
+skip (done): haiku lru-cache rep2
+skip (done): haiku rate-limiter rep0
+skip (done): haiku rate-limiter rep1
+skip (done): haiku rate-limiter rep2
+skip (done): haiku async-memo rep0
+skip (done): haiku async-memo rep1
+skip (done): haiku async-memo rep2
+skip (done): haiku expr-eval rep0
+skip (done): haiku expr-eval rep1
+=== haiku expr-eval rep2 ===
+  wrote out/cal-io/answer-haiku-expr-eval-rep2.txt (6814 bytes)
+=== haiku pricing-deferred rep0 ===
+  wrote out/cal-io/answer-haiku-pricing-deferred-rep0.txt (8151 bytes)
+=== haiku pricing-deferred rep1 ===
+  wrote out/cal-io/answer-haiku-pricing-deferred-rep1.txt (7160 bytes)
+=== haiku pricing-deferred rep2 ===
+  wrote out/cal-io/answer-haiku-pricing-deferred-rep2.txt (7849 bytes)
+=== sonnet lru-cache rep0 ===
+  wrote out/cal-io/answer-sonnet-lru-cache-rep0.txt (4965 bytes)
+=== sonnet lru-cache rep1 ===
+  wrote out/cal-io/answer-sonnet-lru-cache-rep1.txt (4912 bytes)
+=== sonnet lru-cache rep2 ===
+  wrote out/cal-io/answer-sonnet-lru-cache-rep2.txt (4809 bytes)
+=== sonnet rate-limiter rep0 ===
+  wrote out/cal-io/answer-sonnet-rate-limiter-rep0.txt (3829 bytes)
+=== sonnet rate-limiter rep1 ===
+  wrote out/cal-io/answer-sonnet-rate-limiter-rep1.txt (3614 bytes)
+=== sonnet rate-limiter rep2 ===
+  wrote out/cal-io/answer-sonnet-rate-limiter-rep2.txt (5048 bytes)
+=== sonnet async-memo rep0 ===
+  wrote out/cal-io/answer-sonnet-async-memo-rep0.txt (2263 bytes)
+=== sonnet async-memo rep1 ===
+  wrote out/cal-io/answer-sonnet-async-memo-rep1.txt (2099 bytes)
+=== sonnet async-memo rep2 ===
+  wrote out/cal-io/answer-sonnet-async-memo-rep2.txt (2162 bytes)
+=== sonnet expr-eval rep0 ===
+  wrote out/cal-io/answer-sonnet-expr-eval-rep0.txt (5276 bytes)
+=== sonnet expr-eval rep1 ===
+  wrote out/cal-io/answer-sonnet-expr-eval-rep1.txt (6161 bytes)
+=== sonnet expr-eval rep2 ===
+  wrote out/cal-io/answer-sonnet-expr-eval-rep2.txt (5261 bytes)
+=== sonnet pricing-deferred rep0 ===
+  wrote out/cal-io/answer-sonnet-pricing-deferred-rep0.txt (7870 bytes)
+=== sonnet pricing-deferred rep1 ===
+  wrote out/cal-io/answer-sonnet-pricing-deferred-rep1.txt (7994 bytes)
+=== sonnet pricing-deferred rep2 ===
+  wrote out/cal-io/answer-sonnet-pricing-deferred-rep2.txt (9108 bytes)
+=== opus lru-cache rep0 ===
+  wrote out/cal-io/answer-opus-lru-cache-rep0.txt (6895 bytes)
+=== opus lru-cache rep1 ===
+  wrote out/cal-io/answer-opus-lru-cache-rep1.txt (7200 bytes)
+=== opus lru-cache rep2 ===
+  wrote out/cal-io/answer-opus-lru-cache-rep2.txt (6945 bytes)
+=== opus rate-limiter rep0 ===
+  wrote out/cal-io/answer-opus-rate-limiter-rep0.txt (4829 bytes)
+=== opus rate-limiter rep1 ===
+  wrote out/cal-io/answer-opus-rate-limiter-rep1.txt (5221 bytes)
+=== opus rate-limiter rep2 ===
+  wrote out/cal-io/answer-opus-rate-limiter-rep2.txt (5302 bytes)
+=== opus async-memo rep0 ===
+  wrote out/cal-io/answer-opus-async-memo-rep0.txt (3320 bytes)
+=== opus async-memo rep1 ===
+  wrote out/cal-io/answer-opus-async-memo-rep1.txt (3361 bytes)
+=== opus async-memo rep2 ===
+  wrote out/cal-io/answer-opus-async-memo-rep2.txt (4722 bytes)
+=== opus expr-eval rep0 ===
+  wrote out/cal-io/answer-opus-expr-eval-rep0.txt (7343 bytes)
+=== opus expr-eval rep1 ===
+  wrote out/cal-io/answer-opus-expr-eval-rep1.txt (6967 bytes)
+=== opus expr-eval rep2 ===
+  wrote out/cal-io/answer-opus-expr-eval-rep2.txt (6692 bytes)
+skip (done): opus pricing-deferred rep0
+skip (done): opus pricing-deferred rep1
+skip (done): opus pricing-deferred rep2
+
+=== grading ===
+
+wrote calibration-reps.jsonl (45 rows)
+model    task                n  mean%    sd  hard_pass
+haiku    async-memo          3   82.2   5.8  0/3
+haiku    expr-eval           3   64.7   2.6  0/3
+haiku    lru-cache           3   82.9   1.8  0/3
+haiku    pricing-deferred    3   84.8   3.4  0/3
+haiku    rate-limiter        3   89.8   4.3  0/3
+opus     async-memo          3   90.0   5.8  0/3
+opus     expr-eval           3   93.3   3.4  0/3
+opus     lru-cache           3   93.2   2.0  0/3
+opus     pricing-deferred    3   98.0   1.8  1/3
+opus     rate-limiter        3   97.1   0.0  0/3
+sonnet   async-memo          3   93.0   6.3  1/3
+sonnet   expr-eval           3   80.6   8.5  0/3
+sonnet   lru-cache           3   96.2   0.6  1/3
+sonnet   pricing-deferred    3   86.4  19.3  1/3
+sonnet   rate-limiter        3   96.7   3.6  1/3
+
+next: python3 aggregate.py --dir out --by-task --calib-files calibration-reps.jsonl --out out/summary.md

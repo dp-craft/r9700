@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Same clean entries/inFlight separation with correct failure eviction, plus a key-independence test; only the leftover pctOf indirection is redundant."}

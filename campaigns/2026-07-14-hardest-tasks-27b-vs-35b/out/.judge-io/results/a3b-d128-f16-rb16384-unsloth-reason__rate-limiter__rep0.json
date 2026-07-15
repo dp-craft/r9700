@@ -1,0 +1,1 @@
+{"design":3,"clarity":2,"robustness":2,"notes":"Reasonable bucket factoring, but applyLazyRefill carries a nonsensical redundant guard and the refill test asserts nothing after ticking while leaving a dead makeFakeClock binding behind."}

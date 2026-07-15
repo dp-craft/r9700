@@ -1,0 +1,141 @@
+skip (complete: un-d128-f16-rb4096 — 15/15 replies)
+skip (complete: xl-d128-f16-rb4096 — 15/15 replies)
+skip (complete: q5-d128-q8-rb4096 — 15/15 replies)
+skip (complete: q6-d128-q8-rb4096 — 15/15 replies)
+skip (complete: a3b-d128-f16-rb4096 — 15/15 replies)
+skip (complete: q5-d128-f16-rb16384 — 15/15 replies)
+skip (complete: q5-d128-f16-rb4096 — 15/15 replies)
+skip (complete: un-d128-f16-rb16384 — 15/15 replies)
+skip (complete: a3b-d128-f16-rb16384 — 15/15 replies)
+skip (complete: a3b-d128-f16-rbmax — 15/15 replies)
+skip (complete: a3b-d128-f16-rb16384-t03 — 15/15 replies)
+skip (complete: a3b-d128-f16-rb16384-t10 — 15/15 replies)
+skip (complete: a3b-d128-f16-rb16384-qwen-gen — 15/15 replies)
+skip (complete: a3b-d128-f16-rb16384-unsloth-reason — 15/15 replies)
+
+=== grader self-check (vitest must run) ===
+SELFTEST PASS  (good=1.0 > mediocre=0.519 > bad=0.0; hard_pass g/m/b = True/False/False)
+{
+  "good": {
+    "id": "GOOD",
+    "score": 1.0,
+    "hard_pass": true,
+    "objectives": {
+      "types": 1.0,
+      "lint": 1.0,
+      "tests": 1.0,
+      "bdd": 1.0,
+      "novj": 1.0,
+      "reuse": 1.0,
+      "edge": 1.0
+    },
+    "test_counts": {
+      "own": [
+        2,
+        2
+      ]
+    },
+    "files": [
+      "impl.test.ts",
+      "impl.ts"
+    ],
+    "grader": "fractional-2026-07-15"
+  },
+  "mediocre": {
+    "id": "MEDIOCRE",
+    "score": 0.519,
+    "hard_pass": false,
+    "objectives": {
+      "types": 0.33,
+      "lint": 0.8,
+      "tests": 1.0,
+      "bdd": 1.0,
+      "novj": 1.0,
+      "reuse": 0.0,
+      "edge": 0.0
+    },
+    "test_counts": {
+      "own": [
+        1,
+        1
+      ]
+    },
+    "files": [
+      "impl.test.ts",
+      "impl.ts"
+    ],
+    "grader": "fractional-2026-07-15"
+  },
+  "bad": {
+    "id": "BAD",
+    "score": 0.0,
+    "hard_pass": false,
+    "objectives": {
+      "types": 0.0,
+      "lint": 0.0,
+      "tests": 0.0,
+      "bdd": 0.0,
+      "novj": 0.0,
+      "reuse": 0.0,
+      "edge": 0.0
+    },
+    "test_counts": {
+      "own": [
+        0,
+        0
+      ]
+    },
+    "files": [
+      "impl.test.ts",
+      "impl.ts"
+    ],
+    "grader": "fractional-2026-07-15"
+  }
+}
+
+=== grading (tsc + eslint + vitest, per reply) ===
+graded 0 rows (0 errors/empty), reused 210 already-graded -> /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/scores_typescript.jsonl [210 total]
+
+=== blind judge: ONE claude session fans out opus subagents (orchestrator=opus) ===
+judge: fanning out 1 candidates in 1 'opus'-subagent batches via ONE claude session (orchestrator=opus)
+collected 1/1 verdicts (0 missing, 0 unparseable) -> /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/judge_scores.jsonl
+
+=== charts (reused by the benchmark-results skill) ===
+wrote 15 charts + appendix.md -> /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/charts/
+  quality_vs_cost.svg
+  quality_vs_time.svg
+  scorecard.svg
+  quality_deterministic.svg
+  quality_judge.svg
+  token_economy.svg
+  throughput.svg
+  latency.svg
+  memory_power.svg
+  task_heatmap.svg
+  capability.svg
+  hard_pass.svg
+  fluctuation.svg
+  rerun_value.svg
+  objective_breakdown.svg
+
+=== aggregate (deterministic digest → out/summary.md) ===
+wrote /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/summary.md (14 cells) + /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/summary.json
+wrote /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/summary_by_task.json (5 tasks) from scores_typescript.jsonl
+
+=== per-task charts (charts/detailed/) ===
+wrote 8 detailed charts + appendix.md -> /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/charts/detailed/
+  d1_capability_by_task.svg
+  d2_quant_quality.svg
+  d3_quant_cost.svg
+  d4_efficiency_by_task.svg
+  d5_hardpass_by_task.svg
+  d6_model_by_task.svg
+  d7_judge_axes_by_task.svg
+  d8_objective_by_task.svg
+
+Depth run complete.
+  replies:  /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/outputs.jsonl
+  scores:   /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/scores_typescript.jsonl   judge: /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/judge_scores.jsonl
+  VRAM:     /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/vram.jsonl   (gpu samples: /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/gpu_*.csv)
+  charts:   /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/charts/
+  analysis: /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/analysis.md   (auto-written; review before committing run data)

@@ -1,0 +1,1 @@
+{"design":3,"clarity":3,"robustness":3,"notes":"Pricing and labeling are pleasingly direct and the cache single-flights correctly, but `computeTotal` serializes deferred loads in an await loop, and the tests lean on `typeof import(...)` type annotations and `as unknown as Clock` casts while never asserting compute is invoked exactly once nor covering key independence."}

@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":3,"notes":"Compact and well-named lazy-refill bucket with correct ms-to-seconds conversion, but tests assert only the boolean result and never the remaining token count, and refillBucket reads clock.now() twice."}

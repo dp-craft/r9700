@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Solid end-to-end async conversion with parallel Promise.all and a try/finally pending map, marred by a redundant pctOf helper, an unnecessary Partial<Record>/UNKNOWN_LABEL fallback over an exhaustive union, and a flaky wall-clock timing assertion."}

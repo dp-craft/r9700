@@ -1,0 +1,1 @@
+{"design":4,"clarity":3,"robustness":4,"notes":"Leaner single-mechanism recency with a precomputed expiresAt, but dense one-line bodies and a countLive that silently mutates the store behind the size getter."}

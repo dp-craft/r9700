@@ -1,0 +1,1 @@
+{"design":3,"clarity":3,"robustness":3,"notes":"Small focused helpers over an insertion-ordered Map, weakened by isLive receiving a possibly-undefined entry, countLive duplicated inline in the size getter, and repeated lookups in a per-iteration O(n) eviction loop."}

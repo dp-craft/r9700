@@ -1,0 +1,1 @@
+{"design":3,"clarity":1,"robustness":1,"notes":"Separating pending from resolved maps is a sound idea undermined by an undefined-valued cache miss, a needless K extends string|number narrowing, and a test file that is unparseable fragments ending mid-thought."}

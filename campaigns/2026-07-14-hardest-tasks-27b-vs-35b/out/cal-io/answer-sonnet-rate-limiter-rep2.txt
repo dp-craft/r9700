@@ -1,0 +1,168 @@
+// FILE: impl.ts
+import { Clock } from "../../lib/clock";
+
+const MILLISECONDS_PER_SECOND = 1000;
+const DEFAULT_TOKENS = 1;
+
+interface Bucket {
+  readonly tokens: number;
+  readonly lastRefillMs: number;
+}
+
+export interface RateLimiter {
+  tryAcquire(key: string, tokens?: number): boolean;
+}
+
+function createBucket(capacity: number, nowMs: number): Bucket {
+  return { tokens: capacity, lastRefillMs: nowMs };
+}
+
+function refillBucket(
+  bucket: Bucket,
+  capacity: number,
+  refillPerSec: number,
+  nowMs: number,
+): Bucket {
+  const elapsedSeconds = (nowMs - bucket.lastRefillMs) / MILLISECONDS_PER_SECOND;
+  const refilledTokens = bucket.tokens + elapsedSeconds * refillPerSec;
+  return { tokens: Math.min(capacity, refilledTokens), lastRefillMs: nowMs };
+}
+
+function getRefilledBucket(
+  buckets: Map<string, Bucket>,
+  key: string,
+  capacity: number,
+  refillPerSec: number,
+  nowMs: number,
+): Bucket {
+  const existing = buckets.get(key);
+  if (existing === undefined) {
+    return createBucket(capacity, nowMs);
+  }
+  return refillBucket(existing, capacity, refillPerSec, nowMs);
+}
+
+function acquireFromBucket(
+  bucket: Bucket,
+  tokens: number,
+): { readonly acquired: boolean; readonly bucket: Bucket } {
+  if (bucket.tokens < tokens) {
+    return { acquired: false, bucket };
+  }
+  const remaining: Bucket = { tokens: bucket.tokens - tokens, lastRefillMs: bucket.lastRefillMs };
+  return { acquired: true, bucket: remaining };
+}
+
+export function createRateLimiter(
+  capacity: number,
+  refillPerSec: number,
+  clock: Clock,
+): RateLimiter {
+  const buckets = new Map<string, Bucket>();
+
+  function tryAcquire(key: string, tokens: number = DEFAULT_TOKENS): boolean {
+    const nowMs = clock.now();
+    const refilled = getRefilledBucket(buckets, key, capacity, refillPerSec, nowMs);
+    const result = acquireFromBucket(refilled, tokens);
+    buckets.set(key, result.bucket);
+    return result.acquired;
+  }
+
+  return { tryAcquire };
+}
+
+// FILE: impl.test.ts
+import { describe, it, expect } from "vitest";
+import type { Clock } from "../../lib/clock";
+import { createRateLimiter } from "./impl";
+
+const CAPACITY = 5;
+const REFILL_PER_SEC = 2;
+const ONE_SECOND_MS = 1000;
+const HUGE_ELAPSED_MS = 1_000_000;
+
+interface FakeClock extends Clock {
+  advance(ms: number): void;
+}
+
+function createFakeClock(startMs: number): FakeClock {
+  let currentMs = startMs;
+  return {
+    now: (): number => currentMs,
+    advance: (ms: number): void => {
+      currentMs += ms;
+    },
+  };
+}
+
+describe("createRateLimiter", () => {
+  it("should allow exactly capacity acquisitions when bucket starts full", () => {
+    const clock = createFakeClock(0);
+    const limiter = createRateLimiter(CAPACITY, REFILL_PER_SEC, clock);
+
+    for (let i = 0; i < CAPACITY; i++) {
+      expect(limiter.tryAcquire("user-a")).toBe(true);
+    }
+    expect(limiter.tryAcquire("user-a")).toBe(false);
+  });
+
+  it("should reject when bucket is empty and no time has elapsed", () => {
+    const clock = createFakeClock(0);
+    const limiter = createRateLimiter(CAPACITY, REFILL_PER_SEC, clock);
+
+    for (let i = 0; i < CAPACITY; i++) {
+      limiter.tryAcquire("user-b");
+    }
+    expect(limiter.tryAcquire("user-b")).toBe(false);
+  });
+
+  it("should refill lazily based on elapsed time when clock advances", () => {
+    const clock = createFakeClock(0);
+    const limiter = createRateLimiter(CAPACITY, REFILL_PER_SEC, clock);
+
+    for (let i = 0; i < CAPACITY; i++) {
+      limiter.tryAcquire("user-c");
+    }
+    expect(limiter.tryAcquire("user-c")).toBe(false);
+
+    clock.advance(ONE_SECOND_MS);
+    expect(limiter.tryAcquire("user-c")).toBe(true);
+    expect(limiter.tryAcquire("user-c")).toBe(true);
+    expect(limiter.tryAcquire("user-c")).toBe(false);
+  });
+
+  it("should cap refill at capacity when elapsed time is very large", () => {
+    const clock = createFakeClock(0);
+    const limiter = createRateLimiter(CAPACITY, REFILL_PER_SEC, clock);
+
+    limiter.tryAcquire("user-d", CAPACITY);
+    clock.advance(HUGE_ELAPSED_MS);
+
+    for (let i = 0; i < CAPACITY; i++) {
+      expect(limiter.tryAcquire("user-d")).toBe(true);
+    }
+    expect(limiter.tryAcquire("user-d")).toBe(false);
+  });
+
+  it("should keep buckets isolated when different keys are used", () => {
+    const clock = createFakeClock(0);
+    const limiter = createRateLimiter(CAPACITY, REFILL_PER_SEC, clock);
+
+    for (let i = 0; i < CAPACITY; i++) {
+      limiter.tryAcquire("user-e");
+    }
+    expect(limiter.tryAcquire("user-e")).toBe(false);
+    expect(limiter.tryAcquire("user-f")).toBe(true);
+  });
+
+  it("should deduct the requested token count when acquiring multiple tokens", () => {
+    const clock = createFakeClock(0);
+    const limiter = createRateLimiter(CAPACITY, REFILL_PER_SEC, clock);
+    const multiTokenRequest = 3;
+    const remainderRequest = 2;
+
+    expect(limiter.tryAcquire("user-g", multiTokenRequest)).toBe(true);
+    expect(limiter.tryAcquire("user-g", multiTokenRequest)).toBe(false);
+    expect(limiter.tryAcquire("user-g", remainderRequest)).toBe(true);
+  });
+});

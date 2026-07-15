@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":3,"notes":"Clean per-key lazy-refill bucket with named helpers, though refillBucket splits mutation and return awkwardly (writes lastRefillAt but leaves tokens to the caller) and no guards exist for backwards clocks or non-positive token requests."}

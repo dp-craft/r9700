@@ -1,0 +1,1 @@
+{"design":2,"clarity":3,"robustness":1,"notes":"The onRejected handler deletes the cache entry but returns undefined instead of rethrowing, so failures resolve to undefined rather than propagating, and successes are pointlessly re-wrapped in Promise.resolve."}

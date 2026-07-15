@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Correct two-map cache with exhaustive label record and the broadest test coverage (including key independence), marred only by the pointless `InFlightEntry` object wrapping a bare promise."}

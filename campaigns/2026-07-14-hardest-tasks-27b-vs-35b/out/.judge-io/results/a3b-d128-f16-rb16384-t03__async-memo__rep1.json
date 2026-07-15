@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Minimal, idiomatic fix that deletes the entry in the rejection handler and rethrows, with focused tests for all three requirements; the identity fulfillment handler is mildly redundant."}

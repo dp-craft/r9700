@@ -1,0 +1,1 @@
+{"design":4,"clarity":3,"robustness":4,"notes":"Single store holding a settled-or-in-flight union is a tidy design with an exhaustive label Record, but discriminating via `\"value\" in entry` / `\"promise\" in entry` is more opaque than an explicit tag."}

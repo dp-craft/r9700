@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Clean end-to-end async threading with a correct single-flight/no-cache-on-failure cache; the pctOf/syncAdjustmentOf indirection loses union exhaustiveness and computeTotal awaits sequentially."}

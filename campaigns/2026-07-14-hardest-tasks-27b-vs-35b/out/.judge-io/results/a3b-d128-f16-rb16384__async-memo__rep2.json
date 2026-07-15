@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":3,"notes":"Separating settled values from in-flight promises is a clear, explicit model, but keying the cache hit on `cached !== undefined` silently defeats memoization for a resolved undefined value."}

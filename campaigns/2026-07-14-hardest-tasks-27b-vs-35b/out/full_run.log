@@ -484,3 +484,49 @@ SELFTEST PASS  (good=1.0 > mediocre=0.519 > bad=0.0; hard_pass g/m/b = True/Fals
 
 === blind judge: ONE claude session fans out opus subagents (orchestrator=opus) ===
 judge: fanning out 149 candidates in 19 'opus'-subagent batches via ONE claude session (orchestrator=opus)
+collected 149/149 verdicts (0 missing, 0 unparseable) -> /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/judge_scores.jsonl
+
+=== charts (reused by the benchmark-results skill) ===
+wrote 15 charts + appendix.md -> /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/charts/
+  quality_vs_cost.svg
+  quality_vs_time.svg
+  scorecard.svg
+  quality_deterministic.svg
+  quality_judge.svg
+  token_economy.svg
+  throughput.svg
+  latency.svg
+  memory_power.svg
+  task_heatmap.svg
+  capability.svg
+  hard_pass.svg
+  fluctuation.svg
+  rerun_value.svg
+  objective_breakdown.svg
+
+=== aggregate (deterministic digest → out/summary.md) ===
+wrote /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/summary.md (14 cells) + /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/summary.json
+wrote /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/summary_by_task.json (5 tasks) from scores_typescript.jsonl
+
+=== per-task charts (charts/detailed/) ===
+wrote 8 detailed charts + appendix.md -> /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/charts/detailed/
+  d1_capability_by_task.svg
+  d2_quant_quality.svg
+  d3_quant_cost.svg
+  d4_efficiency_by_task.svg
+  d5_hardpass_by_task.svg
+  d6_model_by_task.svg
+  d7_judge_axes_by_task.svg
+  d8_objective_by_task.svg
+
+=== final analysis (benchmark-results skill via interactive claude/tmux, model=opus) ===
+  analysis.md written by claude
+reindex: INDEX.md already current
+  docs/INDEX.md reindexed
+
+Depth run complete.
+  replies:  /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/outputs.jsonl
+  scores:   /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/scores_typescript.jsonl   judge: /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/judge_scores.jsonl
+  VRAM:     /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/vram.jsonl   (gpu samples: /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/gpu_*.csv)
+  charts:   /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/charts/
+  analysis: /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/analysis.md   (auto-written; review before committing run data)

@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Minimal correct fix via a catch-and-evict wrapper with well-organized tests, marred by one concurrent-failure case asserting a resolved undefined from an always-throwing fn."}

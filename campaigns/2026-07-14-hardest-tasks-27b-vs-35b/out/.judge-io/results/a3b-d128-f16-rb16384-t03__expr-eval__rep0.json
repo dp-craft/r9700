@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":3,"notes":"Clean recursive-descent parser with Result threading and bonus unary-minus support, but tokenize signals a bad character by returning an empty array, which surfaces as a misleading \"Empty expression\" error."}

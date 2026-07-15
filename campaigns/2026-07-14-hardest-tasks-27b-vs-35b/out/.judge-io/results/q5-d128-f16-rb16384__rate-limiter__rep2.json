@@ -1,0 +1,1 @@
+{"design":4,"clarity":3,"robustness":3,"notes":"Immutable bucket state correctly writes back the refilled state even on failure, but an inline 1000 sits next to a DEFAULT_TOKENS constant and no backward-clock guard exists."}

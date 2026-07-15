@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Correct pending/fresh split with resolution-time TTL and failure eviction; inline \"value\" in entry / \"promise\" in entry narrowing is clunkier than a named type guard."}

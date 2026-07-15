@@ -1,0 +1,1 @@
+{"design":3,"clarity":4,"robustness":4,"notes":"Cache is clean, but `computeTotal`'s sequential await loop needlessly serializes every deferred `load()`, and the split between `syncAdjustmentOf` and an inline deferred branch scatters the kind dispatch."}

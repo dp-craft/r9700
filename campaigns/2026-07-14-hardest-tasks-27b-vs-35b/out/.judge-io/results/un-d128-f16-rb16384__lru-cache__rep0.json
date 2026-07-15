@@ -1,0 +1,1 @@
+{"design":3,"clarity":3,"robustness":4,"notes":"Recency is really carried by Map insertion order, so the lastAccessedAt field is written but never read — dead state that misleads the reader, though expiry-before-eviction and non-resurrecting has() are handled well."}

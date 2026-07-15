@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":3,"notes":"Clean named-constant unit handling and a well-partitioned test suite; the vi.fn clock is typed as plain Clock so mockReturnValue leans on an unstated cast."}

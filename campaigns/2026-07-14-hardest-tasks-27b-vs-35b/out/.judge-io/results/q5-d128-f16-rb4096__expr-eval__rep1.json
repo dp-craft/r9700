@@ -1,0 +1,1 @@
+{"design":3,"clarity":4,"robustness":3,"notes":"Clean recursive-descent split over an explicit State, but smuggling division-by-zero through a NaN sentinel in a number|undefined channel conflates two failure modes and forces the awkward isNaN re-check in evaluate."}

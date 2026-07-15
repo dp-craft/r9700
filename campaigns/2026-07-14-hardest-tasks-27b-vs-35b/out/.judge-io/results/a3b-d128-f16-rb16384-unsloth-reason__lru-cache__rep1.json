@@ -1,0 +1,1 @@
+{"design":0,"clarity":0,"robustness":0,"notes":"Output is truncated and corrupted mid-`size` getter with an unparseable test file, and the `currentLive` counter is never reconciled with expiry."}

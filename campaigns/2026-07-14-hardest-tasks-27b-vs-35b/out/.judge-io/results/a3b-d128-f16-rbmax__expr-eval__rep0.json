@@ -1,0 +1,1 @@
+{"design":2,"clarity":3,"robustness":2,"notes":"Threading errors through `Result | number` unions and discriminating them with `typeof x === 'object'` is fragile (arrays are objects too), and only the literal space character is treated as whitespace."}

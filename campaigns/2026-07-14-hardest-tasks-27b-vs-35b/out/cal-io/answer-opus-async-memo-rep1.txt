@@ -1,0 +1,94 @@
+// FILE: impl.ts
+/** Memoize an async function: dedups in-flight calls, caches successes,
+ *  and evicts rejected computations so a later call retries `fn`. */
+export function createAsyncMemo<K, V>(fn: (key: K) => Promise<V>): (key: K) => Promise<V> {
+  const cache = new Map<K, Promise<V>>();
+  return (key: K): Promise<V> => {
+    const existing = cache.get(key);
+    if (existing !== undefined) return existing;
+    const pending: Promise<V> = fn(key).catch((err: unknown): never => {
+      if (cache.get(key) === pending) cache.delete(key);
+      throw err;
+    });
+    cache.set(key, pending);
+    return pending;
+  };
+}
+
+// FILE: impl.test.ts
+import { describe, it, expect, vi } from "vitest";
+import { createAsyncMemo } from "./impl";
+
+interface Deferred<V> {
+  promise: Promise<V>;
+  resolve: (value: V) => void;
+  reject: (reason: Error) => void;
+}
+
+function defer<V>(): Deferred<V> {
+  let resolve: (value: V) => void = (): void => {};
+  let reject: (reason: Error) => void = (): void => {};
+  const promise = new Promise<V>((res, rej): void => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+describe("createAsyncMemo", (): void => {
+  it("should run fn once when concurrent calls share the same key", async (): Promise<void> => {
+    const gate = defer<string>();
+    const fn = vi.fn((_key: string): Promise<string> => gate.promise);
+    const memo = createAsyncMemo(fn);
+
+    const first = memo("a");
+    const second = memo("a");
+    gate.resolve("value-a");
+
+    await expect(Promise.all([first, second])).resolves.toEqual(["value-a", "value-a"]);
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it("should run fn again when the previous computation rejected", async (): Promise<void> => {
+    const fn = vi
+      .fn<(key: string) => Promise<string>>()
+      .mockRejectedValueOnce(new Error("boom"))
+      .mockResolvedValueOnce("value-b");
+    const memo = createAsyncMemo(fn);
+
+    await expect(memo("b")).rejects.toThrow("boom");
+    await expect(memo("b")).resolves.toBe("value-b");
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+
+  it("should reject every concurrent caller when the shared computation rejects", async (): Promise<void> => {
+    const gate = defer<string>();
+    const fn = vi.fn((_key: string): Promise<string> => gate.promise);
+    const memo = createAsyncMemo(fn);
+
+    const first = memo("c");
+    const second = memo("c");
+    gate.reject(new Error("shared failure"));
+
+    await expect(first).rejects.toThrow("shared failure");
+    await expect(second).rejects.toThrow("shared failure");
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it("should reuse the cached value when the key resolved earlier", async (): Promise<void> => {
+    const fn = vi.fn((key: string): Promise<string> => Promise.resolve(`value-${key}`));
+    const memo = createAsyncMemo(fn);
+
+    await expect(memo("d")).resolves.toBe("value-d");
+    await expect(memo("d")).resolves.toBe("value-d");
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it("should compute independently when keys differ", async (): Promise<void> => {
+    const fn = vi.fn((key: string): Promise<string> => Promise.resolve(`value-${key}`));
+    const memo = createAsyncMemo(fn);
+
+    await expect(Promise.all([memo("e"), memo("f")])).resolves.toEqual(["value-e", "value-f"]);
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+});

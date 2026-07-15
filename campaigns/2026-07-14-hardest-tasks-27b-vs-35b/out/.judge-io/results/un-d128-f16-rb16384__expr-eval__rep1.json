@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Exception-free Result threading through a clean recursive-descent parser with human-readable errors, and it anticipates unary signs, nested parens, trailing input, and integer division truncation beyond the literal spec."}

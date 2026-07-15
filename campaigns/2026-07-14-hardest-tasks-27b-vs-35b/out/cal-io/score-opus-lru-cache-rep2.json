@@ -1,0 +1,25 @@
+{
+  "id": "opus-lru-cache-rep2",
+  "score": 0.909,
+  "hard_pass": false,
+  "objectives": {
+    "types": 1.0,
+    "lint": 0.4,
+    "tests": 1.0,
+    "bdd": 0.92,
+    "novj": 1.0,
+    "reuse": 1.0,
+    "edge": 1.0
+  },
+  "test_counts": {
+    "own": [
+      13,
+      13
+    ]
+  },
+  "files": [
+    "impl.test.ts",
+    "impl.ts"
+  ],
+  "grader": "fractional-2026-07-15"
+}

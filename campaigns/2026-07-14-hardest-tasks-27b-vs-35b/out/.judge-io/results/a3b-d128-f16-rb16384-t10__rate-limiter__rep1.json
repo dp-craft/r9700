@@ -1,0 +1,1 @@
+{"design":3,"clarity":3,"robustness":3,"notes":"Correct lazy-refill semantics, but refill() mixes lookup/creation/mutation and returns a count that acquire() then redundantly re-fetches and re-guards, and the acquire/tryAcquire split adds no value."}

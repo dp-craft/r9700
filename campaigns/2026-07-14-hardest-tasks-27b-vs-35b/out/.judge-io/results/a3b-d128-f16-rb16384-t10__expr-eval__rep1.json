@@ -1,0 +1,1 @@
+{"design":3,"clarity":3,"robustness":3,"notes":"Conventional recursive descent with a mutable ctx cursor, but it mixes a throwing tokenizer with Result-returning parsers and only skips space/tab despite the arbitrary-whitespace requirement."}

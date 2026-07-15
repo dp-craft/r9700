@@ -1,0 +1,1 @@
+{"design": 4, "clarity": 4, "robustness": 4, "notes": "Cache correctly separates pending from resolved entries to give single-flight, no caching of failures and clock-driven TTL; the Partial<Record> label map needlessly gives up exhaustiveness checking on Amount['kind']."}

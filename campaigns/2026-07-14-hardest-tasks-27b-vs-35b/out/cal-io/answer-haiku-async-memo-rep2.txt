@@ -1,0 +1,81 @@
+// FILE: impl.ts
+```ts
+export function createAsyncMemo<K, V>(fn: (key: K) => Promise<V>): (key: K) => Promise<V> {
+  const inFlight = new Map<K, Promise<V>>();
+  const success = new Map<K, V>();
+
+  return (key: K): Promise<V> => {
+    if (success.has(key)) {
+      return Promise.resolve(success.get(key) as V);
+    }
+
+    if (inFlight.has(key)) {
+      return inFlight.get(key) as Promise<V>;
+    }
+
+    const promise = fn(key)
+      .then((value: V): V => {
+        success.set(key, value);
+        inFlight.delete(key);
+        return value;
+      })
+      .catch((error: unknown): never => {
+        inFlight.delete(key);
+        throw error;
+      });
+
+    inFlight.set(key, promise);
+    return promise;
+  };
+}
+```
+
+// FILE: impl.test.ts
+```ts
+import { describe, it, expect, vi } from 'vitest';
+import { createAsyncMemo } from './impl';
+
+describe('createAsyncMemo', () => {
+  it('should deduplicate and share one in-flight computation when concurrent calls use the same key', async () => {
+    const fn = vi.fn(async (key: string) => `result-${key}`);
+    const memoized = createAsyncMemo(fn);
+
+    const promise1 = memoized('key1');
+    const promise2 = memoized('key1');
+
+    const [result1, result2] = await Promise.all([promise1, promise2]);
+
+    expect(fn).toHaveBeenCalledTimes(1);
+    expect(result1).toBe('result-key1');
+    expect(result2).toBe('result-key1');
+  });
+
+  it('should retry after rejection when subsequent call is made', async () => {
+    const fn = vi.fn(async (key: string) => {
+      if (fn.mock.callCount === 1) {
+        throw new Error('computation failed');
+      }
+      return `result-${key}`;
+    });
+    const memoized = createAsyncMemo(fn);
+
+    await expect(memoized('key1')).rejects.toThrow('computation failed');
+    const result = await memoized('key1');
+
+    expect(fn).toHaveBeenCalledTimes(2);
+    expect(result).toBe('result-key1');
+  });
+
+  it('should cache successful results and reuse them on subsequent calls', async () => {
+    const fn = vi.fn(async (key: string) => `result-${key}`);
+    const memoized = createAsyncMemo(fn);
+
+    const result1 = await memoized('key1');
+    const result2 = await memoized('key1');
+
+    expect(fn).toHaveBeenCalledTimes(1);
+    expect(result1).toBe('result-key1');
+    expect(result2).toBe('result-key1');
+  });
+});
+```

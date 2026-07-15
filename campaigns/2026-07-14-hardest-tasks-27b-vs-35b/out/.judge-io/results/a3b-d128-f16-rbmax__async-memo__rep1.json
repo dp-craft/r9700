@@ -1,0 +1,1 @@
+{"design":3,"clarity":4,"robustness":3,"notes":"Correct and readable, but the needless async wrapper hides promise identity and the truthy cache check plus thinner tests leave edges unexamined."}

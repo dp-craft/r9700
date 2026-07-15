@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":3,"notes":"Pruning up front lets has/size/get stay trivially correct off the live map — an elegant simplification, but paying an O(n) sweep on every single read is a poor tradeoff for a cache."}

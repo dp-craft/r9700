@@ -1,0 +1,1 @@
+{"design":3,"clarity":2,"robustness":3,"notes":"Clean recursive-descent shape but the `ERR:<char>` sentinel smuggled through the token type is a hack, and the dense multi-statement lines hurt readability."}

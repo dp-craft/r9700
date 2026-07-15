@@ -1,0 +1,1 @@
+{"design":2,"clarity":3,"robustness":2,"notes":"The first call for a new key short-circuits to true without deducting or checking the request against capacity, so every key gets one free unbounded acquire."}

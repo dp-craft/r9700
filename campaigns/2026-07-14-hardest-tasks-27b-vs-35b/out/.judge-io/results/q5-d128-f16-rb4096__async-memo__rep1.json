@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":3,"notes":"Tight fix that caches the original promise and evicts via a side-channel catch, but the test suite is thin -- no per-key isolation and no concurrent-rejection coverage."}

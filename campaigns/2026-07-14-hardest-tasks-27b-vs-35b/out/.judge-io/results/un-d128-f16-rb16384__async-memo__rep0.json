@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Minimal, well-targeted fix that caches the rethrowing catch chain so failures self-evict before propagating, slightly padded by redundant nested describes and a manual callCount alongside vi.fn."}

@@ -1,0 +1,47 @@
+ ▐▛███▜▌   Claude Code v2.1.210
+▝▜█████▛▘  Haiku 4.5 · Claude Pro
+  ▘▘ ▝▝    ~/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b
+
+
+❯ Read the file /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/cal-io/prompt-async-memo.txt . It contains exactly one task. Do that task, then write your final answer to the file
+  /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/cal-io/answer-haiku-async-memo-rep1.txt (that file must contain ONLY the answer itself, with no preamble or commentary). Writing that file is the last thing you do.
+
+  Read 1 file (ctrl+o to expand)
+
+● Reading the task now.
+
+  The task is to fix createAsyncMemo so it:
+  1. Deduplicates concurrent calls (one in-flight computation per key)
+  2. Doesn't cache failures (rejects from cache, retries on next call)
+  3. Caches successes (resolved values are reused)
+
+  The bug in the original code is that it caches promises unconditionally—if a promise rejects, it stays cached, so retries get the same rejection.
+
+  The fix: attach a rejection handler that removes the promise from cache on failure. On success, it stays cached.
+
+  Let me write the solution and tests:
+
+● Write(out/cal-io/answer-haiku-async-memo-rep1.txt)
+  ⎿  Wrote 99 lines to out/cal-io/answer-haiku-async-memo-rep1.txt
+       1 // FILE: impl.ts
+       2 export function createAsyncMemo<K, V>(
+       3   fn: (key: K) => Promise<V>
+       4 ): (key: K) => Promise<V> {
+       5   const cache = new Map<K, Promise<V>>();
+       6
+       7   return (key: K): Promise<V> => {
+       8     const cached = cache.get(key);
+       9     if (cached !== undefined) {
+      10       return cached;
+     … +89 lines (ctrl+o to expand)
+
+● Done. The answer file has been written with the fixed implementation and comprehensive tests.
+
+✻ Churned for 43s
+
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Haiku 4.5 | ctx:14% | sess:31k dev@bipubi:/home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b (27b-hybrid-kv-correction-and-finetune-plan *%>)                                                                          /rc
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← 1 agent
+

@@ -1,0 +1,1 @@
+{"design":4,"clarity":3,"robustness":4,"notes":"Textbook recursive descent with unary support and thorough tests, but single-letter token tags and names plus a tokenizer that throws while the parser returns Result make the error strategy inconsistent and the code dense."}

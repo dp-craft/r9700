@@ -1,0 +1,1 @@
+{"design": 2, "clarity": 3, "robustness": 2, "notes": "String(key) coercion silently breaks the generic K contract (object keys collide, 1 and '1' alias), and the pointless buildLruCache wrapper plus a recency counter duplicating Map order add machinery without benefit."}

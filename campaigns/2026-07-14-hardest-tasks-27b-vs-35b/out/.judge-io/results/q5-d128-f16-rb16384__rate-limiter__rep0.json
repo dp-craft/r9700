@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":3,"notes":"Named constants and a clean refill(state, now) split, but nothing guards a non-monotonic clock, where negative elapsed would silently drain the bucket."}

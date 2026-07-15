@@ -1,0 +1,1 @@
+{"design": 3, "clarity": 3, "robustness": 4, "notes": "Cache contract fully met, but inline `\"value\" in entry` / `\"promise\" in entry` narrowing reads worse than a named guard and the Partial<Record> plus unreachable 'other' fallback is dead defensiveness."}

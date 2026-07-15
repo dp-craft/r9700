@@ -1,0 +1,1 @@
+{"design":3,"clarity":3,"robustness":2,"notes":"Readable predicate helpers, but the absent-key path in get() falls through and re-inserts an undefined entry, and size recomputes clock.now() per element."}

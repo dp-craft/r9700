@@ -1,0 +1,1 @@
+{"design":2,"clarity":2,"robustness":1,"notes":"The pointless acquire/tryAcquire indirection, dense multi-statement one-liners and duplicated clock.now() calls obscure a bucket-creation path that ignores the requested token count entirely, and the repetitive tests never probe that case."}

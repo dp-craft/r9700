@@ -1,0 +1,203 @@
+// FILE: impl.ts
+export type Result =
+  | { readonly ok: true; readonly value: number }
+  | { readonly ok: false; readonly error: string };
+
+type Token =
+  | { readonly kind: "num"; readonly value: number }
+  | { readonly kind: "op"; readonly value: "+" | "-" | "*" | "/" }
+  | { readonly kind: "lparen" }
+  | { readonly kind: "rparen" };
+
+interface ParseState {
+  readonly tokens: readonly Token[];
+  pos: number;
+}
+
+class EvalError extends Error {}
+
+const SINGLE: ReadonlyMap<string, Token> = new Map<string, Token>([
+  ["+", { kind: "op", value: "+" }],
+  ["-", { kind: "op", value: "-" }],
+  ["*", { kind: "op", value: "*" }],
+  ["/", { kind: "op", value: "/" }],
+  ["(", { kind: "lparen" }],
+  [")", { kind: "rparen" }],
+]);
+
+function isDigit(ch: string): boolean {
+  return ch >= "0" && ch <= "9";
+}
+
+function scanNumber(expr: string, start: number): { readonly value: number; readonly next: number } {
+  let i = start;
+  while (i < expr.length && isDigit(expr[i] ?? "")) i += 1;
+  return { value: Number(expr.slice(start, i)), next: i };
+}
+
+function nextToken(expr: string, i: number): { readonly token: Token | undefined; readonly next: number } {
+  const ch = expr[i] ?? "";
+  if (/\s/.test(ch)) return { token: undefined, next: i + 1 };
+  const single = SINGLE.get(ch);
+  if (single !== undefined) return { token: single, next: i + 1 };
+  if (isDigit(ch)) {
+    const scanned = scanNumber(expr, i);
+    return { token: { kind: "num", value: scanned.value }, next: scanned.next };
+  }
+  throw new EvalError(`Unexpected character '${ch}'`);
+}
+
+function tokenize(expr: string): Token[] {
+  const tokens: Token[] = [];
+  let i = 0;
+  while (i < expr.length) {
+    const result = nextToken(expr, i);
+    if (result.token !== undefined) tokens.push(result.token);
+    i = result.next;
+  }
+  return tokens;
+}
+
+function peek(state: ParseState): Token | undefined {
+  return state.tokens[state.pos];
+}
+
+function expect(state: ParseState, kind: Token["kind"]): void {
+  const tok = peek(state);
+  if (tok === undefined || tok.kind !== kind) {
+    throw new EvalError(`Expected ${kind}`);
+  }
+  state.pos += 1;
+}
+
+function parseFactor(state: ParseState): number {
+  const tok = peek(state);
+  if (tok === undefined) {
+    throw new EvalError("Unexpected end of input");
+  }
+  if (tok.kind === "num") {
+    state.pos += 1;
+    return tok.value;
+  }
+  if (tok.kind === "lparen") {
+    state.pos += 1;
+    const value = parseExpr(state);
+    expect(state, "rparen");
+    return value;
+  }
+  throw new EvalError("Expected a number or '('");
+}
+
+function parseTerm(state: ParseState): number {
+  let value = parseFactor(state);
+  let tok = peek(state);
+  while (tok !== undefined && tok.kind === "op" && (tok.value === "*" || tok.value === "/")) {
+    state.pos += 1;
+    const rhs = parseFactor(state);
+    if (tok.value === "*") {
+      value = value * rhs;
+    } else {
+      if (rhs === 0) throw new EvalError("Division by zero");
+      value = value / rhs;
+    }
+    tok = peek(state);
+  }
+  return value;
+}
+
+function parseExpr(state: ParseState): number {
+  let value = parseTerm(state);
+  let tok = peek(state);
+  while (tok !== undefined && tok.kind === "op" && (tok.value === "+" || tok.value === "-")) {
+    state.pos += 1;
+    const rhs = parseTerm(state);
+    value = tok.value === "+" ? value + rhs : value - rhs;
+    tok = peek(state);
+  }
+  return value;
+}
+
+export function evaluate(expr: string): Result {
+  try {
+    const tokens = tokenize(expr);
+    const state: ParseState = { tokens, pos: 0 };
+    const value = parseExpr(state);
+    if (state.pos !== tokens.length) {
+      throw new EvalError("Unexpected trailing input");
+    }
+    return { ok: true, value };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Invalid expression";
+    return { ok: false, error: message };
+  }
+}
+
+// FILE: impl.test.ts
+import { describe, it, expect } from "vitest";
+import { evaluate } from "./impl";
+
+describe("evaluate", () => {
+  it("should return the value when the expression is a single number", () => {
+    const result = evaluate("42");
+    expect(result).toEqual({ ok: true, value: 42 });
+  });
+
+  it("should apply multiplication before addition when precedence differs", () => {
+    const result = evaluate("2 + 3 * 4");
+    expect(result).toEqual({ ok: true, value: 14 });
+  });
+
+  it("should apply division before subtraction when precedence differs", () => {
+    const result = evaluate("20 - 8 / 4");
+    expect(result).toEqual({ ok: true, value: 18 });
+  });
+
+  it("should subtract left-to-right when chained subtractions are used", () => {
+    const result = evaluate("10 - 3 - 2");
+    expect(result).toEqual({ ok: true, value: 5 });
+  });
+
+  it("should divide left-to-right when chained divisions are used", () => {
+    const result = evaluate("8 / 2 / 2");
+    expect(result).toEqual({ ok: true, value: 2 });
+  });
+
+  it("should respect parentheses when they override default precedence", () => {
+    const result = evaluate("(2 + 3) * 4");
+    expect(result).toEqual({ ok: true, value: 20 });
+  });
+
+  it("should handle nested parentheses when evaluating deeply grouped expressions", () => {
+    const result = evaluate("((1 + 2) * (3 + 4))");
+    expect(result).toEqual({ ok: true, value: 21 });
+  });
+
+  it("should ignore arbitrary whitespace when tokenizing the expression", () => {
+    const result = evaluate("  12   +   30  ");
+    expect(result).toEqual({ ok: true, value: 42 });
+  });
+
+  it("should return an error when parentheses are unbalanced", () => {
+    const result = evaluate("(2 + 3");
+    expect(result.ok).toBe(false);
+  });
+
+  it("should return an error when an operand is missing", () => {
+    const result = evaluate("2 +");
+    expect(result.ok).toBe(false);
+  });
+
+  it("should return an error when an unexpected character is present", () => {
+    const result = evaluate("2 + @");
+    expect(result.ok).toBe(false);
+  });
+
+  it("should return an error when dividing by zero", () => {
+    const result = evaluate("4 / 0");
+    expect(result.ok).toBe(false);
+  });
+
+  it("should not throw when given a malformed expression", () => {
+    expect(() => evaluate(")(")).not.toThrow();
+  });
+});

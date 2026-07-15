@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Traces the async change cleanly through every layer and rebuilds the cache with a proper pending map so dedup, no-cache-on-failure and TTL all hold, with tests that exercise deferred loads through the cache."}

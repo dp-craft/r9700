@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":3,"notes":"Minimal idiomatic catch-and-evict fix that reads cleanly; tests cover exactly the three required behaviors and nothing beyond them."}

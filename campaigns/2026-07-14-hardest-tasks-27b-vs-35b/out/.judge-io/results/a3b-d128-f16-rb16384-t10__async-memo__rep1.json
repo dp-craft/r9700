@@ -1,0 +1,1 @@
+{"design":4,"clarity":5,"robustness":4,"notes":"Minimal idiomatic fix: a single .catch that evicts then rethrows satisfies dedup, no-cache-on-failure and cache-on-success with no extra machinery."}

@@ -1,0 +1,1 @@
+{"design":3,"clarity":3,"robustness":3,"notes":"Map-order recency is a sound choice and expired entries are correctly skipped during eviction, but O(n) countLive() on every set plus verbose `=== true`/`=== false` comparisons and never purging stale keys hold it back."}

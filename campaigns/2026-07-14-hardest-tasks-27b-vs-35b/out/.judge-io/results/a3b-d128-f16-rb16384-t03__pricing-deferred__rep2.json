@@ -1,0 +1,1 @@
+{"design":4,"clarity":3,"robustness":3,"notes":"Correct parallel async pipeline and try/finally cache dedup, but carries a redundant pctOf helper and Partial<Record> fallback over an exhaustive union, duplicates the vitest import, and never tests key independence."}

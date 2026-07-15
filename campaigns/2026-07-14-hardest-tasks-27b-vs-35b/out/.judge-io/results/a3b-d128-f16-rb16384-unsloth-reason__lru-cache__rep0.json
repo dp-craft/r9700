@@ -1,0 +1,1 @@
+{"design":3,"clarity":3,"robustness":3,"notes":"Works via timestamp scanning but is O(n) on every get/size, evicts the LRU live entry rather than dropping expired ones first, and `findLeastRecentKey` constrains K to a keyof-like type the cache never guarantees."}

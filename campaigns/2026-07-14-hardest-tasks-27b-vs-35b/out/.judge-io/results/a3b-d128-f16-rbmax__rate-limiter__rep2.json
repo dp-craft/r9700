@@ -1,0 +1,1 @@
+{"design":2,"clarity":2,"robustness":1,"notes":"The first-call branch seeds a full bucket and returns true without deducting the requested tokens, refill treats milliseconds as seconds, and everything is crammed onto single lines that hide both flaws."}

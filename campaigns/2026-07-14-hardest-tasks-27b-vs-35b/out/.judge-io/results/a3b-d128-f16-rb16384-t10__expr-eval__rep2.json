@@ -1,0 +1,1 @@
+{"design":3,"clarity":3,"robustness":3,"notes":"Clean ParserState threading and well-organized nested test suites, undercut by a Token[] | Result return union that conflates success and error and by parse helpers using left.value without narrowing left.ok."}

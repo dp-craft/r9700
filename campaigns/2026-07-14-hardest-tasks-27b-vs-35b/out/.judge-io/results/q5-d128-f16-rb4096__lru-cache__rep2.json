@@ -1,0 +1,1 @@
+{"design":3,"clarity":4,"robustness":4,"notes":"Map-insertion-order LRU is the right core, but size/set trigger a full O(n) countLive() sweep that already purges expired entries, leaving the expired branch of evictLruLive dead code, and removeEntry is a pointless delete wrapper."}

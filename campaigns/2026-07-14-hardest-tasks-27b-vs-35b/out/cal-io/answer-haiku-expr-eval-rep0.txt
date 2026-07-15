@@ -1,0 +1,307 @@
+// FILE: impl.ts
+export type Result =
+  | { readonly ok: true; readonly value: number }
+  | { readonly ok: false; readonly error: string };
+
+type Token = { readonly type: "num" | "op" | "lparen" | "rparen"; readonly value: string };
+
+type TokenizeResult =
+  | { readonly ok: true; readonly tokens: readonly Token[] }
+  | { readonly ok: false; readonly error: string };
+
+export function evaluate(expr: string): Result {
+  const tokenizeResult = tokenize(expr);
+  if (!tokenizeResult.ok) {
+    return tokenizeResult as Result;
+  }
+
+  const parser = new Parser(tokenizeResult.tokens);
+  const result = parser.parse();
+
+  if (!result.ok) return result;
+  if (parser.hasMoreTokens()) {
+    return { ok: false, error: "Unexpected tokens after expression" };
+  }
+  return result;
+}
+
+function tokenize(input: string): TokenizeResult {
+  const tokens: Token[] = [];
+  for (let i = 0; i < input.length; ) {
+    const ch = input[i];
+    if (/\s/.test(ch)) i++;
+    else if (/\d/.test(ch)) {
+      let num = "";
+      while (i < input.length && /\d/.test(input[i])) num += input[i++];
+      tokens.push({ type: "num", value: num });
+    } else if ("+-*/".includes(ch)) {
+      tokens.push({ type: "op", value: ch });
+      i++;
+    } else if ("()".includes(ch)) {
+      tokens.push({ type: ch === "(" ? "lparen" : "rparen", value: ch });
+      i++;
+    } else {
+      return { ok: false, error: `Unexpected character: ${ch}` };
+    }
+  }
+  return { ok: true, tokens };
+}
+
+class Parser {
+  private pos: number = 0;
+  private tokens: readonly Token[];
+
+  constructor(tokens: readonly Token[]) {
+    this.tokens = tokens;
+  }
+
+  parse(): Result {
+    return this.parseExpression();
+  }
+
+  hasMoreTokens(): boolean {
+    return this.pos < this.tokens.length;
+  }
+
+  private peek(): Token | undefined {
+    return this.tokens[this.pos];
+  }
+
+  private consume(): Token | undefined {
+    const token = this.tokens[this.pos];
+    this.pos++;
+    return token;
+  }
+
+  private parseExpression(): Result {
+    const left = this.parseTerm();
+    if (!left.ok) return left;
+
+    let result = left.value;
+    while (this.peek()?.type === "op" && "+-".includes(this.peek()?.value ?? "")) {
+      const op = this.consume();
+      const right = this.parseTerm();
+      if (!right.ok) return right;
+      result = op?.value === "+" ? result + right.value : result - right.value;
+    }
+
+    return { ok: true, value: result };
+  }
+
+  private parseTerm(): Result {
+    const left = this.parseFactor();
+    if (!left.ok) return left;
+
+    let result = left.value;
+    while (this.peek()?.type === "op" && "*/".includes(this.peek()?.value ?? "")) {
+      const op = this.consume();
+      const right = this.parseFactor();
+      if (!right.ok) return right;
+      if (op?.value === "/" && right.value === 0) {
+        return { ok: false, error: "Division by zero" };
+      }
+      result = op?.value === "*" ? result * right.value : Math.floor(result / right.value);
+    }
+
+    return { ok: true, value: result };
+  }
+
+  private parseFactor(): Result {
+    const token = this.peek();
+    if (token === undefined) {
+      return { ok: false, error: "Unexpected end of input" };
+    }
+
+    if (token.type === "num") {
+      this.consume();
+      const value = parseInt(token.value, 10);
+      return { ok: true, value };
+    }
+
+    if (token.type === "lparen") {
+      this.consume();
+      const result = this.parseExpression();
+      if (!result.ok) return result;
+
+      const closing = this.peek();
+      if (closing === undefined || closing.type !== "rparen") {
+        return { ok: false, error: "Unbalanced parentheses" };
+      }
+      this.consume();
+      return result;
+    }
+
+    return { ok: false, error: `Unexpected token: ${token.value}` };
+  }
+}
+
+// FILE: impl.test.ts
+import { describe, it, expect } from "vitest";
+import { evaluate, type Result } from "./impl";
+
+describe("evaluate", () => {
+  describe("basic arithmetic", () => {
+    it("should evaluate single number when input is a number", () => {
+      expect(evaluate("42")).toEqual({ ok: true, value: 42 });
+    });
+
+    it("should handle whitespace when spaces surround expression", () => {
+      expect(evaluate("  42  ")).toEqual({ ok: true, value: 42 });
+      expect(evaluate("2 + 3")).toEqual({ ok: true, value: 5 });
+    });
+
+    it("should evaluate zero when input is zero", () => {
+      expect(evaluate("0")).toEqual({ ok: true, value: 0 });
+    });
+  });
+
+  describe("addition and subtraction", () => {
+    it("should add two numbers when given addition operation", () => {
+      expect(evaluate("2+3")).toEqual({ ok: true, value: 5 });
+    });
+
+    it("should subtract two numbers when given subtraction operation", () => {
+      expect(evaluate("5-3")).toEqual({ ok: true, value: 2 });
+    });
+
+    it("should chain additions when given multiple additions", () => {
+      expect(evaluate("1+2+3")).toEqual({ ok: true, value: 6 });
+    });
+
+    it("should apply left associativity when subtracting multiple times", () => {
+      expect(evaluate("10-3-2")).toEqual({ ok: true, value: 5 });
+    });
+  });
+
+  describe("multiplication and division", () => {
+    it("should multiply two numbers when given multiplication operation", () => {
+      expect(evaluate("3*4")).toEqual({ ok: true, value: 12 });
+    });
+
+    it("should divide two numbers when given division operation", () => {
+      expect(evaluate("8/2")).toEqual({ ok: true, value: 4 });
+    });
+
+    it("should perform integer division when dividing non-evenly", () => {
+      expect(evaluate("7/2")).toEqual({ ok: true, value: 3 });
+      expect(evaluate("9/2")).toEqual({ ok: true, value: 4 });
+    });
+
+    it("should chain multiplications when given multiple multiplications", () => {
+      expect(evaluate("2*3*4")).toEqual({ ok: true, value: 24 });
+    });
+
+    it("should apply left associativity when dividing multiple times", () => {
+      expect(evaluate("8/2/2")).toEqual({ ok: true, value: 2 });
+      expect(evaluate("16/2/2/2")).toEqual({ ok: true, value: 2 });
+    });
+  });
+
+  describe("operator precedence", () => {
+    it("should apply multiplication before addition when mixed", () => {
+      expect(evaluate("2+3*4")).toEqual({ ok: true, value: 14 });
+    });
+
+    it("should apply division before addition when mixed", () => {
+      expect(evaluate("10+8/2")).toEqual({ ok: true, value: 14 });
+    });
+
+    it("should apply multiplication before subtraction when mixed", () => {
+      expect(evaluate("10-2*3")).toEqual({ ok: true, value: 4 });
+    });
+
+    it("should handle complex mixed precedence expressions", () => {
+      expect(evaluate("2+3*4-1")).toEqual({ ok: true, value: 13 });
+    });
+  });
+
+  describe("parentheses", () => {
+    it("should override precedence with parentheses when given addition in parens", () => {
+      expect(evaluate("(2+3)*4")).toEqual({ ok: true, value: 20 });
+    });
+
+    it("should handle nested parentheses when multiply nested levels", () => {
+      expect(evaluate("((2+3)*4)")).toEqual({ ok: true, value: 20 });
+    });
+
+    it("should handle complex nested expressions when deeply nested", () => {
+      expect(evaluate("(1+(2*(3+4)))*5")).toEqual({ ok: true, value: 75 });
+    });
+
+    it("should support parentheses in division when parentheses contain sum", () => {
+      expect(evaluate("20/(2+3)")).toEqual({ ok: true, value: 4 });
+    });
+  });
+
+  describe("error handling", () => {
+    it("should return error for division by zero when dividing by zero", () => {
+      const result = evaluate("5/0");
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toContain("Division by zero");
+      }
+    });
+
+    it("should return error for unbalanced left parenthesis", () => {
+      const result = evaluate("(2+3");
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toContain("parentheses");
+      }
+    });
+
+    it("should return error for unbalanced right parenthesis", () => {
+      const result = evaluate("2+3)");
+      expect(result.ok).toBe(false);
+    });
+
+    it("should return error for unexpected character when given invalid symbol", () => {
+      const result = evaluate("2@3");
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toContain("Unexpected character");
+      }
+    });
+
+    it("should return error for missing operand when operator ends expression", () => {
+      const result = evaluate("2+");
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toContain("Unexpected end");
+      }
+    });
+
+    it("should return error for consecutive operators when given multiple operators", () => {
+      const result = evaluate("2++3");
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toContain("Unexpected token");
+      }
+    });
+
+    it("should return error for empty input when given empty string", () => {
+      const result = evaluate("");
+      expect(result.ok).toBe(false);
+    });
+
+    it("should return error for only operator when given operator alone", () => {
+      const result = evaluate("+");
+      expect(result.ok).toBe(false);
+    });
+  });
+
+  describe("zero handling", () => {
+    it("should handle zero in addition when adding zero", () => {
+      expect(evaluate("0+5")).toEqual({ ok: true, value: 5 });
+    });
+
+    it("should handle multiplication by zero when multiplying by zero", () => {
+      expect(evaluate("5*0")).toEqual({ ok: true, value: 0 });
+    });
+
+    it("should return error for division by zero result", () => {
+      const result = evaluate("0/0");
+      expect(result.ok).toBe(false);
+    });
+  });
+});

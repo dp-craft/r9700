@@ -1,0 +1,1 @@
+{"design":4,"clarity":3,"robustness":2,"notes":"Proper recursive-descent parser with unary support, but Result is used as a generic it was never declared to be, division by zero is unguarded despite the spec, and the dense one-line style hurts readability."}

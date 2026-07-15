@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":3,"notes":"Elegant immutable-state refill returning a fresh bucket, but it churns objects on every call and lacks any guard against a non-monotonic clock."}

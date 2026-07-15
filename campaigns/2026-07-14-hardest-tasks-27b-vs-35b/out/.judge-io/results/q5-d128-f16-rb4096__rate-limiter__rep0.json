@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":3,"notes":"Clean lazy-refill bucket, though RateLimiter is left unexported, the acquire/tryAcquire split is thin indirection, and a backwards clock would silently drain tokens."}

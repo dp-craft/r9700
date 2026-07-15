@@ -1,0 +1,1 @@
+{"design":3,"clarity":4,"robustness":1,"notes":"Readable entries/inFlight structure, but nothing clears inFlight on rejection so a failed computation is cached forever as a rejected promise -- the explicit no-caching-failures requirement."}

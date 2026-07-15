@@ -1,0 +1,1 @@
+{"design":2,"clarity":2,"robustness":2,"notes":"Pointless try/catch that only rethrows, an unconditional catch-delete that can drop a newer entry, TTL started before resolution, and amountLabel special-cases deferred outside the label map it belongs in."}

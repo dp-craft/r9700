@@ -1,0 +1,141 @@
+// FILE: impl.ts
+/** Async memoizer: dedups in-flight work per key, caches successes, never caches failures. */
+export function createAsyncMemo<K, V>(fn: (key: K) => Promise<V>): (key: K) => Promise<V> {
+  const cache = new Map<K, Promise<V>>();
+
+  const invoke = (key: K): Promise<V> => {
+    try {
+      return fn(key);
+    } catch (err: unknown) {
+      return Promise.reject(err);
+    }
+  };
+
+  const evictIfCurrent = (key: K, entry: Promise<V>): void => {
+    if (cache.get(key) === entry) cache.delete(key);
+  };
+
+  return (key: K): Promise<V> => {
+    const existing = cache.get(key);
+    if (existing !== undefined) return existing;
+    const entry: Promise<V> = invoke(key).catch((err: unknown): never => {
+      evictIfCurrent(key, entry);
+      throw err;
+    });
+    cache.set(key, entry);
+    return entry;
+  };
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it, vi } from "vitest";
+import { createAsyncMemo } from "./impl";
+
+interface Deferred<V> {
+  promise: Promise<V>;
+  resolve: (value: V) => void;
+  reject: (reason: unknown) => void;
+}
+
+function defer<V>(): Deferred<V> {
+  let resolve: (value: V) => void = (): void => {};
+  let reject: (reason: unknown) => void = (): void => {};
+  const promise = new Promise<V>((res, rej): void => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+describe("createAsyncMemo", (): void => {
+  it("should run fn once when concurrent calls request the same key", async (): Promise<void> => {
+    const gate = defer<number>();
+    const fn = vi.fn((_key: string): Promise<number> => gate.promise);
+    const memo = createAsyncMemo(fn);
+
+    const first = memo("k");
+    const second = memo("k");
+    expect(first).toBe(second);
+
+    gate.resolve(42);
+    await expect(Promise.all([first, second])).resolves.toEqual([42, 42]);
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it("should run fn per key when concurrent calls request different keys", async (): Promise<void> => {
+    const fn = vi.fn((key: string): Promise<string> => Promise.resolve(key.toUpperCase()));
+    const memo = createAsyncMemo(fn);
+
+    await expect(Promise.all([memo("a"), memo("b")])).resolves.toEqual(["A", "B"]);
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+
+  it("should reject every concurrent caller when the shared computation rejects", async (): Promise<void> => {
+    const gate = defer<number>();
+    const fn = vi.fn((_key: string): Promise<number> => gate.promise);
+    const memo = createAsyncMemo(fn);
+
+    const first = memo("k");
+    const second = memo("k");
+    gate.reject(new Error("boom"));
+
+    await expect(first).rejects.toThrow("boom");
+    await expect(second).rejects.toThrow("boom");
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it("should retry fn when the previous computation rejected", async (): Promise<void> => {
+    let calls = 0;
+    const fn = vi.fn((key: string): Promise<string> => {
+      calls += 1;
+      if (calls === 1) return Promise.reject(new Error("transient"));
+      return Promise.resolve(`${key}:ok`);
+    });
+    const memo = createAsyncMemo(fn);
+
+    await expect(memo("a")).rejects.toThrow("transient");
+    await expect(memo("a")).resolves.toBe("a:ok");
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+
+  it("should retry fn when the computation throws synchronously", async (): Promise<void> => {
+    let calls = 0;
+    const fn = vi.fn((_key: string): Promise<number> => {
+      calls += 1;
+      if (calls === 1) throw new Error("sync-boom");
+      return Promise.resolve(9);
+    });
+    const memo = createAsyncMemo(fn);
+
+    await expect(memo("a")).rejects.toThrow("sync-boom");
+    await expect(memo("a")).resolves.toBe(9);
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+
+  it("should reuse the cached value when the key already resolved", async (): Promise<void> => {
+    let calls = 0;
+    const fn = vi.fn((key: string): Promise<string> => {
+      calls += 1;
+      return Promise.resolve(`${key}:${calls}`);
+    });
+    const memo = createAsyncMemo(fn);
+
+    await expect(memo("a")).resolves.toBe("a:1");
+    await expect(memo("a")).resolves.toBe("a:1");
+    await expect(memo("a")).resolves.toBe("a:1");
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it("should keep the cached value when a later key rejects", async (): Promise<void> => {
+    const fn = vi.fn((key: string): Promise<string> => {
+      if (key === "bad") return Promise.reject(new Error("nope"));
+      return Promise.resolve(`${key}:ok`);
+    });
+    const memo = createAsyncMemo(fn);
+
+    await expect(memo("good")).resolves.toBe("good:ok");
+    await expect(memo("bad")).rejects.toThrow("nope");
+    await expect(memo("good")).resolves.toBe("good:ok");
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+});

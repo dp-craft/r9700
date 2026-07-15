@@ -1,0 +1,1 @@
+{"design":3,"clarity":3,"robustness":2,"notes":"Reasonable expiry purging but O(n) recency scans instead of Map insertion order, awkward free functions threading store/clock/capacity, and the output is truncated mid-test."}

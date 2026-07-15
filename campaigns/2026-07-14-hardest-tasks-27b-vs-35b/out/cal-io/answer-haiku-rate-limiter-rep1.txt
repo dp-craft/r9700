@@ -1,0 +1,142 @@
+// FILE: impl.ts
+import { Clock } from '../../lib/clock';
+
+interface BucketState {
+  tokens: number;
+  lastRefillTime: number;
+}
+
+interface RateLimiter {
+  tryAcquire(key: string, tokens?: number): boolean;
+}
+
+export function createRateLimiter(
+  capacity: number,
+  refillPerSec: number,
+  clock: Clock
+): RateLimiter {
+  const buckets = new Map<string, BucketState>();
+
+  function refillBucket(bucket: BucketState): void {
+    const now = clock.now();
+    const elapsedMs = now - bucket.lastRefillTime;
+    const elapsedSec = elapsedMs / 1000;
+    const tokensAdded = elapsedSec * refillPerSec;
+    bucket.tokens = Math.min(capacity, bucket.tokens + tokensAdded);
+    bucket.lastRefillTime = now;
+  }
+
+  function tryAcquire(key: string, tokens: number = 1): boolean {
+    let bucket = buckets.get(key);
+
+    if (!bucket) {
+      bucket = {
+        tokens: capacity,
+        lastRefillTime: clock.now(),
+      };
+      buckets.set(key, bucket);
+    }
+
+    refillBucket(bucket);
+
+    if (bucket.tokens >= tokens) {
+      bucket.tokens -= tokens;
+      return true;
+    }
+
+    return false;
+  }
+
+  return { tryAcquire };
+}
+
+// FILE: impl.test.ts
+import { describe, it, expect } from 'vitest';
+import { createRateLimiter } from './impl';
+import type { Clock } from '../../lib/clock';
+
+describe('createRateLimiter', () => {
+  describe('first-burst', () => {
+    it('should allow acquiring tokens from a full bucket on first call', () => {
+      const fakeClock: Clock = { now: () => 0 };
+      const limiter = createRateLimiter(3, 1, fakeClock);
+
+      expect(limiter.tryAcquire('key1')).toBe(true);
+      expect(limiter.tryAcquire('key1')).toBe(true);
+      expect(limiter.tryAcquire('key1')).toBe(true);
+      expect(limiter.tryAcquire('key1')).toBe(false);
+    });
+  });
+
+  describe('lazy refill over time', () => {
+    it('should refill tokens based on elapsed time', () => {
+      let currentTime = 0;
+      const fakeClock: Clock = { now: () => currentTime };
+      const limiter = createRateLimiter(10, 2, fakeClock);
+
+      for (let i = 0; i < 10; i++) {
+        expect(limiter.tryAcquire('key1')).toBe(true);
+      }
+      expect(limiter.tryAcquire('key1')).toBe(false);
+
+      currentTime = 2000;
+      expect(limiter.tryAcquire('key1')).toBe(true);
+      expect(limiter.tryAcquire('key1')).toBe(true);
+      expect(limiter.tryAcquire('key1')).toBe(true);
+      expect(limiter.tryAcquire('key1')).toBe(true);
+      expect(limiter.tryAcquire('key1')).toBe(false);
+    });
+
+    it('should cap refill at capacity', () => {
+      let currentTime = 0;
+      const fakeClock: Clock = { now: () => currentTime };
+      const limiter = createRateLimiter(5, 1, fakeClock);
+
+      for (let i = 0; i < 5; i++) {
+        expect(limiter.tryAcquire('key1')).toBe(true);
+      }
+
+      currentTime = 100000;
+      for (let i = 0; i < 5; i++) {
+        expect(limiter.tryAcquire('key1')).toBe(true);
+      }
+      expect(limiter.tryAcquire('key1')).toBe(false);
+    });
+  });
+
+  describe('empty-bucket rejection', () => {
+    it('should reject when bucket is empty', () => {
+      const fakeClock: Clock = { now: () => 0 };
+      const limiter = createRateLimiter(1, 0, fakeClock);
+
+      expect(limiter.tryAcquire('key1')).toBe(true);
+      expect(limiter.tryAcquire('key1')).toBe(false);
+    });
+  });
+
+  describe('per-key isolation', () => {
+    it('should maintain independent buckets for different keys', () => {
+      const fakeClock: Clock = { now: () => 0 };
+      const limiter = createRateLimiter(2, 1, fakeClock);
+
+      expect(limiter.tryAcquire('key1')).toBe(true);
+      expect(limiter.tryAcquire('key1')).toBe(true);
+      expect(limiter.tryAcquire('key1')).toBe(false);
+
+      expect(limiter.tryAcquire('key2')).toBe(true);
+      expect(limiter.tryAcquire('key2')).toBe(true);
+      expect(limiter.tryAcquire('key2')).toBe(false);
+    });
+  });
+
+  describe('multiple token acquisition', () => {
+    it('should acquire multiple tokens when specified', () => {
+      const fakeClock: Clock = { now: () => 0 };
+      const limiter = createRateLimiter(10, 1, fakeClock);
+
+      expect(limiter.tryAcquire('key1', 5)).toBe(true);
+      expect(limiter.tryAcquire('key1', 5)).toBe(true);
+      expect(limiter.tryAcquire('key1', 1)).toBe(false);
+    });
+  });
+});

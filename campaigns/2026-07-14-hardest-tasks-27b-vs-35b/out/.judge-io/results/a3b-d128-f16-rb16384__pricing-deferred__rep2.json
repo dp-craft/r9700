@@ -1,0 +1,1 @@
+{"design":3,"clarity":4,"robustness":4,"notes":"Explicit two-arg then() in the cache is the clearest failure handling of the set and tests are thorough, but the redundant pctOf dead branch and the sequential await loop in computeTotal needlessly serialize deferred loads."}

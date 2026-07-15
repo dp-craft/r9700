@@ -1,0 +1,1 @@
+{"design":3,"clarity":4,"robustness":3,"notes":"Compact single-map promise cache reads well, but stamping expiresAt at request time starts the TTL before compute resolves, so a slow computation can expire while still in flight."}

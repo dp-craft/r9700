@@ -1,0 +1,1 @@
+{"design":3,"clarity":3,"robustness":3,"notes":"Correct shape overall, but the useless try/catch rethrow is noise and clearing `pending` via .finally() drops the in-flight entry a microtask before the value is written to `entries`, leaving a narrow double-compute window."}

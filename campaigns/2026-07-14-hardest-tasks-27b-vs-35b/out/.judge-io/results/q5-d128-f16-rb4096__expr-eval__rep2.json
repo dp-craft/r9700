@@ -1,0 +1,1 @@
+{"design":2,"clarity":3,"robustness":3,"notes":"Reuses the public readonly Result union as mutable internal parser state (res.value = ...), which is the wrong abstraction even though the error messages are usefully specific."}

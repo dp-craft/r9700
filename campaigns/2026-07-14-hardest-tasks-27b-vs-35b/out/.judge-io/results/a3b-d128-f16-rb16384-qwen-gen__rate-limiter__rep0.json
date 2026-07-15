@@ -1,0 +1,1 @@
+{"design":3,"clarity":3,"robustness":2,"notes":"Reasonable bucket/refill split, but refill multiplies raw milliseconds by refillPerSec instead of seconds, and a test asserts a throw the implementation never performs."}

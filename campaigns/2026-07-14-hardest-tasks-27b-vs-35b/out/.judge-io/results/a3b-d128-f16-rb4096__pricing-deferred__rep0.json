@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Elegant use of `.finally` to retire the in-flight entry on both paths, but the `Partial<Record>` plus \"other\" fallback in `amountLabel` discards exhaustiveness checking and no test pins key independence."}

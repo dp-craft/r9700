@@ -1,0 +1,58 @@
+ ▐▛███▜▌   Claude Code v2.1.210
+▝▜█████▛▘  Opus 4.8 with high effort · Claude Pro
+  ▘▘ ▝▝    ~/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b
+
+
+❯ Read the file /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/cal-io/prompt-async-memo.txt . It contains exactly one task. Do that task, then write your final answer to the file
+  /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/cal-io/answer-opus-async-memo-rep1.txt (that file must contain ONLY the answer itself, with no preamble or commentary). Writing that file is the last thing you do.
+
+● I'll read the task file first.
+
+  Read 1 file (ctrl+o to expand)
+
+● Write(out/cal-io/answer-opus-async-memo-rep1.txt)
+  ⎿  Wrote 94 lines to out/cal-io/answer-opus-async-memo-rep1.txt
+       1 // FILE: impl.ts
+       2 /** Memoize an async function: dedups in-flight calls, caches successes,
+       3  *  and evicts rejected computations so a later call retries `fn`. */
+       4 export function createAsyncMemo<K, V>(fn: (key: K) => Promise<V>): (key: K) => Promise<V> {
+       5   const cache = new Map<K, Promise<V>>();
+       6   return (key: K): Promise<V> => {
+       7     const existing = cache.get(key);
+       8     if (existing !== undefined) return existing;
+       9     const pending: Promise<V> = fn(key).catch((err: unknown): never => {
+      10       if (cache.get(key) === pending) cache.delete(key);
+     … +84 lines (ctrl+o to expand)
+
+● The task was to fix a buggy createAsyncMemo and write vitest tests for it; the answer is written to out/cal-io/answer-opus-async-memo-rep1.txt containing only the two files.
+
+  The fix keeps one shared promise per key in the cache (so concurrent callers dedup and fn runs once), attaches a .catch that deletes the entry and rethrows so rejections aren't cached, and leaves resolved entries in place so successes are reused.
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 4.8 | ctx:3% | sess:32k dev@bipubi:/home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b (27b-hybrid-kv-correction-and-finetune-plan *%>)                                                                               /rc
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

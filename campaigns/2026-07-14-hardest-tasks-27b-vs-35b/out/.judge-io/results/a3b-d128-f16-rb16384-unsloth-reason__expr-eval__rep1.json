@@ -1,0 +1,1 @@
+{"design":3,"clarity":4,"robustness":4,"notes":"Clean Result-threading recursive descent with safe-integer and trailing-token checks, but the `readonly Token[] | Result` union forces an Array.isArray probe plus an unchecked cast, and `tokenize` is needlessly exported."}

@@ -1,0 +1,1 @@
+{"design": 4, "clarity": 4, "robustness": 3, "notes": "Compact, correct lazy-refill bucket with proper per-key isolation; reads clock.now() twice per refill and a backwards clock would silently drain tokens, while several tests assert only the boolean their names promise to check deduction for."}

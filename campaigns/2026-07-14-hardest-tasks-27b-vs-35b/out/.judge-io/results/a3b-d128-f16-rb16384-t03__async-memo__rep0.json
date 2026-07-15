@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":3,"notes":"Idiomatic minimal fix that dedups in-flight work and evicts on rejection; the success handler needlessly re-sets an equivalent promise and the retry tests lean on an undefined mock default."}

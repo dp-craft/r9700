@@ -1,0 +1,1 @@
+{"design":3,"clarity":3,"robustness":3,"notes":"Textbook recursive-descent shape, but threading errors as a `Result | number` union discriminated by `typeof x === 'object'` is fragile — arrays are objects too, so the tokenize hand-off is unsound — and only literal spaces count as whitespace."}

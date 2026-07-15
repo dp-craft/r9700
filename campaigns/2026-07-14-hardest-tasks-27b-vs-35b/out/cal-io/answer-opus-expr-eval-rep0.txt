@@ -1,0 +1,260 @@
+// FILE: impl.ts
+export type Result =
+  | { readonly ok: true; readonly value: number }
+  | { readonly ok: false; readonly error: string };
+
+type Token =
+  | { readonly kind: "number"; readonly value: number }
+  | { readonly kind: "punct"; readonly text: string };
+
+/** Internal-only signal: never escapes `evaluate`, which maps it to a Result. */
+class ExprError extends Error {}
+
+const DIGIT = /[0-9]/;
+const SPACE = /\s/;
+const PUNCT = "+-*/()";
+
+function fail(message: string): never {
+  throw new ExprError(message);
+}
+
+function readNumber(src: string, start: number): { readonly value: number; readonly next: number } {
+  let end = start;
+  while (DIGIT.test(src[end] ?? "")) {
+    end += 1;
+  }
+  return { value: Number(src.slice(start, end)), next: end };
+}
+
+function tokenize(src: string): Token[] {
+  const tokens: Token[] = [];
+  let at = 0;
+  while (at < src.length) {
+    const ch = src[at] ?? "";
+    if (SPACE.test(ch)) {
+      at += 1;
+    } else if (DIGIT.test(ch)) {
+      const { value, next } = readNumber(src, at);
+      tokens.push({ kind: "number", value });
+      at = next;
+    } else if (PUNCT.includes(ch)) {
+      tokens.push({ kind: "punct", text: ch });
+      at += 1;
+    } else {
+      fail(`unexpected character: ${ch}`);
+    }
+  }
+  return tokens;
+}
+
+/** Read cursor over the token stream; the parser's only mutable state. */
+class Cursor {
+  private index: number = 0;
+
+  constructor(private readonly tokens: readonly Token[]) {}
+
+  peek(): Token | undefined {
+    return this.tokens[this.index];
+  }
+
+  advance(): void {
+    this.index += 1;
+  }
+}
+
+function isPunct(token: Token | undefined, text: string): boolean {
+  return token !== undefined && token.kind === "punct" && token.text === text;
+}
+
+function describe(token: Token): string {
+  return token.kind === "number" ? String(token.value) : token.text;
+}
+
+/** expr := term (("+" | "-") term)* — looped, so it is left-associative. */
+function parseExpr(cursor: Cursor): number {
+  let value = parseTerm(cursor);
+  for (;;) {
+    const token = cursor.peek();
+    if (isPunct(token, "+")) {
+      cursor.advance();
+      value += parseTerm(cursor);
+    } else if (isPunct(token, "-")) {
+      cursor.advance();
+      value -= parseTerm(cursor);
+    } else {
+      return value;
+    }
+  }
+}
+
+/** term := factor (("*" | "/") factor)* — binds tighter than +/-, left-associative. */
+function parseTerm(cursor: Cursor): number {
+  let value = parseFactor(cursor);
+  for (;;) {
+    const token = cursor.peek();
+    if (isPunct(token, "*")) {
+      cursor.advance();
+      value *= parseFactor(cursor);
+    } else if (isPunct(token, "/")) {
+      cursor.advance();
+      value = divide(value, parseFactor(cursor));
+    } else {
+      return value;
+    }
+  }
+}
+
+/** Integer division: truncates toward zero, so 8/2/2 === 2 and 7/2 === 3. */
+function divide(left: number, right: number): number {
+  if (right === 0) {
+    fail("division by zero");
+  }
+  return Math.trunc(left / right);
+}
+
+/** factor := number | ("+" | "-") factor | "(" expr ")" */
+function parseFactor(cursor: Cursor): number {
+  const token = cursor.peek();
+  if (token === undefined) {
+    return fail("unexpected end of input: missing operand");
+  }
+  if (token.kind === "number") {
+    cursor.advance();
+    return token.value;
+  }
+  if (isPunct(token, "(")) {
+    return parseGroup(cursor);
+  }
+  return parseSign(cursor, token);
+}
+
+function parseSign(cursor: Cursor, token: Token): number {
+  if (isPunct(token, "-")) {
+    cursor.advance();
+    return -parseFactor(cursor);
+  }
+  if (isPunct(token, "+")) {
+    cursor.advance();
+    return parseFactor(cursor);
+  }
+  return fail(`unexpected token: ${describe(token)}`);
+}
+
+function parseGroup(cursor: Cursor): number {
+  cursor.advance();
+  const value = parseExpr(cursor);
+  if (!isPunct(cursor.peek(), ")")) {
+    return fail("unbalanced parentheses: expected ')'");
+  }
+  cursor.advance();
+  return value;
+}
+
+export function evaluate(expr: string): Result {
+  try {
+    const cursor = new Cursor(tokenize(expr));
+    const value = parseExpr(cursor);
+    const trailing = cursor.peek();
+    if (trailing !== undefined) {
+      return fail(`unexpected trailing input: ${describe(trailing)}`);
+    }
+    return { ok: true, value };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it } from "vitest";
+import { evaluate } from "./impl";
+
+function valueOf(expr: string): number {
+  const result = evaluate(expr);
+  if (!result.ok) {
+    throw new Error(`expected ${expr} to succeed, but it failed: ${result.error}`);
+  }
+  return result.value;
+}
+
+function errorOf(expr: string): string {
+  const result = evaluate(expr);
+  if (result.ok) {
+    throw new Error(`expected ${expr} to fail, but it returned ${result.value}`);
+  }
+  return result.error;
+}
+
+describe("evaluate", () => {
+  it("should return the number itself when the expression is a single literal", () => {
+    expect(valueOf("42")).toBe(42);
+  });
+
+  it("should add and subtract when only additive operators are present", () => {
+    expect(valueOf("1+2+3")).toBe(6);
+    expect(valueOf("9-4")).toBe(5);
+  });
+
+  it("should evaluate multiplication before addition when precedence levels are mixed", () => {
+    expect(valueOf("2+3*4")).toBe(14);
+    expect(valueOf("3*4+2")).toBe(14);
+  });
+
+  it("should evaluate division before subtraction when precedence levels are mixed", () => {
+    expect(valueOf("10-8/2")).toBe(6);
+  });
+
+  it("should associate to the left when subtraction is chained", () => {
+    expect(valueOf("10-3-2")).toBe(5);
+  });
+
+  it("should associate to the left when division is chained", () => {
+    expect(valueOf("8/2/2")).toBe(2);
+  });
+
+  it("should truncate toward zero when division is not exact", () => {
+    expect(valueOf("7/2")).toBe(3);
+  });
+
+  it("should override precedence when parentheses are used", () => {
+    expect(valueOf("(2+3)*4")).toBe(20);
+  });
+
+  it("should evaluate innermost groups first when parentheses are nested", () => {
+    expect(valueOf("((1+2)*(3+4))-1")).toBe(20);
+  });
+
+  it("should ignore whitespace when it surrounds tokens", () => {
+    expect(valueOf("  1 +   2 * ( 3 - 1 )\t")).toBe(5);
+  });
+
+  it("should negate the operand when a unary minus is applied", () => {
+    expect(valueOf("-5+8")).toBe(3);
+    expect(valueOf("3*-2")).toBe(-6);
+  });
+
+  it("should return an error when parentheses are unbalanced", () => {
+    expect(evaluate("(1+2").ok).toBe(false);
+    expect(errorOf("(1+2")).toMatch(/unbalanced/);
+    expect(evaluate("1+2)").ok).toBe(false);
+  });
+
+  it("should return an error when an operand is missing", () => {
+    expect(evaluate("1+").ok).toBe(false);
+    expect(evaluate("*3").ok).toBe(false);
+    expect(evaluate("").ok).toBe(false);
+  });
+
+  it("should return an error when the input contains an unexpected character", () => {
+    expect(errorOf("1 $ 2")).toMatch(/unexpected character/);
+  });
+
+  it("should return an error when dividing by zero", () => {
+    expect(errorOf("1/0")).toMatch(/division by zero/);
+    expect(errorOf("4/(2-2)")).toMatch(/division by zero/);
+  });
+
+  it("should not throw to the caller when the input is malformed", () => {
+    expect(() => evaluate("((((")).not.toThrow();
+    expect(() => evaluate("1 ** 2")).not.toThrow();
+  });
+});

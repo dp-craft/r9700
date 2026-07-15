@@ -1,0 +1,91 @@
+// FILE: impl.ts
+```ts
+export function createAsyncMemo<K, V>(fn: (key: K) => Promise<V>): (key: K) => Promise<V> {
+  const resolved = new Map<K, Promise<V>>();
+  const inFlight = new Map<K, Promise<V>>();
+
+  return (key: K): Promise<V> => {
+    const resolvedPromise = resolved.get(key);
+    if (resolvedPromise !== undefined) return resolvedPromise;
+
+    const inflightPromise = inFlight.get(key);
+    if (inflightPromise !== undefined) return inflightPromise;
+
+    const promise: Promise<V> = fn(key);
+
+    promise.then((value: V): void => {
+      resolved.set(key, Promise.resolve(value));
+      inFlight.delete(key);
+    });
+
+    promise.catch((): void => {
+      inFlight.delete(key);
+    });
+
+    inFlight.set(key, promise);
+    return promise;
+  };
+}
+```
+
+// FILE: impl.test.ts
+```ts
+import { describe, it, expect, vi } from "vitest";
+import { createAsyncMemo } from "./impl";
+
+describe("createAsyncMemo", () => {
+  it("should call fn only once when called concurrently with same key", async (): Promise<void> => {
+    const fn = vi.fn(async (key: string): Promise<string> => {
+      return `result-${key}`;
+    });
+
+    const memo = createAsyncMemo(fn);
+    const promise1 = memo("a");
+    const promise2 = memo("a");
+
+    expect(promise1).toBe(promise2);
+    await promise1;
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it("should call fn again when called again after rejection", async (): Promise<void> => {
+    let count = 0;
+    const fn = vi.fn(async (key: string): Promise<string> => {
+      count++;
+      if (count === 1) throw new Error("fail");
+      return `result-${key}`;
+    });
+
+    const memo = createAsyncMemo(fn);
+    const promise1 = memo("a");
+
+    try {
+      await promise1;
+    } catch {
+      // expected
+    }
+
+    const promise2 = memo("a");
+    expect(promise1).not.toBe(promise2);
+    const result = await promise2;
+    expect(result).toBe("result-a");
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+
+  it("should return same promise when called with same key after success", async (): Promise<void> => {
+    const fn = vi.fn(async (key: string): Promise<string> => {
+      return `result-${key}`;
+    });
+
+    const memo = createAsyncMemo(fn);
+    const promise1 = memo("a");
+    const result1 = await promise1;
+
+    const promise2 = memo("a");
+    expect(promise1).toBe(promise2);
+    const result2 = await promise2;
+    expect(result1).toBe(result2);
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+});
+```

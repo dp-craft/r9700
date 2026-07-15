@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":3,"notes":"Immutable BucketState with a pure refill() is the cleanest shape here and failed acquires correctly persist nothing; no guard against non-positive capacity or negative token requests."}

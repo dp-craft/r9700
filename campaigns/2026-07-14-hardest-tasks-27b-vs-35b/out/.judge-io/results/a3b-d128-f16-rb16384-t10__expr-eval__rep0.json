@@ -1,0 +1,1 @@
+{"design":2,"clarity":2,"robustness":2,"notes":"Self-referential Parser object with an undeclared index field and a non-generic Result used as if generic makes the abstraction incoherent, and the dense multi-statement lines hurt readability."}

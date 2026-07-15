@@ -1,0 +1,1 @@
+{"design": 4, "clarity": 4, "robustness": 4, "notes": "Idiomatic use of Map insertion order for recency with expired entries correctly skipped by eviction and purged on get/has; refreshRecency redundantly re-looks-up and re-checks the entry the caller just validated."}

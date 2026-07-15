@@ -1,0 +1,114 @@
+ ▐▛███▜▌   Claude Code v2.1.210
+▝▜█████▛▘  Haiku 4.5 · Claude Pro
+  ▘▘ ▝▝    ~/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b
+
+
+❯ Read the file /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/cal-io/prompt-async-memo.txt . It contains exactly one task. Do that task, then write your final answer to the file
+  /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/cal-io/answer-haiku-async-memo-rep2.txt (that file must contain ONLY the answer itself, with no preamble or commentary). Writing that file is the last thing you do.
+
+● I'll read the task file and complete it.
+
+  Read 1 file (ctrl+o to expand)
+
+● // FILE: impl.ts
+  export function createAsyncMemo<K, V>(fn: (key: K) => Promise<V>): (key: K) => Promise<V> {
+    const inFlight = new Map<K, Promise<V>>();
+    const success = new Map<K, V>();
+
+    return (key: K): Promise<V> => {
+      if (success.has(key)) {
+        return Promise.resolve(success.get(key) as V);
+      }
+
+      if (inFlight.has(key)) {
+        return inFlight.get(key) as Promise<V>;
+      }
+
+      const promise = fn(key)
+        .then((value: V): V => {
+          success.set(key, value);
+          inFlight.delete(key);
+          return value;
+        })
+        .catch((error: unknown): never => {
+          inFlight.delete(key);
+          throw error;
+        });
+
+      inFlight.set(key, promise);
+      return promise;
+    };
+  }
+
+  // FILE: impl.test.ts
+
+  import { describe, it, expect, vi } from 'vitest';
+  import { createAsyncMemo } from './impl';
+
+  describe('createAsyncMemo', () => {
+    it('should deduplicate and share one in-flight computation when concurrent calls use the same key', async () => {
+      const fn = vi.fn(async (key: string) => `result-${key}`);
+
+      const promise1 = memoized('key1');
+      const promise2 = memoized('key1');
+
+      const [result1, result2] = await Promise.all([promise1, promise2]);
+
+      expect(fn).toHaveBeenCalledTimes(1);
+      expect(result1).toBe('result-key1');
+      expect(result2).toBe('result-key1');
+    });
+
+    it('should retry after rejection when subsequent call is made', async () => {
+      const fn = vi.fn(async (key: string) => {
+        if (fn.mock.callCount === 1) {
+          throw new Error('computation failed');
+        }
+        return `result-${key}`;
+      });
+      const memoized = createAsyncMemo(fn);
+
+      await expect(memoized('key1')).rejects.toThrow('computation failed');
+      const result = await memoized('key1');
+
+      expect(fn).toHaveBeenCalledTimes(2);
+      expect(result).toBe('result-key1');
+    });
+
+    it('should cache successful results and reuse them on subsequent calls', async () => {
+      const fn = vi.fn(async (key: string) => `result-${key}`);
+      const memoized = createAsyncMemo(fn);
+
+      const result1 = await memoized('key1');
+      const result2 = await memoized('key1');
+
+      expect(fn).toHaveBeenCalledTimes(1);
+      expect(result1).toBe('result-key1');
+      expect(result2).toBe('result-key1');
+    });
+  });
+
+  Now writing the answer file:
+
+● Write(out/cal-io/answer-haiku-async-memo-rep2.txt)
+  ⎿  Wrote 81 lines to out/cal-io/answer-haiku-async-memo-rep2.txt
+       1 // FILE: impl.ts
+       2 ```ts
+       3 export function createAsyncMemo<K, V>(fn: (key: K) => Promise<V>): (key: K) => Promise<V> {
+       4   const inFlight = new Map<K, Promise<V>>();
+       5   const success = new Map<K, V>();
+       6
+       7   return (key: K): Promise<V> => {
+       8     if (success.has(key)) {
+       9       return Promise.resolve(success.get(key) as V);
+      10     }
+     … +71 lines (ctrl+o to expand)
+
+· Fiddle-faddling… (1m 5s · ↓ 7.3k tokens · thinking)
+
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Haiku 4.5 | ctx:14% | sess:34k dev@bipubi:/home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b (27b-hybrid-kv-correction-and-finetune-plan *%>)                                                                          /rc
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents
+

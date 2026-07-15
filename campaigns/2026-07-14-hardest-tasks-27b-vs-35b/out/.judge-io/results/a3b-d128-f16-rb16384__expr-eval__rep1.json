@@ -1,0 +1,1 @@
+{"design":2,"clarity":3,"robustness":3,"notes":"Accumulating results by mutating `res.value` on a readonly-typed Result, plus reading `.value` off unnarrowed token unions, fights the type system throughout; the eof sentinel and error tests are the redeeming parts."}

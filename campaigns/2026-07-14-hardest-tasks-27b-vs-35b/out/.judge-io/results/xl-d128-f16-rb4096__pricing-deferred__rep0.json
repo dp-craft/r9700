@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Separate entries/pending maps make the states explicit, TTL is stamped at resolution and both settle paths clear the pending slot; tests cover sharing, expiry and retry."}

@@ -137,6 +137,39 @@ Axes:
 Sampling stays FIXED across the budget axis so budget remains single-variable; the presets are separate
 cells rather than a confounded walk.
 
+## 5c. Reference ladder at 3 reps + integrity fixes (2026-07-15)
+
+**`run_refs.sh`** collects the haiku/sonnet/opus ladder at 3 reps for every matrix task → `calibration-reps.jsonl`
+(rows carry `rep`; `aggregate.py` then reports mean±sd and hard_pass as k/n). Resumable; glue only — it composes
+`build_context.py` + `claude_ask.sh` + `score_typescript.py`.
+
+```bash
+bash run_refs.sh                 # 3 models × 5 tasks × 3 reps
+GRADE_ONLY=1 bash run_refs.sh    # re-grade + re-emit the jsonl, ask nothing
+```
+
+- **Why reps:** at the measured rep noise a SINGLE reference sample carries ≈±19 pts — the old n=1 ladder could
+  never be quoted as a like-for-like gap. The ladder was also *incomplete*: opus had never run `lru-cache` or
+  `rate-limiter`, and neither haiku nor sonnet had seen `pricing-deferred` (4 of 15 pairs empty).
+- **One-shot on purpose** (`build_context.py --tokens 0`, no filler): the ladder measures CAPABILITY, not
+  capability-at-depth. It is NOT depth-matched — the local cells carry ~133k of context the refs never see, so a
+  bare ref-vs-local Δ is not like-for-like.
+- **`aggregate.py --calib-files`** selects the reference file (default: the legacy n=1 files). `run_capture.sh`
+  passes one `$CALIB` to BOTH `aggregate.py` and `make_charts.py` — they read calibration *separately* and were
+  wired to different sources, which would print a 3-rep table beside an n=1 dashed band. **Do not merge the legacy
+  files in:** they hold n=1 rows for the same pairs, so a pair would silently gain a 4th rep.
+
+**Integrity fixes.** `capture.py` now RAISES on an incomplete stream (missing `finish_reason` / no `[DONE]`)
+instead of returning the partial text: an interrupted generation used to be written as a normal row, counted as
+done by the resume logic, and graded as if the model wrote it that way (one such row scored 0.603 with tests=0.0
+and moved its cell mean 1.1 pts). `score_typescript.py` now stamps a `GRADER` constant on every graded row — it
+previously existed only as a hand-typed label in the calibration files.
+
+**Depth label.** Cells say `120k`; the real prompt is **~132.9k tokens** (522,260 chars ÷ ~3.93 ch/tok on TS). Two
+causes: `CHARS_PER_TOK = 4` is an estimate, and `build_context.py` overshoots its char budget (it breaks *after*
+appending a file). Deliberately NOT fixed — changing the prompt would invalidate all 210 replies. Every cell runs
+the identical prompt, so the comparison is sound; only the label is nominal.
+
 ## 6. Outputs (in `out/`)
 
 `outputs.jsonl` (replies + tokens/latency) · `scores_typescript.jsonl` (objectives incl. fractional

@@ -508,7 +508,7 @@ def calib_by_task(files=None):
     return out
 
 
-def load_by_task(D, scores_file="scores_typescript.jsonl", configs_path=None):
+def load_by_task(D, scores_file="scores_typescript.jsonl", configs_path=None, calib_files=None):
     """Per (task, config) aggregate. `scores_file` selects the grade source (e.g. the corrected
     re-grade). Timing uses GENERATION time = (think+answer)/decode_tps — prefill-free, so the shared
     cold-prefill outlier (~300 s on the first task of a server) does not pollute per-task cost."""
@@ -520,7 +520,7 @@ def load_by_task(D, scores_file="scores_typescript.jsonl", configs_path=None):
     for r in out:
         o_idx.setdefault((r.get("config"), r.get("task_id")), []).append(r)
     tasks = list(dict.fromkeys(r.get("task_id") for r in ts))          # first-seen order
-    refs = calib_by_task()
+    refs = calib_by_task(calib_files)
     by = {}
     for task in tasks:
         tier = next((r.get("tier") for r in ts if r.get("task_id") == task and r.get("tier")), None)
@@ -569,11 +569,11 @@ def cell_ts_by_scores(D, scores_file):
            {l: pct([1 if r.get("hard_pass") else 0 for r in ts if r.get("config") == l]) for l in labels}
 
 
-def build_by_task(D, scores_file="scores_typescript.jsonl", out_json=None):
-    by = load_by_task(D, scores_file)
+def build_by_task(D, scores_file="scores_typescript.jsonl", out_json=None, calib_files=None):
+    by = load_by_task(D, scores_file, calib_files=calib_files)
     out_json = out_json or f"{D}/summary_by_task.json"
     with open(out_json, "w") as fh:
-        json.dump({"scores_file": scores_file, "by_task": by, "refs": calib_by_task()}, fh, indent=1)
+        json.dump({"scores_file": scores_file, "by_task": by, "refs": calib_by_task(calib_files)}, fh, indent=1)
     return out_json, by
 
 
@@ -583,18 +583,29 @@ def main():
     ap.add_argument("--out", default="")
     ap.add_argument("--by-task", action="store_true", help="also emit out/summary_by_task.json (per task×config)")
     ap.add_argument("--scores", default="scores_typescript.jsonl", help="grade file to aggregate (e.g. the corrected re-grade)")
+    ap.add_argument("--calib-files", default="",
+                    help="comma-separated reference/calibration jsonl files, relative to the campaign dir "
+                         "(default: calibration.jsonl,calibration-hard.jsonl). Point this at a multi-rep "
+                         "file (rows carrying `rep`) to get mean+-sd references instead of n=1 one-shots. "
+                         "The legacy files are NOT merged in automatically — list them explicitly if wanted, "
+                         "otherwise a (task,model) present in both would silently gain an extra rep.")
     a = ap.parse_args()
+    calib_files = [p if os.path.isabs(p) else os.path.join(HERE, p)
+                   for p in (s.strip() for s in a.calib_files.split(",")) if p] or None
+    for p in calib_files or []:
+        if not os.path.exists(p):
+            sys.exit(f"aggregate: --calib-files: no such file: {p}")
     # --by-task is ADDITIVE, as its help says. It used to `return` early, so summary.md and
     # summary_by_task.json could only ever be produced by two SEPARATE invocations — which is exactly
     # how they drifted apart (summary_by_task.json 16 min behind a corrected re-grade, 2026-07-15).
     # One invocation now writes both, from the same data, always.
-    outp, cells, _, _ = build_digest(a.dir, a.out or None)
+    outp, cells, _, _ = build_digest(a.dir, a.out or None, calib_files=calib_files)
     print(f"wrote {outp} ({len(cells)} cells) + {outp.replace('.md', '.json')}")
     if a.by_task:
         if a.scores != "scores_typescript.jsonl":
             print(f"  NOTE: --scores {a.scores} applies to summary_by_task.json only; the digest above "
                   f"is built from scores_typescript.jsonl — do not compare them.", file=sys.stderr)
-        outp2, by = build_by_task(a.dir, a.scores)
+        outp2, by = build_by_task(a.dir, a.scores, calib_files=calib_files)
         print(f"wrote {outp2} ({len(by)} tasks) from {a.scores}")
 
 

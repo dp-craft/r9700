@@ -1,0 +1,1 @@
+{"design":2,"clarity":3,"robustness":2,"notes":"Models parser returns as an unsound `Result & { nextPos }` intersection papered over with `as const`, mixes thrown errors with Result values, and only treats a literal space as whitespace."}

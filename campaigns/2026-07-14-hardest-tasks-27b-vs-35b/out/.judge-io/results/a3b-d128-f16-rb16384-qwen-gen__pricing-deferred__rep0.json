@@ -1,0 +1,1 @@
+{"design":4,"clarity":3,"robustness":4,"notes":"Cache single-flight/no-cache-on-failure/TTL contract is right and well tested; the vestigial `pctOf` plus `syncAdjustment` returning 0 for deferred only to be overwritten in `lineTotal` is needless indirection."}

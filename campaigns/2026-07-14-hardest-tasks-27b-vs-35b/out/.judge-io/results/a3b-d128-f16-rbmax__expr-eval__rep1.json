@@ -1,0 +1,1 @@
+{"design":2,"clarity":3,"robustness":2,"notes":"Recursive-descent shape is conventional but it mutates `res.value` in place on a readonly Result and reads `.value` off paren tokens that lack it, and only the space character counts as whitespace."}

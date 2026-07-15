@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Clean bucket abstraction with a well-isolated refill helper and a sensible non-positive-elapsed guard; the unrequested systemClock default slightly widens the contract and a few tests assert weakly."}

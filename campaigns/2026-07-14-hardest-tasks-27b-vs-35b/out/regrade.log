@@ -1,88 +1,3 @@
-skip (done): un-d128-f16-rb4096
-skip (done): xl-d128-f16-rb4096
-skip (done): q5-d128-q8-rb4096
-skip (done): q6-d128-q8-rb4096
-skip (done): a3b-d128-f16-rb4096
-
-=== grader self-check (vitest must run) ===
-SELFTEST PASS  (good=1.0 > mediocre=0.519 > bad=0.0; hard_pass g/m/b = True/False/False)
-{
-  "good": {
-    "id": "GOOD",
-    "score": 1.0,
-    "hard_pass": true,
-    "objectives": {
-      "types": 1.0,
-      "lint": 1.0,
-      "tests": 1.0,
-      "bdd": 1.0,
-      "novj": 1.0,
-      "reuse": 1.0,
-      "edge": 1.0
-    },
-    "test_counts": {
-      "own": [
-        2,
-        2
-      ]
-    },
-    "files": [
-      "impl.test.ts",
-      "impl.ts"
-    ]
-  },
-  "mediocre": {
-    "id": "MEDIOCRE",
-    "score": 0.519,
-    "hard_pass": false,
-    "objectives": {
-      "types": 0.33,
-      "lint": 0.8,
-      "tests": 1.0,
-      "bdd": 1.0,
-      "novj": 1.0,
-      "reuse": 0.0,
-      "edge": 0.0
-    },
-    "test_counts": {
-      "own": [
-        1,
-        1
-      ]
-    },
-    "files": [
-      "impl.test.ts",
-      "impl.ts"
-    ]
-  },
-  "bad": {
-    "id": "BAD",
-    "score": 0.0,
-    "hard_pass": false,
-    "objectives": {
-      "types": 0.0,
-      "lint": 0.0,
-      "tests": 0.0,
-      "bdd": 0.0,
-      "novj": 0.0,
-      "reuse": 0.0,
-      "edge": 0.0
-    },
-    "test_counts": {
-      "own": [
-        0,
-        0
-      ]
-    },
-    "files": [
-      "impl.test.ts",
-      "impl.ts"
-    ]
-  }
-}
-
-=== grading (tsc + eslint + vitest, per reply) ===
-graded 60 rows (0 errors/empty) -> /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/scores_typescript.jsonl
   [un-d128-f16-rb4096] lru-cache rep0: score=0.7 F
   [un-d128-f16-rb4096] lru-cache rep1: score=0.896 F
   [un-d128-f16-rb4096] lru-cache rep2: score=0.957 F
@@ -143,29 +58,154 @@ graded 60 rows (0 errors/empty) -> /home/dev/work/dp-craft/amd/campaigns/2026-07
   [a3b-d128-f16-rb4096] expr-eval rep0: score=0.107 F
   [a3b-d128-f16-rb4096] expr-eval rep1: score=0.639 F
   [a3b-d128-f16-rb4096] expr-eval rep2: score=0.569 F
+  [un-d128-f16-rb4096] pricing-deferred rep0: score=0.786 F
+  [un-d128-f16-rb4096] pricing-deferred rep1: score=0.813 F
+  [un-d128-f16-rb4096] pricing-deferred rep2: score=0.762 F
+  [xl-d128-f16-rb4096] pricing-deferred rep0: score=0.826 F
+  [xl-d128-f16-rb4096] pricing-deferred rep1: score=0.729 F
+  [xl-d128-f16-rb4096] pricing-deferred rep2: score=0.841 F
+  [q5-d128-q8-rb4096] pricing-deferred rep0: score=0.819 F
+  [q5-d128-q8-rb4096] pricing-deferred rep1: score=0.78 F
+  [q5-d128-q8-rb4096] pricing-deferred rep2: score=0.786 F
+  [q6-d128-q8-rb4096] pricing-deferred rep0: score=0.774 F
+  [q6-d128-q8-rb4096] pricing-deferred rep1: score=0.766 F
+  [q6-d128-q8-rb4096] pricing-deferred rep2: score=0.761 F
+  [a3b-d128-f16-rb4096] pricing-deferred rep0: score=0.82 F
+  [a3b-d128-f16-rb4096] pricing-deferred rep1: score=0.931 F
+  [a3b-d128-f16-rb4096] pricing-deferred rep2: score=0.739 F
+  [q5-d128-f16-rb16384] lru-cache rep1: score=0.787 F
+  [q5-d128-f16-rb16384] lru-cache rep2: score=0.914 F
+  [q5-d128-f16-rb16384] rate-limiter rep0: score=0.971 F
+  [q5-d128-f16-rb16384] rate-limiter rep1: score=0.912 F
+  [q5-d128-f16-rb16384] rate-limiter rep2: score=0.941 F
+  [q5-d128-f16-rb16384] async-memo rep0: score=0.652 F
+  [q5-d128-f16-rb16384] async-memo rep1: score=0.667 F
+  [q5-d128-f16-rb16384] async-memo rep2: score=0.666 F
+  [q5-d128-f16-rb16384] expr-eval rep0: score=0.632 F
+  [q5-d128-f16-rb16384] expr-eval rep1: score=0.738 F
+  [q5-d128-f16-rb16384] expr-eval rep2: score=0.645 F
+  [q5-d128-f16-rb16384] pricing-deferred rep0: score=0.832 F
+  [q5-d128-f16-rb16384] pricing-deferred rep1: score=0.789 F
+  [q5-d128-f16-rb16384] pricing-deferred rep2: score=0.809 F
+  [q5-d128-f16-rb4096] lru-cache rep0: score=0.669 F
+  [q5-d128-f16-rb4096] lru-cache rep1: score=0.941 F
+  [q5-d128-f16-rb4096] lru-cache rep2: score=0.547 F
+  [q5-d128-f16-rb4096] rate-limiter rep0: score=0.936 F
+  [q5-d128-f16-rb4096] rate-limiter rep1: score=0.912 F
+  [q5-d128-f16-rb4096] rate-limiter rep2: score=0.837 F
+  [q5-d128-f16-rb4096] async-memo rep0: score=0.652 F
+  [q5-d128-f16-rb4096] async-memo rep1: score=0.667 F
+  [q5-d128-f16-rb4096] async-memo rep2: score=0.666 F
+  [q5-d128-f16-rb4096] expr-eval rep0: score=0.615 F
+  [q5-d128-f16-rb4096] expr-eval rep1: score=0.738 F
+  [q5-d128-f16-rb4096] expr-eval rep2: score=0.59 F
+  [q5-d128-f16-rb4096] pricing-deferred rep0: score=0.813 F
+  [q5-d128-f16-rb4096] pricing-deferred rep1: score=0.76 F
+  [q5-d128-f16-rb4096] pricing-deferred rep2: score=0.809 F
+  [un-d128-f16-rb16384] lru-cache rep0: score=0.736 F
+  [un-d128-f16-rb16384] lru-cache rep1: score=0.896 F
+  [un-d128-f16-rb16384] lru-cache rep2: score=0.854 F
+  [un-d128-f16-rb16384] rate-limiter rep0: score=0.879 F
+  [un-d128-f16-rb16384] rate-limiter rep1: score=0.726 F
+  [un-d128-f16-rb16384] rate-limiter rep2: score=0.761 F
+  [un-d128-f16-rb16384] async-memo rep0: score=0.912 F
+  [un-d128-f16-rb16384] async-memo rep1: score=0.912 F
+  [un-d128-f16-rb16384] async-memo rep2: score=0.912 F
+  [un-d128-f16-rb16384] expr-eval rep0: score=0.667 F
+  [un-d128-f16-rb16384] expr-eval rep1: score=0.569 F
+  [un-d128-f16-rb16384] expr-eval rep2: score=0.528 F
+  [un-d128-f16-rb16384] pricing-deferred rep0: score=0.786 F
+  [un-d128-f16-rb16384] pricing-deferred rep1: score=0.813 F
+  [un-d128-f16-rb16384] pricing-deferred rep2: score=0.838 F
+  [a3b-d128-f16-rb16384] lru-cache rep0: score=0.864 F
+  [a3b-d128-f16-rb16384] lru-cache rep1: score=0.886 F
+  [a3b-d128-f16-rb16384] lru-cache rep2: score=0.836 F
+  [a3b-d128-f16-rb16384] rate-limiter rep0: score=0.792 F
+  [a3b-d128-f16-rb16384] rate-limiter rep1: score=0.774 F
+  [a3b-d128-f16-rb16384] rate-limiter rep2: score=0.621 F
+  [a3b-d128-f16-rb16384] async-memo rep0: score=0.95 F
+  [a3b-d128-f16-rb16384] async-memo rep1: score=0.799 F
+  [a3b-d128-f16-rb16384] async-memo rep2: score=0.944 P
+  [a3b-d128-f16-rb16384] expr-eval rep0: score=0.192 F
+  [a3b-d128-f16-rb16384] expr-eval rep1: score=0.644 F
+  [a3b-d128-f16-rb16384] expr-eval rep2: score=0.667 F
+  [a3b-d128-f16-rb16384] pricing-deferred rep0: score=0.876 F
+  [a3b-d128-f16-rb16384] pricing-deferred rep1: score=0.971 F
+  [a3b-d128-f16-rb16384] pricing-deferred rep2: score=0.81 F
+  [a3b-d128-f16-rbmax] lru-cache rep0: score=0.864 F
+  [a3b-d128-f16-rbmax] lru-cache rep1: score=0.886 F
+  [a3b-d128-f16-rbmax] lru-cache rep2: score=0.836 F
+  [a3b-d128-f16-rbmax] rate-limiter rep0: score=0.792 F
+  [a3b-d128-f16-rbmax] rate-limiter rep1: score=0.453 F
+  [a3b-d128-f16-rbmax] rate-limiter rep2: score=0.621 F
+  [a3b-d128-f16-rbmax] async-memo rep0: score=0.95 F
+  [a3b-d128-f16-rbmax] async-memo rep1: score=0.799 F
+  [a3b-d128-f16-rbmax] async-memo rep2: score=0.944 P
+  [a3b-d128-f16-rbmax] expr-eval rep0: score=0.192 F
+  [a3b-d128-f16-rbmax] expr-eval rep1: score=0.644 F
+  [a3b-d128-f16-rbmax] expr-eval rep2: score=0.667 F
+  [a3b-d128-f16-rbmax] pricing-deferred rep0: score=0.876 F
+  [a3b-d128-f16-rbmax] pricing-deferred rep1: score=0.971 F
+  [a3b-d128-f16-rbmax] pricing-deferred rep2: score=0.81 Fgraded 210 rows (0 errors/empty) -> out/scores_regrade.jsonl [210 total]
 
-=== judge SKIPPED (JUDGE_ENGINE=none) — see JUDGE.md ===
-
-=== charts (reused by the benchmark-results skill) ===
-wrote 11 charts + appendix.md -> /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/charts/
-  quality_vs_cost.svg
-  quality_vs_time.svg
-  scorecard.svg
-  quality_deterministic.svg
-  token_economy.svg
-  throughput.svg
-  latency.svg
-  memory_power.svg
-  capability.svg
-  hard_pass.svg
-  objective_breakdown.svg
-
-=== aggregate (deterministic digest → out/summary.md) ===
-wrote /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/summary.md (5 cells) + /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/summary.json
-
-Depth run complete.
-  replies:  /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/outputs.jsonl
-  scores:   /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/scores_typescript.jsonl   judge: /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/judge_scores.jsonl
-  VRAM:     /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/vram.jsonl   (gpu samples: /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/gpu_*.csv)
-  charts:   /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/charts/
-  analysis: /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/analysis.md   (auto-written; review before committing run data)
+  [a3b-d128-f16-rb16384-t03] lru-cache rep0: score=0.8 F
+  [a3b-d128-f16-rb16384-t03] lru-cache rep1: score=0.805 F
+  [a3b-d128-f16-rb16384-t03] lru-cache rep2: score=0.639 F
+  [a3b-d128-f16-rb16384-t03] rate-limiter rep0: score=0.943 F
+  [a3b-d128-f16-rb16384-t03] rate-limiter rep1: score=0.677 F
+  [a3b-d128-f16-rb16384-t03] rate-limiter rep2: score=0.57 F
+  [a3b-d128-f16-rb16384-t03] async-memo rep0: score=0.753 F
+  [a3b-d128-f16-rb16384-t03] async-memo rep1: score=0.828 F
+  [a3b-d128-f16-rb16384-t03] async-memo rep2: score=0.723 F
+  [a3b-d128-f16-rb16384-t03] expr-eval rep0: score=0.667 F
+  [a3b-d128-f16-rb16384-t03] expr-eval rep1: score=0.467 F
+  [a3b-d128-f16-rb16384-t03] expr-eval rep2: score=0.337 F
+  [a3b-d128-f16-rb16384-t03] pricing-deferred rep0: score=0.761 F
+  [a3b-d128-f16-rb16384-t03] pricing-deferred rep1: score=0.709 F
+  [a3b-d128-f16-rb16384-t03] pricing-deferred rep2: score=0.819 F
+  [a3b-d128-f16-rb16384-t10] lru-cache rep0: score=0.817 F
+  [a3b-d128-f16-rb16384-t10] lru-cache rep1: score=0.772 F
+  [a3b-d128-f16-rb16384-t10] lru-cache rep2: score=0.874 F
+  [a3b-d128-f16-rb16384-t10] rate-limiter rep0: score=0.941 F
+  [a3b-d128-f16-rb16384-t10] rate-limiter rep1: score=0.862 F
+  [a3b-d128-f16-rb16384-t10] rate-limiter rep2: score=0.909 F
+  [a3b-d128-f16-rb16384-t10] async-memo rep0: score=0.655 F
+  [a3b-d128-f16-rb16384-t10] async-memo rep1: score=1.0 P
+  [a3b-d128-f16-rb16384-t10] async-memo rep2: score=0.833 F
+  [a3b-d128-f16-rb16384-t10] expr-eval rep0: score=0.314 F
+  [a3b-d128-f16-rb16384-t10] expr-eval rep1: score=0.362 F
+  [a3b-d128-f16-rb16384-t10] expr-eval rep2: score=0.183 F
+  [a3b-d128-f16-rb16384-t10] pricing-deferred rep0: score=0.679 F
+  [a3b-d128-f16-rb16384-t10] pricing-deferred rep1: score=0.297 F
+  [a3b-d128-f16-rb16384-t10] pricing-deferred rep2: score=0.76 F
+  [a3b-d128-f16-rb16384-qwen-gen] lru-cache rep0: score=0.439 F
+  [a3b-d128-f16-rb16384-qwen-gen] lru-cache rep1: score=0.764 F
+  [a3b-d128-f16-rb16384-qwen-gen] lru-cache rep2: score=0.488 F
+  [a3b-d128-f16-rb16384-qwen-gen] rate-limiter rep0: score=0.535 F
+  [a3b-d128-f16-rb16384-qwen-gen] rate-limiter rep1: score=0.324 F
+  [a3b-d128-f16-rb16384-qwen-gen] rate-limiter rep2: score=0.684 F
+  [a3b-d128-f16-rb16384-qwen-gen] async-memo rep0: score=0.833 F
+  [a3b-d128-f16-rb16384-qwen-gen] async-memo rep1: score=0.822 F
+  [a3b-d128-f16-rb16384-qwen-gen] async-memo rep2: score=0.739 F
+  [a3b-d128-f16-rb16384-qwen-gen] expr-eval rep0: score=0.667 F
+  [a3b-d128-f16-rb16384-qwen-gen] expr-eval rep1: score=0.322 F
+  [a3b-d128-f16-rb16384-qwen-gen] expr-eval rep2: score=0.37 F
+  [a3b-d128-f16-rb16384-qwen-gen] pricing-deferred rep0: score=0.806 F
+  [a3b-d128-f16-rb16384-qwen-gen] pricing-deferred rep1: score=0.839 F
+  [a3b-d128-f16-rb16384-qwen-gen] pricing-deferred rep2: score=0.687 F
+  [a3b-d128-f16-rb16384-unsloth-reason] lru-cache rep0: score=0.372 F
+  [a3b-d128-f16-rb16384-unsloth-reason] lru-cache rep1: score=0.371 F
+  [a3b-d128-f16-rb16384-unsloth-reason] lru-cache rep2: score=0.911 F
+  [a3b-d128-f16-rb16384-unsloth-reason] rate-limiter rep0: score=0.867 F
+  [a3b-d128-f16-rb16384-unsloth-reason] rate-limiter rep1: score=0.357 F
+  [a3b-d128-f16-rb16384-unsloth-reason] rate-limiter rep2: score=0.553 F
+  [a3b-d128-f16-rb16384-unsloth-reason] async-memo rep0: score=0.733 F
+  [a3b-d128-f16-rb16384-unsloth-reason] async-memo rep1: score=0.598 F
+  [a3b-d128-f16-rb16384-unsloth-reason] async-memo rep2: score=0.496 F
+  [a3b-d128-f16-rb16384-unsloth-reason] expr-eval rep0: score=0.596 F
+  [a3b-d128-f16-rb16384-unsloth-reason] expr-eval rep1: score=0.657 F
+  [a3b-d128-f16-rb16384-unsloth-reason] expr-eval rep2: score=0.637 F
+  [a3b-d128-f16-rb16384-unsloth-reason] pricing-deferred rep0: score=0.857 F
+  [a3b-d128-f16-rb16384-unsloth-reason] pricing-deferred rep1: score=0.665 F
+  [a3b-d128-f16-rb16384-unsloth-reason] pricing-deferred rep2: score=0.782 F
+  [q5-d128-f16-rb16384] lru-cache rep0: score=0.669 F

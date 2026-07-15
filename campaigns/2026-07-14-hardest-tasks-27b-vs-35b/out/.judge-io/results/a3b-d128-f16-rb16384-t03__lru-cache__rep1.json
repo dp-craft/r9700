@@ -1,0 +1,1 @@
+{"design":2,"clarity":3,"robustness":3,"notes":"Module-level helpers reference an unbound K and get() resets expiresAt, turning the specified insertion-time TTL into a sliding one, though eviction correctly skips expired entries."}

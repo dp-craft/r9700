@@ -1,0 +1,1 @@
+{"design":2,"clarity":3,"robustness":1,"notes":"The rejection handler evicts the key but never rethrows, so the shared promise silently resolves undefined instead of propagating the failure to callers."}

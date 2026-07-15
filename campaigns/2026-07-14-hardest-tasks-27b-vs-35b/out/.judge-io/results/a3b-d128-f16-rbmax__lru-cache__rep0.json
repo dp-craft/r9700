@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":3,"notes":"Idiomatic use of Map insertion order for recency with clean extracted helpers, though refreshRecency redundantly re-reads and re-checks the entry get() already validated."}

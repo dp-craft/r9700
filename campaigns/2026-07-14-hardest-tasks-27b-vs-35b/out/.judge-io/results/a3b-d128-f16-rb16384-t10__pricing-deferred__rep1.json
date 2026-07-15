@@ -1,0 +1,1 @@
+{"design":2,"clarity":3,"robustness":2,"notes":"The cache duplicates entry-writing logic across two branches, never clears inFlight on success so expired keys resolve from a stale promise, and computeSyncAdjustment silently returns 0 for the deferred kind."}

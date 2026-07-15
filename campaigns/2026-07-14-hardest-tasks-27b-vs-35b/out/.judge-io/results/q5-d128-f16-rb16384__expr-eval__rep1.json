@@ -1,0 +1,1 @@
+{"design": 3, "clarity": 3, "robustness": 3, "notes": "Works, but signalling errors via undefined plus NaN-as-division-by-zero sentinel is a hack that collapses all failures into one generic 'Malformed expression'."}

@@ -1,0 +1,1 @@
+{"design":4,"clarity":3,"robustness":4,"notes":"Thorough tests across dedup, retry and per-key caching, but the two-arg .then with an identity onFulfilled is noise where a plain .catch would read better."}

@@ -1,0 +1,1 @@
+{"design":3,"clarity":1,"robustness":2,"notes":"Sound grammar with unary-minus and empty-input handling, but statements are crammed multiple-per-line into near-unreadable density, the Result type drops the spec's readonly modifiers, and the tokenizer skips only literal spaces so tabs/newlines are rejected as invalid characters despite the arbitrary-whitespace requirement."}

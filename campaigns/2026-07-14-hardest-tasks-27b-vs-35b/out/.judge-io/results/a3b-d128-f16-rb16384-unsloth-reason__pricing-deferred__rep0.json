@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Single-flight cache with try/catch/finally satisfies the full contract and tests cover dedup, retry, TTL and key independence, though `pctOf` and the Partial-Record-plus-fallback labeling add indirection over a total union."}

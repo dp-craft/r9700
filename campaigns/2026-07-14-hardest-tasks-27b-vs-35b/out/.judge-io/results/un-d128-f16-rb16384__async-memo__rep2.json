@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Precise minimal fix with a never-typed rethrow chain, paired with disciplined tests that pin promise identity via a deferred resolver rather than relying on timers."}

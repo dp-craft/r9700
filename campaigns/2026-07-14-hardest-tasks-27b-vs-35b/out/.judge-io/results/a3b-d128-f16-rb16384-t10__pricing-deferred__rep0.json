@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Clean async adjustment helper and a pending-map cache that correctly dedups, skips caching failures and honors the injected Clock, with tests covering every cache contract clause; the pctOf helper is redundant."}

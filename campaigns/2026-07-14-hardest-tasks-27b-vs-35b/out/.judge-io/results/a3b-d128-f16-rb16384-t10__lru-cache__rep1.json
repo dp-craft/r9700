@@ -1,0 +1,1 @@
+{"design":2,"clarity":3,"robustness":2,"notes":"touchRecency deletes the key before re-reading it so the entry is dropped rather than refreshed, eviction keys off raw store.size (letting expired entries block eviction), and Math.max(1, capacity) silently rewrites caller input."}

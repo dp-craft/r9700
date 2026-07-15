@@ -1,0 +1,1 @@
+{"design":3,"clarity":4,"robustness":2,"notes":"Clean factory/closure shape with well-named small helpers, but recency is tracked via timestamps and an O(n) scan where Map insertion order would give O(1), removeEntry is a pointless map.delete wrapper, eviction placement relative to insert is muddled, and there is no guarding of degenerate capacity/ttl inputs."}

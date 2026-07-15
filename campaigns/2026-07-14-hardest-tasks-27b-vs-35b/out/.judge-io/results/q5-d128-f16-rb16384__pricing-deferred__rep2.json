@@ -1,0 +1,1 @@
+{"design": 3, "clarity": 3, "robustness": 4, "notes": "Cache behavior is right, but collapsing CacheEntry and InFlightEntry into one Map discriminated by `in` checks rather than a tag (or two maps) is the weakest structure of the set."}

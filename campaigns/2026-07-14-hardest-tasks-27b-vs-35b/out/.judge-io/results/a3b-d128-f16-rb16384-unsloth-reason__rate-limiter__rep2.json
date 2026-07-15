@@ -1,0 +1,1 @@
+{"design":3,"clarity":3,"robustness":2,"notes":"Tidy structure, but elapsed ms is never converted to seconds, lastRefillTime updates only on success (re-crediting the same interval), and several tests call tick without destructuring it."}

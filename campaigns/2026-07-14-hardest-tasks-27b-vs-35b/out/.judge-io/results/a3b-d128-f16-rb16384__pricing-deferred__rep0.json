@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Clean async pipeline with a well-factored single-flight cache; tests cover dedup with a real delay, failure retry and deferred-inside-cache, though per-key independence is untested."}

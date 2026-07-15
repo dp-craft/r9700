@@ -1,0 +1,1 @@
+{"design":3,"clarity":3,"robustness":3,"notes":"Correct shape but carries a redundant pctOf helper with a dead 0-branch and a pointless PendingEntry wrapper, and the concurrency test has no real delay so it barely exercises single-flight."}

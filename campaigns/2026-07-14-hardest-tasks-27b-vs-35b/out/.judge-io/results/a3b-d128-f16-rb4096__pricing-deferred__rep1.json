@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Correct cache and full contract coverage in tests, but the `PendingEntry` wrapper around a lone promise is redundant and the `Partial<Record>` \"other\" fallback gives up exhaustiveness on a closed union."}

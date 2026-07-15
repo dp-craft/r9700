@@ -19,6 +19,12 @@ reuse(per-task reuse.json) bdd(test naming) novj(no jest). Deps auto-install on 
 import argparse, glob, json, os, re, shutil, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+# Provenance label stamped on every graded row. It used to exist ONLY as a hand-typed string in the
+# calibration jsonl files — nothing in code emitted it, so local scores carried no grader at all and
+# a reference row could claim a grader it was never scored with. Bump this whenever the scoring
+# SEMANTICS change (weights, gates, objective definitions) AND re-grade: rows carrying different
+# GRADER values are not comparable and must never be pooled.
+GRADER = "fractional-2026-07-15"
 HARNESS = os.path.join(HERE, "ts-harness")
 WORK = os.path.join(HARNESS, "cases", "_work")
 WORK_REL = "cases/_work"
@@ -176,7 +182,7 @@ def grade_files(files, task_dir, cid="case"):
     gates = [obj["types"], obj["lint"], obj["tests"]] + [obj[k] for k in ("reuse", "edge") if k in obj]
     hard_pass = all(g == 1 for g in gates)
     return {"id": cid, "score": score, "hard_pass": hard_pass, "objectives": obj,
-            "test_counts": {"own": [tp, tt]}, "files": sorted(files)}
+            "test_counts": {"own": [tp, tt]}, "files": sorted(files), "grader": GRADER}
 
 
 def grade(impl_src, test_src, task_dir, cid="case"):     # single-file convenience
@@ -284,7 +290,8 @@ def grade_batch(outputs_path, tasks_path, out_path, resume=False):
                     try:
                         g = grade_files(files, task_dir, f"{cfg}:{tid}:{rep}")
                         sc = {"config": cfg, "task_id": tid, "rep": rep, "tier": tiers.get(tid, "?"),
-                              "score": g["score"], "hard_pass": g["hard_pass"], "objectives": g["objectives"]}
+                              "score": g["score"], "hard_pass": g["hard_pass"], "objectives": g["objectives"],
+                              "grader": g["grader"]}
                     except GraderError as e:      # THE FIX: harness failure is recorded, never a silent 0
                         sc = {"config": cfg, "task_id": tid, "rep": rep, "tier": tiers.get(tid, "?"),
                               "score": None, "hard_pass": False, "objectives": {}, "grade_error": f"HARNESS: {e}"}

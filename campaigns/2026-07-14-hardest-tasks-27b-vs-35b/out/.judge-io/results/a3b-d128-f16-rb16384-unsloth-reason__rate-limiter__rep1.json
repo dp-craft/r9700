@@ -1,0 +1,1 @@
+{"design":1,"clarity":1,"robustness":0,"notes":"Both files are riddled with syntax errors (malformed object literal, unterminated strings, broken fake clock) and the first call for a new key returns true without ever deducting tokens."}

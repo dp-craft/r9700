@@ -1,0 +1,1 @@
+{"design": 3, "clarity": 4, "robustness": 3, "notes": "Readable and properly generic in K, but set() evicts before checking whether the key already exists, so updating a non-LRU key can drop an unrelated live entry, and removeExpired() sweeps the whole map on every operation."}

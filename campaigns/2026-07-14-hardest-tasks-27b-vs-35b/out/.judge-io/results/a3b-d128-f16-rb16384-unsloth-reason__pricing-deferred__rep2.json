@@ -1,0 +1,1 @@
+{"design":3,"clarity":2,"robustness":3,"notes":"Cache dedup and retry are well exercised, but the file ships scratch work — a test asserting both `toBe(39)` and `toBe(38.5)` on the same value behind a thinking-aloud comment — alongside a no-op `catch (e) { throw e }`, a dead `?? UNKNOWN_LABEL` on a total Record, and a `default:` branch that forfeits exhaustiveness checking."}

@@ -1,0 +1,1 @@
+{"design": 3, "clarity": 4, "robustness": 3, "notes": "Well-named helpers and nicely grouped tests, but the free functions re-thread (map, capacity, now, ttlMs) everywhere instead of closing over them, removeEntry is a pointless delete wrapper, and evictLru's size<=capacity pre-insert guard is fragile."}

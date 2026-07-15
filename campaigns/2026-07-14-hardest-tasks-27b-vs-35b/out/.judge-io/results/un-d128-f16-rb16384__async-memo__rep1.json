@@ -1,0 +1,1 @@
+{"design":3,"clarity":4,"robustness":3,"notes":"Compact and readable, but caching the raw promise while evicting from a detached catch branch leaves the delete ordering unspecified relative to the caller's own rejection handler."}

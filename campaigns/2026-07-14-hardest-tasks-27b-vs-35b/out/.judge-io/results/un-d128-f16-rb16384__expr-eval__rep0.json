@@ -1,0 +1,1 @@
+{"design":3,"clarity":3,"robustness":3,"notes":"Conventional tokenizer plus recursive descent, weakened by a stringly-typed expect(), an operator map rebuilt on every character, unchecked token indexing, and errors that leak internal token names to callers."}

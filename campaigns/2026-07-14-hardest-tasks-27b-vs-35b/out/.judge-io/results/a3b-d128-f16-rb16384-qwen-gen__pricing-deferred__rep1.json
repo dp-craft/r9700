@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Tidy `adjustmentOf` collapses all three kinds behind one promise and the cache meets the full contract with tests for each clause; the `as readonly string[]` cast and the unreachable UNKNOWN_LABEL fallback are minor noise."}

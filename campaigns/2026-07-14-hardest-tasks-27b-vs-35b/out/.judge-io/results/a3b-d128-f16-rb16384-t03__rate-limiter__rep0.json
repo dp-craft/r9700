@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Faithful lazy token bucket with correct capping and no-deduct-on-failure; only nits are the terse `b` binding and an inline 1000 magic number."}

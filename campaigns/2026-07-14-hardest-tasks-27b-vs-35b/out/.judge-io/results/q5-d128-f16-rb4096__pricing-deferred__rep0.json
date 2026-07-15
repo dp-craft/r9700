@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Separate entries/pending maps give a clear single-flight cache that meets the whole contract, marred only by the pointless PendingEntry wrapper around a bare promise."}

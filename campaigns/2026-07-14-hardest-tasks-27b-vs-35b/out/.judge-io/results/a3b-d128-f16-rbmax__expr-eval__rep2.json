@@ -1,0 +1,1 @@
+{"design":3,"clarity":4,"robustness":3,"notes":"Cleanest of the parsers with specific error messages and an explicit stray-`)` case, though it leans on a generic `Result<T>` that the exported non-generic type never provides and treats only spaces as whitespace."}

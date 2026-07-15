@@ -1,0 +1,58 @@
+ ▐▛███▜▌   Claude Code v2.1.210
+▝▜█████▛▘  Sonnet 5 with high effort · Claude Pro
+  ▘▘ ▝▝    ~/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b
+
+
+❯ Read the file /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/cal-io/prompt-async-memo.txt . It contains exactly one task. Do that task, then write your final answer to the file
+  /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/cal-io/answer-sonnet-async-memo-rep2.txt (that file must contain ONLY the answer itself, with no preamble or commentary). Writing that file is the last thing you do.
+
+  Read 1 file (ctrl+o to expand)
+
+● Write(out/cal-io/answer-sonnet-async-memo-rep2.txt)
+  ⎿  Wrote 67 lines to out/cal-io/answer-sonnet-async-memo-rep2.txt
+       1 // FILE: impl.ts
+       2 export function createAsyncMemo<K, V>(fn: (key: K) => Promise<V>): (key: K) => Promise<V> {
+       3   const cache = new Map<K, Promise<V>>();
+       4   return (key: K): Promise<V> => {
+       5     const cached = cache.get(key);
+       6     if (cached !== undefined) return cached;
+       7     const pending = fn(key).catch((err: unknown): never => {
+       8       cache.delete(key);
+       9       throw err;
+      10     });
+     … +57 lines (ctrl+o to expand)
+
+● Done — the fix stores fn(key).catch(...) in the cache and evicts the entry on rejection, so concurrent calls dedup, failures aren't cached (retry works), and successes stay cached. Answer written to out/cal-io/answer-sonnet-async-memo-rep2.txt.
+
+✻ Cooked for 30s
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Sonnet 5 | ctx:4% | sess:42k dev@bipubi:/home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b (27b-hybrid-kv-correction-and-finetune-plan *%>)                                                                               /rc
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

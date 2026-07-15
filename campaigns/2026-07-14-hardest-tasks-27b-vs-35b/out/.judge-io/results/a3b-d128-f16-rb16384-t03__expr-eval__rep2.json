@@ -1,0 +1,1 @@
+{"design":2,"clarity":2,"robustness":1,"notes":"Uses the non-generic `Result` as if it were parameterized (`Result<Token[]>`), mutates parse results in place, omits the division-by-zero guard entirely, and only skips literal spaces."}

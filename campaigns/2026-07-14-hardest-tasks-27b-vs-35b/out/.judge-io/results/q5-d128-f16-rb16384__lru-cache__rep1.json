@@ -1,0 +1,1 @@
+{"design":3,"clarity":4,"robustness":4,"notes":"Tracks recency twice (Map insertion order plus an accessed timestamp) and rescans the whole store on every set, but the extracted helpers read well and the tests are thorough."}

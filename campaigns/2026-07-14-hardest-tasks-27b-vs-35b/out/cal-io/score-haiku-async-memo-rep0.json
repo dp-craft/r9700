@@ -1,0 +1,24 @@
+{
+  "id": "haiku-async-memo-rep0",
+  "score": 0.883,
+  "hard_pass": false,
+  "objectives": {
+    "types": 1.0,
+    "lint": 0.8,
+    "tests": 0.6666666666666666,
+    "bdd": 1.0,
+    "novj": 1.0,
+    "edge": 1.0
+  },
+  "test_counts": {
+    "own": [
+      2,
+      3
+    ]
+  },
+  "files": [
+    "impl.test.ts",
+    "impl.ts"
+  ],
+  "grader": "fractional-2026-07-15"
+}

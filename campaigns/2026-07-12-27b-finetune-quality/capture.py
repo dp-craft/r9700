@@ -50,7 +50,7 @@ def stream_chat(base, payload, timeout=600):
     content, reasoning, acc = [], [], ""
     ttft = ttfa = t_first_content = None
     usage = timings = finish = None
-    saw_reasoning_field = False
+    saw_reasoning_field = saw_done = False
     t0 = time.time()
     with urllib.request.urlopen(req, timeout=timeout) as r:
         for raw in r:
@@ -59,6 +59,7 @@ def stream_chat(base, payload, timeout=600):
                 continue
             data = line[5:].strip()
             if data == "[DONE]":
+                saw_done = True
                 break
             try:
                 obj = json.loads(data)
@@ -86,6 +87,23 @@ def stream_chat(base, payload, timeout=600):
                 content.append(pc); reasoning.append(pr)
                 if ch.get("finish_reason"):
                     finish = ch["finish_reason"]
+    # A COMPLETE OpenAI/llama.cpp SSE stream ALWAYS delivers a finish_reason and terminates with
+    # [DONE]. If either is missing, the connection was cut mid-generation (server killed, timeout,
+    # network drop) and `content` holds a TRUNCATED answer.
+    #
+    # Returning that normally is how an interrupted run silently becomes a graded rep: the caller
+    # writes the row, the resume logic counts the (config, task, rep) as done so it is never
+    # re-collected, and a chopped-off answer is graded as if the model chose to write it that way.
+    # MEASURED (2026-07-15): one such row — q5-d128-f16-rb16384/lru-cache/rep0, cut mid-test when its
+    # server was killed — scored 0.603 with tests=0.0 (code unparseable) and pulled the cell's
+    # reported mean from 78.2% down to 77.1%. It was indistinguishable from a real result except for
+    # a null finish_reason.
+    #
+    # Raise instead: the caller records a retryable error row, which is NEVER counted as done.
+    if finish is None or not saw_done:
+        raise RuntimeError(
+            f"incomplete stream: finish_reason={finish!r} saw_done={saw_done} after "
+            f"{len(''.join(content))} content chars — connection cut mid-generation, answer truncated")
     # non-thinking model (no <think> tag ever) → its first content IS the answer
     if ttfa is None and acc and "<think>" not in acc:
         ttfa = t_first_content

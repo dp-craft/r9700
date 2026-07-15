@@ -1,0 +1,1 @@
+{"design":5,"clarity":4,"robustness":4,"notes":"Minimal, idiomatic cache — settled/in-flight maps kept separate with the two-argument `then` form — plus an exhaustive label record and tests hitting every clause of the cache contract."}

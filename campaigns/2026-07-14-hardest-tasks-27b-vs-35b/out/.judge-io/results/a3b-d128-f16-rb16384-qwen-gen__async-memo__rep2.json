@@ -1,0 +1,1 @@
+{"design":3,"clarity":3,"robustness":3,"notes":"Caching the raw promise with a detached then-observer avoids a wrapper, but the two-arg void p.then is obscure and K is gratuitously narrowed to string|number, shrinking the generic API."}

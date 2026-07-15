@@ -1,0 +1,1 @@
+{"design":3,"clarity":4,"robustness":3,"notes":"Correct dedup and failure-eviction, but the needless async wrapper re-wraps every hit in a fresh promise and the truthiness check on a cached promise is sloppier than an explicit undefined test."}

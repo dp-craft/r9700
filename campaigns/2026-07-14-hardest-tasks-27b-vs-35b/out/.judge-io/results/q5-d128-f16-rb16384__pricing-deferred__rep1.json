@@ -1,0 +1,1 @@
+{"design": 4, "clarity": 4, "robustness": 3, "notes": "Tidy work with a good call to make KIND_LABEL a total Record, but the cache's finally() clears the in-flight map a microtask before the entry is stored, leaving a narrow window where a get re-computes."}

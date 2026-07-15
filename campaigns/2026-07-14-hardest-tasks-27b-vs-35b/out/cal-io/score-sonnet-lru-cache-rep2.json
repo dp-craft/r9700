@@ -1,0 +1,25 @@
+{
+  "id": "sonnet-lru-cache-rep2",
+  "score": 0.959,
+  "hard_pass": false,
+  "objectives": {
+    "types": 1.0,
+    "lint": 0.8,
+    "tests": 1.0,
+    "bdd": 0.83,
+    "novj": 1.0,
+    "reuse": 1.0,
+    "edge": 1.0
+  },
+  "test_counts": {
+    "own": [
+      6,
+      6
+    ]
+  },
+  "files": [
+    "impl.test.ts",
+    "impl.ts"
+  ],
+  "grader": "fractional-2026-07-15"
+}

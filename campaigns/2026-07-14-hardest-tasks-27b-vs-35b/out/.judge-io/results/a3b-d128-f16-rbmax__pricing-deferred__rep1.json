@@ -1,0 +1,1 @@
+{"design":3,"clarity":3,"robustness":4,"notes":"Cache contract is correctly satisfied and tests cover it well, but the `pctOf` helper re-narrows an already-narrowed amount with an unreachable 0 default and `PendingEntry` wraps a single promise for no benefit."}

@@ -1,0 +1,186 @@
+// FILE: impl.ts
+export type Result =
+  | { readonly ok: true; readonly value: number }
+  | { readonly ok: false; readonly error: string };
+
+type OperatorType = "+" | "-" | "*" | "/" | "(" | ")";
+
+type Token =
+  | { readonly type: "num"; readonly value: number }
+  | { readonly type: OperatorType };
+
+function isDigit(ch: string): boolean {
+  return ch >= "0" && ch <= "9";
+}
+
+function readNumber(expr: string, start: number): { readonly value: number; readonly end: number } {
+  let end = start;
+  while (end < expr.length && isDigit(expr[end])) end++;
+  return { value: Number(expr.slice(start, end)), end };
+}
+
+function tokenize(expr: string): readonly Token[] {
+  const tokens: Token[] = [];
+  let i = 0;
+  while (i < expr.length) {
+    const ch = expr[i];
+    if (/\s/.test(ch)) { i++; continue; }
+    if (isDigit(ch)) {
+      const { value, end } = readNumber(expr, i);
+      tokens.push({ type: "num", value });
+      i = end;
+      continue;
+    }
+    if (!"+-*/()".includes(ch)) throw new Error(`Unexpected character: ${ch}`);
+    tokens.push({ type: ch as OperatorType });
+    i++;
+  }
+  return tokens;
+}
+
+class Parser {
+  private pos = 0;
+
+  constructor(private readonly tokens: readonly Token[]) {}
+
+  parseExpr(): number {
+    let value = this.parseTerm();
+    while (this.peek()?.type === "+" || this.peek()?.type === "-") {
+      const op = this.next().type;
+      const rhs = this.parseTerm();
+      value = op === "+" ? value + rhs : value - rhs;
+    }
+    return value;
+  }
+
+  parseTerm(): number {
+    let value = this.parseFactor();
+    while (this.peek()?.type === "*" || this.peek()?.type === "/") {
+      const op = this.next().type;
+      const rhs = this.parseFactor();
+      if (op === "/") {
+        if (rhs === 0) throw new Error("Division by zero");
+        value = value / rhs;
+      } else {
+        value = value * rhs;
+      }
+    }
+    return value;
+  }
+
+  parseFactor(): number {
+    const tok = this.peek();
+    if (tok === undefined) throw new Error("Unexpected end of input");
+    if (tok.type === "num") {
+      this.next();
+      return tok.value;
+    }
+    if (tok.type === "-") {
+      this.next();
+      return -this.parseFactor();
+    }
+    if (tok.type === "(") {
+      this.next();
+      const value = this.parseExpr();
+      this.expect(")");
+      return value;
+    }
+    throw new Error(`Unexpected token: ${tok.type}`);
+  }
+
+  hasMore(): boolean {
+    return this.pos < this.tokens.length;
+  }
+
+  private peek(): Token | undefined {
+    return this.tokens[this.pos];
+  }
+
+  private next(): Token {
+    const tok = this.tokens[this.pos];
+    if (tok === undefined) throw new Error("Unexpected end of input");
+    this.pos += 1;
+    return tok;
+  }
+
+  private expect(type: OperatorType): void {
+    const tok = this.next();
+    if (tok.type !== type) throw new Error(`Expected "${type}"`);
+  }
+}
+
+export function evaluate(expr: string): Result {
+  try {
+    const tokens = tokenize(expr);
+    const parser = new Parser(tokens);
+    const value = parser.parseExpr();
+    if (parser.hasMore()) {
+      return { ok: false, error: "Unexpected trailing input" };
+    }
+    return { ok: true, value };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    return { ok: false, error: message };
+  }
+}
+
+// FILE: impl.test.ts
+import { describe, it, expect } from "vitest";
+import { evaluate } from "./impl";
+
+describe("evaluate", () => {
+  it("should return the correct value when expression uses standard precedence", () => {
+    const result = evaluate("2 + 3 * 4");
+    expect(result).toEqual({ ok: true, value: 14 });
+  });
+
+  it("should apply left associativity when subtracting repeatedly", () => {
+    const result = evaluate("10 - 3 - 2");
+    expect(result).toEqual({ ok: true, value: 5 });
+  });
+
+  it("should apply left associativity when dividing repeatedly", () => {
+    const result = evaluate("8 / 2 / 2");
+    expect(result).toEqual({ ok: true, value: 2 });
+  });
+
+  it("should respect parentheses when they override default precedence", () => {
+    const result = evaluate("(2 + 3) * 4");
+    expect(result).toEqual({ ok: true, value: 20 });
+  });
+
+  it("should ignore arbitrary whitespace between tokens", () => {
+    const result = evaluate("  1 +\t2  \n* 3 ");
+    expect(result).toEqual({ ok: true, value: 7 });
+  });
+
+  it("should evaluate nested parentheses correctly", () => {
+    const result = evaluate("((1 + 2) * (3 + 4))");
+    expect(result).toEqual({ ok: true, value: 21 });
+  });
+
+  it("should return an error when parentheses are unbalanced", () => {
+    const result = evaluate("(1 + 2");
+    expect(result.ok).toBe(false);
+  });
+
+  it("should return an error when there is unexpected trailing input", () => {
+    const result = evaluate("1 + 2)");
+    expect(result.ok).toBe(false);
+  });
+
+  it("should return an error when an operand is missing", () => {
+    const result = evaluate("1 +");
+    expect(result.ok).toBe(false);
+  });
+
+  it("should return an error when dividing by zero", () => {
+    const result = evaluate("3 / 0");
+    expect(result.ok).toBe(false);
+  });
+
+  it("should return an error when the input contains an unexpected character", () => {
+    const result = evaluate("1 + @");
+    expect(result.ok).toBe(false);
+  });
+});

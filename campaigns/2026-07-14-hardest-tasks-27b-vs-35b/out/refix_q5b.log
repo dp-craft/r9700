@@ -1,0 +1,13 @@
+skip (ONLY): un-d128-f16-rb4096
+skip (ONLY): xl-d128-f16-rb4096
+skip (ONLY): q5-d128-q8-rb4096
+skip (ONLY): q6-d128-q8-rb4096
+skip (ONLY): a3b-d128-f16-rb4096
+resume: q5-d128-f16-rb16384 — 14/15 already captured, running the rest
+=== q5-d128-f16-rb16384  (FAIL-FAST PROBE, RUN FIRST: 27B Q5_K_M at f16 KV (removes the q8_0 confound on the ladder). No pre-flight guard by request — f16 caps Q5 ~150k ctx, so this may OOM at ctx 163840. A failure is a RESULT (iron rule 7).: unsloth/Qwen3.6-27B-Q5_K_M mtp=1 kv=f16 depth=120k budget=16384) ===
+starting on :8081 (pid 1853660) — log: /home/dev/work/dp-craft/amd/bench/.servers/8081.log
+up after 14s — model: Qwen3.6-27B-Q5_K_M.gguf — build: b9950-961e4b26a
+cmdline: /home/dev/work/dp-craft/amd/bench/llamacpp-vulkan/llama-server -m /home/dev/models/gguf/unsloth/Qwen3.6-27B-Q5_K_M.gguf -c 163840 -np 1 -ngl 99 -fa on -ub 2048 -b 4096 -ctk f16 -ctv f16 --host 127.0.0.1 --port 8081 --spec-type draft-mtp --reasoning-budget 16384
+  VRAM at load: 32428 MiB  (load 13s)
+  [q5-d128-f16-rb16384] lru-cache rep0: ERROR incomplete stream: finish_reason=None saw_done=False after 0 content chars — connection cut mid-generation, answer truncated
+captured 1 rows -> /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/outputs.jsonl (14 already present, skipped)

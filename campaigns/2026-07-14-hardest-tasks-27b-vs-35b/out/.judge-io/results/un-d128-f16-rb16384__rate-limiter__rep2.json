@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":3,"notes":"Straightforward bucket store with inline lazy init and a DEFAULT_TOKENS constant, though a raw 1000 divisor sits beside it and no edge guards exist for reversed clocks or zero/negative requests."}

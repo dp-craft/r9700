@@ -1,0 +1,1 @@
+{"design":2,"clarity":3,"robustness":2,"notes":"Coercing the generic key via String(key) silently breaks the K contract and collides object keys, and the buildLruCache indirection plus now() wrapper add layers without value."}

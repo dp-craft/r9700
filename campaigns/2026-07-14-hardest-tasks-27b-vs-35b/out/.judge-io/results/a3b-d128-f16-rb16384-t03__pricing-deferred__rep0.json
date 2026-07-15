@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Traces the async change through every file and fixes the cache contract with a clean pending-map plus catch-and-rethrow, though totals are awaited sequentially and expired entries are never evicted."}

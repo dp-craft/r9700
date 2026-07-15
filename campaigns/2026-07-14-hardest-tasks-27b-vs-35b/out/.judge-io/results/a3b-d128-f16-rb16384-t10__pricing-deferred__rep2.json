@@ -1,0 +1,1 @@
+{"design":3,"clarity":4,"robustness":2,"notes":"Storing the promise itself gives elegant dedup, but the rejection handler discards the original error behind a generic \"Compute failed\" and TTL is stamped at request time rather than completion."}

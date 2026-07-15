@@ -1,0 +1,1 @@
+{"design": 4, "clarity": 4, "robustness": 4, "notes": "Correctly threads async through the pipeline and fixes the cache contract atomically (entry set before pending cleared, in both then and catch); the PendingEntry wrapper object is needless indirection."}

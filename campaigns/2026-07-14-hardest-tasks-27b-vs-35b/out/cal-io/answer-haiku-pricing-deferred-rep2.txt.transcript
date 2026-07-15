@@ -1,0 +1,308 @@
+ ▐▛███▜▌   Claude Code v2.1.210
+▝▜█████▛▘  Haiku 4.5 · Claude Pro
+  ▘▘ ▝▝    ~/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b
+
+
+❯ Read the file /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/cal-io/prompt-pricing-deferred.txt . It contains exactly one task. Do that task, then write your final answer to the file
+  /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/cal-io/answer-haiku-pricing-deferred-rep2.txt (that file must contain ONLY the answer itself, with no preamble or commentary). Writing that file is the last thing
+  you do.
+
+● I'll read the task file and complete it.
+
+  Read 1 file (ctrl+o to expand)
+
+● Reading the task file, I need to add a deferred variant to the Amount type that supports async pricing resolution. This requires making the entire pricing pipeline async while ensuring the cache handles concurrency correctly (deduplicating
+  concurrent calls, not caching failures, and respecting TTL).
+
+  Let me work through the changes systematically:
+
+  1. types.ts - Add the deferred variant
+  2. pricing.ts - Make functions async to handle deferred loads
+  3. report.ts - Make functions async to label and render deferred totals
+  4. cache.ts - Fix concurrency: deduplicate in-flight computations, don't cache failures
+  5. pricing.test.ts - Update all tests to be async and add coverage for deferred behavior
+
+  // FILE: types.ts
+  export type Amount =
+    | { readonly kind: "fixed"; readonly value: number }
+    | { readonly kind: "percent"; readonly pct: number }
+    | { readonly kind: "deferred"; readonly load: () => Promise<number> };
+
+  export interface LineItem {
+    readonly id: string;
+    readonly base: number;
+    readonly adjustment: Amount;
+  }
+
+  // FILE: pricing.ts
+  import type { Amount, LineItem } from "./types";
+
+  export const PERCENT_BASE = 100;
+
+  /** Percentage carried by an amount; non-percent amounts contribute no rate. */
+  function pctOf(amount: Amount): number {
+    return amount.kind === "percent" ? amount.pct : 0;
+  }
+
+  async function adjustmentOf(base: number, amount: Amount): Promise<number> {
+    if (amount.kind === "fixed") {
+      return amount.value;
+    }
+    if (amount.kind === "percent") {
+      return (base * pctOf(amount)) / PERCENT_BASE;
+    }
+    const value = await amount.load();
+    return value;
+  }
+
+  export async function lineTotal(item: LineItem): Promise<number> {
+    return item.base + (await adjustmentOf(item.base, item.adjustment));
+  }
+
+  export async function computeTotal(items: readonly LineItem[]): Promise<number> {
+    let sum = 0;
+    for (const item of items) {
+      sum += await lineTotal(item);
+    }
+    return sum;
+  }
+
+  // FILE: report.ts
+  import type { Amount, LineItem } from "./types";
+  import { lineTotal } from "./pricing";
+
+  const KIND_LABEL: Partial<Record<Amount["kind"], string>> = {
+    fixed: "flat",
+    percent: "rate",
+    deferred: "deferred",
+  };
+  const UNKNOWN_LABEL = "other";
+
+  export function amountLabel(amount: Amount): string {
+    return KIND_LABEL[amount.kind] ?? UNKNOWN_LABEL;
+  }
+
+  export async function reportLine(item: LineItem): Promise<string> {
+    const total = await lineTotal(item);
+    return `${item.id} [${amountLabel(item.adjustment)}]: ${String(total)}`;
+  }
+
+  export async function buildReport(
+    items: readonly LineItem[]
+  ): Promise<readonly string[]> {
+    const results: string[] = [];
+    for (const item of items) {
+      results.push(await reportLine(item));
+    }
+    return results;
+  }
+
+  // FILE: cache.ts
+
+  import type { Clock } from "../../lib/clock";
+
+  export interface PriceCache {
+    /** Return the cached total for `key` if fresh, else run `compute` and cache its result. */
+  }
+
+  interface CacheEntry {
+    readonly value: number;
+    readonly expiresAt: number;
+  }
+
+  const DEFAULT_TTL_MS = 60_000;
+
+  export function createPriceCache(
+    clock: Clock,
+    ttlMs: number = DEFAULT_TTL_MS
+  ): PriceCache {
+    const entries = new Map<string, CacheEntry>();
+    const inFlight = new Map<string, Promise<number>>();
+
+    return {
+      async get(key: string, compute: () => Promise<number>): Promise<number> {
+        const hit = entries.get(key);
+        if (hit !== undefined && hit.expiresAt > clock.now()) {
+          return hit.value;
+        }
+
+        const inflightPromise = inFlight.get(key);
+        if (inflightPromise !== undefined) {
+          return inflightPromise;
+        }
+
+        const computePromise = compute();
+        inFlight.set(key, computePromise);
+
+        try {
+          const value = await computePromise;
+          entries.set(key, { value, expiresAt: clock.now() + ttlMs });
+          return value;
+        } finally {
+          inFlight.delete(key);
+        }
+      },
+    };
+  }
+
+  // FILE: pricing.test.ts
+
+  import { describe, it, expect } from "vitest";
+  import { computeTotal, lineTotal } from "./pricing";
+  import { amountLabel, buildReport } from "./report";
+  import { createPriceCache } from "./cache";
+
+  describe("pricing", () => {
+    it("should add the fixed value when the adjustment is fixed", async () => {
+      expect(
+        await lineTotal({ id: "a", base: 100, adjustment: { kind: "fixed", value: 20 } })
+      ).toBe(120);
+    });
+
+    it("should apply the rate when the adjustment is a percent", async () => {
+      expect(
+        await lineTotal({ id: "b", base: 200, adjustment: { kind: "percent", pct: 10 } })
+      ).toBe(220);
+    });
+
+    it("should resolve a deferred adjustment", async () => {
+      expect(
+        await lineTotal({
+          id: "c",
+          base: 100,
+          adjustment: { kind: "deferred", load: async () => 50 },
+        })
+      ).toBe(150);
+    });
+
+    it("should sum the line totals when computing an order total", async () => {
+      const items = [
+        { id: "a", base: 100, adjustment: { kind: "fixed", value: 20 } },
+        { id: "b", base: 200, adjustment: { kind: "percent", pct: 10 } },
+      ] as const;
+      expect(await computeTotal(items)).toBe(340);
+    });
+
+    it("should compute total with deferred adjustment", async () => {
+      const items = [
+        { id: "a", base: 100, adjustment: { kind: "fixed", value: 20 } },
+        { id: "c", base: 50, adjustment: { kind: "deferred", load: async () => 30 } },
+      ] as const;
+      expect(await computeTotal(items)).toBe(200);
+    });
+  });
+
+  describe("report", () => {
+    it("should label each adjustment when building the report", () => {
+      expect(amountLabel({ kind: "fixed", value: 5 })).toBe("flat");
+      expect(amountLabel({ kind: "percent", pct: 5 })).toBe("rate");
+      expect(amountLabel({ kind: "deferred", load: async () => 5 })).toBe("deferred");
+    });
+
+    it("should render one line per item when building the report", async () => {
+      const lines = await buildReport([
+        { id: "a", base: 100, adjustment: { kind: "fixed", value: 20 } },
+      ]);
+      expect(lines).toEqual(["a [flat]: 120"]);
+    });
+
+    it("should render deferred line when building the report", async () => {
+      const lines = await buildReport([
+        { id: "d", base: 100, adjustment: { kind: "deferred", load: async () => 25 } },
+      ]);
+      expect(lines).toEqual(["d [deferred]: 125"]);
+    });
+  });
+
+  describe("createPriceCache", () => {
+    it("should reuse the cached total when the entry is still fresh", async () => {
+      let calls = 0;
+      const cache = createPriceCache({ now: (): number => 0 }, 1000);
+      const compute = async (): Promise<number> => {
+        calls += 1;
+        return 42;
+      };
+      expect(await cache.get("k", compute)).toBe(42);
+      expect(await cache.get("k", compute)).toBe(42);
+      expect(calls).toBe(1);
+    });
+
+    it("should recompute the total when the entry has expired", async () => {
+      let calls = 0;
+      const cache = createPriceCache({ now: (): number => t }, 1000);
+      const compute = async (): Promise<number> => {
+        calls += 1;
+        return calls;
+      };
+      expect(await cache.get("k", compute)).toBe(1);
+      t = 1500;
+      expect(await cache.get("k", compute)).toBe(2);
+      expect(calls).toBe(2);
+    });
+
+    it("should share a single computation across concurrent gets for the same fresh key", async () => {
+      let calls = 0;
+      const cache = createPriceCache({ now: (): number => 0 }, 1000);
+      const compute = async (): Promise<number> => {
+        calls += 1;
+        return 42;
+      };
+      const [r1, r2] = await Promise.all([
+        cache.get("k", compute),
+        cache.get("k", compute),
+      ]);
+      expect(r1).toBe(42);
+      expect(r2).toBe(42);
+      expect(calls).toBe(1);
+    });
+
+    it("should not cache a failed computation", async () => {
+      let calls = 0;
+      const cache = createPriceCache({ now: (): number => 0 }, 1000);
+      const compute = async (): Promise<number> => {
+        calls += 1;
+        throw new Error("compute failed");
+      };
+      await expect(cache.get("k", compute)).rejects.toThrow("compute failed");
+      expect(calls).toBe(1);
+      await expect(cache.get("k", compute)).rejects.toThrow("compute failed");
+      expect(calls).toBe(2);
+    });
+
+    it("should keep different keys independent", async () => {
+      let calls = 0;
+      const cache = createPriceCache({ now: (): number => 0 }, 1000);
+      const compute = async (): Promise<number> => {
+        calls += 1;
+        return calls;
+      };
+      expect(await cache.get("k1", compute)).toBe(1);
+      expect(await cache.get("k2", compute)).toBe(2);
+      expect(calls).toBe(2);
+    });
+  });
+
+  Now writing the final answer to the required file:
+
+● Write(out/cal-io/answer-haiku-pricing-deferred-rep2.txt)
+  ⎿  Wrote 269 lines to out/cal-io/answer-haiku-pricing-deferred-rep2.txt
+       1 // FILE: types.ts
+       2 ```ts
+       3 export type Amount =
+       4   | { readonly kind: "fixed"; readonly value: number }
+       5   | { readonly kind: "percent"; readonly pct: number }
+       6   | { readonly kind: "deferred"; readonly load: () => Promise<number> };
+       7
+       8 export interface LineItem {
+       9   readonly id: string;
+      10   readonly base: number;
+     … +259 lines (ctrl+o to expand)
+
+· Transfiguring… (2m 1s · ↓ 12.3k tokens · thinking)
+
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Haiku 4.5 | ctx:15% | sess:29k dev@bipubi:/home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b (27b-hybrid-kv-correction-and-finetune-plan *%>)                                                                          /rc
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents
+

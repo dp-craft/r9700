@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Idiomatic void p.catch eviction with named type aliases and a broad suite covering distinct keys and cross-key isolation; the unused failCall binding risks an unhandled rejection."}

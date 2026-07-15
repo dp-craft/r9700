@@ -1,0 +1,1 @@
+{"design":4,"clarity":3,"robustness":4,"notes":"Guards non-positive elapsed time and covers the no-deduct-on-failure case, but terse b/req naming and an unused setTime helper on the fake clock cost readability."}

@@ -1,0 +1,63 @@
+// FILE: impl.ts
+export function createAsyncMemo<K, V>(fn: (key: K) => Promise<V>): (key: K) => Promise<V> {
+  const cache = new Map<K, Promise<V>>();
+  return (key: K): Promise<V> => {
+    const cached = cache.get(key);
+    if (cached !== undefined) return cached;
+    const pending = fn(key).catch((err: unknown): Promise<V> => {
+      cache.delete(key);
+      return Promise.reject(err);
+    });
+    cache.set(key, pending);
+    return pending;
+  };
+}
+
+// FILE: impl.test.ts
+import { describe, it, expect } from "vitest";
+import { createAsyncMemo } from "./impl";
+
+describe("createAsyncMemo", () => {
+  it("should dedup concurrent calls when the same key is requested simultaneously", async (): Promise<void> => {
+    let calls = 0;
+    const fn = (key: string): Promise<string> => {
+      calls++;
+      return new Promise<string>((resolve): void => {
+        setTimeout((): void => resolve(`${key}-value`), 10);
+      });
+    };
+    const memo = createAsyncMemo(fn);
+    const [a, b] = await Promise.all([memo("k"), memo("k")]);
+    expect(a).toBe("k-value");
+    expect(b).toBe("k-value");
+    expect(calls).toBe(1);
+  });
+
+  it("should retry the computation when the previous call rejected", async (): Promise<void> => {
+    let attempts = 0;
+    const fn = (key: string): Promise<string> => {
+      attempts++;
+      if (attempts === 1) return Promise.reject(new Error("fail"));
+      return Promise.resolve(`${key}-ok`);
+    };
+    const memo = createAsyncMemo(fn);
+    await expect(memo("k")).rejects.toThrow("fail");
+    const result = await memo("k");
+    expect(result).toBe("k-ok");
+    expect(attempts).toBe(2);
+  });
+
+  it("should return the cached value when a previous call already succeeded", async (): Promise<void> => {
+    let calls = 0;
+    const fn = (key: string): Promise<string> => {
+      calls++;
+      return Promise.resolve(`${key}-cached`);
+    };
+    const memo = createAsyncMemo(fn);
+    const first = await memo("k");
+    const second = await memo("k");
+    expect(first).toBe("k-cached");
+    expect(second).toBe("k-cached");
+    expect(calls).toBe(1);
+  });
+});

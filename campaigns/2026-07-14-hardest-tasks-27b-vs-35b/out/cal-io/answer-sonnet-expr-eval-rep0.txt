@@ -1,0 +1,167 @@
+// FILE: impl.ts
+export type Result =
+  | { readonly ok: true; readonly value: number }
+  | { readonly ok: false; readonly error: string };
+
+interface Token {
+  readonly type: "num" | "op" | "lparen" | "rparen";
+  readonly value: string;
+}
+
+const isDigit = (ch: string): boolean => ch >= "0" && ch <= "9";
+
+function readNumber(expr: string, start: number, tokens: Token[]): number {
+  let j = start;
+  while (j < expr.length && isDigit(expr[j])) j++;
+  tokens.push({ type: "num", value: expr.slice(start, j) });
+  return j;
+}
+
+function tokenize(expr: string): readonly Token[] {
+  const tokens: Token[] = [];
+  let i = 0;
+  while (i < expr.length) {
+    const ch = expr[i];
+    if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") { i++; continue; }
+    if (isDigit(ch)) { i = readNumber(expr, i, tokens); continue; }
+    if (ch === "+" || ch === "-" || ch === "*" || ch === "/") { tokens.push({ type: "op", value: ch }); i++; continue; }
+    if (ch === "(") { tokens.push({ type: "lparen", value: ch }); i++; continue; }
+    if (ch === ")") { tokens.push({ type: "rparen", value: ch }); i++; continue; }
+    throw new Error(`Unexpected character '${ch}'`);
+  }
+  return tokens;
+}
+
+class Parser {
+  private pos = 0;
+  constructor(private readonly tokens: readonly Token[]) {}
+
+  parseExpr(): number {
+    let value = this.parseTerm();
+    while (this.peekOp("+") || this.peekOp("-")) {
+      const op = this.tokens[this.pos].value;
+      this.pos++;
+      const rhs = this.parseTerm();
+      value = op === "+" ? value + rhs : value - rhs;
+    }
+    return value;
+  }
+
+  parseTerm(): number {
+    let value = this.parseFactor();
+    while (this.peekOp("*") || this.peekOp("/")) {
+      const op = this.tokens[this.pos].value;
+      this.pos++;
+      const rhs = this.parseFactor();
+      if (op === "/") {
+        if (rhs === 0) throw new Error("Division by zero");
+        value = value / rhs;
+      } else {
+        value = value * rhs;
+      }
+    }
+    return value;
+  }
+
+  parseFactor(): number {
+    const token = this.tokens[this.pos];
+    if (token === undefined) throw new Error("Unexpected end of expression");
+    if (token.type === "num") { this.pos++; return Number(token.value); }
+    if (token.type === "lparen") {
+      this.pos++;
+      const value = this.parseExpr();
+      this.expectRParen();
+      return value;
+    }
+    throw new Error(`Unexpected token '${token.value}'`);
+  }
+
+  private expectRParen(): void {
+    const token = this.tokens[this.pos];
+    if (token === undefined || token.type !== "rparen") throw new Error("Missing closing parenthesis");
+    this.pos++;
+  }
+
+  private peekOp(op: string): boolean {
+    const token = this.tokens[this.pos];
+    return token !== undefined && token.type === "op" && token.value === op;
+  }
+
+  atEnd(): boolean {
+    return this.pos >= this.tokens.length;
+  }
+}
+
+export function evaluate(expr: string): Result {
+  try {
+    const tokens = tokenize(expr);
+    const parser = new Parser(tokens);
+    const value = parser.parseExpr();
+    if (!parser.atEnd()) throw new Error("Unexpected trailing input");
+    return { ok: true, value };
+  } catch (err) {
+    const error = err instanceof Error ? err.message : "Unknown error";
+    return { ok: false, error };
+  }
+}
+
+// FILE: impl.test.ts
+import { describe, it, expect } from "vitest";
+import { evaluate } from "./impl";
+
+describe("evaluate", () => {
+  it("should return the sum when adding two numbers", () => {
+    const result = evaluate("2 + 3");
+    expect(result).toEqual({ ok: true, value: 5 });
+  });
+
+  it("should apply multiplication before addition when precedence differs", () => {
+    const result = evaluate("2 + 3 * 4");
+    expect(result).toEqual({ ok: true, value: 14 });
+  });
+
+  it("should apply division before subtraction when precedence differs", () => {
+    const result = evaluate("20 - 8 / 4");
+    expect(result).toEqual({ ok: true, value: 18 });
+  });
+
+  it("should evaluate left-to-right when chained subtractions occur", () => {
+    const result = evaluate("10 - 3 - 2");
+    expect(result).toEqual({ ok: true, value: 5 });
+  });
+
+  it("should evaluate left-to-right when chained divisions occur", () => {
+    const result = evaluate("8 / 2 / 2");
+    expect(result).toEqual({ ok: true, value: 2 });
+  });
+
+  it("should respect parentheses when they override default precedence", () => {
+    const result = evaluate("(2 + 3) * 4");
+    expect(result).toEqual({ ok: true, value: 20 });
+  });
+
+  it("should ignore arbitrary whitespace when tokenizing the expression", () => {
+    const result = evaluate("  ( 1\t+\n2 )  *   3 ");
+    expect(result).toEqual({ ok: true, value: 9 });
+  });
+
+  it("should return an error when parentheses are unbalanced", () => {
+    const result = evaluate("(1 + 2");
+    expect(result.ok).toBe(false);
+  });
+
+  it("should return an error when an operand is missing", () => {
+    const result = evaluate("1 + ");
+    expect(result.ok).toBe(false);
+  });
+
+  it("should return an error when an unexpected character appears", () => {
+    const result = evaluate("1 + a");
+    expect(result.ok).toBe(false);
+  });
+
+  it("should return an error when dividing by zero", () => {
+    const result = evaluate("5 / 0");
+    expect(result).toEqual({ ok: false, error: "Division by zero" });
+  });
+});

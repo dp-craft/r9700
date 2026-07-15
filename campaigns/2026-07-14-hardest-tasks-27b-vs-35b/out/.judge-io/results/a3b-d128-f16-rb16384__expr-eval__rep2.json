@@ -1,0 +1,1 @@
+{"design":3,"clarity":3,"robustness":4,"notes":"Best error taxonomy of the set (distinguishes stray closing parens, missing operands and trailing input), but it leans on a generic `Result<T>` the spec-fixed non-generic Result never declares, and packs several statements per line."}

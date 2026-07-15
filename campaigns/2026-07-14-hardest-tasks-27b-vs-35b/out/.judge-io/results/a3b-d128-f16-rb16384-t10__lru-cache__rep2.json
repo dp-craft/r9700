@@ -1,0 +1,1 @@
+{"design":3,"clarity":3,"robustness":3,"notes":"Explicit Map+accessOrder split purges expired heads before evicting live entries and tests that behavior, but the two structures must be kept in sync by hand and indexOf/splice makes recency O(n)."}

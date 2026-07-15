@@ -1,0 +1,1 @@
+{"design":2,"clarity":3,"robustness":2,"notes":"First call for a new key returns true without deducting any tokens, and the systemClock default quietly reintroduces ambient time the spec wanted injected."}

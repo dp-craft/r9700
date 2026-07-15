@@ -1,0 +1,1 @@
+{"design":3,"clarity":4,"robustness":3,"notes":"Readable and correctly keeps TTL insertion-based, but eviction picks the oldest key without purging expired entries first, so a dead entry can force out a live one."}

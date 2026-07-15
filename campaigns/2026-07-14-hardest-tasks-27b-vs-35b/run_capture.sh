@@ -27,6 +27,16 @@ SERVE="$REPO/bench/engine-bench/serve_llamacpp.sh"
 
 : "${MODELS_DIR:=/home/dev/models/gguf}"
 : "${CONFIGS:=$HERE/configs.jsonl}"    # override to run a sweep, e.g. CONFIGS=configs_sampling.jsonl (add-on C)
+# Reference ladder (haiku/sonnet/opus), collected by run_refs.sh: 3 reps per (model, task), rows carry
+# `rep` → aggregate reports mean±sd and hard_pass as k/n instead of an n=1 point estimate.
+# ONE variable feeds BOTH consumers on purpose: aggregate.py builds summary.md's reference rows and
+# make_charts.py draws the reference BANDS on the SVGs from their own separate reads. They were wired to
+# different sources (make_charts hardcoded the legacy calibration{,-hard}.jsonl; aggregate had no flag at
+# all and silently defaulted to them) — which would print a 3-rep table beside an n=1 dashed line and call
+# them the same reference.
+# Do NOT merge the legacy files in: they hold n=1 rows for these same (model, task) pairs, so a pair would
+# silently gain a fourth rep of different provenance. Legacy rows cover OTHER tasks and stay where they are.
+: "${CALIB:=$HERE/calibration-reps.jsonl}"
 : "${PORT:=8081}" ; : "${REPS:=3}" ; : "${BACKEND:=vulkan}" ; : "${UB:=2048}" ; : "${B:=4096}"
 : "${WAIT:=600}"                       # 128k cold load can take ~3 min
 # claude-driven steps (default ON → one script, no human interaction). Both run THROUGH tmux.
@@ -240,7 +250,7 @@ esac
 echo; echo "=== charts (reused by the benchmark-results skill) ==="
 ORDER="$(python3 -c 'import json,sys;print(",".join(json.loads(l)["label"] for l in open(sys.argv[1]) if l.strip()))' "$CONFIGS")"
 python3 "$REPO/campaigns/2026-07-12-27b-finetune-quality/make_charts.py" --dir "$OUTDIR" --charts "$HERE/charts" \
-  --order "$ORDER" --calibration "$HERE/calibration.jsonl,$HERE/calibration-hard.jsonl" \
+  --order "$ORDER" --calibration "$CALIB" \
   || echo "make_charts failed (see above)"
 
 # --- 5. deterministic digest: aggregate.py crunches ALL the numbers in Python (per-cell table +
@@ -249,7 +259,8 @@ echo; echo "=== aggregate (deterministic digest → out/summary.md) ==="
 # --by-task also emits out/summary_by_task.json, which the per-task charts below consume. It was
 # missing here, so summary_by_task.json was only ever written by hand — that is exactly how
 # charts/detailed/ ended up built from a pre-correction aggregate (2026-07-15). Data first, charts after.
-python3 "$HERE/aggregate.py" --dir "$OUTDIR" --by-task --out "$OUTDIR/summary.md" || echo "aggregate failed (see above)"
+python3 "$HERE/aggregate.py" --dir "$OUTDIR" --by-task --out "$OUTDIR/summary.md" \
+  --calib-files "$CALIB" || echo "aggregate failed (see above)"
 
 # Per-task charts LAST: they read out/summary_by_task.json, so they MUST run after aggregate --by-task.
 # Wired in deliberately — running them by hand is what let charts/detailed/ drift behind the data.
@@ -285,42 +296,51 @@ invent nothing. Cover the campaign's questions exactly as summary.md's "Findings
 the strict-lint/types wall, or is the wall real capability? note lint/types are now FRACTIONAL = error-count
 based, so cleanliness has resolution), (b) 27B (best quant) vs 35B-A3B (does the bigger MoE clear the wall
 that precision does not — capacity vs precision?), (c) capability per task vs the haiku/sonnet/opus ladder,
-(d) speed vs quality (generation tokens/time). NOTE KV is NOT uniform: Q5_K_M+Q6_K run q8_0 KV (their weights
-are too heavy for f16 @ctx 163840), the other three run f16 — so treat any Q5/Q6 quant-ladder delta as
-weight-quant PLUS a small KV effect (f16-vs-q8 is within the prior ≤5% rule). If summary.md's Health flags
-GTT spill, surface it; otherwise all five cells fit VRAM.
-All cells share reasoning-budget 4096 (the budget sweep is a separate follow-up campaign — do NOT analyze it).
+(d) speed vs quality (generation tokens/time). NOTE KV is NOT uniform: the two ORIGINAL Q5_K_M/Q6_K cells run
+q8_0 KV, the others f16 — so treat a q8_0-vs-f16 quant-ladder delta as weight-quant PLUS a small KV effect
+(f16-vs-q8 is within the prior ≤5% rule). The 2026-07-15 extension ADDED a Q5_K_M f16 cell precisely to remove
+that confound: Q5_K_M at f16 @ctx 163840 was MEASURED to fit, so the old "their weights are too heavy for f16"
+claim is DEAD — prefer the f16-vs-f16 comparison where one exists, and say which pairing you used. If
+summary.md's Health flags GTT spill, surface it.
+SCOPE — all THREE axes are in scope and must be analyzed: (1) the quant ladder, (2) the REASONING-BUDGET axis
+(4096 / 16384 / -1 unlimited), (3) the 35B SAMPLING sweep (temp 0.3 / 0.6 / 1.0 plus two vendor presets).
+An earlier version of this prompt said "all cells share reasoning-budget 4096 (the budget sweep is a separate
+follow-up campaign — do NOT analyze it)" — that is OBSOLETE and would silently drop most of the matrix; the
+cells are in configs.jsonl and summary.md. Read the matrix from the data, never from this prompt.
 NOTE the grader FIX: this run used single-process vitest + a fail-loud grader + a pre-grade self-check,
 so tests/edge are trustworthy (the previous run's tests/edge=0 was a harness bug). If summary.md's Health
 line flags grade_error/HARNESS rows, runaways, or GTT spill, surface them prominently.
 
 UNCERTAINTY (MANDATORY — this design is UNDERPOWERED; do not present noise as shape): summary.md has an
 "Uncertainty" section with per-cell sd/SE/95% CI, the rep noise, and a PAIRED-by-task t-test vs Q4_K_M.
-Facts you MUST honour: every 95% CI overlaps; NO paired quant Δ is significant (Q4_K_XL -10.9 t=-2.38,
-Q5_K_M -2.5 t=-0.62, Q6_K +3.7 t=+1.16, 35B-A3B -7.4 t=-3.11, all |t|<3.182); mean within-(cell,task) rep
-sd is 9.6 pts; the design resolves only >~10 pts (Δ=10 needs ~8 tasks, Δ=5 ~31 tasks — we have 4).
-Therefore: (1) do NOT rank the quants or call any cell "best"/"worst" — the ordering 78/67/76/82 is NOT
-resolvable; (2) state (a) as a BOUNDED NULL RESULT: "no detectable precision effect; any effect is smaller
-than our ~10-pt resolution", and note the non-monotonic shape is exactly what noise looks like (it does not
-prove precision is useless, it fails to detect an effect); (3) 35B-A3B -7.4 (t=-3.11, p~0.053, negative on
-all 4 tasks) is the ONLY near-significant signal — report it as "suggestive, not significant"; (4) quote
-every Δ with its verdict; (5) name underpowering as the top limitation and recommend MORE TASKS (~8+), not
-more reps (task-to-task variance dominates).
+READ EVERY NUMBER FROM THAT SECTION. Do NOT copy a Δ, t, sd, CI, resolution or task-count out of this
+prompt: they go stale the moment the matrix grows, and they HAVE — this paragraph kept asserting the
+4-task/5-cell era ("35B-A3B -7.4 t=-3.11 is the ONLY near-significant signal") long after the matrix reached
+5 tasks / 14 cells, which the current data contradicts outright. Rules, not numbers:
+(1) do NOT rank the quants or call any cell "best"/"worst" unless its paired Δ clears the significance
+threshold PRINTED in the table; (2) state (a) as a BOUNDED NULL RESULT — "no detectable precision effect;
+any effect is smaller than our resolution" (quote the resolution from the Power line) — and note that a
+non-monotonic ordering is exactly what noise looks like: it does not prove precision is useless, it fails to
+detect an effect; (3) report EVERY comparison whose verdict is SIGNIFICANT, and say plainly which are not —
+do not inherit yesterday's "only signal" from this prompt; (4) quote every Δ with its verdict; (5) name
+underpowering as the top limitation and recommend MORE TASKS (per the Power line), not more reps
+(task-to-task variance dominates).
 
-TIER + REFERENCE COMPARABILITY (MANDATORY — a previous draft got this wrong): TIER is a DIFFICULTY CLASS =
-the weakest REFERENCE tier that yields a strictly-clean hard_pass. It is NOT a score band — a task can be
-tier opus while everyone scores 60-90% on partial credit. EXPLAIN this where the ladder is discussed.
-Use the MEASURED evidence printed in each per-task header, not the label. Specifically: async-memo's "opus"
-label is CORRECT (opus 100% is the only hard-pass; haiku 91%/sonnet 87% do NOT hard-pass) — do NOT claim it
-should be re-labelled just because haiku's SCORE is high; that conflates score with hard-pass. But lru-cache's
-"sonnet" label IS contradicted by data (sonnet scores 95% yet does NOT hard-pass; nobody does) — report it as
-a ceiling task and flag the label for correction. ALSO: the references are NOT depth-matched — one-shot on a
-~550-620 token prompt vs the local cells' ~132.9k tokens (~213x deeper), and n=1 vs local n=3 (a single
-reference carries ~+/-19 pts at the measured rep noise). So (c)/(d): do NOT state "best local 82 vs haiku 83
-(delta -1)" as a like-for-like capability gap or say the 27B is "tied with haiku". The defensible reading is
-"indistinguishable from haiku within noise, while carrying 213x more context" — which if anything favours the
-27B. The binary->fractional re-grade correction itself REMAINS VALID and important (the old ladder's
-"27B beats sonnet" reading is still dead); only its precision was overstated.
+TIER + REFERENCE COMPARABILITY (MANDATORY): TIER is a DIFFICULTY CLASS = the weakest REFERENCE tier that
+yields a strictly-clean hard_pass. It is NOT a score band — a task can be tier opus while everyone scores
+60-90% on partial credit. EXPLAIN this where the ladder is discussed.
+DERIVE every tier claim from the MEASURED per-task evidence in summary.md (references now carry 3 reps, so
+hard_pass is reported as k/n). Do NOT assert a pre-baked tier conclusion from this prompt, from tasks.jsonl's
+label, or from an older draft. This paragraph USED to hardcode conclusions from the n=1 ladder and the 3-rep
+ladder (2026-07-15, run_refs.sh) OVERTURNED them: on async-memo opus now hard-passes 0/3 while sonnet passes
+1/3 (the old single opus 100% was one lucky roll), and lru-cache is NOT a ceiling task (sonnet passes 1/3).
+Treat that as the standing warning: a single sample decided a "tier" and was wrong. Where a tasks.jsonl label
+disagrees with the measured k/n, report the disagreement and flag the label — in either direction.
+The references are still NOT depth-matched: one-shot on a ~550-620 token prompt vs the local cells' ~132.9k
+tokens (~213x deeper). Reps fixed the sampling noise, NOT this asymmetry. So for (c)/(d): never state a bare
+local-vs-reference Δ as a like-for-like capability gap. The defensible reading names both sides, e.g. "level
+with haiku within noise, while carrying ~213x more context" — which if anything favours the 27B. The
+binary->fractional re-grade correction REMAINS VALID (the old ladder's "27B beats sonnet" reading is dead).
 
 PER-REP DETAIL (MANDATORY — the user wants to see all reps, not just means): summary.md ends with a
 "Per-rep detail" section — one table per hardest task listing EVERY local rep (rep 0/1/2, full objective

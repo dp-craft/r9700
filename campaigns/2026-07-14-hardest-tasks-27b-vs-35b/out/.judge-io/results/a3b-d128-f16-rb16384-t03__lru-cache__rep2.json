@@ -1,0 +1,1 @@
+{"design":3,"clarity":4,"robustness":3,"notes":"Tidy structure that purges expired before evicting, but get() refreshes expiresAt and thereby converts the spec's insertion-time TTL into a sliding TTL."}

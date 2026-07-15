@@ -1,0 +1,1 @@
+{"design":2,"clarity":3,"robustness":3,"notes":"Readable parser with good error tests, but it uses `Result<T>` as if generic when `Result` is not, and reassigns raw numbers into a Result-typed accumulator."}

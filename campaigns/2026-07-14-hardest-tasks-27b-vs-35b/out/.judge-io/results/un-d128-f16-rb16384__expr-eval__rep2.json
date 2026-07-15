@@ -1,0 +1,1 @@
+{"design": 3, "clarity": 3, "robustness": 3, "notes": "Clean lexer/recursive-descent split funnelling all failures into Result, but the `t as Token['type']` cast defeats the discriminated union and the index-mutating tokenize loop is fragile."}

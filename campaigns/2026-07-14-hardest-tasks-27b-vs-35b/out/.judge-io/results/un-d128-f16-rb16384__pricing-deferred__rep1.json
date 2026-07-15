@@ -1,0 +1,1 @@
+{"design": 4, "clarity": 4, "robustness": 4, "notes": "Elegant single promise-map cache and an exhaustive Record label map that will fail compilation on a future variant; TTL is measured from compute start rather than resolution, and deferred coverage in computeTotal is untested."}

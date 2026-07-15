@@ -98,16 +98,30 @@ them wastes tokens and tells you nothing. Structure/results live in the files ab
    guards only, never the reported figure.)
 8. **Honor the user's stated values.** When the user fixes a number or parameter, accept and use it.
    Raise a concern *once* if you have one, then comply — never re-litigate it turn after turn.
-9. **Change only what was approved — minimal scope.** Touch exactly what was agreed, nothing more.
-   Brainstorming is not approval to code: a brainstorm/design turn yields a plan, not edits. Before
-   changing anything not explicitly approved, ask first. Prefer the smallest solution that works.
+9. **Change only what was approved — ask first, EVERY time, and wait.** Touch exactly what was agreed,
+   nothing more. Brainstorming is not approval to code: a brainstorm/design turn yields a plan, not
+   edits. Before touching any existing file beyond what was approved, ask and **wait for the answer** —
+   no drive-by fixes, no "while I'm here" refactors, no random edits. Smallest thing that works; no
+   overengineering. Stay on the current task.
 10. **Think before implementing.** Before editing, trace the connected code, data flow, downstream
     consequences, logical gaps, and consistency with existing behavior. Plan, then act.
-11. **Stress-test after implementing.** Follow every non-trivial change with a stress test that
-    exercises it end-to-end; report the outcome honestly (including failures).
+11. **Stress-test, then review.** Follow every non-trivial change with a stress test that exercises it
+    end-to-end; report the outcome honestly (including failures). Then re-read the change for logical
+    gaps and inconsistencies with the rest of the pipeline (a value updated in one place and stale in
+    another is the classic one).
 12. **Be interactive.** Surface concerns as they arise, recommend concrete options (best first), and
     challenge ideas during brainstorming instead of just agreeing.
 13. **Q5_K_M at f16 KV / ctx 163840 fits into VRAM** so all lower values should be accepted without testing (lower model num like Q4, or lower context or Q6 with FP8).
+14. **Long runs: edit before you launch, and kill by pidfile.** Never edit a script that is running —
+    bash reads it lazily by byte offset, so a mid-run edit resumes at the wrong offset and executes
+    garbage. Finish every edit first, then start. Stop a server via its pidfile/port
+    (`bench/.servers/<port>.pid`), never a `pgrep -f` pattern that can match its own command line, and
+    verify the kill (port free + VRAM idle) before relaunching. An orphaned `llama-server` silently
+    contends for VRAM and manufactures fake findings — 2026-07-15 one caused `invalid token`, 10x-slow
+    prefill and a false "Q5 f16 @163840 is unstable" report that nearly reached a published analysis.
+15. **An interrupted run is not a result.** A cut stream, a killed job, a partial file: quarantine it
+    and re-collect. Never let it enter the data as a normal row (2026-07-15: a killed generation was
+    graded as a real reply — 0.603 with tests=0.0 — and moved a published cell mean by 1.1 pts).
 
 ## Tools — the deterministic layer (use these, never hand-roll their output)
 

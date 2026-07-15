@@ -1,0 +1,136 @@
+// FILE: impl.ts
+import { Clock } from '../../lib/clock';
+import { normalizeToken } from '../../lib/tokenize';
+
+export interface RateLimiter {
+  tryAcquire(key: string, tokens?: number): boolean;
+}
+
+interface BucketState {
+  readonly tokens: number;
+  readonly lastRefillTime: number;
+}
+
+export function createRateLimiter(
+  capacity: number,
+  refillPerSec: number,
+  clock: Clock
+): RateLimiter {
+  const buckets = new Map<string, BucketState>();
+  const MS_PER_SECOND = 1000;
+
+  function refillBucket(key: string, now: number): number {
+    const bucket = buckets.get(key);
+
+    if (bucket === undefined) {
+      buckets.set(key, { tokens: capacity, lastRefillTime: now });
+      return capacity;
+    }
+
+    const elapsedMs = now - bucket.lastRefillTime;
+    const tokensToAdd = (elapsedMs / MS_PER_SECOND) * refillPerSec;
+    const newTokens = Math.min(bucket.tokens + tokensToAdd, capacity);
+
+    buckets.set(key, { tokens: newTokens, lastRefillTime: now });
+    return newTokens;
+  }
+
+  function tryDeduct(key: string, tokens: number): void {
+    const bucket = buckets.get(key);
+    if (bucket !== undefined) {
+      buckets.set(key, {
+        tokens: bucket.tokens - tokens,
+        lastRefillTime: bucket.lastRefillTime
+      });
+    }
+  }
+
+  return {
+    tryAcquire(key: string, tokens: number = 1): boolean {
+      const now = clock.now();
+      const normalized = normalizeToken(key);
+      const available = refillBucket(normalized, now);
+
+      if (available >= tokens) {
+        tryDeduct(normalized, tokens);
+        return true;
+      }
+
+      return false;
+    }
+  };
+}
+
+// FILE: impl.test.ts
+import { describe, it, expect, beforeEach } from 'vitest';
+import { createRateLimiter } from './impl';
+import { Clock } from '../../lib/clock';
+
+describe('RateLimiter', (): void => {
+  let fakeClock: Clock;
+  let currentTime: number;
+
+  beforeEach((): void => {
+    currentTime = 1000;
+    fakeClock = {
+      now: (): number => currentTime
+    };
+  });
+
+  it('should allow acquisition on first call when capacity available', (): void => {
+    const limiter = createRateLimiter(10, 5, fakeClock);
+    const result = limiter.tryAcquire('key1');
+    expect(result).toBe(true);
+  });
+
+  it('should reject acquisition when bucket is empty', (): void => {
+    const limiter = createRateLimiter(1, 5, fakeClock);
+    limiter.tryAcquire('key1');
+    const result = limiter.tryAcquire('key1');
+    expect(result).toBe(false);
+  });
+
+  it('should refill tokens when time advances after acquire', (): void => {
+    const limiter = createRateLimiter(10, 5, fakeClock);
+    limiter.tryAcquire('key1');
+
+    currentTime += 2000;
+    const result = limiter.tryAcquire('key1', 5);
+    expect(result).toBe(true);
+  });
+
+  it('should cap refilled tokens at capacity when time advances', (): void => {
+    const limiter = createRateLimiter(10, 5, fakeClock);
+    limiter.tryAcquire('key1');
+
+    currentTime += 10000;
+    const result1 = limiter.tryAcquire('key1', 10);
+    expect(result1).toBe(true);
+
+    const result2 = limiter.tryAcquire('key1', 1);
+    expect(result2).toBe(false);
+  });
+
+  it('should isolate buckets per key when different keys are used', (): void => {
+    const limiter = createRateLimiter(5, 1, fakeClock);
+    limiter.tryAcquire('key1', 5);
+
+    const result = limiter.tryAcquire('key2', 1);
+    expect(result).toBe(true);
+  });
+
+  it('should normalize keys when comparing different cases', (): void => {
+    const limiter = createRateLimiter(5, 1, fakeClock);
+    limiter.tryAcquire('KEY1', 5);
+
+    const result = limiter.tryAcquire('key1', 1);
+    expect(result).toBe(false);
+  });
+
+  it('should default tokens parameter to 1 when not provided', (): void => {
+    const limiter = createRateLimiter(2, 1, fakeClock);
+    expect(limiter.tryAcquire('key1')).toBe(true);
+    expect(limiter.tryAcquire('key1')).toBe(true);
+    expect(limiter.tryAcquire('key1')).toBe(false);
+  });
+});

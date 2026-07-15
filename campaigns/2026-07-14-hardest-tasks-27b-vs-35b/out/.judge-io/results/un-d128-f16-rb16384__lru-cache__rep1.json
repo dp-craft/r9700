@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Precomputed expiresAt plus purge-then-evict in set keeps every path honest, with well-organized tests covering TTL refresh on re-set and the capacity-1 edge."}

@@ -1,0 +1,99 @@
+// FILE: impl.ts
+export function createAsyncMemo<K, V>(
+  fn: (key: K) => Promise<V>
+): (key: K) => Promise<V> {
+  const cache = new Map<K, Promise<V>>();
+
+  return (key: K): Promise<V> => {
+    const cached = cache.get(key);
+    if (cached !== undefined) {
+      return cached;
+    }
+
+    const p = fn(key).then(
+      (value) => value,
+      (error) => {
+        cache.delete(key);
+        throw error;
+      }
+    );
+
+    cache.set(key, p);
+    return p;
+  };
+}
+
+// FILE: impl.test.ts
+import { describe, it, expect, vi } from "vitest";
+import { createAsyncMemo } from "./impl";
+
+describe("createAsyncMemo", () => {
+  it("should share one in-flight computation when concurrent calls have the same key", async () => {
+    const fn = vi.fn(async (key: string) => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      return key.toUpperCase();
+    });
+
+    const memoized = createAsyncMemo(fn);
+    const [result1, result2] = await Promise.all([
+      memoized("test"),
+      memoized("test"),
+    ]);
+
+    expect(result1).toBe("TEST");
+    expect(result2).toBe("TEST");
+    expect(fn).toHaveBeenCalledOnce();
+  });
+
+  it("should not cache rejections and should retry on next call", async () => {
+    let callCount = 0;
+    const fn = vi.fn(async (key: string) => {
+      callCount++;
+      if (callCount === 1) {
+        throw new Error("first attempt fails");
+      }
+      return key.toUpperCase();
+    });
+
+    const memoized = createAsyncMemo(fn);
+
+    await expect(memoized("test")).rejects.toThrow("first attempt fails");
+    const result = await memoized("test");
+
+    expect(result).toBe("TEST");
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+
+  it("should cache successful resolution and not call fn again", async () => {
+    const fn = vi.fn(async (key: string) => key.toUpperCase());
+
+    const memoized = createAsyncMemo(fn);
+    const result1 = await memoized("test");
+    const result2 = await memoized("test");
+
+    expect(result1).toBe("TEST");
+    expect(result2).toBe("TEST");
+    expect(fn).toHaveBeenCalledOnce();
+  });
+
+  it("should retry after rejection and cache the subsequent success", async () => {
+    let callCount = 0;
+    const fn = vi.fn(async (key: string) => {
+      callCount++;
+      if (callCount === 1) {
+        throw new Error("fail once");
+      }
+      return `success-${key}`;
+    });
+
+    const memoized = createAsyncMemo(fn);
+
+    await expect(memoized("key")).rejects.toThrow("fail once");
+    const result1 = await memoized("key");
+    const result2 = await memoized("key");
+
+    expect(result1).toBe("success-key");
+    expect(result2).toBe("success-key");
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+});

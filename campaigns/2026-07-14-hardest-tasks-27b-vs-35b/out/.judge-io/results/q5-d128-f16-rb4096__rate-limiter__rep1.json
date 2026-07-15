@@ -1,0 +1,1 @@
+{"design":4,"clarity":5,"robustness":4,"notes":"Well-named lazy-refill implementation with a named MILLIS_PER_SECOND constant and an elapsed<=0 guard against clock regression, backed by thorough per-key and no-deduct-on-failure tests."}

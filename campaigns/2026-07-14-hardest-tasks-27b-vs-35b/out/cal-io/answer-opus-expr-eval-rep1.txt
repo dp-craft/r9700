@@ -1,0 +1,229 @@
+// FILE: impl.ts
+export type Result =
+  | { readonly ok: true; readonly value: number }
+  | { readonly ok: false; readonly error: string };
+
+type Sign = "+" | "-";
+type MulDiv = "*" | "/";
+
+type Token =
+  | { readonly kind: "num"; readonly value: number }
+  | { readonly kind: "op"; readonly value: Sign | MulDiv }
+  | { readonly kind: "lparen" }
+  | { readonly kind: "rparen" };
+
+interface Cursor {
+  readonly tokens: readonly Token[];
+  index: number;
+}
+
+/** Thrown only inside this module; `evaluate` converts it to a Result. */
+class ParseError extends Error {}
+
+const DECIMAL_RADIX = 10;
+
+function isDigit(ch: string): boolean {
+  return ch >= "0" && ch <= "9";
+}
+
+function isSpace(ch: string): boolean {
+  return ch.trim() === "";
+}
+
+function readNumber(src: string, start: number): { readonly end: number; readonly value: number } {
+  let end = start;
+  while (end < src.length && isDigit(src[end] ?? "")) {
+    end += 1;
+  }
+  return { end, value: Number.parseInt(src.slice(start, end), DECIMAL_RADIX) };
+}
+
+function symbolToken(ch: string): Token {
+  if (ch === "(") return { kind: "lparen" };
+  if (ch === ")") return { kind: "rparen" };
+  if (ch === "+" || ch === "-" || ch === "*" || ch === "/") return { kind: "op", value: ch };
+  throw new ParseError(`unexpected character '${ch}'`);
+}
+
+function tokenize(src: string): readonly Token[] {
+  const tokens: Token[] = [];
+  let i = 0;
+  while (i < src.length) {
+    const ch = src[i] ?? "";
+    if (isSpace(ch)) {
+      i += 1;
+    } else if (isDigit(ch)) {
+      const num = readNumber(src, i);
+      tokens.push({ kind: "num", value: num.value });
+      i = num.end;
+    } else {
+      tokens.push(symbolToken(ch));
+      i += 1;
+    }
+  }
+  return tokens;
+}
+
+function peek(cur: Cursor): Token | undefined {
+  return cur.tokens[cur.index];
+}
+
+function isOp(tok: Token | undefined, a: string, b: string): tok is { kind: "op"; value: Sign | MulDiv } {
+  return tok !== undefined && tok.kind === "op" && (tok.value === a || tok.value === b);
+}
+
+/** Integer arithmetic: division truncates toward zero, so `7/2` is 3. */
+function applyMulDiv(op: string, lhs: number, rhs: number): number {
+  if (op === "*") return lhs * rhs;
+  if (rhs === 0) throw new ParseError("division by zero");
+  return Math.trunc(lhs / rhs);
+}
+
+function parseExpr(cur: Cursor): number {
+  let value = parseTerm(cur);
+  for (;;) {
+    const tok = peek(cur);
+    if (!isOp(tok, "+", "-")) return value;
+    cur.index += 1;
+    const rhs = parseTerm(cur);
+    value = tok.value === "+" ? value + rhs : value - rhs;
+  }
+}
+
+function parseTerm(cur: Cursor): number {
+  let value = parseFactor(cur);
+  for (;;) {
+    const tok = peek(cur);
+    if (!isOp(tok, "*", "/")) return value;
+    cur.index += 1;
+    value = applyMulDiv(tok.value, value, parseFactor(cur));
+  }
+}
+
+function parseParenthesized(cur: Cursor): number {
+  const value = parseExpr(cur);
+  const closing = peek(cur);
+  if (closing === undefined || closing.kind !== "rparen") {
+    throw new ParseError("unbalanced parentheses");
+  }
+  cur.index += 1;
+  return value;
+}
+
+function parseFactor(cur: Cursor): number {
+  const tok = peek(cur);
+  if (tok === undefined) throw new ParseError("unexpected end of input");
+  cur.index += 1;
+  if (tok.kind === "num") return tok.value;
+  if (tok.kind === "lparen") return parseParenthesized(cur);
+  if (isOp(tok, "+", "-")) {
+    const operand = parseFactor(cur);
+    return tok.value === "-" ? -operand : operand;
+  }
+  throw new ParseError("expected a number, a sign or '('");
+}
+
+export function evaluate(expr: string): Result {
+  try {
+    const cur: Cursor = { tokens: tokenize(expr), index: 0 };
+    const value = parseExpr(cur);
+    if (peek(cur) !== undefined) throw new ParseError("unexpected trailing input");
+    return { ok: true, value };
+  } catch (err: unknown) {
+    const error = err instanceof Error ? err.message : "invalid expression";
+    return { ok: false, error };
+  }
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it } from "vitest";
+
+import { evaluate, type Result } from "./impl";
+
+function valueOf(result: Result): number | undefined {
+  return result.ok ? result.value : undefined;
+}
+
+function errorOf(result: Result): string | undefined {
+  return result.ok ? undefined : result.error;
+}
+
+describe("evaluate", () => {
+  it("should return the number itself when the expression is a bare integer", () => {
+    expect(evaluate("42")).toEqual({ ok: true, value: 42 });
+  });
+
+  it("should ignore surrounding and inner whitespace when the expression is padded", () => {
+    expect(valueOf(evaluate("  1 +   2 * 3  "))).toBe(7);
+  });
+
+  it("should bind multiplication tighter than addition when both appear", () => {
+    expect(valueOf(evaluate("2+3*4"))).toBe(14);
+  });
+
+  it("should bind division tighter than subtraction when both appear", () => {
+    expect(valueOf(evaluate("20-8/4"))).toBe(18);
+  });
+
+  it("should subtract left to right when several minus operators chain", () => {
+    expect(valueOf(evaluate("10-3-2"))).toBe(5);
+  });
+
+  it("should divide left to right when several division operators chain", () => {
+    expect(valueOf(evaluate("8/2/2"))).toBe(2);
+  });
+
+  it("should truncate toward zero when a division is not exact", () => {
+    expect(valueOf(evaluate("7/2"))).toBe(3);
+  });
+
+  it("should override precedence when parentheses group an addition", () => {
+    expect(valueOf(evaluate("(2+3)*4"))).toBe(20);
+  });
+
+  it("should evaluate innermost groups first when parentheses are nested", () => {
+    expect(valueOf(evaluate("((1+2)*(3+4))-5"))).toBe(16);
+  });
+
+  it("should negate the operand when a leading minus is used", () => {
+    expect(valueOf(evaluate("-3+5"))).toBe(2);
+  });
+
+  it("should return an error when a closing parenthesis is missing", () => {
+    const result = evaluate("(1+2");
+    expect(result.ok).toBe(false);
+    expect(errorOf(result)).toMatch(/unbalanced/);
+  });
+
+  it("should return an error when a closing parenthesis is unmatched", () => {
+    expect(evaluate("1+2)").ok).toBe(false);
+  });
+
+  it("should return an error when an operand is missing", () => {
+    const result = evaluate("1+");
+    expect(result.ok).toBe(false);
+    expect(errorOf(result)).toMatch(/end of input/);
+  });
+
+  it("should return an error when the expression is empty", () => {
+    expect(evaluate("   ").ok).toBe(false);
+  });
+
+  it("should return an error when an unexpected character appears", () => {
+    const result = evaluate("1 $ 2");
+    expect(result.ok).toBe(false);
+    expect(errorOf(result)).toMatch(/unexpected character/);
+  });
+
+  it("should return an error when dividing by zero", () => {
+    expect(evaluate("1/0")).toEqual({ ok: false, error: "division by zero" });
+  });
+
+  it("should return an error when dividing by a parenthesized zero", () => {
+    expect(errorOf(evaluate("6/(3-3)"))).toBe("division by zero");
+  });
+
+  it("should not throw when the input is malformed", () => {
+    expect(() => evaluate("*(")).not.toThrow();
+  });
+});

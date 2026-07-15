@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Clean pending/settled entry union with TTL stamped at resolution and failures evicted; the Partial<Record> plus UNKNOWN_LABEL fallback is dead weight over an exhaustive union."}

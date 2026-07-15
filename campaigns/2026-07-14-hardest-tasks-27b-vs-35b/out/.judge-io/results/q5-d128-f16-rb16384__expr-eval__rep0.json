@@ -1,0 +1,1 @@
+{"design": 4, "clarity": 4, "robustness": 4, "notes": "Clean tokenizer/parser split with Result-threaded errors and thorough grouped tests; cryptic single-letter token tags and tokenize throwing rather than returning Result are the only blemishes."}

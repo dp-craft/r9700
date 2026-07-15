@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":3,"notes":"Clean Map-ordering LRU with well-factored helpers, but the capacity check uses raw map.size (counting expired entries outside the cleaned prefix) and touchRecency's split double if(e) is clumsy."}

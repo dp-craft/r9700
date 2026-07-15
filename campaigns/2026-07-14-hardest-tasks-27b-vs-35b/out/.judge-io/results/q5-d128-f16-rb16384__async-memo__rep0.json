@@ -1,0 +1,1 @@
+{"design":4,"clarity":5,"robustness":4,"notes":"Minimal idiomatic catch-delete-rethrow that caches the chained promise, with well-grouped tests; the unused callCount counters are leftover noise."}

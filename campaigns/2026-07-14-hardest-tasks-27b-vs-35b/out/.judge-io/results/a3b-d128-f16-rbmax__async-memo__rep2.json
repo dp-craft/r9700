@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":3,"notes":"Cleanly separates the resolved-value cache from in-flight promises, but the `cached !== undefined` probe silently re-runs fn whenever V resolves to undefined."}

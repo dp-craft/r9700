@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":3,"notes":"Tight, well-factored refill-then-deduct with a cohesive mutating helper and a named ms constant, but nothing defends against clock regressions or invalid capacity/token arguments."}

@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Minimal, well-targeted fix with a correct undefined check and tests that assert promise identity as well as call counts."}
