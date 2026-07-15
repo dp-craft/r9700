@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":3,"notes":"Tight idiomatic fix with an explicit void on the eviction catch and a promise-identity dedup assertion, though the eviction is unguarded and the test mock is typed loosely as ReturnType<typeof vi.fn>."}

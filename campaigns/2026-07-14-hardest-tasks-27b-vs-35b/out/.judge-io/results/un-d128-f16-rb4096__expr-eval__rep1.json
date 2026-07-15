@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Consistent Result-propagating recursive descent with unary sign support and truncating division, marred only by a vestigial try/catch around code that never throws and error messages carrying no position."}

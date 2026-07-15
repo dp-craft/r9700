@@ -1,0 +1,1 @@
+{"design":2,"clarity":2,"robustness":3,"notes":"The weak Token type (value: string | number) forces casts throughout and the [number] tuple used as a mutable position pointer is a hack that makes the parser noticeably harder to read than a plain cursor object."}

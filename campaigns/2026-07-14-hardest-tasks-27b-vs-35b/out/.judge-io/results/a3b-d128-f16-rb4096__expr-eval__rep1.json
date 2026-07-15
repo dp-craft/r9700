@@ -1,0 +1,1 @@
+{"design":2,"clarity":2,"robustness":2,"notes":"Overloads the public `Result` as the internal parser return and then mutates its `readonly value` in place, needs an `as` cast to escape the array/Result union, and repeats un-narrowed `tokens[cursor.pos].value` indexing in long unreadable loop conditions; the `eof` sentinel is largely vestigial."}

@@ -1,0 +1,1 @@
+{"design":3,"clarity":4,"robustness":3,"notes":"Clean recursive-descent split with good test coverage, but the operator map is rebuilt per character and the stringly-typed `expect(type: string)` discards the discriminated union's safety."}

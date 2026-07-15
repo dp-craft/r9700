@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":3,"notes":"Clean immutable bucket state with well-named helpers and correct persistence of refill on the reject path, though the 'cap refill' test is vacuous since the bucket is created lazily and already full."}

@@ -1,0 +1,1 @@
+{"design":2,"clarity":3,"robustness":2,"notes":"Eviction correctly purges expired entries first, but the liveCountRef counter backing size is never decremented when entries expire passively, so size goes stale — an incremental cache that buys nothing over counting on demand."}

@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Well-typed discriminated-union tokens with a Result-threading recursive-descent parser and correct integer truncation, though the tokenizer throwing while the parser returns Results is an inconsistent error strategy."}

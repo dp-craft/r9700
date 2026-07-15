@@ -1,0 +1,190 @@
+// FILE: impl.ts
+import type { Clock } from '../../lib/clock';
+
+interface CacheEntry<V> {
+  readonly value: V;
+  readonly insertedAt: number;
+}
+
+export interface LruCache<K, V> {
+  get(key: K): V | undefined;
+  set(key: K, value: V): void;
+  has(key: K): boolean;
+  readonly size: number;
+}
+
+function isExpired(entry: CacheEntry<unknown>, now: number, ttlMs: number): boolean {
+  return now >= entry.insertedAt + ttlMs;
+}
+
+function evictOldest<K, V>(map: Map<K, CacheEntry<V>>): void {
+  const key = map.keys().next().value;
+  if (key !== undefined) {
+    map.delete(key);
+  }
+}
+
+function pruneExpired<K, V>(map: Map<K, CacheEntry<V>>, now: number, ttlMs: number): void {
+  for (const [key, entry] of map.entries()) {
+    if (isExpired(entry, now, ttlMs)) {
+      map.delete(key);
+    }
+  }
+}
+
+function refreshOrder<K, V>(map: Map<K, CacheEntry<V>>, key: K): void {
+  const entry = map.get(key);
+  if (entry !== undefined) {
+    map.delete(key);
+    map.set(key, entry);
+  }
+}
+
+export function createLruCache<K, V>(
+  capacity: number,
+  ttlMs: number,
+  clock: Clock
+): LruCache<K, V> {
+  const store = new Map<K, CacheEntry<V>>();
+
+  return {
+    get(key: K): V | undefined {
+      pruneExpired(store, clock.now(), ttlMs);
+      const entry = store.get(key);
+      if (entry === undefined) return undefined;
+      refreshOrder(store, key);
+      return entry.value;
+    },
+
+    set(key: K, value: V): void {
+      pruneExpired(store, clock.now(), ttlMs);
+      const now = clock.now();
+      if (store.has(key)) {
+        refreshOrder(store, key);
+        store.set(key, { value, insertedAt: now });
+      } else {
+        if (store.size >= capacity) {
+          evictOldest(store);
+        }
+        store.set(key, { value, insertedAt: now });
+      }
+    },
+
+    has(key: K): boolean {
+      pruneExpired(store, clock.now(), ttlMs);
+      return store.has(key);
+    },
+
+    get size(): number {
+      pruneExpired(store, clock.now(), ttlMs);
+      return store.size;
+    },
+  };
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it } from 'vitest';
+import type { Clock } from '../../lib/clock';
+import { createLruCache } from './impl';
+
+function makeFakeClock(initialTime: number): Clock & { tick(ms: number): void } {
+  let now = initialTime;
+  return {
+    now: () => now,
+    tick: (ms: number): void => { now += ms; },
+  };
+}
+
+describe('createLruCache', () => {
+  it('should return the value when key exists and is within TTL', () => {
+    const clock = makeFakeClock(0);
+    const cache = createLruCache<string, number>(2, 1000, clock);
+    cache.set('a', 1);
+    expect(cache.get('a')).toBe(1);
+  });
+
+  it('should return undefined when key is absent', () => {
+    const clock = makeFakeClock(0);
+    const cache = createLruCache<string, number>(2, 1000, clock);
+    expect(cache.get('missing')).toBeUndefined();
+  });
+
+  it('should return undefined when key has expired', () => {
+    const clock = makeFakeClock(0);
+    const cache = createLruCache<string, number>(2, 100, clock);
+    cache.set('a', 1);
+    clock.tick(101);
+    expect(cache.get('a')).toBeUndefined();
+  });
+
+  it('should return false for has when key has expired', () => {
+    const clock = makeFakeClock(0);
+    const cache = createLruCache<string, number>(2, 100, clock);
+    cache.set('a', 1);
+    clock.tick(101);
+    expect(cache.has('a')).toBe(false);
+  });
+
+  it('should not count expired entries toward size', () => {
+    const clock = makeFakeClock(0);
+    const cache = createLruCache<string, number>(2, 100, clock);
+    cache.set('a', 1);
+    cache.set('b', 2);
+    clock.tick(101);
+    expect(cache.size).toBe(0);
+  });
+
+  it('should refresh recency on get when key is accessed', () => {
+    const clock = makeFakeClock(0);
+    const cache = createLruCache<string, number>(2, 1000, clock);
+    cache.set('a', 1);
+    cache.set('b', 2);
+    cache.get('a');
+    cache.set('c', 3);
+    expect(cache.get('b')).toBeUndefined();
+    expect(cache.get('a')).toBe(1);
+  });
+
+  it('should evict least recently used entry when capacity is exceeded', () => {
+    const clock = makeFakeClock(0);
+    const cache = createLruCache<string, number>(2, 1000, clock);
+    cache.set('a', 1);
+    cache.set('b', 2);
+    cache.set('c', 3);
+    expect(cache.get('a')).toBeUndefined();
+    expect(cache.get('b')).toBe(2);
+    expect(cache.get('c')).toBe(3);
+  });
+
+  it('should evict expired entries before checking capacity when setting', () => {
+    const clock = makeFakeClock(0);
+    const cache = createLruCache<string, number>(2, 100, clock);
+    cache.set('a', 1);
+    cache.set('b', 2);
+    clock.tick(101);
+    cache.set('c', 3);
+    expect(cache.size).toBe(1);
+    expect(cache.get('c')).toBe(3);
+  });
+
+  it('should handle capacity edge of 1 correctly', () => {
+    const clock = makeFakeClock(0);
+    const cache = createLruCache<string, number>(1, 1000, clock);
+    cache.set('a', 1);
+    cache.set('b', 2);
+    expect(cache.size).toBe(1);
+    expect(cache.get('a')).toBeUndefined();
+    expect(cache.get('b')).toBe(2);
+  });
+
+  it('should update value and refresh recency on set when key exists', () => {
+    const clock = makeFakeClock(0);
+    const cache = createLruCache<string, number>(2, 1000, clock);
+    cache.set('a', 1);
+    cache.set('b', 2);
+    cache.set('a', 10);
+    cache.set('c', 3);
+    expect(cache.get('a')).toBe(10);
+    expect(cache.get('b')).toBeUndefined();
+  });
+});

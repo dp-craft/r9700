@@ -1,0 +1,1 @@
+{"design":3,"clarity":3,"robustness":3,"notes":"Works and is well tested, but the `.then(() => cache.set(key, p))` re-stores the identical promise and is pure dead logic that obscures the actual fix."}

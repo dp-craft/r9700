@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":3,"notes":"Minimal, well-targeted fix with clear tests, but the catch handler deletes unconditionally rather than checking the cached promise is still the one that rejected, and some wrapping parens are superfluous."}

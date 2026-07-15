@@ -144,24 +144,34 @@ graded 60 rows (0 errors/empty) -> /home/dev/work/dp-craft/amd/campaigns/2026-07
   [a3b-d128-f16-rb4096] expr-eval rep1: score=0.639 F
   [a3b-d128-f16-rb4096] expr-eval rep2: score=0.569 F
 
-=== judge SKIPPED (JUDGE_ENGINE=none) — see JUDGE.md ===
+=== blind judge: ONE claude session fans out opus subagents (orchestrator=opus) ===
+judge: nothing to do (all replies already judged, or no gradable code)
 
 === charts (reused by the benchmark-results skill) ===
-wrote 11 charts + appendix.md -> /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/charts/
+wrote 13 charts + appendix.md -> /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/charts/
   quality_vs_cost.svg
   quality_vs_time.svg
   scorecard.svg
   quality_deterministic.svg
+  quality_judge.svg
   token_economy.svg
   throughput.svg
   latency.svg
   memory_power.svg
+  task_heatmap.svg
   capability.svg
   hard_pass.svg
   objective_breakdown.svg
 
 === aggregate (deterministic digest → out/summary.md) ===
 wrote /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/summary.md (5 cells) + /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/summary.json
+
+=== final analysis (benchmark-results skill via interactive claude/tmux, model=opus) ===
+run_capture.sh: command substitution: line 202: syntax error near unexpected token `no'
+run_capture.sh: command substitution: line 202: `— (no calib)'
+  analysis.md written by claude
+reindex: INDEX.md already current
+  docs/INDEX.md reindexed
 
 Depth run complete.
   replies:  /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/outputs.jsonl

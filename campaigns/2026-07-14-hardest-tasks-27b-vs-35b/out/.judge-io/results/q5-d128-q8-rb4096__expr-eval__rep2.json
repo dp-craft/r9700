@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":3,"notes":"Elegant scannerless recursive descent over a small ParseContext with well-named helpers, but peek() silently mutating position via skipWhitespace is a surprising side effect and integer division is never truncated."}

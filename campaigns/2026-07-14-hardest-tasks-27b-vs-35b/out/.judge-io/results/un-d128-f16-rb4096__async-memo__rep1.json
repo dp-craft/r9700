@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":3,"notes":"Minimal idiomatic fix, but the detached p.catch eviction is subtle and deletes the key without checking it still owns the entry."}

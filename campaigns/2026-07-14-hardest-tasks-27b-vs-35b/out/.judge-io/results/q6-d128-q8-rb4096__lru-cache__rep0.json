@@ -1,0 +1,1 @@
+{"design":3,"clarity":4,"robustness":2,"notes":"Clean readable structure and a thorough suite, but get() rewrites expiresAt so reads extend the TTL beyond the spec's insertion-time rule, and eviction never prefers expired entries."}

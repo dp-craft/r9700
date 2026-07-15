@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Clean use of Map insertion order for recency with well-factored helpers, though size/eviction are O(n) and re-read clock.now() per entry, and refreshRecency redundantly re-fetches the entry get() already holds."}

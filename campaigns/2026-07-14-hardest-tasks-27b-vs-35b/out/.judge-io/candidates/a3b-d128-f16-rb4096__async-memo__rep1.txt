@@ -1,0 +1,63 @@
+// FILE: impl.ts
+export function createAsyncMemo<K, V>(fn: (key: K) => Promise<V>): (key: K) => Promise<V> {
+  const cache = new Map<K, Promise<V>>();
+  return async (key: K): Promise<V> => {
+    const cached = cache.get(key);
+    if (cached) return cached;
+    const promise = fn(key);
+    promise.catch((): void => cache.delete(key));
+    cache.set(key, promise);
+    return promise;
+  };
+}
+
+// FILE: impl.test.ts
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createAsyncMemo } from './impl';
+
+describe('createAsyncMemo', () => {
+  describe('concurrent dedup', () => {
+    it('should run fn once when multiple concurrent calls share the same key', async (): Promise<void> => {
+      const fn = vi.fn(async (key: string): Promise<string> => {
+        await new Promise<void>(resolve => setTimeout(resolve, 10));
+        return `ok-${key}`;
+      });
+      const memoized = createAsyncMemo(fn);
+      const results: readonly string[] = await Promise.all([
+        memoized('a'),
+        memoized('a'),
+        memoized('a')
+      ]);
+      expect(fn).toHaveBeenCalledTimes(1);
+      expect(results).toEqual(['ok-a', 'ok-a', 'ok-a']);
+    });
+  });
+
+  describe('retry-after-rejection', () => {
+    it('should retry fn on the next call after a rejection', async (): Promise<void> => {
+      let callCount = 0;
+      const fn = async (key: string): Promise<string> => {
+        callCount += 1;
+        if (callCount === 1) throw new Error('fail');
+        return `retry-${key}`;
+      };
+      const memoized = createAsyncMemo(fn);
+      await expect(memoized('b')).rejects.toThrow('fail');
+      const result: string = await memoized('b');
+      expect(callCount).toBe(2);
+      expect(result).toBe('retry-b');
+    });
+  });
+
+  describe('cache-hit-after-success', () => {
+    it('should return cached value on subsequent calls without invoking fn', async (): Promise<void> => {
+      const fn = vi.fn(async (key: string): Promise<string> => `cached-${key}`);
+      const memoized = createAsyncMemo(fn);
+      await memoized('c');
+      expect(fn).toHaveBeenCalledTimes(1);
+      const result: string = await memoized('c');
+      expect(fn).toHaveBeenCalledTimes(1);
+      expect(result).toBe('cached-c');
+    });
+  });
+});

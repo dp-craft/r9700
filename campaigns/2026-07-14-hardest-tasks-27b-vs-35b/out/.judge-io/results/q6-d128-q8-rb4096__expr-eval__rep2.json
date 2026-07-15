@@ -1,0 +1,1 @@
+{"design":3,"clarity":3,"robustness":4,"notes":"Properly typed discriminated-union tokens with broad tests including nested parens and trailing input, undercut by the `[number]` tuple-as-mutable-ref idiom and an ERR token that throws away the rest of the stream."}

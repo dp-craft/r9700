@@ -1,0 +1,136 @@
+// FILE: impl.ts
+import type { Clock } from '../../lib/clock';
+
+interface BucketState {
+  readonly tokens: number;
+  readonly lastRefillAt: number;
+}
+
+export interface RateLimiter {
+  tryAcquire(key: string, tokens?: number): boolean;
+}
+
+const DEFAULT_TOKENS = 1;
+
+const createBucket = (capacity: number, now: number): BucketState => ({
+  tokens: capacity,
+  lastRefillAt: now,
+});
+
+const refillBucket = (
+  bucket: BucketState,
+  capacity: number,
+  refillPerSec: number,
+  now: number
+): BucketState => {
+  const elapsedSec = (now - bucket.lastRefillAt) / 1000;
+  if (elapsedSec <= 0) return bucket;
+
+  const newTokens = Math.min(capacity, bucket.tokens + elapsedSec * refillPerSec);
+  return { tokens: newTokens, lastRefillAt: now };
+};
+
+export function createRateLimiter(
+  capacity: number,
+  refillPerSec: number,
+  clock: Clock
+): RateLimiter {
+  const buckets = new Map<string, BucketState>();
+
+  return {
+    tryAcquire: (key: string, tokens: number = DEFAULT_TOKENS): boolean => {
+      const now = clock.now();
+      let bucket = buckets.get(key) ?? createBucket(capacity, now);
+      bucket = refillBucket(bucket, capacity, refillPerSec, now);
+
+      if (bucket.tokens >= tokens) {
+        buckets.set(key, { tokens: bucket.tokens - tokens, lastRefillAt: bucket.lastRefillAt });
+        return true;
+      }
+
+      buckets.set(key, bucket);
+      return false;
+    },
+  };
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it } from 'vitest';
+
+import type { Clock } from '../../lib/clock';
+import { createRateLimiter } from './impl';
+
+const buildFakeClock = (initialMs: number): Clock & { advanceByMs: (ms: number) => void } => {
+  let now = initialMs;
+  return {
+    now: () => now,
+    advanceByMs: (ms: number) => { now += ms; },
+  };
+};
+
+describe('createRateLimiter', () => {
+  it('should allow first-burst acquisition up to capacity when bucket starts full', () => {
+    const clock = buildFakeClock(0);
+    const limiter = createRateLimiter(3, 1, clock);
+
+    expect(limiter.tryAcquire('key-a')).toBe(true);
+    expect(limiter.tryAcquire('key-a')).toBe(true);
+    expect(limiter.tryAcquire('key-a')).toBe(true);
+  });
+
+  it('should reject acquisition when bucket is empty', () => {
+    const clock = buildFakeClock(0);
+    const limiter = createRateLimiter(2, 1, clock);
+
+    limiter.tryAcquire('key-b');
+    limiter.tryAcquire('key-b');
+
+    expect(limiter.tryAcquire('key-b')).toBe(false);
+  });
+
+  it('should lazily refill tokens over elapsed time when acquire is called', () => {
+    const clock = buildFakeClock(0);
+    const limiter = createRateLimiter(2, 10, clock);
+
+    limiter.tryAcquire('key-c');
+    limiter.tryAcquire('key-c');
+
+    expect(limiter.tryAcquire('key-c')).toBe(false);
+
+    clock.advanceByMs(150);
+
+    expect(limiter.tryAcquire('key-c')).toBe(true);
+    expect(limiter.tryAcquire('key-c')).toBe(false);
+  });
+
+  it('should cap refilled tokens at capacity when bucket exceeds limit', () => {
+    const clock = buildFakeClock(0);
+    const limiter = createRateLimiter(2, 100, clock);
+
+    clock.advanceByMs(10000);
+
+    expect(limiter.tryAcquire('key-d')).toBe(true);
+    expect(limiter.tryAcquire('key-d')).toBe(true);
+    expect(limiter.tryAcquire('key-d')).toBe(false);
+  });
+
+  it('should maintain independent buckets for different keys when keys diverge', () => {
+    const clock = buildFakeClock(0);
+    const limiter = createRateLimiter(1, 1, clock);
+
+    expect(limiter.tryAcquire('key-x')).toBe(true);
+    expect(limiter.tryAcquire('key-y')).toBe(true);
+
+    expect(limiter.tryAcquire('key-x')).toBe(false);
+    expect(limiter.tryAcquire('key-y')).toBe(false);
+  });
+
+  it('should deduct custom token amounts when requested tokens exceed default', () => {
+    const clock = buildFakeClock(0);
+    const limiter = createRateLimiter(5, 1, clock);
+
+    expect(limiter.tryAcquire('key-z', 3)).toBe(true);
+    expect(limiter.tryAcquire('key-z', 3)).toBe(false);
+    expect(limiter.tryAcquire('key-z', 2)).toBe(true);
+  });
+});

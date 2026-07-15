@@ -1,0 +1,1 @@
+{"design":3,"clarity":3,"robustness":3,"notes":"Thorough tests, but threading [value, pos] tuples plus redundant `tokens.length - 1` bounds checks alongside an EOF sentinel makes the parser noisier than the design needs, and the operator map is rebuilt per character."}

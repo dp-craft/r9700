@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":3,"notes":"Well-separated getBucket/refill/acquire with a readonly interface and correct fractional refill, though it validates no constructor arguments and ignores backwards clock movement."}

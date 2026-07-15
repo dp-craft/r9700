@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Immutable BucketState with pure createBucket/refillBucket helpers reads cleanly and the elapsedSec <= 0 guard anticipates a backwards clock, though non-positive or over-capacity token requests go unvalidated."}

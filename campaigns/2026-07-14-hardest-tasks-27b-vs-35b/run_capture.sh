@@ -199,7 +199,7 @@ python3 "$HERE/aggregate.py" --dir "$OUTDIR" --out "$OUTDIR/summary.md" || echo 
 if [ "$SUMMARY" = "1" ]; then
   echo; echo "=== final analysis (benchmark-results skill via interactive claude/tmux, model=$SUMMARY_MODEL) ==="
   sp="$OUTDIR/summary_prompt.txt"
-  cat > "$sp" <<EOF
+  cat > "$sp" <<'EOF'
 You are finishing the "hardest-tasks: 27B quant ladder vs 35B-A3B at 128k" benchmark in this repo. Follow the
 repo's benchmark-results skill (read .claude/skills/benchmark-results/SKILL.md) and write the analysis to
 campaigns/2026-07-14-hardest-tasks-27b-vs-35b/analysis.md.

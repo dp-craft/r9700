@@ -1,0 +1,1 @@
+{"design":3,"clarity":3,"robustness":3,"notes":"Best-conceived of the three — uniform result propagation with immutable values, no casts, and distinct error messages — but it leans on a generic `Result<T>` that the spec's non-generic type never provides, and cramped one-liners plus space-only whitespace handling hold it back."}

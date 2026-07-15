@@ -1,0 +1,125 @@
+// FILE: impl.ts
+import type { Clock } from '@/lib/clock';
+
+export interface RateLimiter {
+  tryAcquire(key: string, tokens?: number): boolean;
+}
+
+type Bucket = { tokens: number; lastRefillAt: number };
+
+const MILLIS_PER_SEC = 1000;
+
+export function createRateLimiter(
+  capacity: number,
+  refillPerSec: number,
+  clock: Clock
+): RateLimiter {
+  const buckets = new Map<string, Bucket>();
+
+  const getOrInit = (key: string): Bucket => {
+    const existing = buckets.get(key);
+    if (existing) return existing;
+    const initial: Bucket = { tokens: capacity, lastRefillAt: clock.now() };
+    buckets.set(key, initial);
+    return initial;
+  };
+
+  const refill = (bucket: Bucket): void => {
+    const now = clock.now();
+    const elapsed = (now - bucket.lastRefillAt) / MILLIS_PER_SEC;
+    const added = Math.min(capacity - bucket.tokens, elapsed * refillPerSec);
+    bucket.tokens += added;
+    bucket.lastRefillAt = now;
+  };
+
+  return {
+    tryAcquire: (key: string, tokens: number = 1): boolean => {
+      const bucket = getOrInit(key);
+      refill(bucket);
+      if (bucket.tokens >= tokens) {
+        bucket.tokens -= tokens;
+        return true;
+      }
+      return false;
+    },
+  };
+}
+
+// FILE: impl.test.ts
+import { beforeEach, describe, expect, it } from 'vitest';
+
+import type { Clock } from '@/lib/clock';
+import { createRateLimiter } from './impl';
+
+const buildFakeClock = (initialMs: number): Clock & { advance: (ms: number) => void } => {
+  let now = initialMs;
+  return {
+    now: () => now,
+    advance: (ms: number) => { now += ms; },
+  };
+};
+
+describe('createRateLimiter', () => {
+  let clock: Clock & { advance: (ms: number) => void };
+
+  beforeEach(() => {
+    clock = buildFakeClock(0);
+  });
+
+  it('should allow first-burst up to capacity when bucket starts full', () => {
+    const limiter = createRateLimiter(5, 1, clock);
+    expect(limiter.tryAcquire('key-1')).toBe(true);
+    expect(limiter.tryAcquire('key-1')).toBe(true);
+    expect(limiter.tryAcquire('key-1')).toBe(true);
+    expect(limiter.tryAcquire('key-1')).toBe(true);
+    expect(limiter.tryAcquire('key-1')).toBe(true);
+  });
+
+  it('should reject empty-bucket acquisition when tokens exceed remaining', () => {
+    const limiter = createRateLimiter(2, 1, clock);
+    limiter.tryAcquire('key-1');
+    limiter.tryAcquire('key-1');
+    expect(limiter.tryAcquire('key-1')).toBe(false);
+  });
+
+  it('should lazily refill tokens over elapsed time when clock advances', () => {
+    const limiter = createRateLimiter(10, 5, clock);
+    limiter.tryAcquire('key-1', 10);
+    expect(limiter.tryAcquire('key-1')).toBe(false);
+
+    clock.advance(1000);
+    expect(limiter.tryAcquire('key-1', 5)).toBe(true);
+    expect(limiter.tryAcquire('key-1')).toBe(false);
+
+    clock.advance(500);
+    expect(limiter.tryAcquire('key-1', 2)).toBe(true);
+    expect(limiter.tryAcquire('key-1')).toBe(false);
+  });
+
+  it('should cap refill at capacity when elapsed time exceeds drain time', () => {
+    const limiter = createRateLimiter(5, 10, clock);
+    limiter.tryAcquire('key-1', 5);
+    clock.advance(10000);
+    expect(limiter.tryAcquire('key-1', 5)).toBe(true);
+    expect(limiter.tryAcquire('key-1')).toBe(false);
+  });
+
+  it('should maintain per-key isolation when different keys are acquired', () => {
+    const limiter = createRateLimiter(3, 1, clock);
+    limiter.tryAcquire('key-a');
+    limiter.tryAcquire('key-a');
+    expect(limiter.tryAcquire('key-a')).toBe(false);
+
+    expect(limiter.tryAcquire('key-b')).toBe(true);
+    expect(limiter.tryAcquire('key-b')).toBe(true);
+    expect(limiter.tryAcquire('key-b')).toBe(true);
+    expect(limiter.tryAcquire('key-b')).toBe(false);
+  });
+
+  it('should deduct custom token count when tokens argument is provided', () => {
+    const limiter = createRateLimiter(10, 1, clock);
+    expect(limiter.tryAcquire('key-1', 7)).toBe(true);
+    expect(limiter.tryAcquire('key-1', 4)).toBe(false);
+    expect(limiter.tryAcquire('key-1', 3)).toBe(true);
+  });
+});

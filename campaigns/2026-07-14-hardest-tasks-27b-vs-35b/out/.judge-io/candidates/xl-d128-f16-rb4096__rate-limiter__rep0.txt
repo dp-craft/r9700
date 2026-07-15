@@ -1,0 +1,127 @@
+// FILE: impl.ts
+import type { Clock } from '@/lib/clock';
+
+interface BucketState {
+  tokens: number;
+  lastRefillAt: number;
+}
+
+export interface RateLimiter {
+  tryAcquire(key: string, tokens?: number): boolean;
+}
+
+const DEFAULT_TOKENS = 1;
+
+export function createRateLimiter(
+  capacity: number,
+  refillPerSec: number,
+  clock: Clock
+): RateLimiter {
+  const buckets = new Map<string, BucketState>();
+
+  const getOrCreateBucket = (key: string): BucketState => {
+    const existing = buckets.get(key);
+    if (existing) return existing;
+
+    const now = clock.now();
+    const initial: BucketState = { tokens: capacity, lastRefillAt: now };
+    buckets.set(key, initial);
+    return initial;
+  };
+
+  const refillBucket = (state: BucketState): void => {
+    const now = clock.now();
+    const elapsedSec = (now - state.lastRefillAt) / 1000;
+    const added = Math.min(capacity - state.tokens, elapsedSec * refillPerSec);
+    if (added > 0) {
+      state.tokens += added;
+      state.lastRefillAt = now;
+    }
+  };
+
+  const tryAcquire = (key: string, requestedTokens: number = DEFAULT_TOKENS): boolean => {
+    const state = getOrCreateBucket(key);
+    refillBucket(state);
+
+    if (state.tokens >= requestedTokens) {
+      state.tokens -= requestedTokens;
+      return true;
+    }
+    return false;
+  };
+
+  return { tryAcquire };
+}
+
+// FILE: impl.test.ts
+import { beforeEach, describe, expect, it } from 'vitest';
+
+import type { Clock } from '@/lib/clock';
+import { createRateLimiter } from './impl';
+
+describe('createRateLimiter', () => {
+  let currentTime: number;
+  let clock: Clock;
+  let limiter: ReturnType<typeof createRateLimiter>;
+
+  beforeEach(() => {
+    currentTime = 0;
+    clock = { now: () => currentTime };
+    limiter = createRateLimiter(10, 5, clock);
+  });
+
+  describe('first-burst', () => {
+    it('should allow acquiring tokens up to capacity when bucket is full', () => {
+      expect(limiter.tryAcquire('burst-key', 10)).toBe(true);
+    });
+
+    it('should reject acquisition exceeding capacity when bucket is full', () => {
+      expect(limiter.tryAcquire('burst-key', 11)).toBe(false);
+    });
+  });
+
+  describe('lazy refill', () => {
+    it('should add tokens based on elapsed time when bucket is drained', () => {
+      limiter.tryAcquire('refill-key', 10);
+      currentTime = 1000; // 1 sec passed -> 5 tokens refilled
+      expect(limiter.tryAcquire('refill-key', 5)).toBe(true);
+    });
+
+    it('should cap refilled tokens at capacity when elapsed time exceeds needed', () => {
+      currentTime = 5000; // 5 sec passed -> 25 tokens potential, capped at 10
+      expect(limiter.tryAcquire('cap-key', 10)).toBe(true);
+      expect(limiter.tryAcquire('cap-key', 1)).toBe(false);
+    });
+
+    it('should not deduct tokens when acquisition fails', () => {
+      limiter.tryAcquire('fail-key', 10);
+      expect(limiter.tryAcquire('fail-key', 5)).toBe(false);
+      expect(limiter.tryAcquire('fail-key', 5)).toBe(false); // remains 0
+    });
+  });
+
+  describe('empty-bucket rejection', () => {
+    it('should return false and deduct nothing when insufficient tokens are available', () => {
+      limiter.tryAcquire('empty-key', 10);
+      expect(limiter.tryAcquire('empty-key', 1)).toBe(false);
+      expect(limiter.tryAcquire('empty-key', 10)).toBe(false);
+    });
+  });
+
+  describe('per-key isolation', () => {
+    it('should maintain independent token counts for different keys', () => {
+      limiter.tryAcquire('key-a', 10);
+      currentTime = 1000;
+      expect(limiter.tryAcquire('key-a', 5)).toBe(true);
+      expect(limiter.tryAcquire('key-b', 10)).toBe(true); // key-b untouched, starts full
+      expect(limiter.tryAcquire('key-b', 1)).toBe(false);
+    });
+  });
+
+  describe('default token count', () => {
+    it('should default to 1 token when tokens argument is omitted', () => {
+      expect(limiter.tryAcquire('default-key')).toBe(true);
+      expect(limiter.tryAcquire('default-key')).toBe(true);
+    });
+  });
+});

@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Tidy char-level recursive descent with Result threading, true arbitrary-whitespace handling and bonus unary support; the paren branch masks inner parse errors behind a generic 'Missing closing parenthesis'."}

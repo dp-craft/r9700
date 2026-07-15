@@ -1,0 +1,40 @@
+You are finishing the "hardest-tasks: 27B quant ladder vs 35B-A3B at 128k" benchmark in this repo. Follow the
+repo's benchmark-results skill (read .claude/skills/benchmark-results/SKILL.md) and write the analysis to
+campaigns/2026-07-14-hardest-tasks-27b-vs-35b/analysis.md.
+
+ALL the numbers are ALREADY aggregated deterministically — read ONLY:
+  - campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/summary.md        (per-cell table + PER-REP detail + findings)
+  - campaigns/2026-07-14-hardest-tasks-27b-vs-35b/charts/appendix.md    (cell-level charts + data table)
+  - campaigns/2026-07-14-hardest-tasks-27b-vs-35b/charts/detailed/appendix.md  (per-task charts, if present)
+DO NOT read outputs.jsonl / scores_*.jsonl / judge_scores.jsonl — large per-reply logs; everything you
+need is in summary.md. For design context/glossary you may skim README.md and eval-design.md.
+
+Write analysis.md to the skill's contract: TL;DR + results TABLE FIRST (a memory column is MANDATORY),
+then detail. Every number comes from summary.md/appendix.md — tag MEASURED, mark reasoning INFERRED,
+invent nothing. Cover the campaign's questions exactly as summary.md's "Findings" lists them:
+(a) the 27B QUANT LADDER Q4_K_M->Q4_K_XL->Q5_K_M->Q6_K on the 4 hardest tasks (does higher precision clear
+the strict-lint/types wall, or is the wall real capability? note lint/types are now FRACTIONAL = error-count
+based, so cleanliness has resolution), (b) 27B (best quant) vs 35B-A3B (does the bigger MoE clear the wall
+that precision does not — capacity vs precision?), (c) capability per task vs the haiku/sonnet/opus ladder,
+(d) speed vs quality (generation tokens/time). NOTE KV is NOT uniform: Q5_K_M+Q6_K run q8_0 KV (their weights
+are too heavy for f16 @ctx 163840), the other three run f16 — so treat any Q5/Q6 quant-ladder delta as
+weight-quant PLUS a small KV effect (f16-vs-q8 is within the prior ≤5% rule). If summary.md's Health flags
+GTT spill, surface it; otherwise all five cells fit VRAM.
+All cells share reasoning-budget 4096 (the budget sweep is a separate follow-up campaign — do NOT analyze it).
+NOTE the grader FIX: this run used single-process vitest + a fail-loud grader + a pre-grade self-check,
+so tests/edge are trustworthy (the previous run's tests/edge=0 was a harness bug). If summary.md's Health
+line flags grade_error/HARNESS rows, runaways, or GTT spill, surface them prominently.
+
+PER-REP DETAIL (MANDATORY — the user wants to see all reps, not just means): summary.md ends with a
+"Per-rep detail" section — one table per hardest task listing EVERY local rep (rep 0/1/2, full objective
+vector), a mean row, and the haiku/sonnet/opus one-shot references in the same columns. INLINE these
+per-task tables VERBATIM in analysis.md under a "Per-rep results (all 3 reps + reference ladder)" section —
+do NOT collapse them to means. Call out rep-to-rep spread where reps disagree, and note any 
+reference gaps (e.g. opus on lru-cache/rate-limiter, README add-on D).
+
+JUDGE DETAIL: appendix.md ends with the full blind-judge verdict table + "Judge mean by task". Add a
+"Judge verdicts" section: (1) per-cell judge d.c.r means from summary.md, (2) quote 3-5 most informative
+notes VERBATIM (worst + best), (3) the "Judge mean by task" line, (4) link to appendix for the full table.
+
+Include a <!-- meta --> block so docs/reindex.py can register it. This task is complete once analysis.md
+is written; your final answer is a one-line confirmation, e.g. "analysis.md written (N cells)".

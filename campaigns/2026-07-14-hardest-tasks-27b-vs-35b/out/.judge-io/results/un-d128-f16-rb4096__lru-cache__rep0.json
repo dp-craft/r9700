@@ -1,0 +1,1 @@
+{"design":3,"clarity":3,"robustness":3,"notes":"Carries a lastAccessedAt field that is written but never read, and rescans the whole map twice per set (countLive plus evictOldest's evictExpired)."}

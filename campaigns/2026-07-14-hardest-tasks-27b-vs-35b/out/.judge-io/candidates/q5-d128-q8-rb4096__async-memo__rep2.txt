@@ -1,0 +1,66 @@
+// FILE: impl.ts
+export function createAsyncMemo<K, V>(fn: (key: K) => Promise<V>): (key: K) => Promise<V> {
+  const cache = new Map<K, Promise<V>>();
+  return (key: K): Promise<V> => {
+    const existing = cache.get(key);
+    if (existing !== undefined) return existing;
+    const p = fn(key);
+    cache.set(key, p);
+    p.then(() => {
+      // success: keep in cache
+    }).catch(() => {
+      cache.delete(key);
+    });
+    return p;
+  };
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it, vi } from 'vitest';
+
+import { createAsyncMemo } from './impl';
+
+describe('createAsyncMemo', () => {
+  it('should share one in-flight computation when concurrent calls use the same key', async () => {
+    const fn = vi.fn(async (key: string): Promise<string> => {
+      await new Promise(resolve => setTimeout(resolve, 50));
+      return `result-${key}`;
+    });
+
+    const memoized = createAsyncMemo(fn);
+    const [a, b, c] = await Promise.all([memoized('x'), memoized('x'), memoized('x')]);
+
+    expect(a).toBe('result-x');
+    expect(b).toBe('result-x');
+    expect(c).toBe('result-x');
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it('should retry fn when the computation rejects', async () => {
+    const fn = vi.fn(async (_key: string): Promise<string> => {
+      throw new Error('boom');
+    });
+
+    const memoized = createAsyncMemo(fn);
+
+    await expect(memoized('x')).rejects.toThrow('boom');
+    expect(fn).toHaveBeenCalledTimes(1);
+
+    await expect(memoized('x')).rejects.toThrow('boom');
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+
+  it('should reuse the cached value when a prior call resolved successfully', async () => {
+    const fn = vi.fn(async (key: string): Promise<string> => `value-${key}`);
+
+    const memoized = createAsyncMemo(fn);
+
+    const first = await memoized('a');
+    expect(first).toBe('value-a');
+    expect(fn).toHaveBeenCalledTimes(1);
+
+    const second = await memoized('a');
+    expect(second).toBe('value-a');
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+});

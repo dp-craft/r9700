@@ -1,0 +1,1 @@
+{"design":3,"clarity":4,"robustness":3,"notes":"Shared getLiveEntry keeps get/has DRY, but every read sweeps the whole map via evictExpired and eviction is an O(n) scan, ignoring the O(1) recency ordering a Map already provides."}

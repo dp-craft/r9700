@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Immutable BucketState with a pure refill function reads well and correctly persists the refill on the reject path; tests reach for fractional token amounts, though an unused vi import lingers."}

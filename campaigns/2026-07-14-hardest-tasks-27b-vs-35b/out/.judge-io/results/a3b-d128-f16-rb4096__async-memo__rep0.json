@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Minimal, well-targeted fix that preserves promise identity and evicts on rejection without an extra tick; the delete is unguarded against a newer entry for the same key, and one test asserts toHaveBeenCalledTimes on a plain function rather than a vi.fn."}

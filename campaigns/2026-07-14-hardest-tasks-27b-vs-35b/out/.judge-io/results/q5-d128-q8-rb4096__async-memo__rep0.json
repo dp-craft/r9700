@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":3,"notes":"Correct minimal fix that caches the in-flight promise and evicts on rejection without over-engineering, but leaves the loosely-typed vi.fn() spy and does not guard against fn throwing synchronously."}

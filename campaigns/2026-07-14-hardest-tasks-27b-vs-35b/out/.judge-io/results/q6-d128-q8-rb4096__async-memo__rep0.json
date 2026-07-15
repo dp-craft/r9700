@@ -1,0 +1,1 @@
+{"design":3,"clarity":4,"robustness":2,"notes":"Readable two-map cache/inflight split, but the `cached !== undefined` lookup silently fails to cache an undefined resolved value, re-running fn forever for such keys."}

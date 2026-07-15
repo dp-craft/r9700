@@ -1,0 +1,1 @@
+{"design":2,"clarity":3,"robustness":1,"notes":"The first call for a key returns true on a short-circuit path that creates a full bucket without deducting the requested tokens or honoring capacity, and refill multiplies raw milliseconds by refillPerSec with no conversion to seconds."}

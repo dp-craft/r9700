@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Precomputed expiresAt keeps expiry checks trivial, the size getter stays side-effect free, and set-on-existing-key correctly refreshes both TTL and recency."}

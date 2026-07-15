@@ -1,0 +1,1 @@
+{"design":3,"clarity":3,"robustness":3,"notes":"Correct mutable-bucket limiter with a sensible clock-regression guard, but `evaluateAcquisition` is a misleading name for a mutating helper and the 'default tokens' test just duplicates the first-burst case."}

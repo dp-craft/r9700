@@ -1,0 +1,180 @@
+// FILE: impl.ts
+export type Result =
+  | { readonly ok: true; readonly value: number }
+  | { readonly ok: false; readonly error: string };
+
+type Token =
+  | { readonly type: 'NUM'; readonly value: number }
+  | { readonly type: 'PLUS' }
+  | { readonly type: 'MINUS' }
+  | { readonly type: 'MULT' }
+  | { readonly type: 'DIV' }
+  | { readonly type: 'LPAREN' }
+  | { readonly type: 'RPAREN' }
+  | { readonly type: 'EOF' }
+  | { readonly type: 'ERR' };
+
+function tokenize(input: string): readonly Token[] {
+  const tokens: Token[] = [];
+  let i = 0;
+  while (i < input.length) {
+    const c = input[i];
+    if (c === ' ' || c === '\t' || c === '\n' || c === '\r') { i++; continue; }
+    if (c >= '0' && c <= '9') {
+      let s = '';
+      while (i < input.length && input[i] >= '0' && input[i] <= '9') { s += input[i]; i++; }
+      tokens.push({ type: 'NUM', value: parseInt(s, 10) });
+      continue;
+    }
+    if (c === '+') tokens.push({ type: 'PLUS' });
+    else if (c === '-') tokens.push({ type: 'MINUS' });
+    else if (c === '*') tokens.push({ type: 'MULT' });
+    else if (c === '/') tokens.push({ type: 'DIV' });
+    else if (c === '(') tokens.push({ type: 'LPAREN' });
+    else if (c === ')') tokens.push({ type: 'RPAREN' });
+    else return [{ type: 'ERR' }, { type: 'EOF' }];
+    i++;
+  }
+  tokens.push({ type: 'EOF' });
+  return tokens;
+}
+
+function parseExpr(tokens: readonly Token[], pos: [number]): Result {
+  let left = parseTerm(tokens, pos);
+  if (!left.ok) return left;
+  while (tokens[pos[0]]?.type === 'PLUS' || tokens[pos[0]]?.type === 'MINUS') {
+    const op = tokens[pos[0]!].type;
+    pos[0]++;
+    const right = parseTerm(tokens, pos);
+    if (!right.ok) return right;
+    left = { ok: true, value: op === 'PLUS' ? left.value + right.value : left.value - right.value };
+  }
+  return left;
+}
+
+function parseTerm(tokens: readonly Token[], pos: [number]): Result {
+  let left = parseFactor(tokens, pos);
+  if (!left.ok) return left;
+  while (tokens[pos[0]]?.type === 'MULT' || tokens[pos[0]]?.type === 'DIV') {
+    const op = tokens[pos[0]!].type;
+    pos[0]++;
+    const right = parseFactor(tokens, pos);
+    if (!right.ok) return right;
+    if (op === 'DIV' && right.value === 0) return { ok: false, error: 'Division by zero' };
+    left = { ok: true, value: op === 'MULT' ? left.value * right.value : Math.trunc(left.value / right.value) };
+  }
+  return left;
+}
+
+function parseFactor(tokens: readonly Token[], pos: [number]): Result {
+  const tok = tokens[pos[0]];
+  if (tok?.type === 'ERR') return { ok: false, error: 'Invalid character' };
+  if (tok?.type === 'NUM') { pos[0]++; return { ok: true, value: tok.value }; }
+  if (tok?.type === 'LPAREN') {
+    pos[0]++;
+    const res = parseExpr(tokens, pos);
+    if (!res.ok) return res;
+    if (tokens[pos[0]]?.type !== 'RPAREN') return { ok: false, error: 'Missing closing parenthesis' };
+    pos[0]++;
+    return res;
+  }
+  return { ok: false, error: 'Unexpected token' };
+}
+
+export function evaluate(expr: string): Result {
+  const tokens = tokenize(expr);
+  const pos: [number] = [0];
+  const res = parseExpr(tokens, pos);
+  if (pos[0] < tokens.length - 1) return { ok: false, error: 'Unexpected trailing characters' };
+  return res;
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it } from 'vitest';
+import { evaluate } from './impl';
+
+describe('evaluate', () => {
+  it('should return correct value for simple addition', () => {
+    const res = evaluate('2 + 3');
+    expect(res.ok).toBe(true);
+    expect(res.ok ? res.value : 0).toBe(5);
+  });
+
+  it('should respect multiplication precedence over addition', () => {
+    const res = evaluate('2 + 3 * 4');
+    expect(res.ok).toBe(true);
+    expect(res.ok ? res.value : 0).toBe(14);
+  });
+
+  it('should evaluate left-associative subtraction correctly', () => {
+    const res = evaluate('10 - 3 - 2');
+    expect(res.ok).toBe(true);
+    expect(res.ok ? res.value : 0).toBe(5);
+  });
+
+  it('should evaluate left-associative division correctly', () => {
+    const res = evaluate('8 / 2 / 2');
+    expect(res.ok).toBe(true);
+    expect(res.ok ? res.value : 0).toBe(2);
+  });
+
+  it('should handle parentheses correctly', () => {
+    const res = evaluate('(2 + 3) * 4');
+    expect(res.ok).toBe(true);
+    expect(res.ok ? res.value : 0).toBe(20);
+  });
+
+  it('should handle nested parentheses correctly', () => {
+    const res = evaluate('((2 + 3) * (4 - 1))');
+    expect(res.ok).toBe(true);
+    expect(res.ok ? res.value : 0).toBe(15);
+  });
+
+  it('should ignore arbitrary whitespace', () => {
+    const res = evaluate('  10   +   20  ');
+    expect(res.ok).toBe(true);
+    expect(res.ok ? res.value : 0).toBe(30);
+  });
+
+  it('should return error on division by zero', () => {
+    const res = evaluate('10 / 0');
+    expect(res.ok).toBe(false);
+    expect(res.ok ? '' : res.error).toBe('Division by zero');
+  });
+
+  it('should return error on unbalanced parentheses', () => {
+    const res = evaluate('(2 + 3');
+    expect(res.ok).toBe(false);
+    expect(res.ok ? '' : res.error).toBe('Missing closing parenthesis');
+  });
+
+  it('should return error on unexpected character', () => {
+    const res = evaluate('10 + a');
+    expect(res.ok).toBe(false);
+    expect(res.ok ? '' : res.error).toBe('Invalid character');
+  });
+
+  it('should return error on missing operand', () => {
+    const res = evaluate('10 +');
+    expect(res.ok).toBe(false);
+    expect(res.ok ? '' : res.error).toBe('Unexpected token');
+  });
+
+  it('should return error on trailing characters', () => {
+    const res = evaluate('10 + 20 +');
+    expect(res.ok).toBe(false);
+    expect(res.ok ? '' : res.error).toBe('Unexpected trailing characters');
+  });
+
+  it('should handle integer division truncation towards zero', () => {
+    const res = evaluate('7 / 2');
+    expect(res.ok).toBe(true);
+    expect(res.ok ? res.value : 0).toBe(3);
+  });
+
+  it('should handle mixed precedence and parentheses', () => {
+    const res = evaluate('5 * (3 + 2) - 1');
+    expect(res.ok).toBe(true);
+    expect(res.ok ? res.value : 0).toBe(24);
+  });
+});

@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":3,"notes":"Correct minimal fix, but the needless async wrapper re-wraps the cached promise and costs an extra microtask, the truthiness check on a cached promise is loose, and the tests cover fewer edges."}

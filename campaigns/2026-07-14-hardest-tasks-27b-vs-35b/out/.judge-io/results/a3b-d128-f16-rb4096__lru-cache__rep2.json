@@ -1,0 +1,1 @@
+{"design":3,"clarity":4,"robustness":2,"notes":"Readable and uniform, but set() runs the capacity check before distinguishing overwrite from insert so an update at full capacity evicts an unrelated live entry, and removeExpired() sweeps the whole map on every operation."}

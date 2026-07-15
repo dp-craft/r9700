@@ -1,0 +1,1 @@
+{"design":4,"clarity":3,"robustness":3,"notes":"Same correct minimal fix with an explicit `void` on the floating catch, but the tests track a manual callCount alongside vi.fn spies whose call records are never asserted, duplicating state for no reason."}

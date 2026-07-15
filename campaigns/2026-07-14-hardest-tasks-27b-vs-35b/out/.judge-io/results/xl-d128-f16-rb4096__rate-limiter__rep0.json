@@ -1,0 +1,1 @@
+{"design":3,"clarity":4,"robustness":1,"notes":"Readable structure, but the `if (added > 0)` guard leaves lastRefillAt stale whenever the bucket is full, so a bucket idle for 10s then drained refills to capacity on the very next call, and non-positive/NaN token requests are unvalidated."}

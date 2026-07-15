@@ -1,0 +1,1 @@
+{"design":3,"clarity":3,"robustness":3,"notes":"Correct lazy-expiry semantics and eviction that skips expired entries, but set() makes three full O(n) passes (removeExpired, countLiveEntries, evictLruEntry) where the last two are dead weight after the first, and get/has duplicate the expiry-check-and-delete logic."}

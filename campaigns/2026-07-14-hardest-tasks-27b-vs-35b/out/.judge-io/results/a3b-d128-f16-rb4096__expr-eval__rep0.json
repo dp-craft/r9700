@@ -1,0 +1,1 @@
+{"design":2,"clarity":3,"robustness":2,"notes":"Readable recursive-descent skeleton undermined by an unsound `Result | readonly Token[]` union discriminated with `typeof === 'object'` (arrays are objects, so the success path is indistinguishable from an error), plus whitespace handling limited to literal spaces."}

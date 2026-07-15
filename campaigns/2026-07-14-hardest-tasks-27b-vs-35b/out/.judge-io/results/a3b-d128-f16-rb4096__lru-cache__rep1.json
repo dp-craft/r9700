@@ -1,0 +1,1 @@
+{"design":2,"clarity":1,"robustness":2,"notes":"Coerces the generic key via String(key), silently collapsing distinct object/number keys and defeating the K type parameter, and the test file repeats its entire suite verbatim twice."}

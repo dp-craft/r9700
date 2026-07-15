@@ -1,0 +1,24 @@
+  haiku  /count-words    binary 0.949 -> fractional 0.949
+  haiku  /lru-cache      binary 0.679 -> fractional 0.793
+  haiku  /rate-limiter   binary 0.834 -> fractional 0.948
+  sonnet /lru-cache      binary 0.831 -> fractional 0.946
+  sonnet /rate-limiter   binary 0.982 -> fractional 0.982
+wrote calibration.jsonl (5 rows)
+  haiku  /shape-variant  binary 1.0 -> fractional 1.000
+  sonnet /shape-variant  binary 1.0 -> fractional 1.000
+  haiku  /shape-variant  binary 1.0 -> fractional 1.000
+  sonnet /shape-variant  binary 1.0 -> fractional 1.000
+  opus   /shape-variant  binary 1.0 -> fractional 1.000
+  haiku  /async-memo     binary 0.667 -> fractional 0.912
+  sonnet /async-memo     binary 0.625 -> fractional 0.870
+  opus   /async-memo     binary 1.0 -> fractional 1.000
+  haiku  /store-remove   binary 0.812 -> fractional 0.924
+  sonnet /store-remove   binary 1.0 -> fractional 1.000
+  opus   /store-remove   binary 1.0 -> fractional 1.000
+  haiku  /expr-eval      binary 0.667 -> fractional 0.667
+  sonnet /expr-eval      binary 0.667 -> fractional 0.667
+  opus   /expr-eval      binary 0.833 -> fractional 0.833
+  haiku  /deep-equal     binary 0.792 -> fractional 0.925
+  sonnet /deep-equal     binary 1.0 -> fractional 1.000
+  opus   /deep-equal     binary 0.982 -> fractional 0.982
+wrote calibration-hard.jsonl (15 rows)

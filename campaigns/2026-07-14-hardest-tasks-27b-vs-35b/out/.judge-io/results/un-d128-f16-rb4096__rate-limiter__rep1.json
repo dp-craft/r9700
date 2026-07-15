@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":3,"notes":"Refill is fully encapsulated and the capacity-minus-tokens clamp is neat, though nothing guards against zero/negative/non-finite token requests."}

@@ -1,0 +1,200 @@
+// FILE: impl.ts
+type Token =
+  | { readonly type: 'num'; readonly value: number }
+  | { readonly type: 'op'; readonly value: '+' | '-' | '*' | '/' }
+  | { readonly type: 'lp' }
+  | { readonly type: 'rp' }
+  | { readonly type: 'eof' };
+
+export type Result =
+  | { readonly ok: true; readonly value: number }
+  | { readonly ok: false; readonly error: string };
+
+function tokenize(input: string): readonly Token[] | Result {
+  const tokens: Token[] = [];
+  let i = 0;
+  while (i < input.length) {
+    const ch = input[i];
+    if (ch === ' ') { i++; continue; }
+    if (ch === '(') { tokens.push({ type: 'lp' }); i++; continue; }
+    if (ch === ')') { tokens.push({ type: 'rp' }); i++; continue; }
+    if (ch === '+' || ch === '-' || ch === '*' || ch === '/') {
+      tokens.push({ type: 'op', value: ch }); i++; continue;
+    }
+    if (ch !== undefined && ch >= '0' && ch <= '9') {
+      let num = '';
+      while (i < input.length && input[i] !== undefined && input[i] >= '0' && input[i] <= '9') {
+        num += input[i]; i++;
+      }
+      const val = Number(num);
+      if (Number.isNaN(val)) return { ok: false, error: 'Bad number' };
+      tokens.push({ type: 'num', value: val }); continue;
+    }
+    return { ok: false, error: `Unexpected: ${ch}` };
+  }
+  tokens.push({ type: 'eof' });
+  return tokens;
+}
+
+type Cursor = { pos: number };
+
+function parseExpr(tokens: readonly Token[], cursor: Cursor): Result {
+  let res = parseTerm(tokens, cursor);
+  if (res.ok === false) return res;
+  while (cursor.pos < tokens.length && tokens[cursor.pos].type === 'op' && (tokens[cursor.pos].value === '+' || tokens[cursor.pos].value === '-')) {
+    const op = tokens[cursor.pos].value; cursor.pos++;
+    const right = parseTerm(tokens, cursor);
+    if (right.ok === false) return right;
+    if (op === '+') res.value += right.value; else res.value -= right.value;
+  }
+  return res;
+}
+
+function parseTerm(tokens: readonly Token[], cursor: Cursor): Result {
+  let res = parseFactor(tokens, cursor);
+  if (res.ok === false) return res;
+  while (cursor.pos < tokens.length && tokens[cursor.pos].type === 'op' && (tokens[cursor.pos].value === '*' || tokens[cursor.pos].value === '/')) {
+    const op = tokens[cursor.pos].value; cursor.pos++;
+    const right = parseFactor(tokens, cursor);
+    if (right.ok === false) return right;
+    if (op === '*') res.value *= right.value; else {
+      if (right.value === 0) return { ok: false, error: 'Division by zero' };
+      res.value /= right.value;
+    }
+  }
+  return res;
+}
+
+function parseFactor(tokens: readonly Token[], cursor: Cursor): Result {
+  if (cursor.pos >= tokens.length) return { ok: false, error: 'Missing operand' };
+  const token = tokens[cursor.pos];
+  if (token.type === 'num') { cursor.pos++; return { ok: true, value: token.value }; }
+  if (token.type === 'lp') {
+    cursor.pos++;
+    const inner = parseExpr(tokens, cursor);
+    if (inner.ok === false) return inner;
+    if (cursor.pos >= tokens.length || tokens[cursor.pos].type !== 'rp') return { ok: false, error: 'Unbalanced parens' };
+    cursor.pos++; return inner;
+  }
+  return { ok: false, error: 'Unexpected token' };
+}
+
+export function evaluate(expr: string): Result {
+  const tokensOrErr = tokenize(expr);
+  if (tokensOrErr.ok === false) return tokensOrErr;
+  const tokens = tokensOrErr as readonly Token[];
+  const cursor = { pos: 0 };
+  const res = parseExpr(tokens, cursor);
+  if (res.ok === false) return res;
+  if (cursor.pos < tokens.length && tokens[cursor.pos].type !== 'eof') return { ok: false, error: 'Unexpected token' };
+  return res;
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it } from 'vitest';
+import { evaluate } from './impl';
+
+describe('evaluate', () => {
+  describe('basic arithmetic', () => {
+    it('should return 42 when expression is "42"', () => {
+      const result = evaluate('42');
+      expect(result).toEqual({ ok: true, value: 42 });
+    });
+
+    it('should return 15 when expression is "10 + 5"', () => {
+      const result = evaluate('10 + 5');
+      expect(result).toEqual({ ok: true, value: 15 });
+    });
+
+    it('should return 5 when expression is "10 - 5"', () => {
+      const result = evaluate('10 - 5');
+      expect(result).toEqual({ ok: true, value: 5 });
+    });
+
+    it('should return 20 when expression is "4 * 5"', () => {
+      const result = evaluate('4 * 5');
+      expect(result).toEqual({ ok: true, value: 20 });
+    });
+
+    it('should return 5 when expression is "20 / 4"', () => {
+      const result = evaluate('20 / 4');
+      expect(result).toEqual({ ok: true, value: 5 });
+    });
+  });
+
+  describe('precedence', () => {
+    it('should return 14 when expression is "2 + 3 * 4"', () => {
+      const result = evaluate('2 + 3 * 4');
+      expect(result).toEqual({ ok: true, value: 14 });
+    });
+
+    it('should return 10 when expression is "2 * 3 + 4"', () => {
+      const result = evaluate('2 * 3 + 4');
+      expect(result).toEqual({ ok: true, value: 10 });
+    });
+
+    it('should return 24 when expression is "2 * (3 + 4)"', () => {
+      const result = evaluate('2 * (3 + 4)');
+      expect(result).toEqual({ ok: true, value: 24 });
+    });
+  });
+
+  describe('left associativity', () => {
+    it('should return 5 when expression is "10 - 3 - 2"', () => {
+      const result = evaluate('10 - 3 - 2');
+      expect(result).toEqual({ ok: true, value: 5 });
+    });
+
+    it('should return 2 when expression is "8 / 2 / 2"', () => {
+      const result = evaluate('8 / 2 / 2');
+      expect(result).toEqual({ ok: true, value: 2 });
+    });
+  });
+
+  describe('parentheses', () => {
+    it('should return 10 when expression is "(2 + 3) * 2"', () => {
+      const result = evaluate('(2 + 3) * 2');
+      expect(result).toEqual({ ok: true, value: 10 });
+    });
+
+    it('should return 5 when expression is "((2 + 3))"', () => {
+      const result = evaluate('((2 + 3))');
+      expect(result).toEqual({ ok: true, value: 5 });
+    });
+
+    it('should return 20 when expression is "2 * (3 + (4 * 2))"', () => {
+      const result = evaluate('2 * (3 + (4 * 2))');
+      expect(result).toEqual({ ok: true, value: 20 });
+    });
+  });
+
+  describe('whitespace handling', () => {
+    it('should return 15 when expression is "  10   +   5  "', () => {
+      const result = evaluate('  10   +   5  ');
+      expect(result).toEqual({ ok: true, value: 15 });
+    });
+  });
+
+  describe('error handling', () => {
+    it('should return error when expression is "10 + "', () => {
+      const result = evaluate('10 + ');
+      expect(result.ok).toBe(false);
+    });
+
+    it('should return error when expression is "10 + (2"', () => {
+      const result = evaluate('10 + (2');
+      expect(result.ok).toBe(false);
+    });
+
+    it('should return error when expression is "10 / 0"', () => {
+      const result = evaluate('10 / 0');
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain('Division by zero');
+    });
+
+    it('should return error when expression is "abc"', () => {
+      const result = evaluate('abc');
+      expect(result.ok).toBe(false);
+    });
+  });
+});

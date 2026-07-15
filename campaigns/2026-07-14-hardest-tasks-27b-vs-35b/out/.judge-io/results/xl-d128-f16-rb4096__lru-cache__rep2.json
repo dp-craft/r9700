@@ -1,0 +1,1 @@
+{"design":3,"clarity":4,"robustness":3,"notes":"Tidy closure-scoped helpers and well-organized tests, but `now` is never snapshotted per operation (isExpired re-reads the clock per entry during O(n) scans) and get() reallocates the entry object just to touch lastAccessed."}

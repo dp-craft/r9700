@@ -1,0 +1,1 @@
+{"design":3,"clarity":3,"robustness":2,"notes":"The p.then(value => value) wrapper adds a pointless promise hop for no benefit, the eviction catch floats unhandled, and the retry test re-invokes a key whose mock always throws."}

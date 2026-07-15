@@ -1,0 +1,424 @@
+  ⎿  Added 3 lines, removed 3 lines
+      221  | 35B-A3B (f16) | 1 | 77 | ✗ | 1.00 | 0.00 | 0.86 | 1.00 | 1.0
+           0 | 0.14 | 1.00 | 4095 | 2.0·1.0·2.0 |
+      222  | 35B-A3B (f16) | 2 | 80 | ✗ | 1.00 | 0.00 | 0.90 | 1.00 | 1.0
+           0 | 0.50 | 1.00 | 4095 | 3.0·4.0·2.0 |
+      223  | **35B-A3B (f16) — mean** | – | **82** | 0% | 1.00 | 0.20 | 0
+           .90 | 1.00 | 1.00 | 0.37 | 1.00 | | |
+      224 -| _haiku_ 1-shot | – | 68 | | 1.00 | 0.00 | 0.82 | 0.50 | 1.00
+          - | 0.55 | 1.00 | | |
+      225 -| _sonnet_ 1-shot | – | 83 | | 1.00 | 0.00 | 1.00 | 1.00 | 1.0
+          -0 | 0.64 | 1.00 | | |
+      224 +| _haiku_ 1-shot | – | 79 | | 1.00 | 0.80 | 0.82 | 0.50 | 1.00
+          + | 0.55 | 1.00 | | |
+      225 +| _sonnet_ 1-shot | – | 95 | | 1.00 | 0.80 | 1.00 | 1.00 | 1.0
+          +0 | 0.64 | 1.00 | | |
+      226  | _opus_ | – | — (no calib) | | — | — | — | — | — | — | — | |
+           |
+      227
+      228 -**Rep-to-rep spread (MEASURED):** Q4_K_M swings **70→96** (26
+          -points) on identical inputs — rep0 fails types 0.00 while reps
+          - 1–2 score 1.00. Q4_K_XL swings **77→56** and is the only cell
+          - to fail `edge` here (0.50 on all three reps). The **35B-A3B i
+          -s the only cell with types 1.00 on all three reps** — and stil
+          -l lands at 82% because lint collapses (0.60/0.00/0.00) and bdd
+          - is the worst on the board (0.37 mean). **Reference gap: no op
+          -us calibration point on this task.**
+      228 +**Rep-to-rep spread (MEASURED):** Q4_K_M swings **70→96** (26
+          +points) on identical inputs — rep0 fails types 0.00 while reps
+          + 1–2 score 1.00. Q4_K_XL swings **77→56** and is the only cell
+          + to fail `edge` here (0.50 on all three reps). The **35B-A3B i
+          +s the only cell with types 1.00 on all three reps** — and stil
+          +l lands at 82% because lint collapses (0.60/0.00/0.00) and bdd
+          + is the worst on the board (0.37 mean). **Reference gap: no op
+          +us calibration point on this task** (add-on D). Against the re
+          +-graded references, Q4_K_M's 85 beats **haiku 79** but sits 10
+          + points under **sonnet 95** — and note haiku is the only row h
+          +ere that fails `edge` (0.50), the same objective Q4_K_XL fails
+          +.
+      229
+      230  ### rate-limiter · tier sonnet
+      231
+
+● Update(campaigns/2026-07-14-hardest-tasks-27b-vs-35b/analysis.md)
+  ⎿  Added 1 line, removed 1 line
+      251  | 35B-A3B (f16) | 1 | 77 | ✗ | 0.67 | 0.00 | 1.00 | 1.00 | 1.0
+           0 | 0.50 | 1.00 | 4095 | 4.0·4.0·4.0 |
+      252  | 35B-A3B (f16) | 2 | 48 | ✗ | 0.67 | 0.20 | 0.33 | 0.00 | 1.0
+           0 | 1.00 | 1.00 | 4095 | 2.0·3.0·1.0 |
+      253  | **35B-A3B (f16) — mean** | – | **71** | 0% | 0.67 | 0.27 | 0
+           .74 | 0.67 | 1.00 | 0.83 | 1.00 | | |
+      254 -| _haiku_ 1-shot | – | 83 | | 1.00 | 0.00 | 1.00 | 1.00 | 1.00
+          - | 0.67 | 1.00 | | |
+      254 +| _haiku_ 1-shot | – | 95 | | 1.00 | 0.80 | 1.00 | 1.00 | 1.00
+          + | 0.67 | 1.00 | | |
+      255  | _sonnet_ 1-shot | – | 98 | | 1.00 | 1.00 | 1.00 | 1.00 | 1.0
+           0 | 0.75 | 1.00 | | |
+      256  | _opus_ | – | — (no calib) | | — | — | — | — | — | — | — | |
+           |
+      257
+
+● Update(campaigns/2026-07-14-hardest-tasks-27b-vs-35b/analysis.md)
+  ⎿  Added 1 line, removed 1 line
+      255  | _sonnet_ 1-shot | – | 98 | | 1.00 | 1.00 | 1.00 | 1.00 | 1.0
+           0 | 0.75 | 1.00 | | |
+      256  | _opus_ | – | — (no calib) | | — | — | — | — | — | — | — | |
+           |
+      257
+      258 -**Rep-to-rep spread (MEASURED):** the **most stable task for t
+          -he 27B** — Q4_K_XL scores 75/76/76 and Q6_K 97/86/90, with `te
+          -sts`, `edge`, `reuse` and `bdd` at 1.00 almost throughout. All
+          - the movement is in `types`/`lint`: Q4_K_M rep0 (types 1.00, l
+          -int 0.40, TS 88) vs reps 1–2 (types 0.33, lint 0.00, TS 73/76)
+          - — **a 15-point swing driven purely by error counts on identic
+          -al logic.** The **35B-A3B is the exception: rep2 collapses to
+          -48** (tests 0.33, edge 0.00 — the units bug the judge describe
+          -s), a 39-point drop from its own rep0. **Reference gap: no opu
+          -s calibration point on this task.** Sonnet's 98 (lint 1.00) is
+          - the campaign's cleanest reference reply.
+      258 +**Rep-to-rep spread (MEASURED):** the **most stable task for t
+          +he 27B** — Q4_K_XL scores 75/76/76 and Q6_K 97/86/90, with `te
+          +sts`, `edge`, `reuse` and `bdd` at 1.00 almost throughout. All
+          + the movement is in `types`/`lint`: Q4_K_M rep0 (types 1.00, l
+          +int 0.40, TS 88) vs reps 1–2 (types 0.33, lint 0.00, TS 73/76)
+          + — **a 15-point swing driven purely by error counts on identic
+          +al logic.** The **35B-A3B is the exception: rep2 collapses to
+          +48** (tests 0.33, edge 0.00 — the units bug the judge describe
+          +s), a 39-point drop from its own rep0. **Reference gap: no opu
+          +s calibration point on this task** (add-on D). Sonnet's 98 (li
+          +nt 1.00) is the campaign's cleanest reference reply — and **ev
+          +ery local cell loses to both references here** (best local Q6_
+          +K 91 vs haiku 95 / sonnet 98), purely on `types`/`lint`.
+      259
+      260  ### async-memo · tier opus
+      261
+
+● Now the async-memo per-rep reference rows and their commentary:
+
+● Update(campaigns/2026-07-14-hardest-tasks-27b-vs-35b/analysis.md)
+  ⎿  Added 2 lines, removed 2 lines
+      281  | 35B-A3B (f16) | 1 | 71 | ✗ | 0.00 | 0.60 | 1.00 | 1.00 | — |
+            0.33 | 1.00 | 4095 | 4.0·4.0·3.0 |
+      282  | 35B-A3B (f16) | 2 | 94 | ✓ | 1.00 | 1.00 | 1.00 | 1.00 | — |
+            0.33 | 1.00 | 3621 | 4.0·4.0·3.0 |
+      283  | **35B-A3B (f16) — mean** | – | **87** | 33% | 0.67 | 0.87 |
+           0.93 | 1.00 | — | 0.55 | 1.00 | | |
+      284 -| _haiku_ 1-shot | – | 67 | | 0.00 | 0.00 | 1.00 | 1.00 | — |
+          -1.00 | 1.00 | | |
+      285 -| _sonnet_ 1-shot | – | 62 | | 0.00 | 0.00 | 1.00 | 1.00 | — |
+          - 0.50 | 1.00 | | |
+      284 +| _haiku_ 1-shot | – | 91 | | 0.67 | 0.80 | 1.00 | 1.00 | — |
+          +1.00 | 1.00 | | |
+      285 +| _sonnet_ 1-shot | – | 87 | | 0.67 | 0.80 | 1.00 | 1.00 | — |
+          + 0.50 | 1.00 | | |
+      286  | _opus_ 1-shot | – | 100 | | 1.00 | 1.00 | 1.00 | 1.00 | — |
+           1.00 | 1.00 | | |
+      287
+      288  **Rep-to-rep spread (MEASURED):** **the only task where a cell
+            is perfectly reproducible** — Q4_K_M scores **91/91/91 with a
+           n identical objective vector** on all three reps (types 0.67,
+           lint 0.80, tests 1.00, edge 1.00, bdd 1.00, think 4095). **INF
+           ERRED:** at temp 0.6 the model converges on one canonical solu
+           tion here (the judge's notes for those three reps describe the
+            same delete-on-reject fix), which is what a well-understood s
+           ingle-fix task looks like. **Both hard-passes in the campaign
+           live on this task:** Q6_K rep1 (TS 100, judge 5.0·5.0·4.0) and
+            35B-A3B rep2 (TS 94) — 2 of 60 replies overall, both cells at
+            33% hard-pass here. Note the **think-token variance**: Q5_K_M
+            rep0 stopped thinking at **648 tokens** (vs 3911/2132) and Q4
+           _K_XL rep1 at **2519** — the only cells that ended their reaso
+           ning well short of the 4096 budget anywhere in the campaign; Q
+           5_K_M rep0 is also its worst rep (71). `reuse` is `—` (not gra
+           ded on this task). Both references **fail types 0.00 + lint 0.
+           00** and land at 67/62, **below every local cell** — the local
+            27B genuinely beats haiku and sonnet here.
+
+● Update(campaigns/2026-07-14-hardest-tasks-27b-vs-35b/analysis.md)
+  ⎿  Added 1 line, removed 1 line
+      285  | _sonnet_ 1-shot | – | 87 | | 0.67 | 0.80 | 1.00 | 1.00 | — |
+            0.50 | 1.00 | | |
+      286  | _opus_ 1-shot | – | 100 | | 1.00 | 1.00 | 1.00 | 1.00 | — |
+           1.00 | 1.00 | | |
+      287
+      288 -**Rep-to-rep spread (MEASURED):** **the only task where a cell
+          - is perfectly reproducible** — Q4_K_M scores **91/91/91 with a
+          -n identical objective vector** on all three reps (types 0.67,
+          -lint 0.80, tests 1.00, edge 1.00, bdd 1.00, think 4095). **INF
+          -ERRED:** at temp 0.6 the model converges on one canonical solu
+          -tion here (the judge's notes for those three reps describe the
+          - same delete-on-reject fix), which is what a well-understood s
+          -ingle-fix task looks like. **Both hard-passes in the campaign
+          -live on this task:** Q6_K rep1 (TS 100, judge 5.0·5.0·4.0) and
+          - 35B-A3B rep2 (TS 94) — 2 of 60 replies overall, both cells at
+          - 33% hard-pass here. Note the **think-token variance**: Q5_K_M
+          - rep0 stopped thinking at **648 tokens** (vs 3911/2132) and Q4
+          -_K_XL rep1 at **2519** — the only cells that ended their reaso
+          -ning well short of the 4096 budget anywhere in the campaign; Q
+          -5_K_M rep0 is also its worst rep (71). `reuse` is `—` (not gra
+          -ded on this task). Both references **fail types 0.00 + lint 0.
+          -00** and land at 67/62, **below every local cell** — the local
+          - 27B genuinely beats haiku and sonnet here.
+      288 +**Rep-to-rep spread (MEASURED):** **the only task where a cell
+          + is perfectly reproducible** — Q4_K_M scores **91/91/91 with a
+          +n identical objective vector** on all three reps (types 0.67,
+          +lint 0.80, tests 1.00, edge 1.00, bdd 1.00, think 4095). **INF
+          +ERRED:** at temp 0.6 the model converges on one canonical solu
+          +tion here (the judge's notes for those three reps describe the
+          + same delete-on-reject fix), which is what a well-understood s
+          +ingle-fix task looks like. **Both hard-passes in the campaign
+          +live on this task:** Q6_K rep1 (TS 100, judge 5.0·5.0·4.0) and
+          + 35B-A3B rep2 (TS 94) — 2 of 60 replies overall, both cells at
+          + 33% hard-pass here. Note the **think-token variance**: Q5_K_M
+          + rep0 stopped thinking at **648 tokens** (vs 3911/2132) and Q4
+          +_K_XL rep1 at **2519** — the only cells that ended their reaso
+          +ning well short of the 4096 budget anywhere in the campaign; Q
+          +5_K_M rep0 is also its worst rep (71). `reuse` is `—` (not gra
+          +ded on this task). On the re-graded ladder both references lan
+          +d at **haiku 91 / sonnet 87** with the *same* objective shape
+          +as the local cells (types 0.67, lint 0.80) — so Q4_K_M's 91 **
+          +ties haiku and edges sonnet**, rather than beating them outrig
+          +ht as the binary-graded ladder claimed. Only **opus 100** is c
+          +lean. This is the campaign's single strongest local result.
+      289
+      290  ### expr-eval · tier opus
+      291
+
+● The expr-eval reference rows (67/67/83) are unchanged by the re-grade, so
+  those tables stay. Now finding 7 in the ultrathink section, which was built
+  entirely on the binary-scale caveat:
+
+● Update(campaigns/2026-07-14-hardest-tasks-27b-vs-35b/analysis.md)
+  ⎿  Added 1 line, removed 1 line
+      325  4. **The MoE's deficit is variance, not ceiling — and it is th
+           e latency winner by a wide margin.** *Observation (MEASURED):*
+            35B-A3B best reps (async-memo 95/94 with a hard-pass, lru-cac
+           he 89, rate-limiter 87) are competitive with any 27B cell, but
+            it owns the two worst replies in 60 (expr-eval 11%, rate-limi
+           ter 48%); meanwhile it decodes at **116.1 t/s** (2.6× the best
+            dense 27B) with **ttfa 47.1s** and **full 59.8s** (3.6× faste
+           r than Q6_K). *Explanation (INFERRED):* ~3B active parameters
+           give the speed; the routing appears to make occasional catastr
+           ophic-quality draws that a dense model of the same footprint d
+           oes not (both collapses show tests ≤0.33 **and** edge 0.00 — w
+           hole-solution failures, not degradations). *Consequence:* **th
+           e MoE is the right choice for interactive/agentic loops** wher
+           e a 60s turn vs a 215s turn changes the workflow — provided th
+           e loop can tolerate or retry a bad draw. For unattended single
+           -shot generation, the dense 27B is steadier.
+      326  5. **No lost-in-the-middle at 120k — depth is not the limiter.
+           ** *Observation (MEASURED):* `reuse` = **1.00 on every rep of
+           every cell** where it applies (lru-cache, rate-limiter — 30 re
+           plies). *Explanation (INFERRED):* the planted util is retrieve
+           d from ~132.7k tokens of real context 100% of the time, by eve
+           ry quant and by the MoE; this replicates the prior campaign's
+           64k→128k reuse 1.00→1.00 result on a harder task set. *Consequ
+           ence:* **stop treating 128k depth as a quality risk on this bo
+           x** — the deep-context retrieval is solid; budget the engineer
+           ing at the lint/types wall instead.
+      327  6. **GTT spill is universal, model-independent, and still unex
+           plained — OPEN.** *Observation (MEASURED):* all five cells spi
+           lled **1685–2030 MiB** into host RAM vs a ~77 MiB idle baselin
+           e, with only a 345 MiB spread across cells whose peak VRAM spa
+           ns 3460 MiB (27764–31224). *Explanation (INFERRED):* the near-
+           constant spill across very different memory footprints points
+           at the **serving substrate at ctx 163840 + MTP** rather than p
+           er-model pressure; the prior campaign measured the same univer
+           sal spill (785–2049 MiB) across ten cells with different KV se
+           ttings, so it survives two campaigns and both KV types. **The
+           root cause is not established from our data — OPEN.** *Consequ
+           ence:* monitor GTT in production at 128k; nothing OOM'd or fro
+           ze here (fails 0, runaway 0%, peak VRAM ≤ 31224 < 32624), but
+           `xl` at 31224 MiB sits 1.4 GiB from the physical ceiling and i
+           s the least comfortable cell to deploy. **A research-skill pas
+           s on llama.cpp/Vulkan/RADV allocation at long ctx + MTP is the
+            right next step**, per the skill's rule that unexplained anom
+           alies get investigated, not papered over.
+      328 -7. **The reference ladder needs two repairs before the "beats
+          -sonnet" claim is quotable.** *Observation (MEASURED/INFERRED):
+          -* opus's 92% is a mean over only its 2 calibrated tasks (async
+          --memo 100, expr-eval 83) — README **add-on D** flags the missi
+          -ng `lru-cache`/`rate-limiter` points — so the like-for-like ga
+          -p on the opus-tier tasks is **~15 points, not 10**. And the re
+          -ference lint/types values are all exactly 0.00/1.00 while thei
+          -r tests/bdd are fractional, consistent with the README's add-o
+          -n A caveat that calibration was graded **binary**; a binary sc
+          -ale can only *understate* the references. *Consequence:* **hai
+          -ku 71 / sonnet 78 are lower bounds; "best local beats sonnet b
+          -y 4" is the weakest number in this report.** Close both gaps —
+          - re-grade `out/haiku/` with the fractional grader (add-on A) a
+          -nd collect the two missing opus points (add-on D) — before thi
+          -s ladder is cited anywhere.
+      328 +7. **The reference re-grade reversed the campaign's headline —
+          + the 27B is haiku-class here, not sonnet-class.** *Observation
+          + (MEASURED):* the references were re-graded with the fractiona
+          +l grader (`out/regrade_refs.log`, `grader: fractional-2026-07-
+          +15`) and moved sharply: haiku `async-memo` **0.667→0.912**, so
+          +nnet `async-memo` **0.625→0.870**, sonnet `lru-cache` **0.831→
+          +0.946**, haiku `rate-limiter` **0.834→0.948**, haiku `lru-cach
+          +e` **0.679→0.793**; `expr-eval` did not move (0.667/0.667/0.83
+          +3). The ladder is therefore **haiku 83 · sonnet 87 · opus 92**
+          + against best-local **82** — Δ−1 / Δ−5 / Δ−10, where the binar
+          +y-graded ladder had said Δ+11 / Δ+4 / Δ−10. *Explanation (INFE
+          +RRED):* under binary grading a **single** eslint error scored
+          +the reference 0.00 on that objective; the local cells were alr
+          +eady being graded fractionally (add-on A), so the two sides we
+          +re on different scales and every "local beats reference" claim
+          + was an artifact of that mismatch. The references are frontier
+          + models that write *nearly* clean code — exactly the case bina
+          +ry grading punishes hardest. *Consequence:* **the "27B beats s
+          +onnet" reading is dead; do not cite it.** The defensible state
+          +ment is: on the 4 hardest tasks at 120k, the best 27B cell is
+          +**tied with haiku and ~5 points below sonnet**, and the defici
+          +t is entirely `lint`/`types` (local 0.36/0.45 vs haiku 0.60/0.
+          +67, sonnet 0.65/0.67). **This is also a process lesson: never
+          +compare across grader versions** — when a grader changes, re-g
+          +rade *both* sides before reading a ladder. One gap remains ope
+          +n: **add-on D** (opus has no `lru-cache`/`rate-limiter` point,
+          + so its 92 is a 2-task mean; like-for-like on those two tasks
+          +the gap is ~15 points).
+      329
+      330  ## Recommended config
+      331
+
+● Now the methodology caveats and the external-comparison section, which still
+  assert the binary caveat:
+
+● Update(campaigns/2026-07-14-hardest-tasks-27b-vs-35b/analysis.md)
+  ⎿  Added 2 lines, removed 2 lines
+      352  - **Why ctx 163840:** the server needs `ctx > prompt + generat
+           ion`; a 131072 window fails because the prompt alone exceeds i
+           t. 163840 leaves ~19k headroom for think+answer (the prior cam
+           paign's proven window).
+      353  - **⚠ KV is NOT uniform (the campaign's known confound):** Q5_
+           K_M and Q6_K run **q8_0**; Q4_K_M, Q4_K_XL and 35B-A3B run **f
+           16**. Forced by geometry, not chosen (27B hybrid attention: 16
+            of 65 blocks carry KV → f16 64 KiB/tok, q8_0 34; f16 caps ~15
+           0k for Q5_K_M and ~104k for Q6_K, both below the ~145k needed)
+           . Any Q5/Q6 delta = **weight-quant + a small KV effect**; the
+           f16-vs-q8_0 gap measured **−2.3% TS** in the prior campaign (*
+           *≤5% rule**, CLAIMED), an order of magnitude below the observe
+           d rep spread.
+      354  - **Grader (fixed this run):** single-process vitest (`--no-fi
+           le-parallelism`), fail-loud (retry once → `grade_error` `HARNE
+           SS:` row, never a silent `tests=0`), plus a pre-grade `selftes
+           t` that aborts the run if vitest is broken. **Verified clean:
+           no grade_error/HARNESS rows, fails 0, runaway 0%, trunc 0%.**
+           The previous campaign's `tests`/`edge` = 0 was that harness bu
+           g; **these numbers are trustworthy.**
+      355 -- **Fractional lint/types (add-on A):** `1 − min(1, errors/K)`
+          -, K=5 (lint) / K=3 (types). `hard_pass` still requires a perfe
+          -ct 1.0 on every gate objective. **Caveat: the reference calibr
+          -ation was graded binary** — see finding 7.
+      356 -- **Reference gaps:** **no opus calibration on `lru-cache` or
+          -`rate-limiter`** (README add-on D) → opus's 92% is a 2-task me
+          -an. References are **one-shot, no thinking**, and not run at 1
+          -20k depth — they are a capability ladder, not a like-for-like
+          -serving comparison.
+      355 +- **Fractional lint/types (add-on A):** `1 − min(1, errors/K)`
+          +, K=5 (lint) / K=3 (types). `hard_pass` still requires a perfe
+          +ct 1.0 on every gate objective. **The reference calibration ha
+          +s been re-graded on this same fractional scale** (`out/regrade
+          +_refs.log`; `calibration*.jsonl` now carry `grader: fractional
+          +-2026-07-15`, with the pre-re-grade files preserved as `calibr
+          +ation*.binary.jsonl`), so local cells and references are **lik
+          +e-for-like** — see finding 7 for what that changed.
+      356 +- **Reference gaps:** **no opus calibration on `lru-cache` or
+          +`rate-limiter`** (README add-on D) → opus's 92% is a 2-task me
+          +an (async-memo 100, expr-eval 83); on that 2-task subset the h
+          +onest comparison is best-local ~76.5 vs opus 92, haiku 79, son
+          +net 77. References are **one-shot, no thinking**, and not run
+          +at 120k depth — they are a capability ladder, not a like-for-l
+          +ike serving comparison (the local cells get ~4k thinking token
+          +s and 120k of context the references never saw).
+      357  - **Noise:** REPS 3 per cell/task; observed per-reply spreads
+           of 26–53 points on identical inputs. Per the repo's ±3% platea
+           u rule and the spread above, **all five cells are a tie on TS
+           %**. No spread/CI column is computed by `aggregate.py` — cell
+           means should not be read as rankings.
+      358  - **Out of scope (deliberately):** the **reasoning-budget swee
+           p** {0, 2048, 8192} is a separate follow-up campaign — budget
+           is pinned at a saturated 4096 here and no budget conclusion is
+            drawn. Add-on **B** (repair arm), **C** (sampling sweep) and
+           **D** (opus ladder) are scaffolded but **unrun**.
+      359  - **Failures/runaways:** none (fails 0, runaway 0%, trunc 0%,
+           no cell OOM'd or was guard-skipped). **GTT spill in all five c
+           ells — see §HEALTH.**
+
+● Update(campaigns/2026-07-14-hardest-tasks-27b-vs-35b/analysis.md)
+  ⎿  Added 1 line, removed 1 line
+      361
+      362  ## External comparison
+      363
+      364 -None pulled for this campaign. The only non-local numbers here
+          - are the **haiku/sonnet/opus one-shot references** in `calibra
+          -tion-hard.jsonl` — these are **our own MEASURED gradings** of
+          -frontier-model answers on the same tasks and grader, not exter
+          -nal claims, and they carry the two caveats in finding 7 (binar
+          -y lint/types scale; opus missing 2 of 4 tasks).
+      364 +None pulled for this campaign. The only non-local numbers here
+          + are the **haiku/sonnet/opus one-shot references** in `calibra
+          +tion.jsonl` / `calibration-hard.jsonl` — these are **our own M
+          +EASURED gradings** of frontier-model answers on the same tasks
+          + and the same (now fractional) grader, not external claims. Th
+          +ey carry one open caveat (finding 7): **opus is missing 2 of t
+          +he 4 tasks** (add-on D).
+
+● Bash(cd
+      /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b;
+      echo "=== stale-ladder greps"; grep -n "haiku 71\|sonnet 78\|sonnet
+      62\|haiku 67\|…)
+  ⎿  === stale-ladder greps
+     18:Five model cells were run on the **4 hardest TypeScript-TDD tasks**
+      (`rate-limiter`, `lru-cache`, `async-memo`, `expr-eval`) inside **120
+     … +128 lines (ctrl+o to expand)
+
+● All reference rows now match. Let me verify the per-rep tables are
+  byte-identical to summary.md (the prompt requires them inlined verbatim) and
+  that no other number in the doc drifted:
+
+● Bash(cd
+      /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b;
+      python3 - <<'EOF'
+      import re…)
+  ⎿  per-rep table rows in summary.md: 100
+     MISSING from analysis.md: 0
+     ---- cross-check headline numbers
+     … +17 lines (ctrl+o to expand)
+
+● All 100 per-rep rows from summary.md are inlined verbatim. Now regenerate the
+  index so the corrected takeaway propagates:
+
+● Bash(cd /home/dev/work/dp-craft/amd && python3 docs/reindex.py 2>&1 | tail -5;
+      echo "=== exit:$?"; grep -n "hardest-tasks" docs/INDEX.md | head -2)
+  ⎿  reindex: INDEX.md rewritten
+     === exit:0
+     16:- 2026-07-15 06:37 · analysis · [hardest-tasks-27b-vs-35b](../campa
+     … +13 lines (ctrl+o to expand)
+
+● Now the final answer file:
+
+● Write(campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/summary_result.txt)
+  ⎿  Wrote 1 line to
+     campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/summary_result.txt
+      1 analysis.md written (5 cells) — corrected against the re-graded f
+        ractional reference ladder: best local cell 82% vs haiku 83 (Δ-1)
+         / sonnet 87 (Δ-5) / opus 92 (Δ-10); precision and capacity both
+        fail to clear the lint/types wall; ⚠ GTT spill 1685–2030 MiB in a
+        ll five cells.
+
+● analysis.md is written and out/summary_result.txt contains the one-line
+  confirmation.
+
+  The important thing I found: analysis.md already existed from an earlier pass,
+  but it was stale in a way that inverted the campaign's headline. Its
+  reference ladder said haiku 71 / sonnet 78 — so it concluded the 27B "beats
+  sonnet by 4." The current summary.md says haiku 83 / sonnet 87 / opus 92. The
+  cause is in out/regrade_refs.log: the reference answers were re-graded with
+
+────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────
+  Opus 4.8 | ctx:13% | sess:131k dev@bipubi:/home/dev/work/dp-craft/amd (27b-…
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents
+                                                                           /rc
+

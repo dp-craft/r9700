@@ -1,0 +1,184 @@
+// FILE: impl.ts
+export type Result =
+  | { readonly ok: true; readonly value: number }
+  | { readonly ok: false; readonly error: string };
+
+type Token = { readonly kind: 'number'; readonly value: number } | { readonly kind: 'op'; readonly char: string };
+
+type ParserState = { readonly tokens: readonly Token[]; idx: number };
+
+function tokenize(input: string): Result | readonly Token[] {
+  const tokens: Token[] = [];
+  let i = 0;
+  while (i < input.length) {
+    const ch = input[i];
+    if (ch === ' ') { i++; continue; }
+    if (/\d/.test(ch)) {
+      let num = '';
+      while (i < input.length && /\d/.test(input[i])) {
+        num += input[i]; i++;
+      }
+      tokens.push({ kind: 'number', value: parseInt(num, 10) });
+    } else if (['+', '-', '*', '/', '(', ')'].includes(ch)) {
+      tokens.push({ kind: 'op', char: ch }); i++;
+    } else {
+      return { ok: false, error: `Unexpected character: ${ch}` };
+    }
+  }
+  return tokens;
+}
+
+function peek(state: ParserState): Token | undefined {
+  return state.tokens[state.idx];
+}
+
+function consume(state: ParserState): Token {
+  return state.tokens[state.idx++];
+}
+
+function parseFactor(state: ParserState): Result | number {
+  const tok = peek(state);
+  if (!tok) return { ok: false, error: 'Unexpected end of expression' };
+  if (tok.kind === 'number') { consume(state); return tok.value; }
+  if (tok.char === '(') {
+    consume(state);
+    const val = parseExpr(state);
+    if (typeof val === 'object') return val;
+    const closing = peek(state);
+    if (!closing || closing.char !== ')') return { ok: false, error: 'Missing closing parenthesis' };
+    consume(state);
+    return val;
+  }
+  return { ok: false, error: `Unexpected token: ${tok.char}` };
+}
+
+function parseTerm(state: ParserState): Result | number {
+  let left = parseFactor(state);
+  if (typeof left === 'object') return left;
+  while (true) {
+    const tok = peek(state);
+    if (tok?.kind === 'op' && (tok.char === '*' || tok.char === '/')) {
+      consume(state);
+      const right = parseFactor(state);
+      if (typeof right === 'object') return right;
+      if (tok.char === '/' && right === 0) return { ok: false, error: 'Division by zero' };
+      left = tok.char === '*' ? left * right : left / right;
+    } else {
+      break;
+    }
+  }
+  return left;
+}
+
+function parseExpr(state: ParserState): Result | number {
+  let left = parseTerm(state);
+  if (typeof left === 'object') return left;
+  while (true) {
+    const tok = peek(state);
+    if (tok?.kind === 'op' && (tok.char === '+' || tok.char === '-')) {
+      consume(state);
+      const right = parseTerm(state);
+      if (typeof right === 'object') return right;
+      left = tok.char === '+' ? left + right : left - right;
+    } else {
+      break;
+    }
+  }
+  return left;
+}
+
+function parse(tokens: readonly Token[]): Result {
+  const state: ParserState = { tokens, idx: 0 };
+  const result = parseExpr(state);
+  if (typeof result === 'object') return result;
+  if (state.idx !== tokens.length) return { ok: false, error: 'Unexpected trailing tokens' };
+  return { ok: true, value: result };
+}
+
+export function evaluate(expr: string): Result {
+  const tokensOrErr = tokenize(expr);
+  if (typeof tokensOrErr === 'object' && !tokensOrErr.ok) return tokensOrErr;
+  return parse(tokensOrErr);
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it } from 'vitest';
+
+import { evaluate, type Result } from './impl';
+
+describe('evaluate', () => {
+  it('should return the correct value for a simple addition', () => {
+    const result: Result = evaluate('2 + 3');
+    expect(result).toEqual({ ok: true, value: 5 });
+  });
+
+  it('should return the correct value for a simple subtraction', () => {
+    const result: Result = evaluate('10 - 4');
+    expect(result).toEqual({ ok: true, value: 6 });
+  });
+
+  it('should return the correct value for a simple multiplication', () => {
+    const result: Result = evaluate('3 * 4');
+    expect(result).toEqual({ ok: true, value: 12 });
+  });
+
+  it('should return the correct value for a simple division', () => {
+    const result: Result = evaluate('15 / 3');
+    expect(result).toEqual({ ok: true, value: 5 });
+  });
+
+  it('should respect operator precedence when * binds tighter than +', () => {
+    const result: Result = evaluate('2 + 3 * 4');
+    expect(result).toEqual({ ok: true, value: 14 });
+  });
+
+  it('should return left-associative results for consecutive subtractions', () => {
+    const result: Result = evaluate('10 - 3 - 2');
+    expect(result).toEqual({ ok: true, value: 5 });
+  });
+
+  it('should return left-associative results for consecutive divisions', () => {
+    const result: Result = evaluate('8 / 2 / 2');
+    expect(result).toEqual({ ok: true, value: 2 });
+  });
+
+  it('should correctly evaluate nested parentheses', () => {
+    const result: Result = evaluate('(2 + 3) * (4 - 1)');
+    expect(result).toEqual({ ok: true, value: 15 });
+  });
+
+  it('should handle arbitrary whitespace around tokens', () => {
+    const result: Result = evaluate('  10  +  20  *  (  3  -  1  )  ');
+    expect(result).toEqual({ ok: true, value: 50 });
+  });
+
+  it('should return an error for unbalanced opening parentheses', () => {
+    const result: Result = evaluate('(2 + 3');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain('Missing closing parenthesis');
+  });
+
+  it('should return an error for unbalanced closing parentheses', () => {
+    const result: Result = evaluate('2 + 3)');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain('Unexpected trailing tokens');
+  });
+
+  it('should return an error for division by zero', () => {
+    const result: Result = evaluate('10 / 0');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toBe('Division by zero');
+  });
+
+  it('should return an error for unexpected characters', () => {
+    const result: Result = evaluate('5 % 2');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain('Unexpected character');
+  });
+
+  it('should return an error for an empty expression', () => {
+    const result: Result = evaluate('');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toBe('Unexpected end of expression');
+  });
+});

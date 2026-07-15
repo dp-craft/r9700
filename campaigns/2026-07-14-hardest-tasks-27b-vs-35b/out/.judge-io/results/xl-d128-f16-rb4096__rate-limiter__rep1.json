@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":3,"notes":"Clean, small, well-factored bucket/refill split, but Math.floor quantizes the refill away from the spec's fractional formula and there is no guard on non-positive tokens or clock regression."}

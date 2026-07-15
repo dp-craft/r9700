@@ -1,0 +1,75 @@
+// FILE: impl.ts
+export function createAsyncMemo<K, V>(fn: (key: K) => Promise<V>): (key: K) => Promise<V> {
+  const cache = new Map<K, V>();
+  const inflight = new Map<K, Promise<V>>();
+  return (key: K): Promise<V> => {
+    const cached = cache.get(key);
+    if (cached !== undefined) return Promise.resolve(cached);
+    const existing = inflight.get(key);
+    if (existing !== undefined) return existing;
+    const p = fn(key).then((value: V): V => {
+      cache.set(key, value);
+      inflight.delete(key);
+      return value;
+    }).catch((err: unknown): never => {
+      inflight.delete(key);
+      throw err;
+    });
+    inflight.set(key, p);
+    return p;
+  };
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it, vi } from 'vitest';
+
+import { createAsyncMemo } from './impl';
+
+describe('createAsyncMemo', () => {
+  it('should call fn once when multiple concurrent calls use the same key', async () => {
+    let callCount = 0;
+    const fn = vi.fn(async (_key: string): Promise<number> => {
+      callCount++;
+      await new Promise(resolve => setTimeout(resolve, 10));
+      return 42;
+    });
+    const memoized = createAsyncMemo(fn);
+    const [r1, r2, r3] = await Promise.all([
+      memoized('a'),
+      memoized('a'),
+      memoized('a'),
+    ]);
+    expect(r1).toBe(42);
+    expect(r2).toBe(42);
+    expect(r3).toBe(42);
+    expect(callCount).toBe(1);
+  });
+
+  it('should retry fn when a previous call for the same key rejects', async () => {
+    let attempt = 0;
+    const fn = vi.fn(async (_key: string): Promise<number> => {
+      attempt++;
+      if (attempt === 1) throw new Error('fail');
+      return 99;
+    });
+    const memoized = createAsyncMemo(fn);
+    await expect(memoized('a')).rejects.toThrow('fail');
+    const result = await memoized('a');
+    expect(result).toBe(99);
+    expect(attempt).toBe(2);
+  });
+
+  it('should reuse cached value and not call fn again when the same key resolves successfully', async () => {
+    let callCount = 0;
+    const fn = vi.fn(async (_key: string): Promise<string> => {
+      callCount++;
+      return 'cached';
+    });
+    const memoized = createAsyncMemo(fn);
+    const r1 = await memoized('x');
+    const r2 = await memoized('x');
+    expect(r1).toBe('cached');
+    expect(r2).toBe('cached');
+    expect(callCount).toBe(1);
+  });
+});

@@ -1,0 +1,157 @@
+// FILE: impl.ts
+import type { Clock } from '@/lib/clock';
+
+interface Bucket {
+  tokens: number;
+  lastRefillAt: number;
+}
+
+export interface RateLimiter {
+  readonly tryAcquire: (key: string, tokens?: number) => boolean;
+}
+
+const DEFAULT_TOKENS = 1;
+
+export function createRateLimiter(
+  capacity: number,
+  refillPerSec: number,
+  clock: Clock
+): RateLimiter {
+  const buckets = new Map<string, Bucket>();
+
+  const getBucket = (key: string): Bucket => {
+    const existing = buckets.get(key);
+    if (existing) return existing;
+    const initial: Bucket = { tokens: capacity, lastRefillAt: clock.now() };
+    buckets.set(key, initial);
+    return initial;
+  };
+
+  const refill = (bucket: Bucket): void => {
+    const now = clock.now();
+    const elapsedSec = (now - bucket.lastRefillAt) / 1000;
+    const added = Math.min(capacity - bucket.tokens, elapsedSec * refillPerSec);
+    bucket.tokens = Math.min(capacity, bucket.tokens + added);
+    bucket.lastRefillAt = now;
+  };
+
+  const acquire = (key: string, requestedTokens = DEFAULT_TOKENS): boolean => {
+    const bucket = getBucket(key);
+    refill(bucket);
+    if (bucket.tokens >= requestedTokens) {
+      bucket.tokens -= requestedTokens;
+      return true;
+    }
+    return false;
+  };
+
+  return { tryAcquire: acquire };
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it } from 'vitest';
+
+import type { Clock } from '@/lib/clock';
+import { createRateLimiter } from './impl';
+
+const buildFakeClock = (initialMs: number): Clock & { advanceByMs: (ms: number) => void } => {
+  let current = initialMs;
+  return {
+    now: () => current,
+    advanceByMs: (ms: number) => { current += ms; },
+  };
+};
+
+describe('createRateLimiter', () => {
+  const CAPACITY = 5;
+  const REFILL_PER_SEC = 2;
+
+  describe('first-burst', () => {
+    it('should allow acquiring up to capacity tokens immediately when bucket is full', () => {
+      const clock = buildFakeClock(0);
+      const limiter = createRateLimiter(CAPACITY, REFILL_PER_SEC, clock);
+
+      const acquired = Array.from({ length: CAPACITY }, () => limiter.tryAcquire('key-a'));
+
+      expect(acquired.every(v => v)).toBe(true);
+    });
+
+    it('should reject acquiring more than capacity tokens at once when requested amount exceeds capacity', () => {
+      const clock = buildFakeClock(0);
+      const limiter = createRateLimiter(CAPACITY, REFILL_PER_SEC, clock);
+
+      const result = limiter.tryAcquire('key-b', CAPACITY + 1);
+
+      expect(result).toBe(false);
+    });
+  });
+
+  describe('lazy refill over time', () => {
+    it('should refill tokens based on elapsed time when tryAcquire is called after delay', () => {
+      const clock = buildFakeClock(0);
+      const limiter = createRateLimiter(CAPACITY, REFILL_PER_SEC, clock);
+
+      limiter.tryAcquire('key-c');
+      clock.advanceByMs(1000);
+
+      const result = limiter.tryAcquire('key-c', 3);
+
+      expect(result).toBe(true);
+    });
+
+    it('should cap refilled tokens at capacity when elapsed time exceeds refill limit', () => {
+      const clock = buildFakeClock(0);
+      const limiter = createRateLimiter(CAPACITY, REFILL_PER_SEC, clock);
+
+      limiter.tryAcquire('key-d');
+      clock.advanceByMs(10_000);
+
+      const result = limiter.tryAcquire('key-d', 5);
+
+      expect(result).toBe(true);
+    });
+  });
+
+  describe('empty-bucket rejection', () => {
+    it('should return false and deduct nothing when bucket has insufficient tokens', () => {
+      const clock = buildFakeClock(0);
+      const limiter = createRateLimiter(CAPACITY, REFILL_PER_SEC, clock);
+
+      limiter.tryAcquire('key-e', CAPACITY);
+      const result = limiter.tryAcquire('key-e', 1);
+
+      expect(result).toBe(false);
+    });
+  });
+
+  describe('per-key isolation', () => {
+    it('should maintain independent buckets when different keys are used', () => {
+      const clock = buildFakeClock(0);
+      const limiter = createRateLimiter(CAPACITY, REFILL_PER_SEC, clock);
+
+      limiter.tryAcquire('key-x', CAPACITY);
+      limiter.tryAcquire('key-y', CAPACITY);
+
+      const xResult = limiter.tryAcquire('key-x', 1);
+      const yResult = limiter.tryAcquire('key-y', 1);
+
+      expect(xResult).toBe(false);
+      expect(yResult).toBe(false);
+    });
+
+    it('should allow one key to refill independently when another key remains empty', () => {
+      const clock = buildFakeClock(0);
+      const limiter = createRateLimiter(CAPACITY, REFILL_PER_SEC, clock);
+
+      limiter.tryAcquire('key-p', CAPACITY);
+      limiter.tryAcquire('key-q', CAPACITY);
+      clock.advanceByMs(500);
+
+      const pResult = limiter.tryAcquire('key-p', 1);
+      const qResult = limiter.tryAcquire('key-q', 1);
+
+      expect(pResult).toBe(true);
+      expect(qResult).toBe(true);
+    });
+  });
+});

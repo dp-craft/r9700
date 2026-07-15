@@ -1,0 +1,165 @@
+// FILE: impl.ts
+type Result =
+  | { readonly ok: true; readonly value: number }
+  | { readonly ok: false; readonly error: string };
+
+type Tok =
+  | { readonly type: 'NUM'; readonly value: number }
+  | { readonly type: 'PLUS' } | { readonly type: 'MINUS' }
+  | { readonly type: 'MULT' } | { readonly type: 'DIV' }
+  | { readonly type: 'LPAREN' } | { readonly type: 'RPAREN' }
+  | { readonly type: 'EOF' };
+
+function tokenize(s: string): Tok[] {
+  const t: Tok[] = [];
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (c <= ' ') continue;
+    if (c >= '0' && c <= '9') {
+      let n = '';
+      while (i < s.length && s[i] >= '0' && s[i] <= '9') n += s[i++];
+      t.push({ type: 'NUM', value: parseInt(n, 10) });
+      continue;
+    }
+    const m: Record<string, Tok> = {
+      '+': { type: 'PLUS' }, '-': { type: 'MINUS' }, '*': { type: 'MULT' },
+      '/': { type: 'DIV' }, '(': { type: 'LPAREN' }, ')': { type: 'RPAREN' }
+    };
+    if (!m[c]) throw new Error(`Unexpected: ${c}`);
+    t.push(m[c]);
+  }
+  return [...t, { type: 'EOF' }];
+}
+
+interface P { readonly t: readonly Tok[]; p: number }
+
+function factor(p: P): number {
+  const tk = p.t[p.p];
+  if (tk.type === 'NUM') { p.p++; return tk.value; }
+  if (tk.type === 'LPAREN') {
+    p.p++;
+    const v = expr(p);
+    if (p.t[p.p].type !== 'RPAREN') throw new Error('Missing )');
+    p.p++;
+    return v;
+  }
+  if (tk.type === 'MINUS') { p.p++; return -factor(p); }
+  throw new Error('Unexpected token');
+}
+
+function term(p: P): number {
+  let l = factor(p);
+  while (p.t[p.p].type === 'MULT' || p.t[p.p].type === 'DIV') {
+    const op = p.t[p.p].type; p.p++;
+    const r = factor(p);
+    if (op === 'MULT') l *= r;
+    else { if (r === 0) throw new Error('Division by zero'); l /= r; }
+  }
+  return l;
+}
+
+function expr(p: P): number {
+  let l = term(p);
+  while (p.t[p.p].type === 'PLUS' || p.t[p.p].type === 'MINUS') {
+    const op = p.t[p.p].type; p.p++;
+    l = op === 'PLUS' ? l + term(p) : l - term(p);
+  }
+  return l;
+}
+
+export function evaluate(input: string): Result {
+  try {
+    const tokens = tokenize(input);
+    if (tokens.length === 1) return { ok: false, error: 'Empty expression' };
+    const p: P = { t: tokens, p: 0 };
+    const val = expr(p);
+    if (p.p < p.t.length && p.t[p.p].type !== 'EOF') throw new Error('Trailing token');
+    return { ok: true, value: val };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it } from 'vitest';
+import { evaluate } from './impl';
+
+describe('evaluate', () => {
+  it('should return value for simple addition', () => {
+    const r = evaluate('2 + 3');
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value).toBe(5);
+  });
+
+  it('should respect precedence: * tighter than +', () => {
+    const r = evaluate('2 + 3 * 4');
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value).toBe(14);
+  });
+
+  it('should be left-associative for subtraction', () => {
+    const r = evaluate('10 - 3 - 2');
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value).toBe(5);
+  });
+
+  it('should be left-associative for division', () => {
+    const r = evaluate('8 / 2 / 2');
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value).toBe(2);
+  });
+
+  it('should handle parentheses correctly', () => {
+    const r = evaluate('(2 + 3) * 4');
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value).toBe(20);
+  });
+
+  it('should handle nested parentheses', () => {
+    const r = evaluate('((1 + 2) * 3)');
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value).toBe(9);
+  });
+
+  it('should handle arbitrary whitespace', () => {
+    const r = evaluate('  2   +   3  ');
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value).toBe(5);
+  });
+
+  it('should return error on division by zero', () => {
+    const r = evaluate('10 / 0');
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain('Division by zero');
+  });
+
+  it('should return error on unbalanced parentheses', () => {
+    const r = evaluate('(2 + 3');
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain('Missing');
+  });
+
+  it('should return error on unexpected character', () => {
+    const r = evaluate('2 + a');
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain('Unexpected');
+  });
+
+  it('should return error on missing operand', () => {
+    const r = evaluate('2 +');
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain('Unexpected');
+  });
+
+  it('should return error on trailing token', () => {
+    const r = evaluate('2 + 3 4');
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain('Trailing');
+  });
+
+  it('should return error on empty expression', () => {
+    const r = evaluate('');
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain('Empty');
+  });
+});

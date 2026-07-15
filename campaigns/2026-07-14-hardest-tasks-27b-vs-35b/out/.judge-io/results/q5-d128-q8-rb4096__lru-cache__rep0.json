@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Idiomatic use of Map insertion order for recency with well-factored helpers and lazy pruning only at capacity; prunes expired on get and handles the capacity-1 and expired-blocking-eviction edges."}

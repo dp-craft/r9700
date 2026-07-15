@@ -1,0 +1,53 @@
+// FILE: impl.ts
+export function createAsyncMemo<K, V>(fn: (key: K) => Promise<V>): (key: K) => Promise<V> {
+  const cache = new Map<K, Promise<V>>();
+  return (key: K): Promise<V> => {
+    const existing = cache.get(key);
+    if (existing !== undefined) return existing;
+    const p = fn(key);
+    const safe = p.catch((err: unknown): never => {
+      cache.delete(key);
+      throw err;
+    });
+    cache.set(key, safe);
+    return safe;
+  };
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it, vi } from 'vitest';
+import { createAsyncMemo } from './impl';
+
+describe('createAsyncMemo', () => {
+  it('should dedup concurrent calls when the same key is requested simultaneously', async () => {
+    const fn = vi.fn<(key: string) => Promise<string>>();
+    let resolveFn: ((val: string) => void) | null = null;
+    fn.mockImplementation((_key: string) => new Promise(resolve => { resolveFn = resolve; }));
+    const memoized = createAsyncMemo(fn);
+    const p1 = memoized('a');
+    const p2 = memoized('a');
+    expect(fn).toHaveBeenCalledTimes(1);
+    expect(p1).toBe(p2);
+    resolveFn?.('success');
+    await expect(p1).resolves.toBe('success');
+    await expect(p2).resolves.toBe('success');
+  });
+
+  it('should retry the function when a previous call rejects', async () => {
+    const fn = vi.fn<(key: string) => Promise<string>>();
+    fn.mockRejectedValueOnce(new Error('fail'));
+    fn.mockResolvedValueOnce('ok');
+    const memoized = createAsyncMemo(fn);
+    await expect(memoized('b')).rejects.toThrow('fail');
+    await expect(memoized('b')).resolves.toBe('ok');
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+
+  it('should cache the result when the function resolves successfully', async () => {
+    const fn = vi.fn<(key: string) => Promise<string>>().mockResolvedValue('cached');
+    const memoized = createAsyncMemo(fn);
+    await expect(memoized('c')).resolves.toBe('cached');
+    await expect(memoized('c')).resolves.toBe('cached');
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+});

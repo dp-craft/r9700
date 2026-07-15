@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":3,"notes":"Clean separation of settled cache from in-flight map with correct rejection cleanup, but the `cached !== undefined` lookup instead of `cache.has(key)` silently defeats caching for keys whose value is `undefined`."}

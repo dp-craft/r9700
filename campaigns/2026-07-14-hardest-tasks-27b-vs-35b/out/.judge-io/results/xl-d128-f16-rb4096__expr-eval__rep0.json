@@ -1,0 +1,1 @@
+{"design":3,"clarity":2,"robustness":4,"notes":"Conventional throw-internally/catch-at-boundary parser with good edge coverage including unary minus and trailing tokens, but single-letter names throughout and a Record literal rebuilt on every character make it needlessly hard to read."}

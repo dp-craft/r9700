@@ -1,0 +1,1 @@
+{"design":3,"clarity":4,"robustness":3,"notes":"Pruning up front makes has/size pleasingly trivial, but it repeats the same prune call in all four methods, mutates state from the size getter, and pays an O(n) sweep on every get."}

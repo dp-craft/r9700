@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":3,"notes":"Clean minimal token bucket with an extracted refill helper and a named default; persists refill state on rejection, but no guard against a backwards-moving clock draining tokens."}

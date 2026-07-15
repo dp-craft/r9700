@@ -1,0 +1,1 @@
+analysis.md written (5 cells) — corrected against the re-graded fractional reference ladder: best local cell 82% vs haiku 83 (Δ-1) / sonnet 87 (Δ-5) / opus 92 (Δ-10); precision and capacity both fail to clear the lint/types wall; ⚠ GTT spill 1685–2030 MiB in all five cells.

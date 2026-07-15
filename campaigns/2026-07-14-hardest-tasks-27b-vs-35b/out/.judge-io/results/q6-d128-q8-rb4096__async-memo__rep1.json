@@ -1,0 +1,1 @@
+{"design":5,"clarity":5,"robustness":4,"notes":"Minimal idiomatic fix — one promise map plus a detached catch that evicts on rejection — with tight deterministic tests; only a narrow microtask window between rejection and eviction goes unhandled."}

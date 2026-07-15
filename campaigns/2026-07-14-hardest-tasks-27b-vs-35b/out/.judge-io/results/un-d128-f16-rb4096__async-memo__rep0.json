@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Caching the derived catch-and-rethrow promise is the right shape and keeps every caller's rejection observable; a synchronous throw from fn would still escape unwrapped."}

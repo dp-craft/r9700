@@ -1,0 +1,1 @@
+{"design":3,"clarity":3,"robustness":3,"notes":"refillBucket leaks its responsibility by updating lastRefillAt but returning the token count for the caller to write back on both branches, including a redundant no-op assignment on rejection."}

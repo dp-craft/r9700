@@ -1,0 +1,1 @@
+{"design":2,"clarity":3,"robustness":2,"notes":"Carries a never-read lastAccessedAt field and makes three redundant O(n) passes per set (cleanExpired then countLive then evictOldestLive's dead expiry check), and set has no existing-key path so updating a recently-read key evicts an unrelated live entry."}

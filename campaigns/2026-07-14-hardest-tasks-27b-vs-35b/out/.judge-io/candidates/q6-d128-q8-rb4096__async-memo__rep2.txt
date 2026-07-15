@@ -1,0 +1,98 @@
+// FILE: impl.ts
+export function createAsyncMemo<K, V>(fn: (key: K) => Promise<V>): (key: K) => Promise<V> {
+  const cache = new Map<K, Promise<V>>();
+
+  return (key: K): Promise<V> => {
+    const existing = cache.get(key);
+    if (existing !== undefined) {
+      return existing;
+    }
+
+    const p = fn(key);
+    p.then((_value: V): void => {
+      cache.set(key, p);
+    }).catch((_error: unknown): void => {
+      cache.delete(key);
+    });
+
+    cache.set(key, p);
+    return p;
+  };
+}
+
+// FILE: impl.test.ts
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { createAsyncMemo } from './impl';
+
+describe('createAsyncMemo', () => {
+  let fn: ReturnType<typeof vi.fn>;
+  let memo: (key: string) => Promise<string>;
+
+  beforeEach(() => {
+    fn = vi.fn(async (key: string): Promise<string> => `result-${key}`);
+    memo = createAsyncMemo(fn);
+  });
+
+  describe('concurrent dedup', () => {
+    it('should run fn once when concurrent calls share the same key', async () => {
+      const p1 = memo('a');
+      const p2 = memo('a');
+      const p3 = memo('a');
+
+      await Promise.all([p1, p2, p3]);
+
+      expect(fn).toHaveBeenCalledTimes(1);
+    });
+
+    it('should return the identical promise when concurrent calls are made for the same key', async () => {
+      const p1 = memo('a');
+      const p2 = memo('a');
+
+      expect(p1).toBe(p2);
+    });
+  });
+
+  describe('retry-after-rejection', () => {
+    it('should retry fn when a previous call rejects', async () => {
+      fn.mockRejectedValueOnce(new Error('fail'));
+      await expect(memo('a')).rejects.toThrow('fail');
+
+      fn.mockResolvedValueOnce('recovered');
+      const result = await memo('a');
+
+      expect(fn).toHaveBeenCalledTimes(2);
+      expect(result).toBe('recovered');
+    });
+
+    it('should not cache the rejected promise when fn rejects', async () => {
+      fn.mockRejectedValueOnce(new Error('fail'));
+      await memo('a').catch(() => undefined);
+
+      fn.mockResolvedValueOnce('success');
+      const result = await memo('a');
+
+      expect(result).toBe('success');
+    });
+  });
+
+  describe('cache-hit-after-success', () => {
+    it('should reuse cached value when the key has already resolved', async () => {
+      await memo('a');
+      await memo('a');
+      await memo('a');
+
+      expect(fn).toHaveBeenCalledTimes(1);
+    });
+
+    it('should return the cached value without calling fn again when the key is cached', async () => {
+      const result1 = await memo('b');
+      fn.mockClear();
+
+      const result2 = await memo('b');
+
+      expect(fn).not.toHaveBeenCalled();
+      expect(result2).toBe(result1);
+    });
+  });
+});

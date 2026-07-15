@@ -1,0 +1,1 @@
+{"design":3,"clarity":3,"robustness":3,"notes":"Correct but muddled style: pointless `as const` on numeric constants, a five-positional-parameter refill helper, and it both mutates the bucket in place and redundantly re-sets it into the Map on every call."}

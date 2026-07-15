@@ -1,0 +1,164 @@
+{
+ "cells": {
+  "un-d128-f16-rb4096": {
+   "model": "Qwen3.6-27B-MTP-Q4_K_M",
+   "depth": "120k",
+   "kv": "f16",
+   "budget": 4096,
+   "n": 12,
+   "n_fail": 0,
+   "ts_pct": 78.20833333333333,
+   "hard_pct": 0,
+   "objectives": {
+    "types": 0.47250000000000003,
+    "lint": 0.35000000000000003,
+    "tests": 0.9600694444444444,
+    "reuse": 1.0,
+    "edge": 1.0
+   },
+   "judge": 3.5277777777777777,
+   "judge_axes": {
+    "design": 3.5833333333333335,
+    "clarity": 3.6666666666666665,
+    "robustness": 3.3333333333333335
+   },
+   "think_tok": 4095,
+   "ttfa_s": 126.59008333333334,
+   "ttlt_s": 152.84925,
+   "decode_tps": 44.28664943974642,
+   "runaway_pct": 0,
+   "peak_vram": 30322,
+   "peak_gtt": 2030,
+   "avg_power_w": 209.9
+  },
+  "xl-d128-f16-rb4096": {
+   "model": "unsloth/Qwen3.6-27B-UD-Q4_K_XL",
+   "depth": "120k",
+   "kv": "f16",
+   "budget": 4096,
+   "n": 12,
+   "n_fail": 0,
+   "ts_pct": 67.29166666666667,
+   "hard_pct": 0,
+   "objectives": {
+    "types": 0.305,
+    "lint": 0.2833333333333333,
+    "tests": 0.8647970085470086,
+    "reuse": 1.0,
+    "edge": 0.7683333333333333
+   },
+   "judge": 3.1666666666666665,
+   "judge_axes": {
+    "design": 3.25,
+    "clarity": 3.5,
+    "robustness": 2.75
+   },
+   "think_tok": 3963.3333333333335,
+   "ttfa_s": 124.63641666666666,
+   "ttlt_s": 151.65175,
+   "decode_tps": 43.89855301184224,
+   "runaway_pct": 0,
+   "peak_vram": 31224,
+   "peak_gtt": 1957,
+   "avg_power_w": 209.4
+  },
+  "q5-d128-q8-rb4096": {
+   "model": "unsloth/Qwen3.6-27B-Q5_K_M",
+   "depth": "120k",
+   "kv": "q8_0",
+   "budget": 4096,
+   "n": 12,
+   "n_fail": 0,
+   "ts_pct": 75.75833333333333,
+   "hard_pct": 0,
+   "objectives": {
+    "types": 0.30583333333333335,
+    "lint": 0.3333333333333333,
+    "tests": 0.9621693121693121,
+    "reuse": 1.0,
+    "edge": 1.0
+   },
+   "judge": 3.3333333333333335,
+   "judge_axes": {
+    "design": 3.4166666666666665,
+    "clarity": 3.4166666666666665,
+    "robustness": 3.1666666666666665
+   },
+   "think_tok": 3628.8333333333335,
+   "ttfa_s": 155.85883333333334,
+   "ttlt_s": 187.21233333333333,
+   "decode_tps": 33.60294246653859,
+   "runaway_pct": 0,
+   "peak_vram": 28139,
+   "peak_gtt": 1957,
+   "avg_power_w": 208.9
+  },
+  "q6-d128-q8-rb4096": {
+   "model": "unsloth/Qwen3.6-27B-Q6_K",
+   "depth": "120k",
+   "kv": "q8_0",
+   "budget": 4096,
+   "n": 12,
+   "n_fail": 0,
+   "ts_pct": 81.95,
+   "hard_pct": 8.333333333333332,
+   "objectives": {
+    "types": 0.5575,
+    "lint": 0.48333333333333334,
+    "tests": 0.9236652236652236,
+    "reuse": 1.0,
+    "edge": 1.0
+   },
+   "judge": 3.305555555555556,
+   "judge_axes": {
+    "design": 3.25,
+    "clarity": 3.6666666666666665,
+    "robustness": 3.0
+   },
+   "think_tok": 4046.6666666666665,
+   "ttfa_s": 178.21125,
+   "ttlt_s": 215.06516666666667,
+   "decode_tps": 31.475715278710197,
+   "runaway_pct": 0,
+   "peak_vram": 30888,
+   "peak_gtt": 1957,
+   "avg_power_w": 209.6
+  },
+  "a3b-d128-f16-rb4096": {
+   "model": "Qwen3.6-35B-A3B-UD-Q4_K_M",
+   "depth": "120k",
+   "kv": "f16",
+   "budget": 4096,
+   "n": 12,
+   "n_fail": 0,
+   "ts_pct": 70.81666666666666,
+   "hard_pct": 8.333333333333332,
+   "objectives": {
+    "types": 0.5841666666666667,
+    "lint": 0.3333333333333333,
+    "tests": 0.794679135285119,
+    "reuse": 1.0,
+    "edge": 0.8333333333333334
+   },
+   "judge": 3.0833333333333335,
+   "judge_axes": {
+    "design": 3.1666666666666665,
+    "clarity": 3.3333333333333335,
+    "robustness": 2.75
+   },
+   "think_tok": 4055.4166666666665,
+   "ttfa_s": 47.14875,
+   "ttlt_s": 59.77775,
+   "decode_tps": 116.10414250251574,
+   "runaway_pct": 0,
+   "peak_vram": 27764,
+   "peak_gtt": 1685,
+   "avg_power_w": 207.5
+  }
+ },
+ "bands": {
+  "haiku": 83.0,
+  "sonnet": 86.625,
+  "opus": 91.64999999999999
+ }
+}

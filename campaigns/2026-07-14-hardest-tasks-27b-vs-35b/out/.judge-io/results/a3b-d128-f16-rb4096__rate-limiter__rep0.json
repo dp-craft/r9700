@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":3,"notes":"Compact and correctly shaped lazy refill, though refillBucket reads clock.now() twice for one logical instant and several tests named \"deduct nothing\" never assert that no deduction occurred."}

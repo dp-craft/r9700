@@ -1,0 +1,1473 @@
+{
+ "scores_file": "scores_typescript.jsonl",
+ "by_task": {
+  "lru-cache": {
+   "tier": "sonnet",
+   "refs": {
+    "haiku": 79.3,
+    "sonnet": 94.6
+   },
+   "cells": {
+    "un-d128-f16-rb4096": {
+     "model": "Qwen3.6-27B-MTP-Q4_K_M",
+     "depth": "120k",
+     "kv": "f16",
+     "budget": 4096,
+     "mtp": 1,
+     "n": 3,
+     "ts_pct": 85.1,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.6666666666666666,
+      "lint": 0.4666666666666667,
+      "tests": 1.0,
+      "edge": 1.0,
+      "reuse": 1.0,
+      "bdd": 0.65,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 3.3333333333333335,
+      "clarity": 3.6666666666666665,
+      "robustness": 3.3333333333333335
+     },
+     "judge_mean": 3.4444444444444446,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 3.0,
+       "clarity": 3.0,
+       "robustness": 3.0,
+       "note": "Carries a lastAccessedAt field that is written but never read, and rescans the whole map twice per set (countLive plus evictOldest's evictExpired).",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.2,
+        "bdd": 0.4
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Precomputed expiresAt keeps expiry checks trivial, the size getter stays side-effect free, and set-on-existing-key correctly refreshes both TTL and recency.",
+       "fails": {
+        "lint": 0.4,
+        "bdd": 0.75
+       }
+      },
+      {
+       "rep": 2,
+       "design": 3.0,
+       "clarity": 4.0,
+       "robustness": 3.0,
+       "note": "Pruning up front makes has/size pleasingly trivial, but it repeats the same prune call in all four methods, mutates state from the size getter, and pays an O(n) sweep on every get.",
+       "fails": {
+        "lint": 0.8,
+        "bdd": 0.8
+       }
+      }
+     ],
+     "think_tok": 4095,
+     "answer_tok": 1799.6666666666667,
+     "out_tok": 5894.666666666667,
+     "total_tok": 138690.66666666666,
+     "decode_tps": 44.44521010343029,
+     "gen_s": 132.617127,
+     "ttft_warm_s": 7.201,
+     "cap_hit_pct": 0
+    },
+    "xl-d128-f16-rb4096": {
+     "model": "unsloth/Qwen3.6-27B-UD-Q4_K_XL",
+     "depth": "120k",
+     "kv": "f16",
+     "budget": 4096,
+     "mtp": 1,
+     "n": 3,
+     "ts_pct": 63.366666666666674,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.3333333333333333,
+      "lint": 0.19999999999999998,
+      "tests": 0.9388888888888889,
+      "edge": 0.5,
+      "reuse": 1.0,
+      "bdd": 0.49333333333333335,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 3.0,
+      "clarity": 3.6666666666666665,
+      "robustness": 3.0
+     },
+     "judge_mean": 3.2222222222222223,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 3.0,
+       "clarity": 4.0,
+       "robustness": 3.0,
+       "note": "Shared getLiveEntry keeps get/has DRY, but every read sweeps the whole map via evictExpired and eviction is an O(n) scan, ignoring the O(1) recency ordering a Map already provides.",
+       "fails": {
+        "lint": 0.6,
+        "tests": 0.9,
+        "bdd": 0.4,
+        "edge": 0.5
+       }
+      },
+      {
+       "rep": 1,
+       "design": 3.0,
+       "clarity": 3.0,
+       "robustness": 3.0,
+       "note": "Correct lazy-expiry semantics and eviction that skips expired entries, but set() makes three full O(n) passes (removeExpired, countLiveEntries, evictLruEntry) where the last two are dead weight after the first, and get/has duplicate the expiry-check-and-delete logic.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "bdd": 0.5,
+        "edge": 0.5
+       }
+      },
+      {
+       "rep": 2,
+       "design": 3.0,
+       "clarity": 4.0,
+       "robustness": 3.0,
+       "note": "Tidy closure-scoped helpers and well-organized tests, but `now` is never snapshotted per operation (isExpired re-reads the clock per entry during O(n) scans) and get() reallocates the entry object just to touch lastAccessed.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "tests": 0.9166666666666666,
+        "bdd": 0.58,
+        "edge": 0.5
+       }
+      }
+     ],
+     "think_tok": 4094.3333333333335,
+     "answer_tok": 1810.3333333333333,
+     "out_tok": 5904.666666666667,
+     "total_tok": 138700.66666666666,
+     "decode_tps": 44.020862183349344,
+     "gen_s": 134.170336,
+     "ttft_warm_s": 7.201,
+     "cap_hit_pct": 0
+    },
+    "q5-d128-q8-rb4096": {
+     "model": "unsloth/Qwen3.6-27B-Q5_K_M",
+     "depth": "120k",
+     "kv": "q8_0",
+     "budget": 4096,
+     "mtp": 1,
+     "n": 3,
+     "ts_pct": 83.73333333333333,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.5566666666666666,
+      "lint": 0.5333333333333333,
+      "tests": 0.9153439153439153,
+      "edge": 1.0,
+      "reuse": 1.0,
+      "bdd": 0.7966666666666666,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 2.6666666666666665,
+      "clarity": 3.3333333333333335,
+      "robustness": 3.0
+     },
+     "judge_mean": 3.0,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Idiomatic use of Map insertion order for recency with well-factored helpers and lazy pruning only at capacity; prunes expired on get and handles the capacity-1 and expired-blocking-eviction edges.",
+       "fails": {
+        "lint": 0.6,
+        "tests": 0.8571428571428571
+       }
+      },
+      {
+       "rep": 1,
+       "design": 2.0,
+       "clarity": 3.0,
+       "robustness": 2.0,
+       "note": "Carries a never-read lastAccessedAt field and makes three redundant O(n) passes per set (cleanExpired then countLive then evictOldestLive's dead expiry check), and set has no existing-key path so updating a recently-read key evicts an unrelated live entry.",
+       "fails": {
+        "types": 0.67,
+        "lint": 0.6,
+        "bdd": 0.5
+       }
+      },
+      {
+       "rep": 2,
+       "design": 2.0,
+       "clarity": 3.0,
+       "robustness": 3.0,
+       "note": "Maintains a parallel order array duplicating the Map's own insertion order, adding an O(n) indexOf/splice invariant to keep in sync for no benefit, and threads clock+ttlMs through every helper signature.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.4,
+        "tests": 0.8888888888888888,
+        "bdd": 0.89
+       }
+      }
+     ],
+     "think_tok": 4095,
+     "answer_tok": 1484.3333333333333,
+     "out_tok": 5579.333333333333,
+     "total_tok": 138375.33333333334,
+     "decode_tps": 33.42312577174712,
+     "gen_s": 166.93434833333333,
+     "ttft_warm_s": 10.81,
+     "cap_hit_pct": 0
+    },
+    "q6-d128-q8-rb4096": {
+     "model": "unsloth/Qwen3.6-27B-Q6_K",
+     "depth": "120k",
+     "kv": "q8_0",
+     "budget": 4096,
+     "mtp": 1,
+     "n": 3,
+     "ts_pct": 84.06666666666666,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.67,
+      "lint": 0.6,
+      "tests": 0.8232323232323232,
+      "edge": 1.0,
+      "reuse": 1.0,
+      "bdd": 0.7566666666666667,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 2.6666666666666665,
+      "clarity": 3.6666666666666665,
+      "robustness": 2.3333333333333335
+     },
+     "judge_mean": 2.888888888888889,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 3.0,
+       "clarity": 4.0,
+       "robustness": 2.0,
+       "note": "Clean readable structure and a thorough suite, but get() rewrites expiresAt so reads extend the TTL beyond the spec's insertion-time rule, and eviction never prefers expired entries.",
+       "fails": {
+        "types": 0.67,
+        "lint": 0.6
+       }
+      },
+      {
+       "rep": 1,
+       "design": 3.0,
+       "clarity": 4.0,
+       "robustness": 3.0,
+       "note": "Good helper decomposition and correct insertion-time TTL, but accessedAt is stored and never read (Map order already carries recency), has() refreshes recency beyond the spec, and eviction can drop a live entry while expired ones linger.",
+       "fails": {
+        "types": 0.67,
+        "lint": 0.8,
+        "tests": 0.8333333333333334
+       }
+      },
+      {
+       "rep": 2,
+       "design": 2.0,
+       "clarity": 3.0,
+       "robustness": 2.0,
+       "note": "Eviction correctly purges expired entries first, but the liveCountRef counter backing size is never decremented when entries expire passively, so size goes stale \u2014 an incremental cache that buys nothing over counting on demand.",
+       "fails": {
+        "types": 0.67,
+        "lint": 0.4,
+        "tests": 0.6363636363636364,
+        "bdd": 0.27
+       }
+      }
+     ],
+     "think_tok": 4095,
+     "answer_tok": 1567,
+     "out_tok": 5662,
+     "total_tok": 138458,
+     "decode_tps": 30.74325874844622,
+     "gen_s": 184.201623,
+     "ttft_warm_s": 11.013,
+     "cap_hit_pct": 0
+    },
+    "a3b-d128-f16-rb4096": {
+     "model": "Qwen3.6-35B-A3B-UD-Q4_K_M",
+     "depth": "120k",
+     "kv": "f16",
+     "budget": 4096,
+     "mtp": 1,
+     "n": 3,
+     "ts_pct": 81.80000000000001,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 1.0,
+      "lint": 0.19999999999999998,
+      "tests": 0.8950486295313882,
+      "edge": 1.0,
+      "reuse": 1.0,
+      "bdd": 0.3666666666666667,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 3.0,
+      "clarity": 3.0,
+      "robustness": 2.6666666666666665
+     },
+     "judge_mean": 2.888888888888889,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Clean use of Map insertion order for recency with well-factored helpers, though size/eviction are O(n) and re-read clock.now() per entry, and refreshRecency redundantly re-fetches the entry get() already holds.",
+       "fails": {
+        "lint": 0.6,
+        "tests": 0.9230769230769231,
+        "bdd": 0.46
+       }
+      },
+      {
+       "rep": 1,
+       "design": 2.0,
+       "clarity": 1.0,
+       "robustness": 2.0,
+       "note": "Coerces the generic key via String(key), silently collapsing distinct object/number keys and defeating the K type parameter, and the test file repeats its entire suite verbatim twice.",
+       "fails": {
+        "lint": 0.0,
+        "tests": 0.8620689655172413,
+        "bdd": 0.14
+       }
+      },
+      {
+       "rep": 2,
+       "design": 3.0,
+       "clarity": 4.0,
+       "robustness": 2.0,
+       "note": "Readable and uniform, but set() runs the capacity check before distinguishing overwrite from insert so an update at full capacity evicts an unrelated live entry, and removeExpired() sweeps the whole map on every operation.",
+       "fails": {
+        "lint": 0.0,
+        "tests": 0.9,
+        "bdd": 0.5
+       }
+      }
+     ],
+     "think_tok": 4095,
+     "answer_tok": 2562.6666666666665,
+     "out_tok": 6657.666666666666,
+     "total_tok": 139453.66666666666,
+     "decode_tps": 118.58723759084577,
+     "gen_s": 56.26157966666667,
+     "ttft_warm_s": 2.883,
+     "cap_hit_pct": 0
+    }
+   }
+  },
+  "rate-limiter": {
+   "tier": "sonnet",
+   "refs": {
+    "haiku": 94.8,
+    "sonnet": 98.2
+   },
+   "cells": {
+    "un-d128-f16-rb4096": {
+     "model": "Qwen3.6-27B-MTP-Q4_K_M",
+     "depth": "120k",
+     "kv": "f16",
+     "budget": 4096,
+     "mtp": 1,
+     "n": 3,
+     "ts_pct": 78.86666666666666,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.5533333333333333,
+      "lint": 0.13333333333333333,
+      "tests": 0.888888888888889,
+      "edge": 1.0,
+      "reuse": 1.0,
+      "bdd": 1.0,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 3.6666666666666665,
+      "clarity": 3.3333333333333335,
+      "robustness": 3.0
+     },
+     "judge_mean": 3.3333333333333335,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 3.0,
+       "clarity": 3.0,
+       "robustness": 3.0,
+       "note": "refillBucket leaks its responsibility by updating lastRefillAt but returning the token count for the caller to write back on both branches, including a redundant no-op assignment on rejection.",
+       "fails": {
+        "lint": 0.4,
+        "tests": 0.8333333333333334
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 3.0,
+       "note": "Refill is fully encapsulated and the capacity-minus-tokens clamp is neat, though nothing guards against zero/negative/non-finite token requests.",
+       "fails": {
+        "types": 0.33,
+        "lint": 0.0,
+        "tests": 0.8333333333333334
+       }
+      },
+      {
+       "rep": 2,
+       "design": 4.0,
+       "clarity": 3.0,
+       "robustness": 3.0,
+       "note": "Sound lazy-refill core, but naming a DEFAULT_TOKENS constant while leaving the 1000 ms divisor inline is inconsistent and bucket init is inlined into tryAcquire.",
+       "fails": {
+        "types": 0.33,
+        "lint": 0.0
+       }
+      }
+     ],
+     "think_tok": 4095,
+     "answer_tok": 1152.3333333333333,
+     "out_tok": 5247.333333333333,
+     "total_tok": 137994.33333333334,
+     "decode_tps": 44.7286125561517,
+     "gen_s": 117.31888466666668,
+     "ttft_warm_s": 6.929,
+     "cap_hit_pct": 0
+    },
+    "xl-d128-f16-rb4096": {
+     "model": "unsloth/Qwen3.6-27B-UD-Q4_K_XL",
+     "depth": "120k",
+     "kv": "f16",
+     "budget": 4096,
+     "mtp": 1,
+     "n": 3,
+     "ts_pct": 75.83333333333333,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.33,
+      "lint": 0.0,
+      "tests": 1.0,
+      "edge": 1.0,
+      "reuse": 1.0,
+      "bdd": 0.96,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 3.6666666666666665,
+      "clarity": 4.0,
+      "robustness": 2.3333333333333335
+     },
+     "judge_mean": 3.333333333333333,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 3.0,
+       "clarity": 4.0,
+       "robustness": 1.0,
+       "note": "Readable structure, but the `if (added > 0)` guard leaves lastRefillAt stale whenever the bucket is full, so a bucket idle for 10s then drained refills to capacity on the very next call, and non-positive/NaN token requests are unvalidated.",
+       "fails": {
+        "types": 0.33,
+        "lint": 0.0,
+        "bdd": 0.88
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 3.0,
+       "note": "Clean, small, well-factored bucket/refill split, but Math.floor quantizes the refill away from the spec's fractional formula and there is no guard on non-positive tokens or clock regression.",
+       "fails": {
+        "types": 0.33,
+        "lint": 0.0
+       }
+      },
+      {
+       "rep": 2,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 3.0,
+       "note": "Well-separated getBucket/refill/acquire with a readonly interface and correct fractional refill, though it validates no constructor arguments and ignores backwards clock movement.",
+       "fails": {
+        "types": 0.33,
+        "lint": 0.0
+       }
+      }
+     ],
+     "think_tok": 4095,
+     "answer_tok": 1184.3333333333333,
+     "out_tok": 5279.333333333333,
+     "total_tok": 138026.33333333334,
+     "decode_tps": 43.93749053098376,
+     "gen_s": 120.159773,
+     "ttft_warm_s": 6.939,
+     "cap_hit_pct": 0
+    },
+    "q5-d128-q8-rb4096": {
+     "model": "unsloth/Qwen3.6-27B-Q5_K_M",
+     "depth": "120k",
+     "kv": "q8_0",
+     "budget": 4096,
+     "mtp": 1,
+     "n": 3,
+     "ts_pct": 77.60000000000001,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.3333333333333333,
+      "lint": 0.19999999999999998,
+      "tests": 0.9333333333333333,
+      "edge": 1.0,
+      "reuse": 1.0,
+      "bdd": 1.0,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 3.6666666666666665,
+      "clarity": 3.6666666666666665,
+      "robustness": 3.3333333333333335
+     },
+     "judge_mean": 3.5555555555555554,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 3.0,
+       "note": "Clean minimal token bucket with an extracted refill helper and a named default; persists refill state on rejection, but no guard against a backwards-moving clock draining tokens.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "tests": 0.8
+       }
+      },
+      {
+       "rep": 1,
+       "design": 3.0,
+       "clarity": 3.0,
+       "robustness": 3.0,
+       "note": "Correct but muddled style: pointless `as const` on numeric constants, a five-positional-parameter refill helper, and it both mutates the bucket in place and redundantly re-sets it into the Map on every call.",
+       "fails": {
+        "lint": 0.6
+       }
+      },
+      {
+       "rep": 2,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Immutable BucketState with a pure refill function reads well and correctly persists the refill on the reject path; tests reach for fractional token amounts, though an unused vi import lingers.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0
+       }
+      }
+     ],
+     "think_tok": 4095,
+     "answer_tok": 1202.3333333333333,
+     "out_tok": 5297.333333333333,
+     "total_tok": 138044.33333333334,
+     "decode_tps": 34.450734492949806,
+     "gen_s": 153.76376199999999,
+     "ttft_warm_s": 10.577,
+     "cap_hit_pct": 0
+    },
+    "q6-d128-q8-rb4096": {
+     "model": "unsloth/Qwen3.6-27B-Q6_K",
+     "depth": "120k",
+     "kv": "q8_0",
+     "budget": 4096,
+     "mtp": 1,
+     "n": 3,
+     "ts_pct": 91.06666666666666,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.78,
+      "lint": 0.6666666666666666,
+      "tests": 0.9523809523809523,
+      "edge": 1.0,
+      "reuse": 1.0,
+      "bdd": 1.0,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 3.6666666666666665,
+      "clarity": 3.6666666666666665,
+      "robustness": 3.3333333333333335
+     },
+     "judge_mean": 3.5555555555555554,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Immutable BucketState with pure createBucket/refillBucket helpers reads cleanly and the elapsedSec <= 0 guard anticipates a backwards clock, though non-positive or over-capacity token requests go unvalidated.",
+       "fails": {
+        "lint": 0.8
+       }
+      },
+      {
+       "rep": 1,
+       "design": 3.0,
+       "clarity": 3.0,
+       "robustness": 3.0,
+       "note": "Correct mutable-bucket limiter with a sensible clock-regression guard, but `evaluateAcquisition` is a misleading name for a mutating helper and the 'default tokens' test just duplicates the first-burst case.",
+       "fails": {
+        "types": 0.67,
+        "lint": 0.6,
+        "tests": 0.8571428571428571
+       }
+      },
+      {
+       "rep": 2,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 3.0,
+       "note": "Clean immutable bucket state with well-named helpers and correct persistence of refill on the reject path, though the 'cap refill' test is vacuous since the bucket is created lazily and already full.",
+       "fails": {
+        "types": 0.67,
+        "lint": 0.6
+       }
+      }
+     ],
+     "think_tok": 4095,
+     "answer_tok": 1270,
+     "out_tok": 5365,
+     "total_tok": 138112,
+     "decode_tps": 31.77777099796696,
+     "gen_s": 168.85574766666667,
+     "ttft_warm_s": 10.768,
+     "cap_hit_pct": 0
+    },
+    "a3b-d128-f16-rb4096": {
+     "model": "Qwen3.6-35B-A3B-UD-Q4_K_M",
+     "depth": "120k",
+     "kv": "f16",
+     "budget": 4096,
+     "mtp": 1,
+     "n": 3,
+     "ts_pct": 70.8,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.67,
+      "lint": 0.26666666666666666,
+      "tests": 0.7361111111111112,
+      "edge": 0.6666666666666666,
+      "reuse": 1.0,
+      "bdd": 0.8333333333333334,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 3.3333333333333335,
+      "clarity": 3.6666666666666665,
+      "robustness": 2.6666666666666665
+     },
+     "judge_mean": 3.2222222222222223,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 3.0,
+       "note": "Compact and correctly shaped lazy refill, though refillBucket reads clock.now() twice for one logical instant and several tests named \"deduct nothing\" never assert that no deduction occurred.",
+       "fails": {
+        "types": 0.67,
+        "lint": 0.6,
+        "tests": 0.875
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Well-structured with a single clock read per refill and a guard against non-positive elapsed time; the systemClock default parameter is unrequested scope and vi is imported unused.",
+       "fails": {
+        "types": 0.67,
+        "lint": 0.0,
+        "bdd": 0.5
+       }
+      },
+      {
+       "rep": 2,
+       "design": 2.0,
+       "clarity": 3.0,
+       "robustness": 1.0,
+       "note": "The first call for a key returns true on a short-circuit path that creates a full bucket without deducting the requested tokens or honoring capacity, and refill multiplies raw milliseconds by refillPerSec with no conversion to seconds.",
+       "fails": {
+        "types": 0.67,
+        "lint": 0.2,
+        "tests": 0.3333333333333333,
+        "edge": 0.0
+       }
+      }
+     ],
+     "think_tok": 4095,
+     "answer_tok": 1243.3333333333333,
+     "out_tok": 5338.333333333333,
+     "total_tok": 138085.33333333334,
+     "decode_tps": 117.71964758397507,
+     "gen_s": 45.35213033333333,
+     "ttft_warm_s": 2.756,
+     "cap_hit_pct": 0
+    }
+   }
+  },
+  "async-memo": {
+   "tier": "opus",
+   "refs": {
+    "haiku": 91.2,
+    "sonnet": 87.0,
+    "opus": 100.0
+   },
+   "cells": {
+    "un-d128-f16-rb4096": {
+     "model": "Qwen3.6-27B-MTP-Q4_K_M",
+     "depth": "120k",
+     "kv": "f16",
+     "budget": 4096,
+     "mtp": 1,
+     "n": 3,
+     "ts_pct": 91.2,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.67,
+      "lint": 0.8,
+      "tests": 1.0,
+      "edge": 1.0,
+      "bdd": 1.0,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.0,
+      "clarity": 4.0,
+      "robustness": 3.6666666666666665
+     },
+     "judge_mean": 3.888888888888889,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Caching the derived catch-and-rethrow promise is the right shape and keeps every caller's rejection observable; a synchronous throw from fn would still escape unwrapped.",
+       "fails": {
+        "types": 0.67,
+        "lint": 0.8
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 3.0,
+       "note": "Minimal idiomatic fix, but the detached p.catch eviction is subtle and deletes the key without checking it still owns the entry.",
+       "fails": {
+        "types": 0.67,
+        "lint": 0.8
+       }
+      },
+      {
+       "rep": 2,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Textbook delete-on-reject fix that is minimal and self-explanatory, though the catch handler deletes unconditionally rather than checking the cached promise is still the same one.",
+       "fails": {
+        "types": 0.67,
+        "lint": 0.8
+       }
+      }
+     ],
+     "think_tok": 4095,
+     "answer_tok": 603.6666666666666,
+     "out_tok": 4698.666666666667,
+     "total_tok": 137428.66666666666,
+     "decode_tps": 42.959954775748045,
+     "gen_s": 109.38233433333333,
+     "ttft_warm_s": 6.89,
+     "cap_hit_pct": 0
+    },
+    "xl-d128-f16-rb4096": {
+     "model": "unsloth/Qwen3.6-27B-UD-Q4_K_XL",
+     "depth": "120k",
+     "kv": "f16",
+     "budget": 4096,
+     "mtp": 1,
+     "n": 3,
+     "ts_pct": 87.63333333333334,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.5566666666666666,
+      "lint": 0.8666666666666667,
+      "tests": 0.8888888888888888,
+      "edge": 1.0,
+      "bdd": 1.0,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 3.6666666666666665,
+      "clarity": 3.6666666666666665,
+      "robustness": 2.6666666666666665
+     },
+     "judge_mean": 3.333333333333333,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 3.0,
+       "note": "Minimal, well-targeted fix with clear tests, but the catch handler deletes unconditionally rather than checking the cached promise is still the one that rejected, and some wrapping parens are superfluous.",
+       "fails": {
+        "types": 0.67,
+        "lint": 0.8
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 3.0,
+       "note": "Tight idiomatic fix with an explicit void on the eviction catch and a promise-identity dedup assertion, though the eviction is unguarded and the test mock is typed loosely as ReturnType<typeof vi.fn>.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.8
+       }
+      },
+      {
+       "rep": 2,
+       "design": 3.0,
+       "clarity": 3.0,
+       "robustness": 2.0,
+       "note": "The p.then(value => value) wrapper adds a pointless promise hop for no benefit, the eviction catch floats unhandled, and the retry test re-invokes a key whose mock always throws.",
+       "fails": {
+        "tests": 0.6666666666666666
+       }
+      }
+     ],
+     "think_tok": 3569,
+     "answer_tok": 555,
+     "out_tok": 4124,
+     "total_tok": 136854,
+     "decode_tps": 42.47221836463338,
+     "gen_s": 97.308988,
+     "ttft_warm_s": 7.064,
+     "cap_hit_pct": 0
+    },
+    "q5-d128-q8-rb4096": {
+     "model": "unsloth/Qwen3.6-27B-Q5_K_M",
+     "depth": "120k",
+     "kv": "q8_0",
+     "budget": 4096,
+     "mtp": 1,
+     "n": 3,
+     "ts_pct": 78.13333333333333,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.33333333333333337,
+      "lint": 0.4666666666666667,
+      "tests": 1.0,
+      "edge": 1.0,
+      "bdd": 0.7766666666666666,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.0,
+      "clarity": 3.3333333333333335,
+      "robustness": 3.0
+     },
+     "judge_mean": 3.4444444444444446,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 3.0,
+       "note": "Correct minimal fix that caches the in-flight promise and evicts on rejection without over-engineering, but leaves the loosely-typed vi.fn() spy and does not guard against fn throwing synchronously.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.6,
+        "bdd": 0.33
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 3.0,
+       "robustness": 3.0,
+       "note": "Same correct minimal fix with an explicit `void` on the floating catch, but the tests track a manual callCount alongside vi.fn spies whose call records are never asserted, duplicating state for no reason.",
+       "fails": {
+        "types": 0.33,
+        "lint": 0.2
+       }
+      },
+      {
+       "rep": 2,
+       "design": 4.0,
+       "clarity": 3.0,
+       "robustness": 3.0,
+       "note": "Minimal correct fix, but the empty .then() block with a filler comment is noise where a bare p.catch() would do, and a synchronously-throwing fn still escapes the promise contract.",
+       "fails": {
+        "types": 0.67,
+        "lint": 0.6
+       }
+      }
+     ],
+     "think_tok": 2230.3333333333335,
+     "answer_tok": 576,
+     "out_tok": 2806.3333333333335,
+     "total_tok": 135536.33333333334,
+     "decode_tps": 32.69517715063121,
+     "gen_s": 85.33857633333334,
+     "ttft_warm_s": 10.507,
+     "cap_hit_pct": 0
+    },
+    "q6-d128-q8-rb4096": {
+     "model": "unsloth/Qwen3.6-27B-Q6_K",
+     "depth": "120k",
+     "kv": "q8_0",
+     "budget": 4096,
+     "mtp": 1,
+     "n": 3,
+     "ts_pct": 89.66666666666667,
+     "hard_pct": 33.33333333333333,
+     "objectives": {
+      "types": 0.78,
+      "lint": 0.6,
+      "tests": 1.0,
+      "edge": 1.0,
+      "bdd": 1.0,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 3.6666666666666665,
+      "clarity": 4.0,
+      "robustness": 3.0
+     },
+     "judge_mean": 3.555555555555556,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 3.0,
+       "clarity": 4.0,
+       "robustness": 2.0,
+       "note": "Readable two-map cache/inflight split, but the `cached !== undefined` lookup silently fails to cache an undefined resolved value, re-running fn forever for such keys.",
+       "fails": {
+        "types": 0.67,
+        "lint": 0.2
+       }
+      },
+      {
+       "rep": 1,
+       "design": 5,
+       "clarity": 5,
+       "robustness": 4.0,
+       "note": "Minimal idiomatic fix \u2014 one promise map plus a detached catch that evicts on rejection \u2014 with tight deterministic tests; only a narrow microtask window between rejection and eviction goes unhandled.",
+       "fails": {}
+      },
+      {
+       "rep": 2,
+       "design": 3.0,
+       "clarity": 3.0,
+       "robustness": 3.0,
+       "note": "Works and is well tested, but the `.then(() => cache.set(key, p))` re-stores the identical promise and is pure dead logic that obscures the actual fix.",
+       "fails": {
+        "types": 0.67,
+        "lint": 0.6
+       }
+      }
+     ],
+     "think_tok": 3901.6666666666665,
+     "answer_tok": 650.3333333333334,
+     "out_tok": 4552.0,
+     "total_tok": 137282,
+     "decode_tps": 31.30051606161269,
+     "gen_s": 145.90355366666665,
+     "ttft_warm_s": 10.714,
+     "cap_hit_pct": 0
+    },
+    "a3b-d128-f16-rb4096": {
+     "model": "Qwen3.6-35B-A3B-UD-Q4_K_M",
+     "depth": "120k",
+     "kv": "f16",
+     "budget": 4096,
+     "mtp": 1,
+     "n": 3,
+     "ts_pct": 86.83333333333333,
+     "hard_pct": 33.33333333333333,
+     "objectives": {
+      "types": 0.6666666666666666,
+      "lint": 0.8666666666666667,
+      "tests": 0.9333333333333333,
+      "edge": 1.0,
+      "bdd": 0.5533333333333333,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 4.0,
+      "clarity": 4.0,
+      "robustness": 3.3333333333333335
+     },
+     "judge_mean": 3.7777777777777777,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Minimal, well-targeted fix that preserves promise identity and evicts on rejection without an extra tick; the delete is unguarded against a newer entry for the same key, and one test asserts toHaveBeenCalledTimes on a plain function rather than a vi.fn.",
+       "fails": {
+        "tests": 0.8
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 3.0,
+       "note": "Correct minimal fix, but the needless async wrapper re-wraps the cached promise and costs an extra microtask, the truthiness check on a cached promise is loose, and the tests cover fewer edges.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.6,
+        "bdd": 0.33
+       }
+      },
+      {
+       "rep": 2,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 3.0,
+       "note": "Clean separation of settled cache from in-flight map with correct rejection cleanup, but the `cached !== undefined` lookup instead of `cache.has(key)` silently defeats caching for keys whose value is `undefined`.",
+       "fails": {
+        "bdd": 0.33
+       }
+      }
+     ],
+     "think_tok": 3936.6666666666665,
+     "answer_tok": 672.3333333333334,
+     "out_tok": 4609.0,
+     "total_tok": 137339,
+     "decode_tps": 112.15020916034659,
+     "gen_s": 41.15995866666667,
+     "ttft_warm_s": 2.736,
+     "cap_hit_pct": 0
+    }
+   }
+  },
+  "expr-eval": {
+   "tier": "opus",
+   "refs": {
+    "haiku": 66.7,
+    "sonnet": 66.7,
+    "opus": 83.3
+   },
+   "cells": {
+    "un-d128-f16-rb4096": {
+     "model": "Qwen3.6-27B-MTP-Q4_K_M",
+     "depth": "120k",
+     "kv": "f16",
+     "budget": 4096,
+     "mtp": 1,
+     "n": 3,
+     "ts_pct": 57.666666666666664,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.0,
+      "lint": 0.0,
+      "tests": 0.9513888888888888,
+      "edge": 1.0,
+      "bdd": 0.06666666666666667,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 3.3333333333333335,
+      "clarity": 3.6666666666666665,
+      "robustness": 3.3333333333333335
+     },
+     "judge_mean": 3.4444444444444446,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 3.0,
+       "clarity": 4.0,
+       "robustness": 3.0,
+       "note": "Clean recursive-descent split with good test coverage, but the operator map is rebuilt per character and the stringly-typed `expect(type: string)` discards the discriminated union's safety.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "bdd": 0.0
+       }
+      },
+      {
+       "rep": 1,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Consistent Result-propagating recursive descent with unary sign support and truncating division, marred only by a vestigial try/catch around code that never throws and error messages carrying no position.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "tests": 0.9166666666666666,
+        "bdd": 0.08
+       }
+      },
+      {
+       "rep": 2,
+       "design": 3.0,
+       "clarity": 3.0,
+       "robustness": 3.0,
+       "note": "Thorough tests, but threading [value, pos] tuples plus redundant `tokens.length - 1` bounds checks alongside an EOF sentinel makes the parser noisier than the design needs, and the operator map is rebuilt per character.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "tests": 0.9375,
+        "bdd": 0.12
+       }
+      }
+     ],
+     "think_tok": 4095,
+     "answer_tok": 1590.3333333333333,
+     "out_tok": 5685.333333333333,
+     "total_tok": 138400.33333333334,
+     "decode_tps": 45.01282032365564,
+     "gen_s": 126.29483033333332,
+     "ttft_warm_s": 6.883,
+     "cap_hit_pct": 0
+    },
+    "xl-d128-f16-rb4096": {
+     "model": "unsloth/Qwen3.6-27B-UD-Q4_K_XL",
+     "depth": "120k",
+     "kv": "f16",
+     "budget": 4096,
+     "mtp": 1,
+     "n": 3,
+     "ts_pct": 42.333333333333336,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.0,
+      "lint": 0.06666666666666667,
+      "tests": 0.6314102564102564,
+      "edge": 0.5733333333333334,
+      "bdd": 0.3333333333333333,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 2.6666666666666665,
+      "clarity": 2.6666666666666665,
+      "robustness": 3.0
+     },
+     "judge_mean": 2.7777777777777777,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 3.0,
+       "clarity": 2.0,
+       "robustness": 4.0,
+       "note": "Conventional throw-internally/catch-at-boundary parser with good edge coverage including unary minus and trailing tokens, but single-letter names throughout and a Record literal rebuilt on every character make it needlessly hard to read.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.2,
+        "tests": 0.8461538461538461,
+        "bdd": 0.0,
+        "edge": 0.29
+       }
+      },
+      {
+       "rep": 1,
+       "design": 2.0,
+       "clarity": 3.0,
+       "robustness": 2.0,
+       "note": "Result-threading is the right instinct but the code uses Result<T> generically when the declared type is not generic, and the `c as TokenType` cast pushes raw punctuation the parser never matches; tests omit missing-operand and empty-input cases.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "tests": 0.125,
+        "edge": 0.43
+       }
+      },
+      {
+       "rep": 2,
+       "design": 3.0,
+       "clarity": 3.0,
+       "robustness": 3.0,
+       "note": "Decent tokenizer/parser separation and broad edge coverage, undermined by a mutable error-flag plus return-0 sentinel that every caller must remember to check, a stringly-typed consume(), and an unreachable null-token branch.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "tests": 0.9230769230769231,
+        "bdd": 0.0
+       }
+      }
+     ],
+     "think_tok": 4095,
+     "answer_tok": 1708.6666666666667,
+     "out_tok": 5803.666666666667,
+     "total_tok": 138518.66666666666,
+     "decode_tps": 45.16364096840248,
+     "gen_s": 128.56121466666667,
+     "ttft_warm_s": 6.837,
+     "cap_hit_pct": 0
+    },
+    "q5-d128-q8-rb4096": {
+     "model": "unsloth/Qwen3.6-27B-Q5_K_M",
+     "depth": "120k",
+     "kv": "q8_0",
+     "budget": 4096,
+     "mtp": 1,
+     "n": 3,
+     "ts_pct": 63.56666666666667,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.0,
+      "lint": 0.13333333333333333,
+      "tests": 1.0,
+      "edge": 1.0,
+      "bdd": 0.36,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 3.3333333333333335,
+      "clarity": 3.3333333333333335,
+      "robustness": 3.3333333333333335
+     },
+     "judge_mean": 3.3333333333333335,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Well-typed discriminated-union tokens with a Result-threading recursive-descent parser and correct integer truncation, though the tokenizer throwing while the parser returns Results is an inconsistent error strategy.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0
+       }
+      },
+      {
+       "rep": 1,
+       "design": 2.0,
+       "clarity": 2.0,
+       "robustness": 3.0,
+       "note": "The weak Token type (value: string | number) forces casts throughout and the [number] tuple used as a mutable position pointer is a hack that makes the parser noticeably harder to read than a plain cursor object.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "bdd": 0.08
+       }
+      },
+      {
+       "rep": 2,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 3.0,
+       "note": "Elegant scannerless recursive descent over a small ParseContext with well-named helpers, but peek() silently mutating position via skipWhitespace is a surprising side effect and integer division is never truncated.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.4,
+        "bdd": 0.0
+       }
+      }
+     ],
+     "think_tok": 4095,
+     "answer_tok": 1460.3333333333333,
+     "out_tok": 5555.333333333333,
+     "total_tok": 138270.33333333334,
+     "decode_tps": 33.842732450826254,
+     "gen_s": 164.20550033333336,
+     "ttft_warm_s": 10.439,
+     "cap_hit_pct": 0
+    },
+    "q6-d128-q8-rb4096": {
+     "model": "unsloth/Qwen3.6-27B-Q6_K",
+     "depth": "120k",
+     "kv": "q8_0",
+     "budget": 4096,
+     "mtp": 1,
+     "n": 3,
+     "ts_pct": 63.0,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.0,
+      "lint": 0.06666666666666667,
+      "tests": 0.919047619047619,
+      "edge": 1.0,
+      "bdd": 0.6666666666666666,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 3.0,
+      "clarity": 3.3333333333333335,
+      "robustness": 3.3333333333333335
+     },
+     "judge_mean": 3.2222222222222223,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 4.0,
+       "clarity": 4.0,
+       "robustness": 4.0,
+       "note": "Tidy char-level recursive descent with Result threading, true arbitrary-whitespace handling and bonus unary support; the paren branch masks inner parse errors behind a generic 'Missing closing parenthesis'.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.2
+       }
+      },
+      {
+       "rep": 1,
+       "design": 2.0,
+       "clarity": 3.0,
+       "robustness": 2.0,
+       "note": "Encodes lexer errors as an `ERR:x` string sentinel that discards the whole token stream, repeats an inline ctx object type three times, re-validates digits the tokenizer already guaranteed, and only skips literal spaces despite the arbitrary-whitespace requirement.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "tests": 0.9
+       }
+      },
+      {
+       "rep": 2,
+       "design": 3.0,
+       "clarity": 3.0,
+       "robustness": 4.0,
+       "note": "Properly typed discriminated-union tokens with broad tests including nested parens and trailing input, undercut by the `[number]` tuple-as-mutable-ref idiom and an ERR token that throws away the rest of the stream.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "tests": 0.8571428571428571,
+        "bdd": 0.0
+       }
+      }
+     ],
+     "think_tok": 4095,
+     "answer_tok": 1630,
+     "out_tok": 5725,
+     "total_tok": 138440,
+     "decode_tps": 32.08131530681493,
+     "gen_s": 178.51185999999998,
+     "ttft_warm_s": 10.666,
+     "cap_hit_pct": 0
+    },
+    "a3b-d128-f16-rb4096": {
+     "model": "Qwen3.6-35B-A3B-UD-Q4_K_M",
+     "depth": "120k",
+     "kv": "f16",
+     "budget": 4096,
+     "mtp": 1,
+     "n": 3,
+     "ts_pct": 43.83333333333333,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.0,
+      "lint": 0.0,
+      "tests": 0.6142234671646436,
+      "edge": 0.6666666666666666,
+      "bdd": 0.4166666666666667,
+      "novj": 1.0
+     },
+     "judge": {
+      "design": 2.3333333333333335,
+      "clarity": 2.6666666666666665,
+      "robustness": 2.3333333333333335
+     },
+     "judge_mean": 2.4444444444444446,
+     "notes": [
+      {
+       "rep": 0,
+       "design": 2.0,
+       "clarity": 3.0,
+       "robustness": 2.0,
+       "note": "Readable recursive-descent skeleton undermined by an unsound `Result | readonly Token[]` union discriminated with `typeof === 'object'` (arrays are objects, so the success path is indistinguishable from an error), plus whitespace handling limited to literal spaces.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "tests": 0.07142857142857142,
+        "bdd": 0.07,
+        "edge": 0.0
+       }
+      },
+      {
+       "rep": 1,
+       "design": 2.0,
+       "clarity": 2.0,
+       "robustness": 2.0,
+       "note": "Overloads the public `Result` as the internal parser return and then mutates its `readonly value` in place, needs an `as` cast to escape the array/Result union, and repeats un-narrowed `tokens[cursor.pos].value` indexing in long unreadable loop conditions; the `eof` sentinel is largely vestigial.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "tests": 0.8888888888888888
+       }
+      },
+      {
+       "rep": 2,
+       "design": 3.0,
+       "clarity": 3.0,
+       "robustness": 3.0,
+       "note": "Best-conceived of the three \u2014 uniform result propagation with immutable values, no casts, and distinct error messages \u2014 but it leans on a generic `Result<T>` that the spec's non-generic type never provides, and cramped one-liners plus space-only whitespace handling hold it back.",
+       "fails": {
+        "types": 0.0,
+        "lint": 0.0,
+        "tests": 0.8823529411764706,
+        "bdd": 0.18
+       }
+      }
+     ],
+     "think_tok": 4095,
+     "answer_tok": 1945.3333333333333,
+     "out_tok": 6040.333333333333,
+     "total_tok": 138755.33333333334,
+     "decode_tps": 115.9594756748955,
+     "gen_s": 52.145169,
+     "ttft_warm_s": 2.717,
+     "cap_hit_pct": 0
+    }
+   }
+  }
+ },
+ "refs": {
+  "count-words": {
+   "haiku": 94.89999999999999
+  },
+  "lru-cache": {
+   "haiku": 79.3,
+   "sonnet": 94.6
+  },
+  "rate-limiter": {
+   "haiku": 94.8,
+   "sonnet": 98.2
+  },
+  "shape-variant": {
+   "haiku": 100.0,
+   "sonnet": 100.0,
+   "opus": 100.0
+  },
+  "async-memo": {
+   "haiku": 91.2,
+   "sonnet": 87.0,
+   "opus": 100.0
+  },
+  "store-remove": {
+   "haiku": 92.4,
+   "sonnet": 100.0,
+   "opus": 100.0
+  },
+  "expr-eval": {
+   "haiku": 66.7,
+   "sonnet": 66.7,
+   "opus": 83.3
+  },
+  "deep-equal": {
+   "haiku": 92.5,
+   "sonnet": 100.0,
+   "opus": 98.2
+  }
+ }
+}

@@ -1,0 +1,1 @@
+{"design":3,"clarity":3,"robustness":3,"notes":"Decent tokenizer/parser separation and broad edge coverage, undermined by a mutable error-flag plus return-0 sentinel that every caller must remember to check, a stringly-typed consume(), and an unreachable null-token branch."}
