@@ -158,8 +158,12 @@ if ! python3 "$HERE/score_typescript.py" selftest; then
   exit 4
 fi
 echo; echo "=== grading (tsc + eslint + vitest, per reply) ==="
+# --resume: reuse rows already graded (keyed config/task_id/rep) so an INCREMENTAL run (new cells
+# appended to configs.jsonl) only pays tsc+eslint+vitest for the NEW replies. Output is rewritten in
+# outputs.jsonl order and is byte-identical to a full re-grade; grade_error rows are always retried.
+# Set REGRADE=1 to force a full re-grade (e.g. after changing the grader itself).
 python3 "$HERE/score_typescript.py" batch --outputs "$OUT" --tasks "$HERE/tasks.jsonl" \
-  --out "$OUTDIR/scores_typescript.jsonl" || true
+  --out "$OUTDIR/scores_typescript.jsonl" $([ "${REGRADE:-0}" = "1" ] || echo --resume) || true
 
 # --- 4. blind LLM judge (subjective design/clarity/robustness the toolchain can't grade) ---
 # 27B is the strongest LOCAL model, so it can't judge itself — the judge is Claude via the tmux gateway
@@ -189,7 +193,17 @@ python3 "$REPO/campaigns/2026-07-12-27b-finetune-quality/make_charts.py" --dir "
 # --- 5. deterministic digest: aggregate.py crunches ALL the numbers in Python (per-cell table +
 #        the 4 campaign questions answered numerically) so the analysis LLM never touches bulk JSON. ---
 echo; echo "=== aggregate (deterministic digest → out/summary.md) ==="
-python3 "$HERE/aggregate.py" --dir "$OUTDIR" --out "$OUTDIR/summary.md" || echo "aggregate failed (see above)"
+# --by-task also emits out/summary_by_task.json, which the per-task charts below consume. It was
+# missing here, so summary_by_task.json was only ever written by hand — that is exactly how
+# charts/detailed/ ended up built from a pre-correction aggregate (2026-07-15). Data first, charts after.
+python3 "$HERE/aggregate.py" --dir "$OUTDIR" --by-task --out "$OUTDIR/summary.md" || echo "aggregate failed (see above)"
+
+# Per-task charts LAST: they read out/summary_by_task.json, so they MUST run after aggregate --by-task.
+# Wired in deliberately — running them by hand is what let charts/detailed/ drift behind the data.
+echo; echo "=== per-task charts (charts/detailed/) ==="
+python3 "$HERE/make_charts_detailed.py" --dir "$OUTDIR" --charts "$HERE/charts/detailed" \
+  --scores scores_typescript.jsonl --orig scores_typescript.jsonl \
+  || echo "make_charts_detailed failed (see above)"
 
 # --- 6. auto-write analysis.md via the benchmark-results skill (interactive claude, through tmux) ---
 # claude_ask.sh opens an interactive claude in tmux and TYPES the request (no headless -p); claude runs
@@ -226,6 +240,34 @@ All cells share reasoning-budget 4096 (the budget sweep is a separate follow-up 
 NOTE the grader FIX: this run used single-process vitest + a fail-loud grader + a pre-grade self-check,
 so tests/edge are trustworthy (the previous run's tests/edge=0 was a harness bug). If summary.md's Health
 line flags grade_error/HARNESS rows, runaways, or GTT spill, surface them prominently.
+
+UNCERTAINTY (MANDATORY — this design is UNDERPOWERED; do not present noise as shape): summary.md has an
+"Uncertainty" section with per-cell sd/SE/95% CI, the rep noise, and a PAIRED-by-task t-test vs Q4_K_M.
+Facts you MUST honour: every 95% CI overlaps; NO paired quant Δ is significant (Q4_K_XL -10.9 t=-2.38,
+Q5_K_M -2.5 t=-0.62, Q6_K +3.7 t=+1.16, 35B-A3B -7.4 t=-3.11, all |t|<3.182); mean within-(cell,task) rep
+sd is 9.6 pts; the design resolves only >~10 pts (Δ=10 needs ~8 tasks, Δ=5 ~31 tasks — we have 4).
+Therefore: (1) do NOT rank the quants or call any cell "best"/"worst" — the ordering 78/67/76/82 is NOT
+resolvable; (2) state (a) as a BOUNDED NULL RESULT: "no detectable precision effect; any effect is smaller
+than our ~10-pt resolution", and note the non-monotonic shape is exactly what noise looks like (it does not
+prove precision is useless, it fails to detect an effect); (3) 35B-A3B -7.4 (t=-3.11, p~0.053, negative on
+all 4 tasks) is the ONLY near-significant signal — report it as "suggestive, not significant"; (4) quote
+every Δ with its verdict; (5) name underpowering as the top limitation and recommend MORE TASKS (~8+), not
+more reps (task-to-task variance dominates).
+
+TIER + REFERENCE COMPARABILITY (MANDATORY — a previous draft got this wrong): TIER is a DIFFICULTY CLASS =
+the weakest REFERENCE tier that yields a strictly-clean hard_pass. It is NOT a score band — a task can be
+tier opus while everyone scores 60-90% on partial credit. EXPLAIN this where the ladder is discussed.
+Use the MEASURED evidence printed in each per-task header, not the label. Specifically: async-memo's "opus"
+label is CORRECT (opus 100% is the only hard-pass; haiku 91%/sonnet 87% do NOT hard-pass) — do NOT claim it
+should be re-labelled just because haiku's SCORE is high; that conflates score with hard-pass. But lru-cache's
+"sonnet" label IS contradicted by data (sonnet scores 95% yet does NOT hard-pass; nobody does) — report it as
+a ceiling task and flag the label for correction. ALSO: the references are NOT depth-matched — one-shot on a
+~550-620 token prompt vs the local cells' ~132.9k tokens (~213x deeper), and n=1 vs local n=3 (a single
+reference carries ~+/-19 pts at the measured rep noise). So (c)/(d): do NOT state "best local 82 vs haiku 83
+(delta -1)" as a like-for-like capability gap or say the 27B is "tied with haiku". The defensible reading is
+"indistinguishable from haiku within noise, while carrying 213x more context" — which if anything favours the
+27B. The binary->fractional re-grade correction itself REMAINS VALID and important (the old ladder's
+"27B beats sonnet" reading is still dead); only its precision was overstated.
 
 PER-REP DETAIL (MANDATORY — the user wants to see all reps, not just means): summary.md ends with a
 "Per-rep detail" section — one table per hardest task listing EVERY local rep (rep 0/1/2, full objective

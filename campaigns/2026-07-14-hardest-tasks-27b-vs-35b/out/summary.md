@@ -4,13 +4,13 @@ _All numbers computed in Python from out/*.jsonl. The analysis LLM writes prose 
 
 ## Per-cell aggregates
 
-| cell | model | depth | kv | budget | n | TS % | hard % | judge/5 | judge d·c·r | think tok | ttfa s | full s | decode t/s | peak VRAM | peak GTT | runaway % | fails |
-|------|-------|-------|----|-------:|--:|-----:|-------:|--------:|:-----------:|----------:|-------:|-------:|-----------:|----------:|---------:|----------:|------:|
-| un-d128-f16-rb4096 | Qwen3.6-27B-MTP-Q4_K_M | 120k | f16 | 4096 | 12 | 78 | 0 | 3.5 | 3.6·3.7·3.3 | 4095 | 126.6 | 152.8 | 44.3 | 30322 | 2030 | 0 | 0 |
-| a3b-d128-f16-rb4096 | Qwen3.6-35B-A3B-UD-Q4_K_M | 120k | f16 | 4096 | 12 | 71 | 8 | 3.1 | 3.2·3.3·2.8 | 4055 | 47.1 | 59.8 | 116.1 | 27764 | 1685 | 0 | 0 |
-| q5-d128-q8-rb4096 | unsloth/Qwen3.6-27B-Q5_K_M | 120k | q8_0 | 4096 | 12 | 76 | 0 | 3.3 | 3.4·3.4·3.2 | 3629 | 155.9 | 187.2 | 33.6 | 28139 | 1957 | 0 | 0 |
-| q6-d128-q8-rb4096 | unsloth/Qwen3.6-27B-Q6_K | 120k | q8_0 | 4096 | 12 | 82 | 8 | 3.3 | 3.2·3.7·3.0 | 4047 | 178.2 | 215.1 | 31.5 | 30888 | 1957 | 0 | 0 |
-| xl-d128-f16-rb4096 | unsloth/Qwen3.6-27B-UD-Q4_K_XL | 120k | f16 | 4096 | 12 | 67 | 0 | 3.2 | 3.2·3.5·2.8 | 3963 | 124.6 | 151.7 | 43.9 | 31224 | 1957 | 0 | 0 |
+| cell | model | depth | kv | budget | n | TS % | worst | best | hard % | judge/5 | judge d·c·r | think tok | ttfa s | full s | decode t/s | peak VRAM | peak GTT | runaway % | fails |
+|------|-------|-------|----|-------:|--:|-----:|------:|-----:|-------:|--------:|:-----------:|----------:|-------:|-------:|-----------:|----------:|---------:|----------:|------:|
+| un-d128-f16-rb4096 | Qwen3.6-27B-MTP-Q4_K_M | 120k | f16 | 4096 | 12 | 78 | 57 | 96 | 0 | 3.5 | 3.6·3.7·3.3 | 4095 | 126.6 | 152.8 | 44.3 | 30322 | 2030 | 0 | 0 |
+| a3b-d128-f16-rb4096 | Qwen3.6-35B-A3B-UD-Q4_K_M | 120k | f16 | 4096 | 12 | 71 | 11 | 95 | 8 | 3.1 | 3.2·3.3·2.8 | 4055 | 47.1 | 59.8 | 116.1 | 27764 | 1685 | 0 | 0 |
+| q5-d128-q8-rb4096 | unsloth/Qwen3.6-27B-Q5_K_M | 120k | q8_0 | 4096 | 12 | 76 | 59 | 94 | 0 | 3.3 | 3.4·3.4·3.2 | 3629 | 155.9 | 187.2 | 33.6 | 28139 | 1957 | 0 | 0 |
+| q6-d128-q8-rb4096 | unsloth/Qwen3.6-27B-Q6_K | 120k | q8_0 | 4096 | 12 | 82 | 55 | 100 | 8 | 3.3 | 3.2·3.7·3.0 | 4047 | 178.2 | 215.1 | 31.5 | 30888 | 1957 | 0 | 0 |
+| xl-d128-f16-rb4096 | unsloth/Qwen3.6-27B-UD-Q4_K_XL | 120k | f16 | 4096 | 12 | 67 | 30 | 92 | 0 | 3.2 | 3.2·3.5·2.8 | 3963 | 124.6 | 151.7 | 43.9 | 31224 | 1957 | 0 | 0 |
 
 ## Findings (computed, not inferred)
 
@@ -20,11 +20,61 @@ _All numbers computed in Python from out/*.jsonl. The analysis LLM writes prose 
 - **(d) Capability (hardest tasks):** best local cell = 82% TS. Reference: haiku 83% (Δ-1) · sonnet 87% (Δ-5) · opus 92% (Δ-10).
 - **Health:** **GTT spill (>500 MiB) in: un-d128-f16-rb4096, xl-d128-f16-rb4096, q5-d128-q8-rb4096, q6-d128-q8-rb4096, a3b-d128-f16-rb4096** — freeze risk, flag loudly
 
+## Uncertainty — is the ladder resolvable? (READ BEFORE QUOTING ANY Δ)
+
+| cell | n | TS % | sd | SE | 95% CI |
+|---|--:|--:|--:|--:|:--:|
+| Q4_K_M (f16) | 12 | 78.2 | 14.8 | 4.3 | [69.8, 86.6] |
+| Q4_K_XL (f16) | 12 | 67.3 | 19.3 | 5.6 | [56.4, 78.2] |
+| Q5_K_M (q8_0) | 12 | 75.8 | 11.4 | 3.3 | [69.3, 82.2] |
+| Q6_K (q8_0) | 12 | 82.0 | 13.6 | 3.9 | [74.2, 89.7] |
+| 35B-A3B (f16) | 12 | 70.8 | 23.8 | 6.9 | [57.3, 84.3] |
+
+**Rep noise (MEASURED):** mean within-(cell,task) sd = **9.6 pts** → SE of a 3-rep mean ≈ **5.5 pts**. A single-task cell-vs-cell gap must exceed ~**22 pts** to beat rep noise alone.
+
+### Paired Δ vs Q4_K_M (by task — removes task-difficulty variance)
+
+| cell | Δ per task | meanΔ | sd | t | verdict |
+|---|---|--:|--:|--:|---|
+| Q4_K_XL (f16) | -22, -3, -4, -15 | **-10.9** | 9.2 | -2.38 | not significant (|t|<3.182, n=4 tasks) |
+| Q5_K_M (q8_0) | -1, -1, -13, +6 | **-2.5** | 7.9 | -0.62 | not significant (|t|<3.182, n=4 tasks) |
+| Q6_K (q8_0) | -1, +12, -2, +5 | **3.7** | 6.4 | 1.16 | not significant (|t|<3.182, n=4 tasks) |
+| 35B-A3B (f16) | -3, -8, -4, -14 | **-7.4** | 4.8 | -3.11 | not significant (|t|<3.182, n=4 tasks) |
+
+**Power (INFERRED):** with **4 tasks** this design resolves only **≳10 pts**. To detect Δ=10 pts needs ~**8 tasks**; Δ=5 pts needs ~**31 tasks** (reps do not help — task-to-task variance dominates).
+
+## Fluctuation & rerun value (the mean hides both)
+
+_`rep sd` = mean within-(cell,task) sd — how much the same cell swings on the same task; compare it ACROSS cells to see whether a setting **changed** the fluctuation. `best-of-R` takes the best rep per task, then averages over tasks; `Δ rerun` = best-of-R − mean = what re-rolling buys. `hard@1` = per-reply strict-clean rate; `hard@R` = share of TASKS where **any** rep is strictly clean — the toolchain (tsc/eslint/vitest) picks the winner, so this is a real strategy, not an oracle._
+
+| cell | n | mean | worst | best | range | **rep sd** | best-of-R | **Δ rerun** | worst-of-R | hard@1 | **hard@R** |
+|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|
+| Q4_K_M (f16) | 12 | 78.2 | 57 | 96 | 39 | **5.5** | 83.3 | **5.1** | 72.7 | 0% | **0%** |
+| Q4_K_XL (f16) | 12 | 67.3 | 30 | 92 | 61 | **8.0** | 75.3 | **8.0** | 60.4 | 0% | **0%** |
+| Q5_K_M (q8_0) | 12 | 75.8 | 59 | 94 | 35 | **9.0** | 85.0 | **9.2** | 67.8 | 0% | **0%** |
+| Q6_K (q8_0) | 12 | 82.0 | 55 | 100 | 45 | **7.9** | 89.2 | **7.2** | 74.0 | 8% | **25%** |
+| 35B-A3B (f16) | 12 | 70.8 | 11 | 95 | 84 | **17.3** | 83.7 | **12.8** | 51.6 | 8% | **25%** |
+
+**Change of fluctuation vs `Q4_K_M (f16)` (rep sd, pts):**
+
+| cell | rep sd | Δ sd vs baseline | steadier? |
+|---|--:|--:|:--:|
+| Q4_K_M (f16) | 5.5 | — | — |
+| Q4_K_XL (f16) | 8.0 | 2.5 | ⚠ noisier |
+| Q5_K_M (q8_0) | 9.0 | 3.5 | ⚠ noisier |
+| Q6_K (q8_0) | 7.9 | 2.4 | ⚠ noisier |
+| 35B-A3B (f16) | 17.3 | 11.7 | ⚠ noisier |
+
+_A Δ sd inside ±1 pt is not a change — rep sd is itself estimated from few reps._
+
 ## Per-rep detail — every rep + haiku/sonnet/opus reference (nothing averaged away)
 
 _Local cells show all REPS individually (full objective vector 0–1) then a **mean** row; references are one-shot. `— (no calib)` = reference point not yet collected (see README add-on D)._
 
-### lru-cache · tier sonnet
+> **TIER is a difficulty class, NOT a score band.** It names the weakest REFERENCE tier that produces a strictly-clean **hard_pass** — so a task can be `tier opus` while every model scores 60–90% on partial credit. Each header below prints the label next to the MEASURED hard-pass evidence; trust the evidence.
+> **The references are NOT depth-matched:** they are one-shot on a ~550–620-token prompt, while local cells answer the same task at ~132.9k tokens (**~213× deeper**), and each reference is a single sample (n=1) vs the local n=3. Reference-vs-local Δ are therefore indicative only — do not quote them as a like-for-like capability gap.
+
+### lru-cache · tier `sonnet` — measured weakest hard-pass: **NONE (ceiling)** (haiku 79%✗ · sonnet 95%✗ · opus n/a)  ⚠ **LABEL CONTRADICTED BY DATA** (label says `sonnet`, measured weakest hard-pass = `NONE (ceiling)`)
 
 | model (kv) | rep | TS % | hard | types | lint | tests | edge | reuse | bdd | novj | think | judge d·c·r |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -52,7 +102,7 @@ _Local cells show all REPS individually (full objective vector 0–1) then a **m
 | _sonnet_ 1-shot | – | 95 | | 1.00 | 0.80 | 1.00 | 1.00 | 1.00 | 0.64 | 1.00 | | |
 | _opus_ | – | — (no calib) | | — | — | — | — | — | — | — | | |
 
-### rate-limiter · tier sonnet
+### rate-limiter · tier `sonnet` — measured weakest hard-pass: **sonnet** (haiku 95%✗ · sonnet 98%✓ · opus n/a)
 
 | model (kv) | rep | TS % | hard | types | lint | tests | edge | reuse | bdd | novj | think | judge d·c·r |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -80,7 +130,7 @@ _Local cells show all REPS individually (full objective vector 0–1) then a **m
 | _sonnet_ 1-shot | – | 98 | | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 0.75 | 1.00 | | |
 | _opus_ | – | — (no calib) | | — | — | — | — | — | — | — | | |
 
-### async-memo · tier opus
+### async-memo · tier `opus` — measured weakest hard-pass: **opus** (haiku 91%✗ · sonnet 87%✗ · opus 100%✓)
 
 | model (kv) | rep | TS % | hard | types | lint | tests | edge | reuse | bdd | novj | think | judge d·c·r |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -108,7 +158,7 @@ _Local cells show all REPS individually (full objective vector 0–1) then a **m
 | _sonnet_ 1-shot | – | 87 | | 0.67 | 0.80 | 1.00 | 1.00 | — | 0.50 | 1.00 | | |
 | _opus_ 1-shot | – | 100 | | 1.00 | 1.00 | 1.00 | 1.00 | — | 1.00 | 1.00 | | |
 
-### expr-eval · tier opus
+### expr-eval · tier `opus` — measured weakest hard-pass: **NONE (ceiling)** (haiku 67%✗ · sonnet 67%✗ · opus 83%✗)
 
 | model (kv) | rep | TS % | hard | types | lint | tests | edge | reuse | bdd | novj | think | judge d·c·r |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|

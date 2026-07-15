@@ -230,21 +230,45 @@ def extract_files(response):
     return out
 
 
-def grade_batch(outputs_path, tasks_path, out_path):
+def grade_batch(outputs_path, tasks_path, out_path, resume=False):
     """Grade a whole capture run. outputs.jsonl rows carry {config, task_id, rep, response}; the
     task manifest (tasks.jsonl) maps task_id -> ts-harness/tasks/<id>. One score row per output row,
-    tagged with config/task_id/rep/tier so make_charts can aggregate + draw the calibration bands."""
+    tagged with config/task_id/rep/tier so make_charts can aggregate + draw the calibration bands.
+
+    resume=True: reuse rows already present in out_path (keyed config/task_id/rep) instead of
+    re-running tsc+eslint+vitest on them — grading is the expensive step, so an incremental campaign
+    (new cells appended to configs.jsonl) only pays for the NEW replies. Rows carrying a grade_error
+    are always re-graded (a harness failure is not a result worth caching). The file is still
+    REWRITTEN in outputs.jsonl order, so the output is identical to a full run and can never
+    accumulate duplicates or stale rows."""
     tiers = {}
     for l in open(tasks_path):
         if l.strip():
             t = json.loads(l); tiers[t["id"]] = t.get("tier", "?")
-    rows, n_err = [], 0
+    done = {}
+    if resume and os.path.exists(out_path):
+        for l in open(out_path):
+            if not l.strip():
+                continue
+            try:
+                r = json.loads(l)
+            except json.JSONDecodeError:
+                continue
+            if r.get("grade_error"):          # never cache a harness failure — retry it
+                continue
+            done[(r.get("config"), r.get("task_id"), r.get("rep", 0))] = r
+    rows, n_err, n_skip = [], 0, 0
     with open(out_path, "w") as fout:
         for l in open(outputs_path):
             if not l.strip():
                 continue
             o = json.loads(l)
             tid, cfg, rep = o.get("task_id"), o.get("config"), o.get("rep", 0)
+            cached = done.get((cfg, tid, rep))
+            if cached is not None:
+                fout.write(json.dumps(cached) + "\n"); fout.flush()
+                rows.append(cached); n_skip += 1
+                continue
             if o.get("error") or not o.get("response"):
                 sc = {"config": cfg, "task_id": tid, "rep": rep, "tier": tiers.get(tid, "?"),
                       "score": 0.0, "hard_pass": False, "objectives": {}, "grade_error": o.get("error") or "empty response"}
@@ -270,7 +294,9 @@ def grade_batch(outputs_path, tasks_path, out_path):
             hp = "P" if sc["hard_pass"] else "F"
             print(f"  [{cfg}] {tid} rep{rep}: score={sc['score']} {hp}"
                   + (f"  ({sc['grade_error']})" if sc.get("grade_error") else ""))
-    print(f"graded {len(rows)} rows ({n_err} errors/empty) -> {out_path}", file=sys.stderr)
+    print(f"graded {len(rows) - n_skip} rows ({n_err} errors/empty)"
+          + (f", reused {n_skip} already-graded" if n_skip else "")
+          + f" -> {out_path} [{len(rows)} total]", file=sys.stderr)
     return rows
 
 
@@ -280,6 +306,9 @@ def main():
     f = sub.add_parser("fixture"); f.add_argument("--dir", required=True); f.add_argument("--task", required=True)
     r = sub.add_parser("response"); r.add_argument("--response-file", required=True); r.add_argument("--task", required=True); r.add_argument("--id", default="case")
     b = sub.add_parser("batch"); b.add_argument("--outputs", required=True); b.add_argument("--tasks", required=True); b.add_argument("--out", required=True)
+    b.add_argument("--resume", action="store_true",
+                   help="reuse rows already in --out (skip re-running tsc/eslint/vitest on them); "
+                        "grade_error rows are always retried")
     sub.add_parser("selftest")
     a = ap.parse_args()
 
@@ -293,7 +322,7 @@ def main():
             sys.exit("no `// FILE:` blocks or ```ts fences found in response")
         print(json.dumps(grade_files(files, a.task, a.id), indent=2))
     elif a.cmd == "batch":
-        grade_batch(a.outputs, a.tasks, a.out)
+        grade_batch(a.outputs, a.tasks, a.out, resume=a.resume)
     elif a.cmd == "selftest":
         task = os.path.join(HARNESS, "tasks", "count-words")
         def g(name):

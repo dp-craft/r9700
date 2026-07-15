@@ -10,7 +10,7 @@ capability vs haiku/Sonnet/Opus). The LLM then only writes prose from this diges
 
   python3 aggregate.py --dir out --out out/summary.md
 """
-import argparse, json, os, statistics as st
+import argparse, json, os, statistics as st, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 GATES = ["types", "lint", "tests", "reuse", "edge"]
@@ -60,6 +60,10 @@ def load_cells(D, configs_path=None):
             "budget": c.get("budget"), "n": len(tsr),
             "n_fail": sum(1 for r in tsr if r.get("grade_error")),
             "ts_pct": pct([r.get("score") for r in tsr]),
+            # worst/best over every reply in the cell — the mean alone hides the swing a user feels,
+            # and "can a rerun rescue this?" is answered by best, not by the average.
+            "ts_worst": (100 * min(_s)) if (_s := [r["score"] for r in tsr if r.get("score") is not None]) else None,
+            "ts_best": (100 * max(_s)) if _s else None,
             "hard_pct": pct([1 if r.get("hard_pass") else 0 for r in tsr]),
             "objectives": objs,
             "judge": mean([mean([r.get("design"), r.get("clarity"), r.get("robustness")]) for r in jdr]) if jdr else None,
@@ -79,15 +83,40 @@ OBJ_COLS = ["types", "lint", "tests", "edge", "reuse", "bdd", "novj"]   # per-re
 
 
 def calib_by_task_full(files=None):
-    """{task: {model: {score, objectives}}} from the haiku/sonnet/opus one-shots — WITH the objective
-    vector, so reference rows sit in the same columns as the local per-rep rows."""
+    """{task: {model: {...}}} from the haiku/sonnet/opus references — WITH the objective vector, so
+    reference rows sit in the same columns as the local per-rep rows.
+
+    REFERENCE REPS: a reference point may now carry several reps (add `"rep": N` to its calibration
+    rows). At the measured rep noise (~9.6 pts) a SINGLE reference sample carries roughly ±19 pts —
+    which is why the n=1 ladder could never be quoted as a like-for-like gap. Reps collapse that.
+    Rows with no `rep` field keep file order, so legacy n=1 calibration files aggregate to exactly
+    the same numbers as before.
+
+    Per (task, model) we return: score = mean over reps · sd/n · hard_pass = ANY rep strictly clean
+    (the tier's *existence* semantics, unchanged from n=1) · hard_pass_k = how many of n."""
     files = files or [os.path.join(HERE, "calibration.jsonl"), os.path.join(HERE, "calibration-hard.jsonl")]
-    out = {}
+    acc = {}
     for r in (row for p in files for row in jl(p)):
         t, m = r.get("task"), r.get("model")
         if t is None or m is None:
             continue
-        out.setdefault(t, {})[m] = {"score": r.get("score"), "objectives": r.get("objectives") or {}}
+        acc.setdefault(t, {}).setdefault(m, []).append(r)
+    out = {}
+    for t, models in acc.items():
+        out[t] = {}
+        for m, rows in models.items():
+            rows = sorted(rows, key=lambda r: r.get("rep", 0))
+            scores = [r.get("score") for r in rows if r.get("score") is not None]
+            hps = [bool(r.get("hard_pass")) for r in rows]
+            out[t][m] = {
+                "score": mean([r.get("score") for r in rows]),
+                "sd": st.stdev(scores) if len(scores) > 1 else None,
+                "n": len(rows),
+                "reps": rows,
+                "objectives": {k: mean([(r.get("objectives") or {}).get(k) for r in rows]) for k in OBJ_COLS},
+                "hard_pass": any(hps),        # ANY rep clean → this tier can do it (needed by tier_evidence)
+                "hard_pass_k": sum(hps),
+            }
     return out
 
 
@@ -96,13 +125,17 @@ def _objrow(objs):
 
 
 def calib_bands(run_task_ids, files=None):
-    files = files or [os.path.join(HERE, "calibration.jsonl"), os.path.join(HERE, "calibration-hard.jsonl")]
-    rows = [r for p in files for r in jl(p)]
+    """Reference band per model, averaged over the run's tasks. Means per (model, task) FIRST, then
+    across tasks — so a task with more reference reps cannot outweigh the others. Identical to the
+    old row-wise mean when every reference point is n=1."""
+    refs = calib_by_task_full(files)
     band = {}
-    for r in rows:
-        if run_task_ids and r.get("task") not in run_task_ids:
+    for t, models in refs.items():
+        if run_task_ids and t not in run_task_ids:
             continue
-        band.setdefault(r.get("model"), []).append(r.get("score"))
+        for m, d in models.items():
+            if d.get("score") is not None:
+                band.setdefault(m, []).append(d["score"])
     return {m: pct(v) for m, v in band.items() if mean(v) is not None}
 
 
@@ -167,14 +200,15 @@ def render_md(cells, bands):
          "", "_All numbers computed in Python from out/*.jsonl. The analysis LLM writes prose from THIS "
          "+ charts/appendix.md — it does not read the per-reply jsonl._", "",
          "## Per-cell aggregates", "",
-         "| cell | model | depth | kv | budget | n | TS % | hard % | judge/5 | judge d·c·r | think tok | ttfa s | full s | decode t/s | peak VRAM | peak GTT | runaway % | fails |",
-         "|------|-------|-------|----|-------:|--:|-----:|-------:|--------:|:-----------:|----------:|-------:|-------:|-----------:|----------:|---------:|----------:|------:|"]
+         "| cell | model | depth | kv | budget | n | TS % | worst | best | hard % | judge/5 | judge d·c·r | think tok | ttfa s | full s | decode t/s | peak VRAM | peak GTT | runaway % | fails |",
+         "|------|-------|-------|----|-------:|--:|-----:|------:|-----:|-------:|--------:|:-----------:|----------:|-------:|-------:|-----------:|----------:|---------:|----------:|------:|"]
     for l in order:
         c = cells[l]
         ja = c.get("judge_axes") or {}
         dcr = ("·".join(f(ja.get(ax), 1) for ax in ("design", "clarity", "robustness"))) if ja else "—"
         L.append(f"| {l} | {c['model']} | {c['depth']} | {c['kv']} | {c['budget']} | {c['n']} | "
-                 f"{f(c['ts_pct'],0)} | {f(c['hard_pct'],0)} | {f(c['judge'],1)} | {dcr} | {f(c['think_tok'],0)} | "
+                 f"{f(c['ts_pct'],0)} | {f(c.get('ts_worst'),0)} | {f(c.get('ts_best'),0)} | "
+                 f"{f(c['hard_pct'],0)} | {f(c['judge'],1)} | {dcr} | {f(c['think_tok'],0)} | "
                  f"{f(c['ttfa_s'],1)} | {f(c['ttlt_s'],1)} | {f(c['decode_tps'],1)} | {f(c['peak_vram'],0)} | {f(c['peak_gtt'],0)} | "
                  f"{f(c['runaway_pct'],0)} | {c['n_fail']} |")
     L += ["", "## Findings (computed, not inferred)", ""]
@@ -189,6 +223,178 @@ def _cell_name(label, cfgs):
     c = cfgs.get(label, {})
     name = _LADDER_NAME.get(label) or label     # label is unique → never collide if not in the ladder map
     return f"{name} ({c.get('kv', '?')})"
+
+
+T_CRIT_95 = {1: 12.71, 2: 4.303, 3: 3.182, 4: 2.776, 5: 2.571, 6: 2.447, 7: 2.365, 8: 2.306, 9: 2.262}
+
+
+def _sdse(xs):
+    """(mean, sd, se) — sd/se are None for n<2."""
+    xs = [x for x in xs if isinstance(x, (int, float))]
+    if not xs:
+        return None, None, None
+    if len(xs) < 2:
+        return xs[0], None, None
+    sd = st.stdev(xs)
+    return st.mean(xs), sd, sd / len(xs) ** 0.5
+
+
+def tier_evidence(task, refs):
+    """TIER = the weakest REFERENCE tier that produces a strictly-clean **hard_pass** — it is NOT a score
+    band (a task can be 'opus-tier' while every model scores 60-90% on partial credit). Recompute it from
+    the measured calibration so a stale label (assigned under the old binary grader) cannot mislead."""
+    rf = refs.get(task, {})
+    seen, hp = [], None
+    for m in ("haiku", "sonnet", "opus"):
+        r = rf.get(m)
+        if not r:
+            seen.append(f"{m} n/a")
+            continue
+        ok = bool(r.get("hard_pass"))          # ANY rep strictly clean → the tier can do it
+        n, k = r.get("n", 1), r.get("hard_pass_k", 0)
+        # With reps, a bare ✓/✗ hides how RELIABLY the tier passes: 1/3 and 3/3 are both "✓" but mean
+        # very different things. Show k/n whenever n>1; n=1 renders exactly as before.
+        mark = ("✓" if ok else "✗") + (f"{k}/{n}" if n > 1 else "")
+        seen.append(f"{m} {f(100*r['score'],0)}%{mark}")
+        if ok and hp is None:
+            hp = m
+    return hp, " · ".join(seen)
+
+
+def render_uncertainty(D, configs_path=None):
+    """Uncertainty + significance — WITHOUT this the reader treats noise as shape. Reports per-cell
+    sd/SE/95% CI, the within-(cell,task) rep noise, and a PAIRED-by-task t-test vs the Q4_K_M baseline
+    (pairing removes task-difficulty variance = the most sensitive test available at this n)."""
+    cfgs = {c["label"]: c for c in jl(configs_path or os.path.join(HERE, "configs.jsonl"))}
+    ts = jl(f"{D}/scores_typescript.jsonl")
+    if not ts:
+        return ""
+    tasks = list(dict.fromkeys(r.get("task_id") for r in ts))
+    def sc(lbl, task=None):
+        return [100 * r["score"] for r in ts if r.get("config") == lbl and r.get("score") is not None
+                and (task is None or r.get("task_id") == task)]
+    order = [l for l, _ in QUANT_LADDER] + [A3B_CELL]
+    labels = [l for l in order if l in cfgs] + [l for l in cfgs if l not in order]
+    L = ["", "## Uncertainty — is the ladder resolvable? (READ BEFORE QUOTING ANY Δ)", "",
+         "| cell | n | TS % | sd | SE | 95% CI |", "|---|--:|--:|--:|--:|:--:|"]
+    for lbl in labels:
+        s = sc(lbl)
+        if not s:
+            continue
+        m, sd, se = _sdse(s)
+        ci = f"[{f(m-1.96*se,1)}, {f(m+1.96*se,1)}]" if se else "—"
+        L.append(f"| {_cell_name(lbl, cfgs)} | {len(s)} | {f(m,1)} | {f(sd,1)} | {f(se,1)} | {ci} |")
+    # within-(cell,task) rep noise
+    reps_sd = [st.stdev(sc(l, t)) for l in labels for t in tasks if len(sc(l, t)) > 1]
+    if reps_sd:
+        msd = st.mean(reps_sd)
+        L += ["", f"**Rep noise (MEASURED):** mean within-(cell,task) sd = **{f(msd,1)} pts** → SE of a "
+              f"{len(sc(labels[0], tasks[0]))}-rep mean ≈ **{f(msd/max(len(sc(labels[0], tasks[0])),1)**0.5,1)} pts**. "
+              f"A single-task cell-vs-cell gap must exceed ~**{f(2*1.96*msd/max(len(sc(labels[0], tasks[0])),1)**0.5,0)} pts** to beat rep noise alone."]
+    # paired-by-task t-test vs baseline
+    base = QUANT_LADDER[0][0]
+    if base in cfgs:
+        L += ["", f"### Paired Δ vs {_LADDER_NAME.get(base, base)} (by task — removes task-difficulty variance)", "",
+              "| cell | Δ per task | meanΔ | sd | t | verdict |", "|---|---|--:|--:|--:|---|"]
+        for lbl in labels:
+            if lbl == base:
+                continue
+            d = [st.mean(sc(lbl, t)) - st.mean(sc(base, t)) for t in tasks if sc(lbl, t) and sc(base, t)]
+            if len(d) < 2:
+                continue
+            m, sd, se = _sdse(d)
+            tv = m / se if se else 0.0
+            crit = T_CRIT_95.get(len(d) - 1, 2.0)
+            verdict = "**SIGNIFICANT**" if abs(tv) > crit else f"not significant (|t|<{crit}, n={len(d)} tasks)"
+            L.append(f"| {_cell_name(lbl, cfgs)} | {', '.join(f'{x:+.0f}' for x in d)} | **{f(m,1)}** | "
+                     f"{f(sd,1)} | {f(tv,2)} | {verdict} |")
+        if reps_sd:
+            sd_d = st.mean([st.stdev([st.mean(sc(l, t)) - st.mean(sc(base, t)) for t in tasks])
+                            for l in labels if l != base and all(sc(l, t) for t in tasks)] or [0])
+            if sd_d:
+                need = lambda dl: 2 * (1.96 + 0.84) ** 2 * sd_d ** 2 / dl ** 2
+                L += ["", f"**Power (INFERRED):** with **{len(tasks)} tasks** this design resolves only "
+                      f"**≳{f(2.776*sd_d/len(tasks)**0.5,0)} pts**. To detect Δ=10 pts needs ~**{need(10):.0f} tasks**; "
+                      f"Δ=5 pts needs ~**{need(5):.0f} tasks** (reps do not help — task-to-task variance dominates)."]
+    return "\n".join(L) + "\n"
+
+
+def render_fluctuation(D, configs_path=None):
+    """FLUCTUATION + RERUN VALUE — the mean hides the two things a user actually decides on: how much a
+    cell swings, and whether re-rolling buys anything.
+
+    Three ideas, kept distinct on purpose:
+      * **worst / best**  — the raw extremes over every reply in the cell. Range = best - worst.
+      * **rep sd**        — mean within-(cell,task) sd = how much the SAME cell varies on the SAME task.
+        This is THE fluctuation number, and comparing it ACROSS cells is how "did this setting calm the
+        model down?" gets answered (budget / temperature axes). Cell-level sd would be useless here: it
+        is dominated by task difficulty, not by instability.
+      * **best-of-R / Δ rerun** — per task take the BEST rep, then average over tasks. Δ rerun =
+        best-of-R − mean = what re-rolling R times and keeping the winner buys you.
+
+    Why best-of-R is honest here (and not oracle cheating): the pick is made by the TOOLCHAIN, not by a
+    human who already knows the answer — tsc/eslint/vitest say which candidate is clean. `hard@R` (a task
+    counts if ANY rep is strictly clean) is therefore a REAL, reproducible strategy for this task class,
+    which is exactly why it is reported next to hard@1."""
+    cfgs = {c["label"]: c for c in jl(configs_path or os.path.join(HERE, "configs.jsonl"))}
+    ts = jl(f"{D}/scores_typescript.jsonl")
+    if not ts:
+        return ""
+    tasks = list(dict.fromkeys(r.get("task_id") for r in ts))
+    order = [l for l, _ in QUANT_LADDER] + [A3B_CELL]
+    labels = [l for l in order if l in cfgs] + [l for l in cfgs if l not in order]
+
+    def rows_of(lbl, task=None):
+        return [r for r in ts if r.get("config") == lbl and r.get("score") is not None
+                and (task is None or r.get("task_id") == task)]
+
+    def sc(lbl, task=None):
+        return [100 * r["score"] for r in rows_of(lbl, task)]
+
+    L = ["", "## Fluctuation & rerun value (the mean hides both)", "",
+         "_`rep sd` = mean within-(cell,task) sd — how much the same cell swings on the same task; compare it "
+         "ACROSS cells to see whether a setting **changed** the fluctuation. `best-of-R` takes the best rep per "
+         "task, then averages over tasks; `Δ rerun` = best-of-R − mean = what re-rolling buys. `hard@1` = "
+         "per-reply strict-clean rate; `hard@R` = share of TASKS where **any** rep is strictly clean — the "
+         "toolchain (tsc/eslint/vitest) picks the winner, so this is a real strategy, not an oracle._", "",
+         "| cell | n | mean | worst | best | range | **rep sd** | best-of-R | **Δ rerun** | worst-of-R | hard@1 | **hard@R** |",
+         "|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|"]
+    base_sd = None
+    for lbl in labels:
+        s = sc(lbl)
+        if not s:
+            continue
+        per_task = [sc(lbl, t) for t in tasks if sc(lbl, t)]
+        sds = [st.stdev(v) for v in per_task if len(v) > 1]
+        rsd = st.mean(sds) if sds else None
+        if base_sd is None and rsd is not None:
+            base_sd = rsd
+        bestR = mean([max(v) for v in per_task]) if per_task else None
+        worstR = mean([min(v) for v in per_task]) if per_task else None
+        m = st.mean(s)
+        hp1 = pct([1 if r.get("hard_pass") else 0 for r in rows_of(lbl)])
+        hpR = pct([1 if any(r.get("hard_pass") for r in rows_of(lbl, t)) else 0 for t in tasks if rows_of(lbl, t)])
+        L.append(f"| {_cell_name(lbl, cfgs)} | {len(s)} | {f(m,1)} | {f(min(s),0)} | {f(max(s),0)} | "
+                 f"{f(max(s)-min(s),0)} | **{f(rsd,1)}** | {f(bestR,1)} | **{f((bestR-m) if bestR is not None else None,1)}** | "
+                 f"{f(worstR,1)} | {f(hp1,0)}% | **{f(hpR,0)}%** |")
+
+    # change of fluctuation: rep sd per cell against the first cell (the campaign's baseline)
+    if len(labels) > 1:
+        ref = labels[0]
+        rows = []
+        for lbl in labels:
+            sds = [st.stdev(sc(lbl, t)) for t in tasks if len(sc(lbl, t)) > 1]
+            if sds:
+                rows.append((lbl, st.mean(sds)))
+        if len(rows) > 1 and base_sd:
+            L += ["", f"**Change of fluctuation vs `{_cell_name(ref, cfgs)}` (rep sd, pts):**", "",
+                  "| cell | rep sd | Δ sd vs baseline | steadier? |", "|---|--:|--:|:--:|"]
+            for lbl, v in rows:
+                d = v - base_sd
+                mark = "—" if lbl == ref else ("✅ steadier" if d < -1 else ("⚠ noisier" if d > 1 else "≈ same"))
+                L.append(f"| {_cell_name(lbl, cfgs)} | {f(v,1)} | {f(d,1) if lbl != ref else '—'} | {mark} |")
+            L += ["", "_A Δ sd inside ±1 pt is not a change — rep sd is itself estimated from few reps._"]
+    return "\n".join(L) + "\n"
 
 
 def render_reps(D, configs_path=None, calib_files=None):
@@ -211,10 +417,22 @@ def render_reps(D, configs_path=None, calib_files=None):
     sep = "|" + "---|" * (5 + len(OBJ_COLS) + 1)
     L = ["", "## Per-rep detail — every rep + haiku/sonnet/opus reference (nothing averaged away)", "",
          "_Local cells show all REPS individually (full objective vector 0–1) then a **mean** row; "
-         "references are one-shot. `— (no calib)` = reference point not yet collected (see README add-on D)._", ""]
+         "references are one-shot. `— (no calib)` = reference point not yet collected (see README add-on D)._",
+         "",
+         "> **TIER is a difficulty class, NOT a score band.** It names the weakest REFERENCE tier that produces a "
+         "strictly-clean **hard_pass** — so a task can be `tier opus` while every model scores 60–90% on partial "
+         "credit. Each header below prints the label next to the MEASURED hard-pass evidence; trust the evidence.",
+         "> **The references are NOT depth-matched:** they are one-shot on a ~550–620-token prompt, while local "
+         "cells answer the same task at ~132.9k tokens (**~213× deeper**), and each reference is a single sample "
+         "(n=1) vs the local n=3. Reference-vs-local Δ are therefore indicative only — do not quote them as a "
+         "like-for-like capability gap.", ""]
     for task in tasks:
         tier = next((r.get("tier") for r in ts if r.get("task_id") == task and r.get("tier")), "?")
-        L += [f"### {task} · tier {tier}", "", hdr, sep]
+        hp, ev = tier_evidence(task, refs)
+        measured = hp or "NONE (ceiling)"
+        flag = "" if (hp == tier or (hp is None and tier == "opus")) else \
+               f"  ⚠ **LABEL CONTRADICTED BY DATA** (label says `{tier}`, measured weakest hard-pass = `{measured}`)"
+        L += [f"### {task} · tier `{tier}` — measured weakest hard-pass: **{measured}** ({ev}){flag}", "", hdr, sep]
         for label in labels:
             rows = sorted([r for r in ts if r.get("config") == label and r.get("task_id") == task],
                           key=lambda r: r.get("rep", 0))
@@ -234,12 +452,22 @@ def render_reps(D, configs_path=None, calib_files=None):
                      f"{f(pct([1 if x.get('hard_pass') else 0 for x in rows]),0)}% | {_objrow(mobj)} | | |")
         rf = refs.get(task, {})
         for m in ("haiku", "sonnet", "opus"):
-            if m in rf:
-                d = rf[m]
+            if m not in rf:
+                L.append(f"| _{m}_ | – | — (no calib) | | " + " | ".join("—" for _ in OBJ_COLS) + " | | |")
+                continue
+            d = rf[m]
+            reps = d.get("reps") or []
+            if len(reps) > 1:      # multi-rep reference: every rep, then a mean row (as for local cells)
+                for r in reps:
+                    sc = None if r.get("score") is None else 100 * r["score"]
+                    L.append(f"| _{m}_ ref | {r.get('rep',0)} | {f(sc,0)} | {'✓' if r.get('hard_pass') else '✗'} | "
+                             f"{_objrow(r.get('objectives'))} | | |")
+                L.append(f"| _**{m} — mean**_ | – | **{f(pct([r.get('score') for r in reps]),0)}** | "
+                         f"{f(pct([1 if r.get('hard_pass') else 0 for r in reps]),0)}% | "
+                         f"{_objrow(d.get('objectives'))} | | |")
+            else:
                 sc = None if d.get("score") is None else 100 * d["score"]
                 L.append(f"| _{m}_ 1-shot | – | {f(sc,0)} | | {_objrow(d.get('objectives'))} | | |")
-            else:
-                L.append(f"| _{m}_ | – | — (no calib) | | " + " | ".join("—" for _ in OBJ_COLS) + " | | |")
         L.append("")
     return "\n".join(L) + "\n"
 
@@ -248,7 +476,9 @@ def build_digest(D, out_path=None, configs_path=None, calib_files=None):
     cells = load_cells(D, configs_path)
     run_task_ids = {r.get("task_id") for r in jl(f"{D}/scores_typescript.jsonl")}
     bands = calib_bands(run_task_ids, calib_files)
-    md = render_md(cells, bands) + render_reps(D, configs_path, calib_files)
+    md = (render_md(cells, bands) + render_uncertainty(D, configs_path)
+          + render_fluctuation(D, configs_path)
+          + render_reps(D, configs_path, calib_files))
     out_path = out_path or f"{D}/summary.md"
     with open(out_path, "w") as fh:
         fh.write(md)
@@ -354,12 +584,18 @@ def main():
     ap.add_argument("--by-task", action="store_true", help="also emit out/summary_by_task.json (per task×config)")
     ap.add_argument("--scores", default="scores_typescript.jsonl", help="grade file to aggregate (e.g. the corrected re-grade)")
     a = ap.parse_args()
-    if a.by_task:
-        outp, by = build_by_task(a.dir, a.scores)
-        print(f"wrote {outp} ({len(by)} tasks) from {a.scores}")
-        return
+    # --by-task is ADDITIVE, as its help says. It used to `return` early, so summary.md and
+    # summary_by_task.json could only ever be produced by two SEPARATE invocations — which is exactly
+    # how they drifted apart (summary_by_task.json 16 min behind a corrected re-grade, 2026-07-15).
+    # One invocation now writes both, from the same data, always.
     outp, cells, _, _ = build_digest(a.dir, a.out or None)
     print(f"wrote {outp} ({len(cells)} cells) + {outp.replace('.md', '.json')}")
+    if a.by_task:
+        if a.scores != "scores_typescript.jsonl":
+            print(f"  NOTE: --scores {a.scores} applies to summary_by_task.json only; the digest above "
+                  f"is built from scores_typescript.jsonl — do not compare them.", file=sys.stderr)
+        outp2, by = build_by_task(a.dir, a.scores)
+        print(f"wrote {outp2} ({len(by)} tasks) from {a.scores}")
 
 
 if __name__ == "__main__":
