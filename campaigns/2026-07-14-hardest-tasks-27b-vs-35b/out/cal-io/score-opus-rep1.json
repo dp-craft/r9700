@@ -1,0 +1,27 @@
+{
+  "id": "opus-rep1",
+  "score": 0.968,
+  "hard_pass": false,
+  "objectives": {
+    "types": 1.0,
+    "lint": 0.8,
+    "tests": 1.0,
+    "bdd": 0.95,
+    "novj": 1.0,
+    "reuse": 1.0,
+    "edge": 1.0
+  },
+  "test_counts": {
+    "own": [
+      19,
+      19
+    ]
+  },
+  "files": [
+    "cache.ts",
+    "pricing.test.ts",
+    "pricing.ts",
+    "report.ts",
+    "types.ts"
+  ]
+}

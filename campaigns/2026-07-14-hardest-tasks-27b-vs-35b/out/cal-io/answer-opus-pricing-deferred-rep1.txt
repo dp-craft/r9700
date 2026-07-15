@@ -1,0 +1,321 @@
+// FILE: types.ts
+export type Amount =
+  | { readonly kind: "fixed"; readonly value: number }
+  | { readonly kind: "percent"; readonly pct: number }
+  | { readonly kind: "deferred"; readonly load: () => Promise<number> };
+
+export interface LineItem {
+  readonly id: string;
+  readonly base: number;
+  readonly adjustment: Amount;
+}
+
+
+// FILE: pricing.ts
+import type { Amount, LineItem } from "./types";
+
+export const PERCENT_BASE = 100;
+const EMPTY_TOTAL = 0;
+
+/** Percentage carried by an amount; non-percent amounts contribute no rate. */
+function pctOf(amount: Amount): number {
+  return amount.kind === "percent" ? amount.pct : 0;
+}
+
+/** Resolve the adjustment an amount contributes to `base`.
+ *  A `deferred` amount is loaded on demand and then behaves exactly like `fixed`. */
+async function adjustmentOf(base: number, amount: Amount): Promise<number> {
+  switch (amount.kind) {
+    case "fixed":
+      return amount.value;
+    case "deferred":
+      return await amount.load();
+    case "percent":
+      return (base * pctOf(amount)) / PERCENT_BASE;
+  }
+}
+
+export async function lineTotal(item: LineItem): Promise<number> {
+  return item.base + (await adjustmentOf(item.base, item.adjustment));
+}
+
+export async function computeTotal(items: readonly LineItem[]): Promise<number> {
+  const totals: readonly number[] = await Promise.all(
+    items.map((item: LineItem): Promise<number> => lineTotal(item)),
+  );
+  return totals.reduce((sum: number, total: number): number => sum + total, EMPTY_TOTAL);
+}
+
+
+// FILE: report.ts
+import type { Amount, LineItem } from "./types";
+import { lineTotal } from "./pricing";
+
+const KIND_LABEL: Partial<Record<Amount["kind"], string>> = {
+  fixed: "flat",
+  percent: "rate",
+  deferred: "deferred",
+};
+const UNKNOWN_LABEL = "other";
+
+export function amountLabel(amount: Amount): string {
+  return KIND_LABEL[amount.kind] ?? UNKNOWN_LABEL;
+}
+
+export async function reportLine(item: LineItem): Promise<string> {
+  const total: number = await lineTotal(item);
+  return `${item.id} [${amountLabel(item.adjustment)}]: ${String(total)}`;
+}
+
+export async function buildReport(items: readonly LineItem[]): Promise<readonly string[]> {
+  return await Promise.all(items.map((item: LineItem): Promise<string> => reportLine(item)));
+}
+
+
+// FILE: cache.ts
+import type { Clock } from "../../lib/clock";
+
+export interface PriceCache {
+  /** Return the cached total for `key` if fresh, else run `compute` and cache its result. */
+  get(key: string, compute: () => Promise<number>): Promise<number>;
+}
+
+interface CacheEntry {
+  readonly value: number;
+  readonly expiresAt: number;
+}
+
+const DEFAULT_TTL_MS = 60_000;
+
+export function createPriceCache(clock: Clock, ttlMs: number = DEFAULT_TTL_MS): PriceCache {
+  const entries = new Map<string, CacheEntry>();
+  /** Computations already running, keyed by cache key: concurrent `get` calls join these
+   *  instead of starting a second `compute`. A rejected run is dropped, never cached. */
+  const inFlight = new Map<string, Promise<number>>();
+
+  function forget(key: string, run: Promise<number>): void {
+    if (inFlight.get(key) === run) {
+      inFlight.delete(key);
+    }
+  }
+
+  function start(key: string, compute: () => Promise<number>): Promise<number> {
+    const run: Promise<number> = (async (): Promise<number> => {
+      const value: number = await compute();
+      entries.set(key, { value, expiresAt: clock.now() + ttlMs });
+      return value;
+    })();
+    inFlight.set(key, run);
+    const cleanup = (): void => {
+      forget(key, run);
+    };
+    void run.then(cleanup, cleanup);
+    return run;
+  }
+
+  return {
+    get(key: string, compute: () => Promise<number>): Promise<number> {
+      const hit = entries.get(key);
+      if (hit !== undefined && hit.expiresAt > clock.now()) {
+        return Promise.resolve(hit.value);
+      }
+      const pending = inFlight.get(key);
+      if (pending !== undefined) {
+        return pending;
+      }
+      return start(key, compute);
+    },
+  };
+}
+
+
+// FILE: pricing.test.ts
+import { describe, it, expect } from "vitest";
+import { computeTotal, lineTotal } from "./pricing";
+import { amountLabel, buildReport, reportLine } from "./report";
+import { createPriceCache } from "./cache";
+import type { LineItem } from "./types";
+
+const TTL_MS = 1000;
+const FROZEN_NOW = 0;
+
+/** A deferred amount whose `load` counts its invocations, so tests can assert call counts. */
+function countingDeferred(value: number): { readonly load: () => Promise<number>; calls: () => number } {
+  let calls = 0;
+  return {
+    load: async (): Promise<number> => {
+      calls += 1;
+      return await Promise.resolve(value);
+    },
+    calls: (): number => calls,
+  };
+}
+
+describe("pricing", () => {
+  it("should add the fixed value when the adjustment is fixed", async () => {
+    expect(await lineTotal({ id: "a", base: 100, adjustment: { kind: "fixed", value: 20 } })).toBe(120);
+  });
+  it("should apply the rate when the adjustment is a percent", async () => {
+    expect(await lineTotal({ id: "b", base: 200, adjustment: { kind: "percent", pct: 10 } })).toBe(220);
+  });
+  it("should add the resolved value when the adjustment is deferred", async () => {
+    const deferred = countingDeferred(20);
+    expect(await lineTotal({ id: "c", base: 100, adjustment: { kind: "deferred", load: deferred.load } })).toBe(120);
+    expect(deferred.calls()).toBe(1);
+  });
+  it("should sum the line totals when computing an order total", async () => {
+    const items = [
+      { id: "a", base: 100, adjustment: { kind: "fixed", value: 20 } },
+      { id: "b", base: 200, adjustment: { kind: "percent", pct: 10 } },
+    ] as const;
+    expect(await computeTotal(items)).toBe(340);
+  });
+  it("should include the resolved deferred totals when computing an order total", async () => {
+    const items: readonly LineItem[] = [
+      { id: "a", base: 100, adjustment: { kind: "fixed", value: 20 } },
+      { id: "b", base: 200, adjustment: { kind: "percent", pct: 10 } },
+      { id: "c", base: 50, adjustment: { kind: "deferred", load: async (): Promise<number> => 5 } },
+    ];
+    expect(await computeTotal(items)).toBe(395);
+  });
+  it("should reject the total when a deferred load fails", async () => {
+    const item: LineItem = {
+      id: "c",
+      base: 100,
+      adjustment: {
+        kind: "deferred",
+        load: async (): Promise<number> => {
+          throw new Error("load failed");
+        },
+      },
+    };
+    await expect(lineTotal(item)).rejects.toThrow("load failed");
+  });
+});
+
+describe("report", () => {
+  it("should label each adjustment when building the report", () => {
+    expect(amountLabel({ kind: "fixed", value: 5 })).toBe("flat");
+    expect(amountLabel({ kind: "percent", pct: 5 })).toBe("rate");
+  });
+  it("should label the adjustment deferred when the amount is deferred", () => {
+    expect(amountLabel({ kind: "deferred", load: async (): Promise<number> => 5 })).toBe("deferred");
+  });
+  it("should render one line per item when building the report", async () => {
+    const lines = await buildReport([{ id: "a", base: 100, adjustment: { kind: "fixed", value: 20 } }]);
+    expect(lines).toEqual(["a [flat]: 120"]);
+  });
+  it("should render the resolved total when the adjustment is deferred", async () => {
+    const line = await reportLine({
+      id: "c",
+      base: 100,
+      adjustment: { kind: "deferred", load: async (): Promise<number> => 20 },
+    });
+    expect(line).toBe("c [deferred]: 120");
+  });
+  it("should never render a stringified promise when the report mixes deferred items", async () => {
+    const lines = await buildReport([
+      { id: "a", base: 100, adjustment: { kind: "fixed", value: 20 } },
+      { id: "c", base: 50, adjustment: { kind: "deferred", load: async (): Promise<number> => 5 } },
+    ]);
+    expect(lines).toEqual(["a [flat]: 120", "c [deferred]: 55"]);
+  });
+});
+
+describe("createPriceCache", () => {
+  it("should reuse the cached total when the entry is still fresh", async () => {
+    let calls = 0;
+    const cache = createPriceCache({ now: (): number => FROZEN_NOW }, TTL_MS);
+    const compute = async (): Promise<number> => {
+      calls += 1;
+      return 42;
+    };
+    expect(await cache.get("k", compute)).toBe(42);
+    expect(await cache.get("k", compute)).toBe(42);
+    expect(calls).toBe(1);
+  });
+  it("should recompute the total when the entry has expired", async () => {
+    let t = 0;
+    let calls = 0;
+    const cache = createPriceCache({ now: (): number => t }, TTL_MS);
+    const compute = async (): Promise<number> => {
+      calls += 1;
+      return calls;
+    };
+    expect(await cache.get("k", compute)).toBe(1);
+    t = 1500;
+    expect(await cache.get("k", compute)).toBe(2);
+    expect(calls).toBe(2);
+  });
+  it("should share one computation when concurrent gets race for the same key", async () => {
+    let calls = 0;
+    let release: (value: number) => void = (): void => undefined;
+    const gate = new Promise<number>((resolve: (value: number) => void): void => {
+      release = resolve;
+    });
+    const cache = createPriceCache({ now: (): number => FROZEN_NOW }, TTL_MS);
+    const compute = async (): Promise<number> => {
+      calls += 1;
+      return await gate;
+    };
+    const both = Promise.all([cache.get("k", compute), cache.get("k", compute)]);
+    release(7);
+    expect(await both).toEqual([7, 7]);
+    expect(calls).toBe(1);
+  });
+  it("should load a deferred amount once when concurrent gets race for the same key", async () => {
+    const deferred = countingDeferred(20);
+    const item: LineItem = { id: "c", base: 100, adjustment: { kind: "deferred", load: deferred.load } };
+    const cache = createPriceCache({ now: (): number => FROZEN_NOW }, TTL_MS);
+    const compute = (): Promise<number> => lineTotal(item);
+    const totals = await Promise.all([cache.get(item.id, compute), cache.get(item.id, compute)]);
+    expect(totals).toEqual([120, 120]);
+    expect(deferred.calls()).toBe(1);
+  });
+  it("should retry the computation when the previous attempt failed", async () => {
+    let calls = 0;
+    const cache = createPriceCache({ now: (): number => FROZEN_NOW }, TTL_MS);
+    const compute = async (): Promise<number> => {
+      calls += 1;
+      if (calls === 1) {
+        throw new Error("boom");
+      }
+      return 5;
+    };
+    await expect(cache.get("k", compute)).rejects.toThrow("boom");
+    expect(await cache.get("k", compute)).toBe(5);
+    expect(calls).toBe(2);
+  });
+  it("should reject every concurrent get when the shared computation fails", async () => {
+    let calls = 0;
+    const cache = createPriceCache({ now: (): number => FROZEN_NOW }, TTL_MS);
+    const compute = async (): Promise<number> => {
+      calls += 1;
+      await Promise.resolve();
+      throw new Error("boom");
+    };
+    const first = cache.get("k", compute);
+    const second = cache.get("k", compute);
+    await expect(first).rejects.toThrow("boom");
+    await expect(second).rejects.toThrow("boom");
+    expect(calls).toBe(1);
+  });
+  it("should keep the totals independent when different keys are cached", async () => {
+    const cache = createPriceCache({ now: (): number => FROZEN_NOW }, TTL_MS);
+    expect(await cache.get("a", async (): Promise<number> => 1)).toBe(1);
+    expect(await cache.get("b", async (): Promise<number> => 2)).toBe(2);
+    expect(await cache.get("a", async (): Promise<number> => 99)).toBe(1);
+    expect(await cache.get("b", async (): Promise<number> => 99)).toBe(2);
+  });
+  it("should give the same total with the cache as without it", async () => {
+    const items: readonly LineItem[] = [
+      { id: "a", base: 100, adjustment: { kind: "fixed", value: 20 } },
+      { id: "b", base: 200, adjustment: { kind: "percent", pct: 10 } },
+      { id: "c", base: 50, adjustment: { kind: "deferred", load: async (): Promise<number> => 5 } },
+    ];
+    const cache = createPriceCache({ now: (): number => FROZEN_NOW }, TTL_MS);
+    const uncached = await computeTotal(items);
+    const cached = await cache.get("order", (): Promise<number> => computeTotal(items));
+    expect(cached).toBe(uncached);
+  });
+});
