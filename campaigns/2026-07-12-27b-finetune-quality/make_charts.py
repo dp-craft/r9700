@@ -132,6 +132,48 @@ def dumbbell(title, rows, w=720):
     return svg(w, int(h), "".join(b))
 
 
+def spread(title, rows, w=720, sub="", refs=None):
+    """rows: (label, worst, mean, best, slot). A worst→best line with the mean marked — the BAR WIDTH
+    IS THE FLUCTUATION, which is the whole point: a mean alone hides whether a config is steady or a
+    coin-flip. `best` doubles as the rerun ceiling (what re-rolling could reach).
+
+    `mean` may be None → no diamond is drawn. Use that when the two ends are a PAIR rather than a
+    distribution (e.g. hard@1 vs hard@N): inventing a midpoint marker would draw a statistic that
+    does not exist.
+
+    Distinct from dumbbell(), which is latency-specific (ttft→ttfa→ttlt, hardcoded seconds). This one
+    is a generic worst/mean/best spread on a 0–100 score axis.
+    refs: optional [(label, value)] vertical dashed lines, sharing the x-scale."""
+    rows = [r for r in rows if isinstance(r[1], (int, float)) and isinstance(r[3], (int, float))]
+    refs = [(l, v) for l, v in (refs or []) if isinstance(v, (int, float))]
+    pad_l, pad_r, top, rh, gap = 168, 84, 66, 24, 16
+    h = top + len(rows) * (rh + gap) + 34
+    vmax = max([r[3] for r in rows] + [v for _, v in refs] + [1e-9]) * 1.12
+    plot_w = w - pad_l - pad_r
+    def x(v): return pad_l + plot_w * v / vmax
+    b = [f'<text x="20" y="26" class="t" font-size="15">{esc(title)}</text>',
+         f'<text x="20" y="44" class="mut" font-size="11">'
+         f'{esc(sub or "○ worst — ◆ mean — ● best · a WIDER bar = a less predictable config")}</text>']
+    for lab, v in refs:
+        b.append(f'<line x1="{x(v):.1f}" y1="{top-8}" x2="{x(v):.1f}" y2="{h-26}" stroke="var(--grid)" '
+                 f'stroke-width="1" stroke-dasharray="4 3"/>')
+        b.append(f'<text x="{x(v):.1f}" y="{h-14}" text-anchor="middle" class="mut" font-size="10">{esc(lab)}</text>')
+    for i, (lab, worst, m, best, slot) in enumerate(rows):
+        y = top + i * (rh + gap) + rh / 2
+        b.append(f'<text x="{pad_l-10}" y="{y+4}" text-anchor="end" class="lab" font-size="12.5">{esc(lab)}</text>')
+        b.append(f'<line x1="{x(worst):.1f}" y1="{y}" x2="{x(best):.1f}" y2="{y}" stroke="var(--s{slot+1})" '
+                 f'stroke-width="3" opacity="0.45"/>')
+        b.append(f'<circle cx="{x(worst):.1f}" cy="{y}" r="5.5" fill="var(--surface)" stroke="var(--s{slot+1})" stroke-width="2.5"/>')
+        b.append(f'<circle cx="{x(best):.1f}" cy="{y}" r="6" fill="var(--s{slot+1})" stroke="var(--surface)" stroke-width="1.5"/>')
+        if isinstance(m, (int, float)):     # None → the ends are a pair, not a distribution
+            b.append(f'<rect x="{x(m)-4.5:.1f}" y="{y-4.5}" width="9" height="9" rx="1.5" '
+                     f'transform="rotate(45 {x(m):.1f} {y})" fill="var(--s{slot+1})" stroke="var(--surface)" stroke-width="1.5"/>')
+        # "N wide" reads as a spread (distribution); "+N" reads as a gain (a pair). Match the marker.
+        cap = f'{best-worst:.0f} wide' if isinstance(m, (int, float)) else f'+{best-worst:.0f}'
+        b.append(f'<text x="{x(best)+10:.1f}" y="{y+4}" class="val" font-size="12">{cap}</text>')
+    return svg(w, int(h), "".join(b))
+
+
 def scatter_quality_cost(title, pts, w=720, h=470,
                          xlabel="mean tokens per task (cost →)",
                          sub="↑ better quality · ← fewer tokens · so UP-and-LEFT is the efficient choice",
@@ -486,6 +528,41 @@ def main():
             "Hard-pass rate — % of tasks passing ALL gate objectives (types+lint+tests+reuse+edge)",
             sorted([(c, tshard.get(c), S(c)) for c in configs if tshard.get(c) is not None],
                    key=lambda r: -(r[1] or 0)), unit="%", fmt="{:.0f}")
+
+        # --- fluctuation + rerun value: the mean hides whether a config is steady or a coin-flip ---
+        ts_by_cfg = {c: [100 * r["score"] for r in tss
+                         if r.get("config") == c and r.get("score") is not None] for c in configs}
+        spread_rows = [(c, min(v), mean(v), max(v), S(c))
+                       for c in configs for v in [ts_by_cfg.get(c)] if v]
+        if spread_rows:
+            files["fluctuation.svg"] = spread(
+                "Fluctuation — worst / mean / best TS score per config",
+                sorted(spread_rows, key=lambda r: -(r[3] - r[1])),      # widest (least predictable) first
+                sub="○ worst — ◆ mean — ● best · a WIDER bar = a less predictable config; "
+                    "● best is also the rerun ceiling", refs=refs)
+        # hard@1 (per-reply strict-clean rate) vs hard@R (task counts if ANY rep is clean) = what a
+        # re-roll buys. Honest because the TOOLCHAIN picks the winner, not a human who knows the answer.
+        tasks_seen = list(dict.fromkeys(r.get("task_id") for r in tss))
+        rerun_rows = []
+        for c in configs:
+            per = [[r for r in tss if r.get("config") == c and r.get("task_id") == t] for t in tasks_seen]
+            per = [p for p in per if p]
+            if not per:
+                continue
+            m1 = mean([1 if r.get("hard_pass") else 0 for r in tss if r.get("config") == c])
+            mR = mean([1 if any(r.get("hard_pass") for r in p) else 0 for p in per])
+            if m1 is None or mR is None:
+                continue
+            rerun_rows.append((c, 100 * m1, 100 * mR, S(c)))
+        if rerun_rows and any(r[2] > r[1] for r in rerun_rows):
+            files["rerun_value.svg"] = spread(
+                "Rerun value — strict-clean rate: single shot vs best-of-N",
+                # mean=None on purpose: these two ends are a PAIR, not a distribution — a midpoint
+                # diamond here would draw a statistic that does not exist.
+                sorted([(c, h1, None, hR, s) for c, h1, hR, s in rerun_rows],
+                       key=lambda r: -(r[3] - r[1])),
+                sub="○ hard@1 (one shot) — ● hard@N (any rep clean, toolchain picks the winner) · "
+                    "the gap is what re-rolling buys")
         OBJ_RAMP = ["#e06666", "#f0a860", "#f6d24b", "#c6d94a", "#8ec96a", "#4fb06a"]  # 0..1 red→green
         def ocell(c, k):
             v = (obj_mean.get(c) or {}).get(k)
@@ -549,6 +626,8 @@ def main():
         ("quality_vs_time.svg", "Decision: quality vs full answer time (time to LAST token)"),
         ("capability.svg", "Capability — mean TS score vs haiku/sonnet/opus reference"),
         ("hard_pass.svg", "Hard-pass rate (all gate objectives)"),
+        ("fluctuation.svg", "Fluctuation — worst / mean / best per config (wider = less predictable)"),
+        ("rerun_value.svg", "Rerun value — strict-clean rate, single shot vs best-of-N"),
         ("objective_breakdown.svg", "Objective breakdown (where configs fail)"),
         ("quality_vs_cost.svg", "Headline: quality vs token cost (up-and-left wins)"),
         ("quality_deterministic.svg", "Objective accuracy"),

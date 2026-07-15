@@ -108,6 +108,11 @@ def main():
     ap.add_argument("--temp", type=float, default=1.0)     # GGUF-recommended Qwen3.6 sampling
     ap.add_argument("--top-p", type=float, default=0.95)
     ap.add_argument("--top-k", type=int, default=20)
+    ap.add_argument("--presence-penalty", type=float, default=None,
+                    # Qwen ties presence_penalty to the temperature PRESET (thinking-general = 1.0/pp 1.5,
+                    # precise-coding = 0.6/pp 0.0), so a vendor preset cannot be reproduced without it.
+                    # Omitted from the payload when None → server default, i.e. previous behaviour.
+                    help="presence_penalty (Qwen: 0.0 for precise coding, 1.5 for thinking-general)")
     ap.add_argument("--min-p", type=float, default=None,   # Qwen3.6 thinking wants 0; server default is 0.05.
                     help="only sent when set — pin to 0 for Qwen3.6 thinking; omit to keep server default")
     ap.add_argument("--seed", type=int, default=42)        # fixed for reproducibility
@@ -137,6 +142,8 @@ def main():
                             "seed": a.seed + rep}
                 if a.min_p is not None:
                     sampling["min_p"] = a.min_p
+                if a.presence_penalty is not None:
+                    sampling["presence_penalty"] = a.presence_penalty
                 payload = {"messages": [{"role": "user", "content": t["prompt"]}],
                            "max_tokens": a.max_tokens, **sampling}
                 try:

@@ -64,7 +64,19 @@ fi
 # --- 1. build the per-depth task prompts once (shared corpus prefix + per-task rules/spec suffix) ---
 build_depth_tasks() {   # $1 = depth label (64k|128k), $2 = target tokens
   local depth="$1" toks="$2" f="$OUTDIR/tasks-$depth.jsonl"
-  [ -s "$f" ] && { echo "$f"; return; }
+  # Cache is valid ONLY if it holds exactly the task ids the manifest expects. The old check was a
+  # bare `[ -s "$f" ]`, so ADDING a task to tasks.jsonl silently reused the stale prompt file and the
+  # new task was never captured at all.
+  if [ -s "$f" ] && SMOKE="${SMOKE:-0}" python3 - "$HERE" "$f" 2>/dev/null <<'PY'
+import sys, json, os
+here, cache = sys.argv[1], sys.argv[2]
+smoke = os.environ.get("SMOKE") == "1"
+manifest = [json.loads(l) for l in open(os.path.join(here, "tasks.jsonl")) if l.strip()]
+want = {t["id"] for t in manifest if smoke or t.get("matrix", True)}
+have = {json.loads(l)["id"] for l in open(cache) if l.strip()}
+sys.exit(0 if want == have else 1)
+PY
+  then echo "$f"; return; fi
   SMOKE="${SMOKE:-0}" python3 - "$HERE" "$toks" "$f" >&2 <<'PY'
 import sys, json, os
 here, toks, out = sys.argv[1], int(sys.argv[2]), sys.argv[3]
@@ -74,9 +86,17 @@ manifest = [json.loads(l) for l in open(os.path.join(here, "tasks.jsonl")) if l.
 tasks = [t for t in manifest if smoke or t.get("matrix", True)]   # easy tasks (matrix:false) are smoke-only
 with open(out, "w") as fo:
     for t in tasks:
-        prompt = build_context.build(os.path.join(here, "ts-harness", "tasks", t["id"]), toks)
+        # A task may pin its OWN prompt size via `"tokens": N` in tasks.jsonl (pricing-deferred needs
+        # ~85k so that prompt + up to 32,768 thinking + answer still fits ctx 163840). Without this
+        # every task was forced to the cell's depth, which would have made unlimited reasoning
+        # truncate. Depth differing per task is not a confound: Δ is paired BY TASK, and every cell
+        # runs a given task identically.
+        tt = int(t.get("tokens", toks))
+        prompt = build_context.build(os.path.join(here, "ts-harness", "tasks", t["id"]), tt)
         fo.write(json.dumps({"id": t["id"], "type": "ts-tdd", "category": t["tier"],
                              "prompt": prompt}) + "\n")
+        if tt != toks:
+            print(f"  {t['id']}: pinned to ~{tt} tok (cell depth is ~{toks})")
 print(f"built {out} ({len(tasks)}/{len(manifest)} tasks @ ~{toks} tok; smoke={smoke})")
 PY
   echo "$f"
@@ -91,17 +111,49 @@ import json,sys
 for l in open(sys.argv[1]):
     if not l.strip(): continue
     c=json.loads(l)
+    # presence_penalty before role/optin: Qwen ties pp to the temperature PRESET, so a vendor preset
+    # cell (temp 1.0 + pp 1.5) is NOT reproducible without it — without this column those cells would
+    # silently collapse into the plain temp-1.0 cell and fake a "preset ≈ temp" finding.
     print("|".join(str(c.get(k,"")) for k in
-      ["label","model","mtp","kv","depth","tokens","ctx","budget","temp","top_p","top_k","min_p","role","optin"]))
-' "$CONFIGS" | while IFS='|' read -r label model mtp kv depth tokens ctx budget temp top_p top_k min_p role optin; do
+      ["label","model","mtp","kv","depth","tokens","ctx","budget","temp","top_p","top_k","min_p","presence_penalty","role","optin"]))
+' "$CONFIGS" | while IFS='|' read -r label model mtp kv depth tokens ctx budget temp top_p top_k min_p presence_penalty role optin; do
   [ -n "${ONLY:-}" ] && [[ "$label" != ${ONLY} ]] && { echo "skip (ONLY): $label"; continue; }
   [ "$optin" = "True" ] && [ "${RUN_OPTIN:-0}" != "1" ] && { echo "skip (opt-in, set RUN_OPTIN=1): $label"; continue; }
-  [ -f "$OUTDIR/done/$label" ] && { echo "skip (done): $label"; continue; }
   mfile="$MODELS_DIR/$model"
   [ -f "$mfile" ] || { echo "MISSING MODEL, skipping: $mfile" | tee -a "$OUTDIR/failures.txt"; continue; }
   tasks_file=$(build_depth_tasks "$depth" "$tokens")
-  # budget 0 = uncapped/no-think (semantics verified pre-run) — give generous headroom either way
-  if [ "$budget" -gt 0 ]; then max_tokens=$(( budget + 8192 )); else max_tokens=16384; fi
+
+  # A cell is done only when every (task, rep) it owes is already captured — derived from the DATA,
+  # not from a marker. capture.py has row-level resume, so an INCOMPLETE cell (a task added to
+  # tasks.jsonl after this cell ran) only pays for the MISSING replies. The old marker-only check
+  # short-circuited before capture.py ever ran, so a newly added task could never be backfilled and
+  # the grid stayed ragged (old cells 4 tasks, new cells 5).
+  need=$(( $(grep -c . "$tasks_file") * REPS ))
+  have=$(python3 - "$OUT" "$label" <<'PY'
+import sys, json, os
+out, label = sys.argv[1], sys.argv[2]
+n = 0
+if os.path.exists(out):
+    for l in open(out):
+        if not l.strip():
+            continue
+        r = json.loads(l)
+        if r.get("config") == label and not r.get("error") and r.get("response"):
+            n += 1
+print(n)
+PY
+)
+  [ "$have" -ge "$need" ] && { echo "skip (complete: $label — $have/$need replies)"; continue; }
+  [ "$have" -gt 0 ] && echo "resume: $label — $have/$need already captured, running the rest"
+  # --reasoning-budget semantics, MEASURED from our own b9950 `--help` (docs/research/2026-07-15-1000-*):
+  #   -1 = unrestricted · 0 = IMMEDIATE END (not "uncapped": the old comment here was wrong) · N>0 = budget.
+  # For -1 the cap must be generous or "unlimited" is not unlimited (it used to fall to 16384, which
+  # would have silently capped the whole point of the cell). 40960 covers Qwen's 32768 recommendation
+  # plus an answer; where ctx has less headroom the server stops at the wall and the truncation IS the
+  # measurement.
+  if [ "$budget" -gt 0 ]; then max_tokens=$(( budget + 8192 ))
+  elif [ "$budget" -lt 0 ]; then max_tokens=40960
+  else max_tokens=8192; fi
 
   echo "=== $label  ($role: ${model%%.gguf} mtp=$mtp kv=$kv depth=$depth budget=$budget) ==="
   t0=$(date +%s)
@@ -121,6 +173,7 @@ for l in open(sys.argv[1]):
       --tasks "$tasks_file" --out "$OUT" --base-url "http://127.0.0.1:$PORT" \
       --reps "$REPS" --max-tokens "$max_tokens" \
       --temp "$temp" --top-p "$top_p" --top-k "$top_k" --min-p "$min_p" \
+      ${presence_penalty:+--presence-penalty "$presence_penalty"} \
       && touch "$OUTDIR/done/$label"
     [ -n "$SPID" ] && { kill "$SPID" 2>/dev/null; wait "$SPID" 2>/dev/null || true; }
     python3 - "$label" "$model" "$mtp" "$ctx" "$kv" "$budget" "$depth" "$used" "$csv" "$load_s" "$msize" >> "$VRAM" <<'PY'

@@ -107,6 +107,36 @@ separate follow-up campaign, out of scope here).
   # then append {"model":"opus","task":"rate-limiter","score":…,"objectives":…} to calibration-hard.jsonl
   ```
 
+## 5b. Extension (2026-07-15): budget axis · 35B sampling sweep · pricing-deferred
+
+9 new cells appended to `configs.jsonl` (14 total). `run_capture.sh` is incremental: a cell is skipped
+only when every (task, rep) it owes is already captured, so the 5 original cells re-open ONLY to
+backfill the new `pricing-deferred` task (3 replies each), and grading reuses the 60 existing rows
+(`--resume`).
+
+**RUN THE FAIL-FAST PROBE FIRST** — `q5-d128-f16-rb16384` is the risky cell (f16 caps Q5 ~150k ctx, so
+it may OOM at ctx 163840; by request there is NO pre-flight guard). Do not reorder `configs.jsonl` for
+this — the order drives the chart palette. Use ONLY:
+
+```bash
+ONLY=q5-d128-f16-rb16384 bash run_capture.sh     # fail-fast: does Q5 fit at f16?
+bash run_capture.sh                              # then the rest (skips whatever is complete)
+```
+
+Axes:
+- **budget** {4096 (have) → 16384 → -1 unlimited}, KV **f16** throughout. rb4096 is SATURATED 12/12 on
+  Q4_K_M (exactly 4095) = thinking forced to stop mid-reasoning; Qwen recommends 32,768 output.
+  16384 is the ceiling at 128k depth; **unlimited only runs untruncated on `pricing-deferred`**
+  (~84.4k prompt → ~79.4k headroom), where `think_tokens` becomes the OUTCOME: how much does the model
+  CHOOSE to think?
+- **sampling** (35B only): temp {0.3, 0.6, 1.0} single-variable with everything else pinned at Qwen's
+  coding recipe, PLUS the two vendor presets as separate labelled points (Qwen thinking-general
+  `1.0/0.95/20/pp1.5`; **Unsloth-only** `1.0/1.0/40/pp2.0` — Qwen's card does not document it).
+  temp 0.3 is FOLKLORE: documented by neither vendor. See `docs/research/2026-07-15-1000-*`.
+
+Sampling stays FIXED across the budget axis so budget remains single-variable; the presets are separate
+cells rather than a confounded walk.
+
 ## 6. Outputs (in `out/`)
 
 `outputs.jsonl` (replies + tokens/latency) · `scores_typescript.jsonl` (objectives incl. fractional
