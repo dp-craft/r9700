@@ -1,0 +1,130 @@
+// FILE: impl.ts
+import type { Clock } from '../../lib/clock';
+
+const MILLIS_PER_SECOND = 1000;
+
+interface BucketState {
+  tokens: number;
+  lastRefillTime: number;
+}
+
+export interface RateLimiter {
+  tryAcquire(key: string, tokens?: number): boolean;
+}
+
+export function createRateLimiter(
+  capacity: number,
+  refillPerSec: number,
+  clock: Clock
+): RateLimiter {
+  const buckets = new Map<string, BucketState>();
+
+  const refill = (b: BucketState): void => {
+    const now = clock.now();
+    const elapsed = (now - b.lastRefillTime) / MILLIS_PER_SECOND;
+    if (elapsed <= 0) return;
+    b.tokens = Math.min(capacity, b.tokens + elapsed * refillPerSec);
+    b.lastRefillTime = now;
+  };
+
+  const tryAcquire = (key: string, req: number = 1): boolean => {
+    let b = buckets.get(key);
+    if (b === undefined) {
+      const now = clock.now();
+      b = { tokens: capacity, lastRefillTime: now };
+      buckets.set(key, b);
+    }
+    refill(b);
+    if (b.tokens >= req) { b.tokens -= req; return true; }
+    return false;
+  };
+
+  return { tryAcquire };
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it } from 'vitest';
+import type { Clock } from '../../lib/clock';
+import { createRateLimiter } from './impl';
+
+class FakeClock implements Clock {
+  private _time = 0;
+  now(): number { return this._time; }
+  tick(ms: number): void { this._time += ms; }
+  setTime(ms: number): void { this._time = ms; }
+}
+
+describe('createRateLimiter', () => {
+  it('should allow first-burst up to capacity when bucket is initially full', () => {
+    const clock = new FakeClock();
+    const limiter = createRateLimiter(3, 1, clock);
+
+    expect(limiter.tryAcquire('k')).toBe(true);
+    expect(limiter.tryAcquire('k')).toBe(true);
+    expect(limiter.tryAcquire('k')).toBe(true);
+    expect(limiter.tryAcquire('k')).toBe(false);
+  });
+
+  it('should reject acquisition when bucket is empty', () => {
+    const clock = new FakeClock();
+    const limiter = createRateLimiter(1, 1, clock);
+
+    expect(limiter.tryAcquire('k')).toBe(true);
+    expect(limiter.tryAcquire('k')).toBe(false);
+  });
+
+  it('should refill tokens lazily when time elapses between calls', () => {
+    const clock = new FakeClock();
+    const limiter = createRateLimiter(2, 2, clock);
+
+    expect(limiter.tryAcquire('k')).toBe(true);
+    expect(limiter.tryAcquire('k')).toBe(true);
+    expect(limiter.tryAcquire('k')).toBe(false);
+
+    clock.tick(500);
+    expect(limiter.tryAcquire('k')).toBe(true);
+    expect(limiter.tryAcquire('k')).toBe(false);
+
+    clock.tick(500);
+    expect(limiter.tryAcquire('k')).toBe(true);
+  });
+
+  it('should cap refilled tokens at capacity when elapsed time exceeds full refill', () => {
+    const clock = new FakeClock();
+    const limiter = createRateLimiter(2, 100, clock);
+
+    expect(limiter.tryAcquire('k')).toBe(true);
+    expect(limiter.tryAcquire('k')).toBe(true);
+
+    clock.tick(10000);
+    expect(limiter.tryAcquire('k')).toBe(true);
+    expect(limiter.tryAcquire('k')).toBe(false);
+  });
+
+  it('should maintain per-key isolation when multiple keys are used', () => {
+    const clock = new FakeClock();
+    const limiter = createRateLimiter(1, 1, clock);
+
+    expect(limiter.tryAcquire('a')).toBe(true);
+    expect(limiter.tryAcquire('b')).toBe(true);
+    expect(limiter.tryAcquire('a')).toBe(false);
+    expect(limiter.tryAcquire('b')).toBe(false);
+  });
+
+  it('should deduct exact requested tokens when sufficient balance exists', () => {
+    const clock = new FakeClock();
+    const limiter = createRateLimiter(5, 1, clock);
+
+    expect(limiter.tryAcquire('k', 3)).toBe(true);
+    expect(limiter.tryAcquire('k', 2)).toBe(true);
+    expect(limiter.tryAcquire('k', 1)).toBe(false);
+  });
+
+  it('should not deduct tokens when requested amount exceeds available balance', () => {
+    const clock = new FakeClock();
+    const limiter = createRateLimiter(2, 1, clock);
+
+    expect(limiter.tryAcquire('k', 3)).toBe(false);
+    expect(limiter.tryAcquire('k', 2)).toBe(true);
+  });
+});

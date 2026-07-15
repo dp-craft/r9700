@@ -1,0 +1,165 @@
+// FILE: impl.ts
+import type { Clock } from '../../lib/clock';
+
+export interface LruCache<K, V> {
+  get(key: K): V | undefined;
+  set(key: K, value: V): void;
+  has(key: K): boolean;
+  readonly size: number;
+}
+
+export function createLruCache<K, V>(
+  capacity: number,
+  ttlMs: number,
+  clock: Clock
+): LruCache<K, V> {
+  const entries = new Map<K, { value: V; expiresAt: number }>();
+
+  const isExpired = (entry: { value: V; expiresAt: number }): boolean =>
+    clock.now() >= entry.expiresAt;
+
+  const removeOldestLive = (): void => {
+    for (const [key, entry] of entries) {
+      if (isExpired(entry) === false) {
+        entries.delete(key);
+        return;
+      }
+    }
+  };
+
+  const countLive = (): number => {
+    let count = 0;
+    for (const entry of entries.values()) {
+      if (isExpired(entry) === false) count++;
+    }
+    return count;
+  };
+
+  return {
+    get(key: K): V | undefined {
+      const entry = entries.get(key);
+      if (entry === undefined || isExpired(entry) === true) {
+        entries.delete(key);
+        return undefined;
+      }
+      const liveValue = entry.value;
+      entries.delete(key);
+      entries.set(key, { value: liveValue, expiresAt: entry.expiresAt });
+      return liveValue;
+    },
+    set(key: K, value: V): void {
+      if (entries.has(key) === true) {
+        entries.delete(key);
+        entries.set(key, { value, expiresAt: clock.now() + ttlMs });
+        return;
+      }
+      if (countLive() >= capacity) {
+        removeOldestLive();
+      }
+      entries.set(key, { value, expiresAt: clock.now() + ttlMs });
+    },
+    has(key: K): boolean {
+      const entry = entries.get(key);
+      return entry !== undefined && isExpired(entry) === false;
+    },
+    get size(): number {
+      return countLive();
+    },
+  };
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it } from 'vitest';
+import type { Clock } from '../../lib/clock';
+import { createLruCache } from './impl';
+
+const createFakeClock = (initialTime: number): Clock & { tick: (ms: number) => void } => {
+  let t = initialTime;
+  return {
+    now: (): number => t,
+    tick: (ms: number): void => { t += ms; },
+  } as const;
+};
+
+describe('createLruCache', () => {
+  describe('expiry', () => {
+    it('should return undefined when entry TTL elapses', () => {
+      const clock = createFakeClock(0);
+      const cache = createLruCache(10, 100, clock);
+      cache.set('a', 1);
+      clock.tick(100);
+      expect(cache.get('a')).toBe(undefined);
+    });
+
+    it('should return false for has when entry TTL elapses', () => {
+      const clock = createFakeClock(0);
+      const cache = createLruCache(10, 100, clock);
+      cache.set('b', 2);
+      clock.tick(100);
+      expect(cache.has('b')).toBe(false);
+    });
+
+    it('should exclude expired entries from size when entry TTL elapses', () => {
+      const clock = createFakeClock(0);
+      const cache = createLruCache(10, 50, clock);
+      cache.set('x', 1);
+      clock.tick(50);
+      expect(cache.size).toBe(0);
+    });
+  });
+
+  describe('recency refresh', () => {
+    it('should update access order when get retrieves a live entry', () => {
+      const clock = createFakeClock(0);
+      const cache = createLruCache(2, 1000, clock);
+      cache.set('a', 1);
+      cache.set('b', 2);
+      cache.get('a');
+      clock.tick(1000);
+      cache.set('c', 3);
+      expect(cache.has('a')).toBe(true);
+      expect(cache.has('b')).toBe(false);
+    });
+  });
+
+  describe('eviction order', () => {
+    it('should evict the least recently used live entry when capacity is reached', () => {
+      const clock = createFakeClock(0);
+      const cache = createLruCache(2, 1000, clock);
+      cache.set('a', 1);
+      cache.set('b', 2);
+      cache.get('b');
+      cache.set('c', 3);
+      expect(cache.has('a')).toBe(false);
+      expect(cache.has('b')).toBe(true);
+      expect(cache.has('c')).toBe(true);
+    });
+
+    it('should skip expired entries when determining eviction candidate', () => {
+      const clock = createFakeClock(0);
+      const cache = createLruCache(2, 100, clock);
+      cache.set('a', 1);
+      clock.tick(100);
+      cache.set('b', 2);
+      cache.set('c', 3);
+      cache.set('d', 4);
+      expect(cache.has('a')).toBe(false);
+      expect(cache.has('b')).toBe(false);
+      expect(cache.has('c')).toBe(true);
+      expect(cache.has('d')).toBe(true);
+    });
+  });
+
+  describe('capacity edge', () => {
+    it('should handle capacity of 1 correctly', () => {
+      const clock = createFakeClock(0);
+      const cache = createLruCache(1, 1000, clock);
+      cache.set('a', 1);
+      expect(cache.size).toBe(1);
+      cache.set('b', 2);
+      expect(cache.size).toBe(1);
+      expect(cache.get('a')).toBe(undefined);
+      expect(cache.get('b')).toBe(2);
+    });
+  });
+});

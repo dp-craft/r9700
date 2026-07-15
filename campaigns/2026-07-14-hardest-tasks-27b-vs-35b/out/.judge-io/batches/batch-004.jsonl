@@ -1,0 +1,8 @@
+{"id": "q5-d128-f16-rb4096__lru-cache__rep2", "spec": "ts-harness/tasks/lru-cache/spec.md", "code": "out/.judge-io/candidates/q5-d128-f16-rb4096__lru-cache__rep2.txt"}
+{"id": "q5-d128-f16-rb4096__rate-limiter__rep0", "spec": "ts-harness/tasks/rate-limiter/spec.md", "code": "out/.judge-io/candidates/q5-d128-f16-rb4096__rate-limiter__rep0.txt"}
+{"id": "q5-d128-f16-rb4096__rate-limiter__rep1", "spec": "ts-harness/tasks/rate-limiter/spec.md", "code": "out/.judge-io/candidates/q5-d128-f16-rb4096__rate-limiter__rep1.txt"}
+{"id": "q5-d128-f16-rb4096__rate-limiter__rep2", "spec": "ts-harness/tasks/rate-limiter/spec.md", "code": "out/.judge-io/candidates/q5-d128-f16-rb4096__rate-limiter__rep2.txt"}
+{"id": "q5-d128-f16-rb4096__async-memo__rep0", "spec": "ts-harness/tasks/async-memo/spec.md", "code": "out/.judge-io/candidates/q5-d128-f16-rb4096__async-memo__rep0.txt"}
+{"id": "q5-d128-f16-rb4096__async-memo__rep1", "spec": "ts-harness/tasks/async-memo/spec.md", "code": "out/.judge-io/candidates/q5-d128-f16-rb4096__async-memo__rep1.txt"}
+{"id": "q5-d128-f16-rb4096__async-memo__rep2", "spec": "ts-harness/tasks/async-memo/spec.md", "code": "out/.judge-io/candidates/q5-d128-f16-rb4096__async-memo__rep2.txt"}
+{"id": "q5-d128-f16-rb4096__expr-eval__rep0", "spec": "ts-harness/tasks/expr-eval/spec.md", "code": "out/.judge-io/candidates/q5-d128-f16-rb4096__expr-eval__rep0.txt"}

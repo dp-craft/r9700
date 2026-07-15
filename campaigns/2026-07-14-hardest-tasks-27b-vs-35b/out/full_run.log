@@ -1,0 +1,486 @@
+resume: un-d128-f16-rb4096 — 12/15 already captured, running the rest
+=== un-d128-f16-rb4096  (27B Q4_K_M (baseline, prior best fp16 quant): Qwen3.6-27B-MTP-Q4_K_M mtp=1 kv=f16 depth=120k budget=4096) ===
+starting on :8081 (pid 1625176) — log: /home/dev/work/dp-craft/amd/bench/.servers/8081.log
+up after 39s — model: Qwen3.6-27B-MTP-Q4_K_M.gguf — build: b9950-961e4b26a
+cmdline: /home/dev/work/dp-craft/amd/bench/llamacpp-vulkan/llama-server -m /home/dev/models/gguf/Qwen3.6-27B-MTP-Q4_K_M.gguf -c 163840 -np 1 -ngl 99 -fa on -ub 2048 -b 4096 -ctk f16 -ctv f16 --host 127.0.0.1 --port 8081 --spec-type draft-mtp --reasoning-budget 4096
+  VRAM at load: 29751 MiB  (load 39s)
+  [un-d128-f16-rb4096] pricing-deferred rep0: 6275 tok (4095 think/2180 ans) | prefill 527 decode 53.3 t/s | ttft 160.378s ttfa 239.871s | stop
+  [un-d128-f16-rb4096] pricing-deferred rep1: 5984 tok (4095 think/1889 ans) | prefill 382 decode 53.9 t/s | ttft 5.53s ttfa 83.359s | stop
+  [un-d128-f16-rb4096] pricing-deferred rep2: 6222 tok (4095 think/2127 ans) | prefill 386 decode 52.4 t/s | ttft 5.488s ttfa 86.778s | stop
+captured 3 rows -> /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/outputs.jsonl (12 already present, skipped)
+stopped port 8081
+resume: xl-d128-f16-rb4096 — 12/15 already captured, running the rest
+=== xl-d128-f16-rb4096  (27B UD-Q4_K_XL (unsloth dynamic 4-bit XL): unsloth/Qwen3.6-27B-UD-Q4_K_XL mtp=1 kv=f16 depth=120k budget=4096) ===
+starting on :8081 (pid 1629265) — log: /home/dev/work/dp-craft/amd/bench/.servers/8081.log
+up after 40s — model: Qwen3.6-27B-UD-Q4_K_XL.gguf — build: b9950-961e4b26a
+cmdline: /home/dev/work/dp-craft/amd/bench/llamacpp-vulkan/llama-server -m /home/dev/models/gguf/unsloth/Qwen3.6-27B-UD-Q4_K_XL.gguf -c 163840 -np 1 -ngl 99 -fa on -ub 2048 -b 4096 -ctk f16 -ctv f16 --host 127.0.0.1 --port 8081 --spec-type draft-mtp --reasoning-budget 4096
+  VRAM at load: 30426 MiB  (load 40s)
+  [xl-d128-f16-rb4096] pricing-deferred rep0: 6142 tok (4095 think/2047 ans) | prefill 528 decode 52.7 t/s | ttft 160.069s ttfa 240.168s | stop
+  [xl-d128-f16-rb4096] pricing-deferred rep1: 6340 tok (4095 think/2245 ans) | prefill 375 decode 50.6 t/s | ttft 5.626s ttfa 90.931s | stop
+  [xl-d128-f16-rb4096] pricing-deferred rep2: 6043 tok (4095 think/1948 ans) | prefill 386 decode 51.4 t/s | ttft 5.473s ttfa 88.278s | stop
+captured 3 rows -> /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/outputs.jsonl (12 already present, skipped)
+stopped port 8081
+resume: q5-d128-q8-rb4096 — 12/15 already captured, running the rest
+=== q5-d128-q8-rb4096  (27B Q5_K_M (mid precision): unsloth/Qwen3.6-27B-Q5_K_M mtp=1 kv=q8_0 depth=120k budget=4096) ===
+starting on :8081 (pid 1633996) — log: /home/dev/work/dp-craft/amd/bench/.servers/8081.log
+up after 48s — model: Qwen3.6-27B-Q5_K_M.gguf — build: b9950-961e4b26a
+cmdline: /home/dev/work/dp-craft/amd/bench/llamacpp-vulkan/llama-server -m /home/dev/models/gguf/unsloth/Qwen3.6-27B-Q5_K_M.gguf -c 163840 -np 1 -ngl 99 -fa on -ub 2048 -b 4096 -ctk q8_0 -ctv q8_0 --host 127.0.0.1 --port 8081 --spec-type draft-mtp --reasoning-budget 4096
+  VRAM at load: 27421 MiB  (load 47s)
+  [q5-d128-q8-rb4096] pricing-deferred rep0: 2949 tok (650 think/2299 ans) | prefill 402 decode 43.3 t/s | ttft 210.406s ttfa 227.219s | stop
+  [q5-d128-q8-rb4096] pricing-deferred rep1: 6289 tok (4095 think/2194 ans) | prefill 267 decode 41.7 t/s | ttft 7.843s ttfa 110.417s | stop
+  [q5-d128-q8-rb4096] pricing-deferred rep2: 6268 tok (4095 think/2173 ans) | prefill 267 decode 42.5 t/s | ttft 7.836s ttfa 107.002s | stop
+captured 3 rows -> /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/outputs.jsonl (12 already present, skipped)
+stopped port 8081
+resume: q6-d128-q8-rb4096 — 12/15 already captured, running the rest
+=== q6-d128-q8-rb4096  (27B Q6_K (highest precision; heaviest cell — needs q8_0 KV to fit @ctx 163840): unsloth/Qwen3.6-27B-Q6_K mtp=1 kv=q8_0 depth=120k budget=4096) ===
+starting on :8081 (pid 1638712) — log: /home/dev/work/dp-craft/amd/bench/.servers/8081.log
+up after 51s — model: Qwen3.6-27B-Q6_K.gguf — build: b9950-961e4b26a
+cmdline: /home/dev/work/dp-craft/amd/bench/llamacpp-vulkan/llama-server -m /home/dev/models/gguf/unsloth/Qwen3.6-27B-Q6_K.gguf -c 163840 -np 1 -ngl 99 -fa on -ub 2048 -b 4096 -ctk q8_0 -ctv q8_0 --host 127.0.0.1 --port 8081 --spec-type draft-mtp --reasoning-budget 4096
+  VRAM at load: 30168 MiB  (load 50s)
+  [q6-d128-q8-rb4096] pricing-deferred rep0: 3596 tok (1142 think/2454 ans) | prefill 389 decode 39.0 t/s | ttft 217.127s ttfa 248.772s | stop
+  [q6-d128-q8-rb4096] pricing-deferred rep1: 3888 tok (1526 think/2362 ans) | prefill 260 decode 35.1 t/s | ttft 8.04s ttfa 59.747s | stop
+  [q6-d128-q8-rb4096] pricing-deferred rep2: 6478 tok (3756 think/2722 ans) | prefill 261 decode 37.7 t/s | ttft 8.033s ttfa 112.844s | stop
+captured 3 rows -> /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/outputs.jsonl (12 already present, skipped)
+stopped port 8081
+resume: a3b-d128-f16-rb4096 — 12/15 already captured, running the rest
+=== a3b-d128-f16-rb4096  (35B-A3B (MoE ~3B active; capacity comparison): Qwen3.6-35B-A3B-UD-Q4_K_M mtp=1 kv=f16 depth=120k budget=4096) ===
+starting on :8081 (pid 1643086) — log: /home/dev/work/dp-craft/amd/bench/.servers/8081.log
+up after 64s — model: Qwen3.6-35B-A3B-UD-Q4_K_M.gguf — build: b9950-961e4b26a
+cmdline: /home/dev/work/dp-craft/amd/bench/llamacpp-vulkan/llama-server -m /home/dev/models/gguf/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf -c 163840 -np 1 -ngl 99 -fa on -ub 2048 -b 4096 -ctk f16 -ctv f16 --host 127.0.0.1 --port 8081 --spec-type draft-mtp --reasoning-budget 4096
+  VRAM at load: 27030 MiB  (load 64s)
+  [a3b-d128-f16-rb4096] pricing-deferred rep0: 6431 tok (4095 think/2336 ans) | prefill 1643 decode 136.6 t/s | ttft 51.575s ttfa 82.857s | stop
+  [a3b-d128-f16-rb4096] pricing-deferred rep1: 6329 tok (4095 think/2234 ans) | prefill 1045 decode 136.0 t/s | ttft 2.119s ttfa 33.531s | stop
+  [a3b-d128-f16-rb4096] pricing-deferred rep2: 6338 tok (4095 think/2243 ans) | prefill 1084 decode 135.1 t/s | ttft 2.049s ttfa 33.797s | stop
+captured 3 rows -> /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/outputs.jsonl (12 already present, skipped)
+stopped port 8081
+resume: q5-d128-f16-rb16384 — 1/15 already captured, running the rest
+=== q5-d128-f16-rb16384  (FAIL-FAST PROBE, RUN FIRST: 27B Q5_K_M at f16 KV (removes the q8_0 confound on the ladder). No pre-flight guard by request — f16 caps Q5 ~150k ctx, so this may OOM at ctx 163840. A failure is a RESULT (iron rule 7).: unsloth/Qwen3.6-27B-Q5_K_M mtp=1 kv=f16 depth=120k budget=16384) ===
+starting on :8081 (pid 1644954) — log: /home/dev/work/dp-craft/amd/bench/.servers/8081.log
+up after 53s — model: Qwen3.6-27B-Q5_K_M.gguf — build: b9950-961e4b26a
+cmdline: /home/dev/work/dp-craft/amd/bench/llamacpp-vulkan/llama-server -m /home/dev/models/gguf/unsloth/Qwen3.6-27B-Q5_K_M.gguf -c 163840 -np 1 -ngl 99 -fa on -ub 2048 -b 4096 -ctk f16 -ctv f16 --host 127.0.0.1 --port 8081 --spec-type draft-mtp --reasoning-budget 16384
+  VRAM at load: 31196 MiB  (load 53s)
+  [q5-d128-f16-rb16384] lru-cache rep1: 9332 tok (7247 think/2085 ans) | prefill 396 decode 40.3 t/s | ttft 335.436s ttfa 521.672s | stop
+  [q5-d128-f16-rb16384] lru-cache rep2: 9808 tok (8203 think/1605 ans) | prefill 265 decode 40.1 t/s | ttft 7.967s ttfa 217.58s | stop
+  [q5-d128-f16-rb16384] rate-limiter rep0: 9055 tok (8129 think/926 ans) | prefill 278 decode 42.1 t/s | ttft 7.455s ttfa 202.351s | stop
+  [q5-d128-f16-rb16384] rate-limiter rep1: 8152 tok (6977 think/1175 ans) | prefill 272 decode 42.5 t/s | ttft 7.607s ttfa 174.114s | stop
+  [q5-d128-f16-rb16384] rate-limiter rep2: 9916 tok (8723 think/1193 ans) | prefill 279 decode 42.3 t/s | ttft 7.425s ttfa 215.979s | stop
+  [q5-d128-f16-rb16384] async-memo rep0: 2573 tok (1501 think/1072 ans) | prefill 268 decode 41.3 t/s | ttft 7.647s ttfa 46.165s | stop
+  [q5-d128-f16-rb16384] async-memo rep1: 4679 tok (4073 think/606 ans) | prefill 269 decode 40.5 t/s | ttft 7.616s ttfa 110.207s | stop
+  [q5-d128-f16-rb16384] async-memo rep2: 1748 tok (538 think/1210 ans) | prefill 279 decode 42.3 t/s | ttft 7.353s ttfa 20.883s | stop
+  [q5-d128-f16-rb16384] expr-eval rep0: 9284 tok (7172 think/2112 ans) | prefill 277 decode 42.4 t/s | ttft 7.361s ttfa 178.598s | stop
+  [q5-d128-f16-rb16384] expr-eval rep1: 6732 tok (5249 think/1483 ans) | prefill 275 decode 42.7 t/s | ttft 7.392s ttfa 132.898s | stop
+  [q5-d128-f16-rb16384] expr-eval rep2: 6957 tok (5585 think/1372 ans) | prefill 278 decode 41.2 t/s | ttft 7.341s ttfa 146.572s | stop
+  [q5-d128-f16-rb16384] pricing-deferred rep0: 6551 tok (4503 think/2048 ans) | prefill 462 decode 48.5 t/s | ttft 182.742s ttfa 279.252s | stop
+  [q5-d128-f16-rb16384] pricing-deferred rep1: 10632 tok (8512 think/2120 ans) | prefill 344 decode 49.0 t/s | ttft 6.115s ttfa 182.641s | stop
+  [q5-d128-f16-rb16384] pricing-deferred rep2: 10742 tok (8615 think/2127 ans) | prefill 344 decode 48.4 t/s | ttft 6.119s ttfa 187.309s | stop
+captured 14 rows -> /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/outputs.jsonl (1 already present, skipped)
+stopped port 8081
+=== q5-d128-f16-rb4096  (27B Q5_K_M f16 @ rb4096 — completes Q5's f16 budget axis (the existing q5 cell is q8_0, so not comparable): unsloth/Qwen3.6-27B-Q5_K_M mtp=1 kv=f16 depth=120k budget=4096) ===
+starting on :8081 (pid 1664781) — log: /home/dev/work/dp-craft/amd/bench/.servers/8081.log
+up after 10s — model: Qwen3.6-27B-Q5_K_M.gguf — build: b9950-961e4b26a
+cmdline: /home/dev/work/dp-craft/amd/bench/llamacpp-vulkan/llama-server -m /home/dev/models/gguf/unsloth/Qwen3.6-27B-Q5_K_M.gguf -c 163840 -np 1 -ngl 99 -fa on -ub 2048 -b 4096 -ctk f16 -ctv f16 --host 127.0.0.1 --port 8081 --spec-type draft-mtp --reasoning-budget 4096
+  VRAM at load: 31194 MiB  (load 10s)
+  [q5-d128-f16-rb4096] lru-cache rep0: 2824 tok (335 think/2489 ans) | prefill 396 decode 42.4 t/s | ttft 335.493s ttfa 345.011s | stop
+  [q5-d128-f16-rb4096] lru-cache rep1: 6258 tok (4095 think/2163 ans) | prefill 265 decode 40.8 t/s | ttft 7.97s ttfa 113.322s | stop
+  [q5-d128-f16-rb4096] lru-cache rep2: 5689 tok (4095 think/1594 ans) | prefill 276 decode 40.1 t/s | ttft 7.67s ttfa 114.881s | stop
+  [q5-d128-f16-rb4096] rate-limiter rep0: 4998 tok (4095 think/903 ans) | prefill 276 decode 42.1 t/s | ttft 7.483s ttfa 106.906s | stop
+  [q5-d128-f16-rb4096] rate-limiter rep1: 5283 tok (4094 think/1189 ans) | prefill 278 decode 42.2 t/s | ttft 7.444s ttfa 107.04s | stop
+  [q5-d128-f16-rb4096] rate-limiter rep2: 5283 tok (4095 think/1188 ans) | prefill 279 decode 42.3 t/s | ttft 7.404s ttfa 106.821s | stop
+  [q5-d128-f16-rb4096] async-memo rep0: 2573 tok (1501 think/1072 ans) | prefill 273 decode 41.2 t/s | ttft 7.52s ttfa 46.053s | stop
+  [q5-d128-f16-rb4096] async-memo rep1: 4679 tok (4073 think/606 ans) | prefill 277 decode 40.5 t/s | ttft 7.413s ttfa 110.032s | stop
+  [q5-d128-f16-rb4096] async-memo rep2: 1748 tok (538 think/1210 ans) | prefill 278 decode 42.3 t/s | ttft 7.38s ttfa 20.928s | stop
+  [q5-d128-f16-rb4096] expr-eval rep0: 6334 tok (4095 think/2239 ans) | prefill 278 decode 41.9 t/s | ttft 7.328s ttfa 107.383s | stop
+  [q5-d128-f16-rb4096] expr-eval rep1: 5578 tok (4095 think/1483 ans) | prefill 276 decode 42.4 t/s | ttft 7.401s ttfa 106.936s | stop
+  [q5-d128-f16-rb4096] expr-eval rep2: 5453 tok (4095 think/1358 ans) | prefill 276 decode 41.2 t/s | ttft 7.375s ttfa 110.28s | stop
+  [q5-d128-f16-rb4096] pricing-deferred rep0: 6131 tok (4095 think/2036 ans) | prefill 463 decode 48.8 t/s | ttft 182.549s ttfa 269.772s | stop
+  [q5-d128-f16-rb4096] pricing-deferred rep1: 6240 tok (4095 think/2145 ans) | prefill 350 decode 48.8 t/s | ttft 6.017s ttfa 93.373s | stop
+  [q5-d128-f16-rb4096] pricing-deferred rep2: 6197 tok (4095 think/2102 ans) | prefill 346 decode 49.7 t/s | ttft 6.077s ttfa 91.095s | stop
+captured 15 rows -> /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/outputs.jsonl
+stopped port 8081
+=== un-d128-f16-rb16384  (BUDGET AXIS: 27B Q4_K_M @ 16384 vs the existing rb4096 cell. rb4096 is SATURATED 12/12 (exactly 4095) = thinking forced to stop mid-reasoning; Qwen recommends 32768 output. 16384 is the ceiling at 128k depth.: Qwen3.6-27B-MTP-Q4_K_M mtp=1 kv=f16 depth=120k budget=16384) ===
+starting on :8081 (pid 1680127) — log: /home/dev/work/dp-craft/amd/bench/.servers/8081.log
+up after 38s — model: Qwen3.6-27B-MTP-Q4_K_M.gguf — build: b9950-961e4b26a
+cmdline: /home/dev/work/dp-craft/amd/bench/llamacpp-vulkan/llama-server -m /home/dev/models/gguf/Qwen3.6-27B-MTP-Q4_K_M.gguf -c 163840 -np 1 -ngl 99 -fa on -ub 2048 -b 4096 -ctk f16 -ctv f16 --host 127.0.0.1 --port 8081 --spec-type draft-mtp --reasoning-budget 16384
+  VRAM at load: 29674 MiB  (load 38s)
+  [un-d128-f16-rb16384] lru-cache rep0: 10332 tok (8640 think/1692 ans) | prefill 441 decode 43.9 t/s | ttft 301.229s ttfa 502.246s | stop
+  [un-d128-f16-rb16384] lru-cache rep1: 7751 tok (5736 think/2015 ans) | prefill 286 decode 44.0 t/s | ttft 7.417s ttfa 142.928s | stop
+  [un-d128-f16-rb16384] lru-cache rep2: 8102 tok (6426 think/1676 ans) | prefill 294 decode 44.0 t/s | ttft 7.21s ttfa 157.22s | stop
+  [un-d128-f16-rb16384] rate-limiter rep0: 6287 tok (5158 think/1129 ans) | prefill 300 decode 44.9 t/s | ttft 6.917s ttfa 124.226s | stop
+  [un-d128-f16-rb16384] rate-limiter rep1: 6482 tok (5287 think/1195 ans) | prefill 299 decode 44.6 t/s | ttft 6.933s ttfa 128.145s | stop
+  [un-d128-f16-rb16384] rate-limiter rep2: 6476 tok (5343 think/1133 ans) | prefill 297 decode 44.2 t/s | ttft 6.97s ttfa 130.774s | stop
+  [un-d128-f16-rb16384] async-memo rep0: 5274 tok (4589 think/685 ans) | prefill 297 decode 43.1 t/s | ttft 6.916s ttfa 115.375s | stop
+  [un-d128-f16-rb16384] async-memo rep1: 5262 tok (4700 think/562 ans) | prefill 297 decode 44.1 t/s | ttft 6.926s ttfa 114.99s | stop
+  [un-d128-f16-rb16384] async-memo rep2: 4911 tok (4345 think/566 ans) | prefill 295 decode 42.4 t/s | ttft 6.981s ttfa 111.359s | stop
+  [un-d128-f16-rb16384] expr-eval rep0: 12013 tok (10486 think/1527 ans) | prefill 289 decode 44.8 t/s | ttft 7.062s ttfa 243.608s | stop
+  [un-d128-f16-rb16384] expr-eval rep1: 8411 tok (6967 think/1444 ans) | prefill 298 decode 44.4 t/s | ttft 6.846s ttfa 166.972s | stop
+  [un-d128-f16-rb16384] expr-eval rep2: 12631 tok (11081 think/1550 ans) | prefill 296 decode 45.0 t/s | ttft 6.892s ttfa 255.842s | stop
+  [un-d128-f16-rb16384] pricing-deferred rep0: 9709 tok (7529 think/2180 ans) | prefill 525 decode 52.6 t/s | ttft 160.9s ttfa 306.415s | stop
+  [un-d128-f16-rb16384] pricing-deferred rep1: 9617 tok (7726 think/1891 ans) | prefill 384 decode 51.8 t/s | ttft 5.5s ttfa 157.491s | stop
+  [un-d128-f16-rb16384] pricing-deferred rep2: 10611 tok (8490 think/2121 ans) | prefill 385 decode 51.2 t/s | ttft 5.485s ttfa 174.782s | stop
+captured 15 rows -> /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/outputs.jsonl
+stopped port 8081
+=== a3b-d128-f16-rb16384  (BUDGET AXIS: 35B-A3B @ 16384 vs its rb4096 cell. Watch rep sd: the 35B is the noisiest cell (17.3 vs 5.5) — does more thinking calm it down?: Qwen3.6-35B-A3B-UD-Q4_K_M mtp=1 kv=f16 depth=120k budget=16384) ===
+starting on :8081 (pid 1702272) — log: /home/dev/work/dp-craft/amd/bench/.servers/8081.log
+up after 49s — model: Qwen3.6-35B-A3B-UD-Q4_K_M.gguf — build: b9950-961e4b26a
+cmdline: /home/dev/work/dp-craft/amd/bench/llamacpp-vulkan/llama-server -m /home/dev/models/gguf/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf -c 163840 -np 1 -ngl 99 -fa on -ub 2048 -b 4096 -ctk f16 -ctv f16 --host 127.0.0.1 --port 8081 --spec-type draft-mtp --reasoning-budget 16384
+  VRAM at load: 27146 MiB  (load 48s)
+  [a3b-d128-f16-rb16384] lru-cache rep0: 8558 tok (6852 think/1706 ans) | prefill 1302 decode 113.4 t/s | ttft 102.241s ttfa 164.412s | stop
+  [a3b-d128-f16-rb16384] lru-cache rep1: 12624 tok (10594 think/2030 ans) | prefill 773 decode 114.4 t/s | ttft 2.893s ttfa 97.328s | stop
+  [a3b-d128-f16-rb16384] lru-cache rep2: 10892 tok (9163 think/1729 ans) | prefill 781 decode 120.3 t/s | ttft 2.867s ttfa 80.033s | stop
+  [a3b-d128-f16-rb16384] rate-limiter rep0: 6206 tok (4962 think/1244 ans) | prefill 793 decode 115.5 t/s | ttft 2.768s ttfa 46.911s | stop
+  [a3b-d128-f16-rb16384] rate-limiter rep1: 17649 tok (16383 think/1266 ans) | prefill 796 decode 124.7 t/s | ttft 2.755s ttfa 134.296s | stop
+  [a3b-d128-f16-rb16384] rate-limiter rep2: 9973 tok (8622 think/1351 ans) | prefill 795 decode 116.7 t/s | ttft 2.762s ttfa 77.527s | stop
+  [a3b-d128-f16-rb16384] async-memo rep0: 7788 tok (6972 think/816 ans) | prefill 790 decode 113.2 t/s | ttft 2.76s ttfa 65.29s | stop
+  [a3b-d128-f16-rb16384] async-memo rep1: 5640 tok (5021 think/619 ans) | prefill 797 decode 113.3 t/s | ttft 2.729s ttfa 47.784s | stop
+  [a3b-d128-f16-rb16384] async-memo rep2: 4207 tok (3621 think/586 ans) | prefill 793 decode 114.5 t/s | ttft 2.742s ttfa 35.04s | stop
+  [a3b-d128-f16-rb16384] expr-eval rep0: 10055 tok (8651 think/1404 ans) | prefill 794 decode 117.7 t/s | ttft 2.72s ttfa 77.272s | stop
+  [a3b-d128-f16-rb16384] expr-eval rep1: 13615 tok (11647 think/1968 ans) | prefill 767 decode 115.2 t/s | ttft 2.808s ttfa 105.269s | stop
+  [a3b-d128-f16-rb16384] expr-eval rep2: 10436 tok (8613 think/1823 ans) | prefill 796 decode 119.8 t/s | ttft 2.705s ttfa 75.642s | stop
+  [a3b-d128-f16-rb16384] pricing-deferred rep0: 10910 tok (8621 think/2289 ans) | prefill 1642 decode 133.0 t/s | ttft 51.577s ttfa 117.925s | stop
+  [a3b-d128-f16-rb16384] pricing-deferred rep1: 11680 tok (9418 think/2262 ans) | prefill 1083 decode 135.7 t/s | ttft 2.045s ttfa 72.626s | stop
+  [a3b-d128-f16-rb16384] pricing-deferred rep2: 11214 tok (8974 think/2240 ans) | prefill 1064 decode 134.7 t/s | ttft 2.08s ttfa 69.99s | stop
+captured 15 rows -> /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/outputs.jsonl
+stopped port 8081
+=== a3b-d128-f16-rbmax  (UNLIMITED reasoning (-1). On the 128k tasks only ~30.9k of headroom remains → truncation is EXPECTED and is itself the measurement; on pricing-deferred (~84.4k prompt) ~79.4k remains, so thinking is genuinely unbounded and think_tokens becomes the OUTCOME: how much does the model CHOOSE to think?: Qwen3.6-35B-A3B-UD-Q4_K_M mtp=1 kv=f16 depth=120k budget=-1) ===
+starting on :8081 (pid 1712982) — log: /home/dev/work/dp-craft/amd/bench/.servers/8081.log
+up after 9s — model: Qwen3.6-35B-A3B-UD-Q4_K_M.gguf — build: b9950-961e4b26a
+cmdline: /home/dev/work/dp-craft/amd/bench/llamacpp-vulkan/llama-server -m /home/dev/models/gguf/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf -c 163840 -np 1 -ngl 99 -fa on -ub 2048 -b 4096 -ctk f16 -ctv f16 --host 127.0.0.1 --port 8081 --spec-type draft-mtp --reasoning-budget -1
+  VRAM at load: 27142 MiB  (load 9s)
+  [a3b-d128-f16-rbmax] lru-cache rep0: 8558 tok (6852 think/1706 ans) | prefill 1302 decode 114.0 t/s | ttft 102.232s ttfa 164.124s | stop
+  [a3b-d128-f16-rbmax] lru-cache rep1: 12624 tok (10594 think/2030 ans) | prefill 773 decode 115.7 t/s | ttft 2.892s ttfa 96.191s | stop
+  [a3b-d128-f16-rbmax] lru-cache rep2: 10892 tok (9163 think/1729 ans) | prefill 778 decode 120.4 t/s | ttft 2.882s ttfa 79.987s | stop
+  [a3b-d128-f16-rbmax] rate-limiter rep0: 6206 tok (4962 think/1244 ans) | prefill 798 decode 115.6 t/s | ttft 2.749s ttfa 46.835s | stop
+  [a3b-d128-f16-rbmax] rate-limiter rep1: 31093 tok (31093 think/0 ans) | prefill 771 decode 119.9 t/s | ttft 2.85s ttfa Nones | length
+  [a3b-d128-f16-rbmax] rate-limiter rep2: 9973 tok (8622 think/1351 ans) | prefill 778 decode 116.0 t/s | ttft 2.814s ttfa 78.127s | stop
+  [a3b-d128-f16-rbmax] async-memo rep0: 7788 tok (6972 think/816 ans) | prefill 790 decode 111.8 t/s | ttft 2.752s ttfa 66.129s | stop
+  [a3b-d128-f16-rbmax] async-memo rep1: 5640 tok (5021 think/619 ans) | prefill 796 decode 111.9 t/s | ttft 2.735s ttfa 48.355s | stop
+  [a3b-d128-f16-rbmax] async-memo rep2: 4207 tok (3621 think/586 ans) | prefill 744 decode 112.9 t/s | ttft 2.917s ttfa 35.655s | stop
+  [a3b-d128-f16-rbmax] expr-eval rep0: 10055 tok (8651 think/1404 ans) | prefill 752 decode 116.8 t/s | ttft 2.87s ttfa 77.865s | stop
+  [a3b-d128-f16-rbmax] expr-eval rep1: 13615 tok (11647 think/1968 ans) | prefill 791 decode 114.5 t/s | ttft 2.73s ttfa 105.936s | stop
+  [a3b-d128-f16-rbmax] expr-eval rep2: 10436 tok (8613 think/1823 ans) | prefill 776 decode 119.6 t/s | ttft 2.77s ttfa 75.87s | stop
+  [a3b-d128-f16-rbmax] pricing-deferred rep0: 10910 tok (8621 think/2289 ans) | prefill 1642 decode 131.4 t/s | ttft 51.561s ttfa 118.772s | stop
+  [a3b-d128-f16-rbmax] pricing-deferred rep1: 11680 tok (9418 think/2262 ans) | prefill 1078 decode 134.9 t/s | ttft 2.055s ttfa 72.944s | stop
+  [a3b-d128-f16-rbmax] pricing-deferred rep2: 11214 tok (8974 think/2240 ans) | prefill 1078 decode 134.1 t/s | ttft 2.055s ttfa 70.273s | stop
+captured 15 rows -> /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/outputs.jsonl
+stopped port 8081
+=== a3b-d128-f16-rb16384-t03  (SAMPLING AXIS (35B only), single-variable: temp 0.3. FOLKLORE — documented by NEITHER Qwen nor Unsloth; probing it precisely because it is unsourced. Everything else pinned at Qwen's coding recipe.: Qwen3.6-35B-A3B-UD-Q4_K_M mtp=1 kv=f16 depth=120k budget=16384) ===
+starting on :8081 (pid 1725378) — log: /home/dev/work/dp-craft/amd/bench/.servers/8081.log
+up after 30s — model: Qwen3.6-35B-A3B-UD-Q4_K_M.gguf — build: b9950-961e4b26a
+cmdline: /home/dev/work/dp-craft/amd/bench/llamacpp-vulkan/llama-server -m /home/dev/models/gguf/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf -c 163840 -np 1 -ngl 99 -fa on -ub 2048 -b 4096 -ctk f16 -ctv f16 --host 127.0.0.1 --port 8081 --spec-type draft-mtp --reasoning-budget 16384
+  VRAM at load: 27444 MiB  (load 29s)
+  [a3b-d128-f16-rb16384-t03] lru-cache rep0: 10816 tok (8742 think/2074 ans) | prefill 1301 decode 118.3 t/s | ttft 102.336s ttfa 177.623s | stop
+  [a3b-d128-f16-rb16384-t03] lru-cache rep1: 9840 tok (8298 think/1542 ans) | prefill 754 decode 115.6 t/s | ttft 2.974s ttfa 76.141s | stop
+  [a3b-d128-f16-rb16384-t03] lru-cache rep2: 8277 tok (6749 think/1528 ans) | prefill 773 decode 116.4 t/s | ttft 2.898s ttfa 62.109s | stop
+  [a3b-d128-f16-rb16384-t03] rate-limiter rep0: 9451 tok (8166 think/1285 ans) | prefill 760 decode 116.3 t/s | ttft 2.89s ttfa 74.114s | stop
+  [a3b-d128-f16-rb16384-t03] rate-limiter rep1: 9375 tok (8121 think/1254 ans) | prefill 792 decode 118.1 t/s | ttft 2.773s ttfa 71.961s | stop
+  [a3b-d128-f16-rb16384-t03] rate-limiter rep2: 9336 tok (7878 think/1458 ans) | prefill 740 decode 119.0 t/s | ttft 2.957s ttfa 69.998s | stop
+  [a3b-d128-f16-rb16384-t03] async-memo rep0: 6441 tok (5769 think/672 ans) | prefill 783 decode 114.6 t/s | ttft 2.779s ttfa 53.734s | stop
+  [a3b-d128-f16-rb16384-t03] async-memo rep1: 7259 tok (6635 think/624 ans) | prefill 732 decode 117.0 t/s | ttft 2.957s ttfa 60.192s | stop
+  [a3b-d128-f16-rb16384-t03] async-memo rep2: 5584 tok (5097 think/487 ans) | prefill 792 decode 112.7 t/s | ttft 2.744s ttfa 48.531s | stop
+  [a3b-d128-f16-rb16384-t03] expr-eval rep0: 11097 tok (9361 think/1736 ans) | prefill 749 decode 116.5 t/s | ttft 2.884s ttfa 84.608s | stop
+  [a3b-d128-f16-rb16384-t03] expr-eval rep1: 10795 tok (8883 think/1912 ans) | prefill 796 decode 115.9 t/s | ttft 2.714s ttfa 80.964s | stop
+  [a3b-d128-f16-rb16384-t03] expr-eval rep2: 10365 tok (8868 think/1497 ans) | prefill 791 decode 115.8 t/s | ttft 2.724s ttfa 80.543s | stop
+  [a3b-d128-f16-rb16384-t03] pricing-deferred rep0: 13697 tok (11299 think/2398 ans) | prefill 1641 decode 134.9 t/s | ttft 51.611s ttfa 136.409s | stop
+  [a3b-d128-f16-rb16384-t03] pricing-deferred rep1: 11293 tok (8923 think/2370 ans) | prefill 1077 decode 135.4 t/s | ttft 2.056s ttfa 69.103s | stop
+  [a3b-d128-f16-rb16384-t03] pricing-deferred rep2: 11230 tok (9026 think/2204 ans) | prefill 1073 decode 136.5 t/s | ttft 2.063s ttfa 69.138s | stop
+captured 15 rows -> /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/outputs.jsonl
+stopped port 8081
+=== a3b-d128-f16-rb16384-t10  (SAMPLING AXIS (35B only), single-variable: temp 1.0 with pp pinned at 0.0. NOT Qwen's paired preset (which ties temp 1.0 to pp 1.5) — that is the next cell. Isolates temperature.: Qwen3.6-35B-A3B-UD-Q4_K_M mtp=1 kv=f16 depth=120k budget=16384) ===
+starting on :8081 (pid 1736500) — log: /home/dev/work/dp-craft/amd/bench/.servers/8081.log
+up after 38s — model: Qwen3.6-35B-A3B-UD-Q4_K_M.gguf — build: b9950-961e4b26a
+cmdline: /home/dev/work/dp-craft/amd/bench/llamacpp-vulkan/llama-server -m /home/dev/models/gguf/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf -c 163840 -np 1 -ngl 99 -fa on -ub 2048 -b 4096 -ctk f16 -ctv f16 --host 127.0.0.1 --port 8081 --spec-type draft-mtp --reasoning-budget 16384
+  VRAM at load: 27486 MiB  (load 38s)
+  [a3b-d128-f16-rb16384-t10] lru-cache rep0: 7938 tok (6486 think/1452 ans) | prefill 1302 decode 107.5 t/s | ttft 102.281s ttfa 164.891s | stop
+  [a3b-d128-f16-rb16384-t10] lru-cache rep1: 11638 tok (10153 think/1485 ans) | prefill 773 decode 113.0 t/s | ttft 2.891s ttfa 94.237s | stop
+  [a3b-d128-f16-rb16384-t10] lru-cache rep2: 13500 tok (11906 think/1594 ans) | prefill 784 decode 113.7 t/s | ttft 2.859s ttfa 109.057s | stop
+  [a3b-d128-f16-rb16384-t10] rate-limiter rep0: 10631 tok (9484 think/1147 ans) | prefill 794 decode 114.3 t/s | ttft 2.765s ttfa 86.898s | stop
+  [a3b-d128-f16-rb16384-t10] rate-limiter rep1: 9453 tok (8273 think/1180 ans) | prefill 795 decode 113.0 t/s | ttft 2.759s ttfa 77.279s | stop
+  [a3b-d128-f16-rb16384-t10] rate-limiter rep2: 8293 tok (6972 think/1321 ans) | prefill 784 decode 113.3 t/s | ttft 2.797s ttfa 65.771s | stop
+  [a3b-d128-f16-rb16384-t10] async-memo rep0: 6612 tok (5884 think/728 ans) | prefill 791 decode 109.4 t/s | ttft 2.75s ttfa 57.629s | stop
+  [a3b-d128-f16-rb16384-t10] async-memo rep1: 6074 tok (5593 think/481 ans) | prefill 778 decode 112.6 t/s | ttft 2.793s ttfa 53.037s | stop
+  [a3b-d128-f16-rb16384-t10] async-memo rep2: 6988 tok (6370 think/618 ans) | prefill 793 decode 104.7 t/s | ttft 2.742s ttfa 64.723s | stop
+  [a3b-d128-f16-rb16384-t10] expr-eval rep0: 12474 tok (10683 think/1791 ans) | prefill 784 decode 113.5 t/s | ttft 2.752s ttfa 98.694s | stop
+  [a3b-d128-f16-rb16384-t10] expr-eval rep1: 12961 tok (11224 think/1737 ans) | prefill 794 decode 112.6 t/s | ttft 2.72s ttfa 104.291s | stop
+  [a3b-d128-f16-rb16384-t10] expr-eval rep2: 12080 tok (10060 think/2020 ans) | prefill 779 decode 113.5 t/s | ttft 2.76s ttfa 93.462s | stop
+  [a3b-d128-f16-rb16384-t10] pricing-deferred rep0: 16336 tok (13964 think/2372 ans) | prefill 1642 decode 132.2 t/s | ttft 51.556s ttfa 158.65s | stop
+  [a3b-d128-f16-rb16384-t10] pricing-deferred rep1: 13063 tok (10856 think/2207 ans) | prefill 1068 decode 129.4 t/s | ttft 2.072s ttfa 87.828s | stop
+  [a3b-d128-f16-rb16384-t10] pricing-deferred rep2: 11168 tok (8885 think/2283 ans) | prefill 1064 decode 132.0 t/s | ttft 2.078s ttfa 71.01s | stop
+captured 15 rows -> /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/outputs.jsonl
+stopped port 8081
+=== a3b-d128-f16-rb16384-qwen-gen  (VENDOR PRESET (Qwen, both cards): 'Thinking mode for general tasks' = temp 1.0 / top_p 0.95 / top_k 20 / pp 1.5. Answers 'is the vendor's PAIRED recipe better?' without polluting the temp axis.: Qwen3.6-35B-A3B-UD-Q4_K_M mtp=1 kv=f16 depth=120k budget=16384) ===
+starting on :8081 (pid 1748585) — log: /home/dev/work/dp-craft/amd/bench/.servers/8081.log
+up after 18s — model: Qwen3.6-35B-A3B-UD-Q4_K_M.gguf — build: b9950-961e4b26a
+cmdline: /home/dev/work/dp-craft/amd/bench/llamacpp-vulkan/llama-server -m /home/dev/models/gguf/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf -c 163840 -np 1 -ngl 99 -fa on -ub 2048 -b 4096 -ctk f16 -ctv f16 --host 127.0.0.1 --port 8081 --spec-type draft-mtp --reasoning-budget 16384
+  VRAM at load: 27280 MiB  (load 17s)
+  [a3b-d128-f16-rb16384-qwen-gen] lru-cache rep0: 10207 tok (8672 think/1535 ans) | prefill 1305 decode 76.0 t/s | ttft 101.98s ttfa 218.885s | stop
+  [a3b-d128-f16-rb16384-qwen-gen] lru-cache rep1: 10601 tok (8612 think/1989 ans) | prefill 734 decode 78.2 t/s | ttft 3.036s ttfa 116.204s | stop
+  [a3b-d128-f16-rb16384-qwen-gen] lru-cache rep2: 9940 tok (7939 think/2001 ans) | prefill 743 decode 73.8 t/s | ttft 2.997s ttfa 115.088s | stop
+  [a3b-d128-f16-rb16384-qwen-gen] rate-limiter rep0: 5565 tok (4519 think/1046 ans) | prefill 748 decode 76.2 t/s | ttft 2.914s ttfa 64.134s | stop
+  [a3b-d128-f16-rb16384-qwen-gen] rate-limiter rep1: 11149 tok (9830 think/1319 ans) | prefill 749 decode 75.9 t/s | ttft 2.914s ttfa 134.846s | stop
+  [a3b-d128-f16-rb16384-qwen-gen] rate-limiter rep2: 8943 tok (7614 think/1329 ans) | prefill 748 decode 78.0 t/s | ttft 2.92s ttfa 102.461s | stop
+  [a3b-d128-f16-rb16384-qwen-gen] async-memo rep0: 5365 tok (4869 think/496 ans) | prefill 744 decode 73.6 t/s | ttft 2.907s ttfa 70.216s | stop
+  [a3b-d128-f16-rb16384-qwen-gen] async-memo rep1: 5596 tok (4906 think/690 ans) | prefill 744 decode 75.4 t/s | ttft 2.909s ttfa 69.442s | stop
+  [a3b-d128-f16-rb16384-qwen-gen] async-memo rep2: 6543 tok (5913 think/630 ans) | prefill 745 decode 73.3 t/s | ttft 2.906s ttfa 85.13s | stop
+  [a3b-d128-f16-rb16384-qwen-gen] expr-eval rep0: 12662 tok (11157 think/1505 ans) | prefill 743 decode 77.8 t/s | ttft 2.894s ttfa 148.554s | stop
+  [a3b-d128-f16-rb16384-qwen-gen] expr-eval rep1: 12242 tok (10874 think/1368 ans) | prefill 744 decode 75.2 t/s | ttft 2.888s ttfa 150.013s | stop
+  [a3b-d128-f16-rb16384-qwen-gen] expr-eval rep2: 10111 tok (8477 think/1634 ans) | prefill 743 decode 75.6 t/s | ttft 2.886s ttfa 117.83s | stop
+  [a3b-d128-f16-rb16384-qwen-gen] pricing-deferred rep0: 13636 tok (11141 think/2495 ans) | prefill 1620 decode 88.0 t/s | ttft 52.272s ttfa 181.864s | stop
+  [a3b-d128-f16-rb16384-qwen-gen] pricing-deferred rep1: 9938 tok (7417 think/2521 ans) | prefill 1001 decode 86.6 t/s | ttft 2.201s ttfa 91.554s | stop
+  [a3b-d128-f16-rb16384-qwen-gen] pricing-deferred rep2: 9774 tok (7669 think/2105 ans) | prefill 998 decode 88.1 t/s | ttft 2.207s ttfa 91.995s | stop
+captured 15 rows -> /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/outputs.jsonl
+stopped port 8081
+=== a3b-d128-f16-rb16384-unsloth-reason  (VENDOR PRESET (UNSLOTH-ONLY): 'Instruct mode for reasoning tasks' = temp 1.0 / top_p 1.0 / top_k 40 / pp 2.0. Qwen's card does NOT document it (verified) though Unsloth attributes it to Qwen. We run Unsloth GGUFs, so it is the only vendor-shipped top_k 40 point.: Qwen3.6-35B-A3B-UD-Q4_K_M mtp=1 kv=f16 depth=120k budget=16384) ===
+starting on :8081 (pid 1763561) — log: /home/dev/work/dp-craft/amd/bench/.servers/8081.log
+up after 9s — model: Qwen3.6-35B-A3B-UD-Q4_K_M.gguf — build: b9950-961e4b26a
+cmdline: /home/dev/work/dp-craft/amd/bench/llamacpp-vulkan/llama-server -m /home/dev/models/gguf/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf -c 163840 -np 1 -ngl 99 -fa on -ub 2048 -b 4096 -ctk f16 -ctv f16 --host 127.0.0.1 --port 8081 --spec-type draft-mtp --reasoning-budget 16384
+  VRAM at load: 27279 MiB  (load 10s)
+  [a3b-d128-f16-rb16384-unsloth-reason] lru-cache rep0: 10962 tok (9136 think/1826 ans) | prefill 1295 decode 70.2 t/s | ttft 102.793s ttfa 238.517s | stop
+  [a3b-d128-f16-rb16384-unsloth-reason] lru-cache rep1: 12833 tok (12017 think/816 ans) | prefill 733 decode 68.0 t/s | ttft 3.037s ttfa 181.794s | stop
+  [a3b-d128-f16-rb16384-unsloth-reason] lru-cache rep2: 12789 tok (10776 think/2013 ans) | prefill 741 decode 69.7 t/s | ttft 3.008s ttfa 163.333s | stop
+  [a3b-d128-f16-rb16384-unsloth-reason] rate-limiter rep0: 8586 tok (7540 think/1046 ans) | prefill 747 decode 71.6 t/s | ttft 2.921s ttfa 110.914s | stop
+  [a3b-d128-f16-rb16384-unsloth-reason] rate-limiter rep1: 10042 tok (8949 think/1093 ans) | prefill 747 decode 72.0 t/s | ttft 2.918s ttfa 129.934s | stop
+  [a3b-d128-f16-rb16384-unsloth-reason] rate-limiter rep2: 12798 tok (11189 think/1609 ans) | prefill 747 decode 72.0 t/s | ttft 2.922s ttfa 162.375s | stop
+  [a3b-d128-f16-rb16384-unsloth-reason] async-memo rep0: 7558 tok (6894 think/664 ans) | prefill 745 decode 67.7 t/s | ttft 2.905s ttfa 107.039s | stop
+  [a3b-d128-f16-rb16384-unsloth-reason] async-memo rep1: 9991 tok (8945 think/1046 ans) | prefill 744 decode 67.9 t/s | ttft 2.908s ttfa 138.067s | stop
+  [a3b-d128-f16-rb16384-unsloth-reason] async-memo rep2: 6860 tok (6260 think/600 ans) | prefill 745 decode 66.8 t/s | ttft 2.905s ttfa 97.437s | stop
+  [a3b-d128-f16-rb16384-unsloth-reason] expr-eval rep0: 10970 tok (9570 think/1400 ans) | prefill 745 decode 72.1 t/s | ttft 2.881s ttfa 139.305s | stop
+  [a3b-d128-f16-rb16384-unsloth-reason] expr-eval rep1: 8767 tok (7232 think/1535 ans) | prefill 743 decode 71.9 t/s | ttft 2.893s ttfa 106.853s | stop
+  [a3b-d128-f16-rb16384-unsloth-reason] expr-eval rep2: 12645 tok (10912 think/1733 ans) | prefill 744 decode 71.4 t/s | ttft 2.879s ttfa 158.543s | stop
+  [a3b-d128-f16-rb16384-unsloth-reason] pricing-deferred rep0: 14383 tok (11870 think/2513 ans) | prefill 1617 decode 80.1 t/s | ttft 52.346s ttfa 206.693s | stop
+  [a3b-d128-f16-rb16384-unsloth-reason] pricing-deferred rep1: 11976 tok (9818 think/2158 ans) | prefill 1001 decode 84.5 t/s | ttft 2.204s ttfa 121.996s | stop
+  [a3b-d128-f16-rb16384-unsloth-reason] pricing-deferred rep2: 10372 tok (7287 think/3085 ans) | prefill 999 decode 83.7 t/s | ttft 2.206s ttfa 94.076s | stop
+captured 15 rows -> /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/outputs.jsonl
+stopped port 8081
+
+=== grader self-check (vitest must run) ===
+SELFTEST PASS  (good=1.0 > mediocre=0.519 > bad=0.0; hard_pass g/m/b = True/False/False)
+{
+  "good": {
+    "id": "GOOD",
+    "score": 1.0,
+    "hard_pass": true,
+    "objectives": {
+      "types": 1.0,
+      "lint": 1.0,
+      "tests": 1.0,
+      "bdd": 1.0,
+      "novj": 1.0,
+      "reuse": 1.0,
+      "edge": 1.0
+    },
+    "test_counts": {
+      "own": [
+        2,
+        2
+      ]
+    },
+    "files": [
+      "impl.test.ts",
+      "impl.ts"
+    ]
+  },
+  "mediocre": {
+    "id": "MEDIOCRE",
+    "score": 0.519,
+    "hard_pass": false,
+    "objectives": {
+      "types": 0.33,
+      "lint": 0.8,
+      "tests": 1.0,
+      "bdd": 1.0,
+      "novj": 1.0,
+      "reuse": 0.0,
+      "edge": 0.0
+    },
+    "test_counts": {
+      "own": [
+        1,
+        1
+      ]
+    },
+    "files": [
+      "impl.test.ts",
+      "impl.ts"
+    ]
+  },
+  "bad": {
+    "id": "BAD",
+    "score": 0.0,
+    "hard_pass": false,
+    "objectives": {
+      "types": 0.0,
+      "lint": 0.0,
+      "tests": 0.0,
+      "bdd": 0.0,
+      "novj": 0.0,
+      "reuse": 0.0,
+      "edge": 0.0
+    },
+    "test_counts": {
+      "own": [
+        0,
+        0
+      ]
+    },
+    "files": [
+      "impl.test.ts",
+      "impl.ts"
+    ]
+  }
+}
+
+=== grading (tsc + eslint + vitest, per reply) ===
+  [q5-d128-f16-rb16384] lru-cache rep0: score=0.603 F
+  [un-d128-f16-rb4096] pricing-deferred rep0: score=0.786 F
+  [un-d128-f16-rb4096] pricing-deferred rep1: score=0.813 F
+  [un-d128-f16-rb4096] pricing-deferred rep2: score=0.762 F
+  [xl-d128-f16-rb4096] pricing-deferred rep0: score=0.826 F
+  [xl-d128-f16-rb4096] pricing-deferred rep1: score=0.729 F
+  [xl-d128-f16-rb4096] pricing-deferred rep2: score=0.841 F
+  [q5-d128-q8-rb4096] pricing-deferred rep0: score=0.819 F
+  [q5-d128-q8-rb4096] pricing-deferred rep1: score=0.78 F
+  [q5-d128-q8-rb4096] pricing-deferred rep2: score=0.786 F
+  [q6-d128-q8-rb4096] pricing-deferred rep0: score=0.774 F
+  [q6-d128-q8-rb4096] pricing-deferred rep1: score=0.766 F
+  [q6-d128-q8-rb4096] pricing-deferred rep2: score=0.761 F
+  [a3b-d128-f16-rb4096] pricing-deferred rep0: score=0.82 F
+  [a3b-d128-f16-rb4096] pricing-deferred rep1: score=0.931 F
+  [a3b-d128-f16-rb4096] pricing-deferred rep2: score=0.739 F
+  [q5-d128-f16-rb16384] lru-cache rep1: score=0.787 F
+  [q5-d128-f16-rb16384] lru-cache rep2: score=0.914 F
+  [q5-d128-f16-rb16384] rate-limiter rep0: score=0.971 F
+  [q5-d128-f16-rb16384] rate-limiter rep1: score=0.912 F
+  [q5-d128-f16-rb16384] rate-limiter rep2: score=0.941 F
+  [q5-d128-f16-rb16384] async-memo rep0: score=0.652 F
+  [q5-d128-f16-rb16384] async-memo rep1: score=0.667 F
+  [q5-d128-f16-rb16384] async-memo rep2: score=0.666 F
+  [q5-d128-f16-rb16384] expr-eval rep0: score=0.632 F
+  [q5-d128-f16-rb16384] expr-eval rep1: score=0.738 F
+  [q5-d128-f16-rb16384] expr-eval rep2: score=0.645 F
+  [q5-d128-f16-rb16384] pricing-deferred rep0: score=0.832 F
+  [q5-d128-f16-rb16384] pricing-deferred rep1: score=0.789 F
+  [q5-d128-f16-rb16384] pricing-deferred rep2: score=0.809 F
+  [q5-d128-f16-rb4096] lru-cache rep0: score=0.669 F
+  [q5-d128-f16-rb4096] lru-cache rep1: score=0.941 F
+  [q5-d128-f16-rb4096] lru-cache rep2: score=0.547 F
+  [q5-d128-f16-rb4096] rate-limiter rep0: score=0.936 F
+  [q5-d128-f16-rb4096] rate-limiter rep1: score=0.912 F
+  [q5-d128-f16-rb4096] rate-limiter rep2: score=0.837 F
+  [q5-d128-f16-rb4096] async-memo rep0: score=0.652 F
+  [q5-d128-f16-rb4096] async-memo rep1: score=0.667 F
+  [q5-d128-f16-rb4096] async-memo rep2: score=0.666 F
+  [q5-d128-f16-rb4096] expr-eval rep0: score=0.615 F
+  [q5-d128-f16-rb4096] expr-eval rep1: score=0.738 F
+  [q5-d128-f16-rb4096] expr-eval rep2: score=0.59 F
+  [q5-d128-f16-rb4096] pricing-deferred rep0: score=0.813 F
+  [q5-d128-f16-rb4096] pricing-deferred rep1: score=0.76 F
+  [q5-d128-f16-rb4096] pricing-deferred rep2: score=0.809 F
+  [un-d128-f16-rb16384] lru-cache rep0: score=0.736 F
+  [un-d128-f16-rb16384] lru-cache rep1: score=0.896 F
+  [un-d128-f16-rb16384] lru-cache rep2: score=0.854 F
+  [un-d128-f16-rb16384] rate-limiter rep0: score=0.879 F
+  [un-d128-f16-rb16384] rate-limiter rep1: score=0.726 F
+  [un-d128-f16-rb16384] rate-limiter rep2: score=0.761 F
+  [un-d128-f16-rb16384] async-memo rep0: score=0.912 F
+  [un-d128-f16-rb16384] async-memo rep1: score=0.912 F
+  [un-d128-f16-rb16384] async-memo rep2: score=0.912 F
+  [un-d128-f16-rb16384] expr-eval rep0: score=0.667 F
+  [un-d128-f16-rb16384] expr-eval rep1: score=0.569 F
+  [un-d128-f16-rb16384] expr-eval rep2: score=0.528 F
+  [un-d128-f16-rb16384] pricing-deferred rep0: score=0.786 F
+  [un-d128-f16-rb16384] pricing-deferred rep1: score=0.813 F
+  [un-d128-f16-rb16384] pricing-deferred rep2: score=0.838 F
+  [a3b-d128-f16-rb16384] lru-cache rep0: score=0.864 F
+  [a3b-d128-f16-rb16384] lru-cache rep1: score=0.886 F
+  [a3b-d128-f16-rb16384] lru-cache rep2: score=0.836 F
+  [a3b-d128-f16-rb16384] rate-limiter rep0: score=0.792 F
+  [a3b-d128-f16-rb16384] rate-limiter rep1: score=0.774 F
+  [a3b-d128-f16-rb16384] rate-limiter rep2: score=0.621 F
+  [a3b-d128-f16-rb16384] async-memo rep0: score=0.95 F
+  [a3b-d128-f16-rb16384] async-memo rep1: score=0.799 F
+  [a3b-d128-f16-rb16384] async-memo rep2: score=0.944 P
+  [a3b-d128-f16-rb16384] expr-eval rep0: score=0.192 F
+  [a3b-d128-f16-rb16384] expr-eval rep1: score=0.644 F
+  [a3b-d128-f16-rb16384] expr-eval rep2: score=0.667 F
+  [a3b-d128-f16-rb16384] pricing-deferred rep0: score=0.876 F
+  [a3b-d128-f16-rb16384] pricing-deferred rep1: score=0.971 F
+  [a3b-d128-f16-rb16384] pricing-deferred rep2: score=0.81 F
+  [a3b-d128-f16-rbmax] lru-cache rep0: score=0.864 F
+  [a3b-d128-f16-rbmax] lru-cache rep1: score=0.886 F
+  [a3b-d128-f16-rbmax] lru-cache rep2: score=0.836 F
+  [a3b-d128-f16-rbmax] rate-limiter rep0: score=0.792 F
+  [a3b-d128-f16-rbmax] rate-limiter rep1: score=0.453 F
+  [a3b-d128-f16-rbmax] rate-limiter rep2: score=0.621 F
+  [a3b-d128-f16-rbmax] async-memo rep0: score=0.95 F
+  [a3b-d128-f16-rbmax] async-memo rep1: score=0.799 F
+  [a3b-d128-f16-rbmax] async-memo rep2: score=0.944 P
+  [a3b-d128-f16-rbmax] expr-eval rep0: score=0.192 F
+  [a3b-d128-f16-rbmax] expr-eval rep1: score=0.644 F
+  [a3b-d128-f16-rbmax] expr-eval rep2: score=0.667 F
+  [a3b-d128-f16-rbmax] pricing-deferred rep0: score=0.876 F
+  [a3b-d128-f16-rbmax] pricing-deferred rep1: score=0.971 F
+  [a3b-d128-f16-rbmax] pricing-deferred rep2: score=0.81 F
+  [a3b-d128-f16-rb16384-t03] lru-cache rep0: score=0.8 F
+  [a3b-d128-f16-rb16384-t03] lru-cache rep1: score=0.805 F
+  [a3b-d128-f16-rb16384-t03] lru-cache rep2: score=0.639 F
+  [a3b-d128-f16-rb16384-t03] rate-limiter rep0: score=0.943 F
+  [a3b-d128-f16-rb16384-t03] rate-limiter rep1: score=0.677 F
+  [a3b-d128-f16-rb16384-t03] rate-limiter rep2: score=0.57 F
+  [a3b-d128-f16-rb16384-t03] async-memo rep0: score=0.753 F
+  [a3b-d128-f16-rb16384-t03] async-memo rep1: score=0.828 F
+  [a3b-d128-f16-rb16384-t03] async-memo rep2: score=0.723 F
+  [a3b-d128-f16-rb16384-t03] expr-eval rep0: score=0.667 F
+  [a3b-d128-f16-rb16384-t03] expr-eval rep1: score=0.467 F
+  [a3b-d128-f16-rb16384-t03] expr-eval rep2: score=0.337 F
+  [a3b-d128-f16-rb16384-t03] pricing-deferred rep0: score=0.761 F
+  [a3b-d128-f16-rb16384-t03] pricing-deferred rep1: score=0.709 F
+  [a3b-d128-f16-rb16384-t03] pricing-deferred rep2: score=0.819 F
+  [a3b-d128-f16-rb16384-t10] lru-cache rep0: score=0.817 F
+  [a3b-d128-f16-rb16384-t10] lru-cache rep1: score=0.772 F
+  [a3b-d128-f16-rb16384-t10] lru-cache rep2: score=0.874 F
+  [a3b-d128-f16-rb16384-t10] rate-limiter rep0: score=0.941 F
+  [a3b-d128-f16-rb16384-t10] rate-limiter rep1: score=0.862 F
+  [a3b-d128-f16-rb16384-t10] rate-limiter rep2: score=0.909 F
+  [a3b-d128-f16-rb16384-t10] async-memo rep0: score=0.655 F
+  [a3b-d128-f16-rb16384-t10] async-memo rep1: score=1.0 P
+  [a3b-d128-f16-rb16384-t10] async-memo rep2: score=0.833 F
+  [a3b-d128-f16-rb16384-t10] expr-eval rep0: score=0.314 F
+  [a3b-d128-f16-rb16384-t10] expr-eval rep1: score=0.362 F
+  [a3b-d128-f16-rb16384-t10] expr-eval rep2: score=0.183 F
+  [a3b-d128-f16-rb16384-t10] pricing-deferred rep0: score=0.679 F
+  [a3b-d128-f16-rb16384-t10] pricing-deferred rep1: score=0.297 F
+  [a3b-d128-f16-rb16384-t10] pricing-deferred rep2: score=0.76 F
+  [a3b-d128-f16-rb16384-qwen-gen] lru-cache rep0: score=0.439 F
+  [a3b-d128-f16-rb16384-qwen-gen] lru-cache rep1: score=0.764 F
+  [a3b-d128-f16-rb16384-qwen-gen] lru-cache rep2: score=0.488 F
+  [a3b-d128-f16-rb16384-qwen-gen] rate-limiter rep0: score=0.535 F
+  [a3b-d128-f16-rb16384-qwen-gen] rate-limiter rep1: score=0.324 F
+  [a3b-d128-f16-rb16384-qwen-gen] rate-limiter rep2: score=0.684 F
+  [a3b-d128-f16-rb16384-qwen-gen] async-memo rep0: score=0.833 F
+  [a3b-d128-f16-rb16384-qwen-gen] async-memo rep1: score=0.822 F
+  [a3b-d128-f16-rb16384-qwen-gen] async-memo rep2: score=0.739 F
+  [a3b-d128-f16-rb16384-qwen-gen] expr-eval rep0: score=0.667 F
+  [a3b-d128-f16-rb16384-qwen-gen] expr-eval rep1: score=0.322 F
+  [a3b-d128-f16-rb16384-qwen-gen] expr-eval rep2: score=0.37 F
+  [a3b-d128-f16-rb16384-qwen-gen] pricing-deferred rep0: score=0.806 F
+  [a3b-d128-f16-rb16384-qwen-gen] pricing-deferred rep1: score=0.839 F
+  [a3b-d128-f16-rb16384-qwen-gen] pricing-deferred rep2: score=0.687 F
+  [a3b-d128-f16-rb16384-unsloth-reason] lru-cache rep0: score=0.372 F
+  [a3b-d128-f16-rb16384-unsloth-reason] lru-cache rep1: score=0.371 F
+  [a3b-d128-f16-rb16384-unsloth-reason] lru-cache rep2: score=0.911 F
+  [a3b-d128-f16-rb16384-unsloth-reason] rate-limiter rep0: score=0.867 Fgraded 150 rows (0 errors/empty), reused 60 already-graded -> /home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/scores_typescript.jsonl [210 total]
+
+  [a3b-d128-f16-rb16384-unsloth-reason] rate-limiter rep1: score=0.357 F
+  [a3b-d128-f16-rb16384-unsloth-reason] rate-limiter rep2: score=0.553 F
+  [a3b-d128-f16-rb16384-unsloth-reason] async-memo rep0: score=0.733 F
+  [a3b-d128-f16-rb16384-unsloth-reason] async-memo rep1: score=0.598 F
+  [a3b-d128-f16-rb16384-unsloth-reason] async-memo rep2: score=0.496 F
+  [a3b-d128-f16-rb16384-unsloth-reason] expr-eval rep0: score=0.596 F
+  [a3b-d128-f16-rb16384-unsloth-reason] expr-eval rep1: score=0.657 F
+  [a3b-d128-f16-rb16384-unsloth-reason] expr-eval rep2: score=0.637 F
+  [a3b-d128-f16-rb16384-unsloth-reason] pricing-deferred rep0: score=0.857 F
+  [a3b-d128-f16-rb16384-unsloth-reason] pricing-deferred rep1: score=0.665 F
+  [a3b-d128-f16-rb16384-unsloth-reason] pricing-deferred rep2: score=0.782 F
+
+=== blind judge: ONE claude session fans out opus subagents (orchestrator=opus) ===
+judge: fanning out 149 candidates in 19 'opus'-subagent batches via ONE claude session (orchestrator=opus)

@@ -1,0 +1,1 @@
+{"design":4,"clarity":4,"robustness":4,"notes":"Clean split of settled entries from in-flight promises and thorough cache tests, though the `Partial<Record>` plus \"other\" fallback in `amountLabel` needlessly forfeits exhaustiveness checking on the union."}

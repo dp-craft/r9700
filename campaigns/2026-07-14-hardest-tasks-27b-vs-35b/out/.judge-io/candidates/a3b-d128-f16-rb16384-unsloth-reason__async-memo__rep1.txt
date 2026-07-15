@@ -1,0 +1,127 @@
+// FILE: impl.ts
+type AsyncFn<K, V> = (key: K) => Promise<V>;
+type MemoizedFn<K, V> = (key: K) => Promise<V>;
+
+export function createAsyncMemo<K, V>(fn: AsyncFn<K, V>): MemoizedFn<K, V> {
+  const cache = new Map<K, Promise<V>>();
+
+  return (key: K): Promise<V> => {
+    const cached = cache.get(key);
+
+    if (cached !== undefined) {
+      return cached;
+    }
+
+    const p: Promise<V> = fn(key);
+    cache.set(key, p);
+
+    void p.catch((): void => cache.delete(key));
+
+    return p;
+  };
+}
+
+// FILE: impl.test.ts
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import type { Mock } from 'vitest';
+
+import { createAsyncMemo } from './impl';
+
+describe('createAsyncMemo', () => {
+  let memoized: (key: string) => Promise<string>;
+  let stub: Mock<[string], Promise<string>>;
+
+  beforeEach(() => {
+    stub = vi.fn();
+    memoized = createAsyncMemo(stub);
+    vi.resetAllMocks();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe('concurrent deduplication', () => {
+    it('should share one computation when concurrent calls use the same key', async (): Promise<void> => {
+      stub.mockImplementation(async (k: string): Promise<string> => 
+        new Promise<string>((res): void => setTimeout(() => res(k), 50))
+      );
+
+      const [first, second] = await Promise.all([memoized('a'), memoized('a')]);
+
+      expect(first).toBe('a');
+      expect(second).toBe('a');
+      expect(stub).toHaveBeenCalledTimes(1);
+    });
+
+    it('should invoke fn independently when keys differ', async (): Promise<void> => {
+      stub.mockImplementation(async (k: string): Promise<string> => 
+        new Promise<string>((res): void => setTimeout(() => res(k), 20))
+      );
+
+      const [first, second] = await Promise.all([memoized('a'), memoized('b')]);
+
+      expect(first).toBe('a');
+      expect(second).toBe('b');
+      expect(stub).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('retry after rejection', () => {
+    it('should call fn again on next invocation when previous attempt rejected', async (): Promise<void> => {
+      stub.mockImplementation(async (): Promise<string> => 
+        new Promise<never>((rej: (err: Error) => void): Promise<never> => rej(new Error('initial fail')))
+      );
+
+      const failCall = memoized('x');
+      
+      await new Promise((res): void => setTimeout(res, 10));
+      
+      stub.mockResolvedValueOnce('success');
+      const result: string = await memoized('x');
+
+      expect(result).toBe('success');
+      expect(stub).toHaveBeenCalledTimes(2);
+    });
+
+    it('should not block independent keys when one key computation rejects', async (): Promise<void> => {
+      stub.mockImplementation(async (k: string): Promise<string> => 
+        k === 'fail' ? Promise.reject<never>(new Error('boom')) : new Promise<string>((res): void => res(k))
+      );
+
+      await expect(memoized('fail')).rejects.toThrow();
+      
+      const ok: string = await memoized('ok');
+      
+      expect(ok).toBe('ok');
+    });
+  });
+
+  describe('cache hit after successful resolution', () => {
+    it('should return resolved value without calling fn again for the same key', async (): Promise<void> => {
+      stub.mockResolvedValueOnce('cached result');
+
+      const first: string = await memoized('y');
+      const second: string = await memoized('y');
+
+      expect(first).toBe('cached result');
+      expect(second).toBe('cached result');
+      expect(stub).toHaveBeenCalledTimes(1);
+    });
+
+    it('should preserve single invocation across sequential cache hits', async (): Promise<void> => {
+      stub.mockResolvedValueOnce('stable value');
+
+      const first: string = await memoized('z');
+      
+      const later1: string = await memoized('z');
+      const later2: string = await memoized('z');
+
+      expect(first).toBe('stable value');
+      expect(later1).toBe('stable value');
+      expect(later2).toBe('stable value');
+      expect(stub).toHaveBeenCalledTimes(1);
+    });
+  });
+});

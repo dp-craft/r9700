@@ -1,0 +1,142 @@
+// FILE: impl.ts
+export type Result =
+  | { readonly ok: true; readonly value: number }
+  | { readonly ok: false; readonly error: string };
+
+type TokenKind = 'NUM' | '+' | '-' | '*' | '/' | '(' | ')';
+type Token = { kind: TokenKind; text: string };
+type Ref = { current: number };
+const makeRef = (v: number): Ref => ({ current: v });
+
+export const tokenize = (input: string): readonly Token[] | Result => {
+  const tokens: Token[] = [];
+  let i = 0;
+  while (i < input.length) {
+    const char = input[i];
+    if (/\s/.test(char)) ++i;
+    else if (char === '+' || char === '-' || char === '*' || char === '/') {
+      tokens.push({ kind: char, text: char }); ++i;
+    } else if (char === '(') {
+      tokens.push({ kind: '(', text: '(' }); ++i;
+    } else if (char === ')') {
+      tokens.push({ kind: ')', text: ')' }); ++i;
+    } else if (/\d/.test(char)) {
+      const start = i;
+      while (i < input.length && /\d/.test(input[i])!) ++i;
+      tokens.push({ kind: 'NUM', text: input.slice(start, i) });
+    } else return { ok: false, error: `Unexpected character: ${char}` };
+  }
+  return tokens;
+};
+
+const parseExpr = (tokens: readonly Token[], pos: Ref): Result => {
+  let result = parseTerm(tokens, pos);
+  if (!result.ok) return result;
+  while (pos.current < tokens.length) {
+    const t = tokens[pos.current];
+    if (t.kind !== '+' && t.kind !== '-') break;
+    ++pos.current;
+    const rhs = parseTerm(tokens, pos);
+    if (!rhs.ok) return rhs;
+    result = t.kind === '+' ? { ok: true, value: result.value + rhs.value } : { ok: true, value: result.value - rhs.value };
+  }
+  return result;
+};
+
+const parseTerm = (tokens: readonly Token[], pos: Ref): Result => {
+  let result = parseFactor(tokens, pos);
+  if (!result.ok) return result;
+  while (pos.current < tokens.length) {
+    const t = tokens[pos.current];
+    if (t.kind !== '*' && t.kind !== '/') break;
+    ++pos.current;
+    const rhs = parseFactor(tokens, pos);
+    if (!rhs.ok) return rhs;
+    if (t.kind === '/' && rhs.value === 0) return { ok: false, error: 'Division by zero' };
+    result = t.kind === '*' ? { ok: true, value: result.value * rhs.value } : { ok: true, value: result.value / rhs.value };
+  }
+  return result;
+};
+
+const parseFactor = (tokens: readonly Token[], pos: Ref): Result => {
+  if (pos.current >= tokens.length) return { ok: false, error: 'Unexpected end' };
+  const t = tokens[pos.current]; ++pos.current;
+  if (t.kind === '(') {
+    const inner = parseExpr(tokens, pos);
+    if (!inner.ok) return inner;
+    if (pos.current >= tokens.length || tokens[pos.current].kind !== ')') return { ok: false, error: 'Missing paren' };
+    ++pos.current;
+    return inner;
+  }
+  if (t.kind !== 'NUM') return { ok: false, error: `Expected number` };
+  const v = Number(t.text);
+  return !Number.isFinite(v) || !Number.isSafeInteger(v) ? { ok: false, error: 'Invalid integer' } : { ok: true, value: v };
+};
+
+export const evaluate = (expr: string): Result => {
+  const tokens = tokenize(expr);
+  if (!Array.isArray(tokens)) return (tokens as Result);
+  const pos = makeRef(0);
+  const r = parseExpr(tokens, pos);
+  if (!r.ok) return r;
+  if (pos.current !== tokens.length) return { ok: false, error: 'Unexpected extra characters' };
+  return r;
+};
+
+// FILE: impl.test.ts
+import { describe, expect, it } from 'vitest';
+import { evaluate, Result } from './impl';
+
+describe('evaluate', () => {
+  describe('value computation', () => {
+    it('should parse and resolve correctly when provided with balanced parentheses', () => {
+      const res: Result = evaluate('(2 + 3) * 4');
+      expect(res.ok).toBe(true);
+      if (res.ok) expect(res.value).toBe(20);
+    });
+
+    it('should enforce standard precedence rules when mixing addition and multiplication', () => {
+      const res: Result = evaluate('2 + 3 * 4');
+      expect(res.ok).toBe(true);
+      if (res.ok) expect(res.value).toBe(14);
+    });
+
+    it('should evaluate left-associativity correctly when given chained subtractions', () => {
+      const res: Result = evaluate('10 - 3 - 2');
+      expect(res.ok).toBe(true);
+      if (res.ok) expect(res.value).toBe(5);
+    });
+
+    it('should evaluate left-associativity correctly when given chained divisions', () => {
+      const res: Result = evaluate('8 / 2 / 2');
+      expect(res.ok).toBe(true);
+      if (res.ok) expect(res.value).toBe(2);
+    });
+  });
+
+  describe('edge cases and safety', () => {
+    it('should ignore surrounding whitespace when given padded numeric expressions', () => {
+      const res: Result = evaluate('  15  +  5  ');
+      expect(res.ok).toBe(true);
+      if (res.ok) expect(res.value).toBe(20);
+    });
+
+    it('should return a typed failure object when division by zero occurs', () => {
+      const res: Result = evaluate('10 / 0');
+      expect(res.ok).toBe(false);
+      expect(typeof res.error).toBe('string');
+      if (!res.ok) expect(res.error).toContain('zero');
+    });
+
+    it('should reject unbalanced parentheses safely without throwing', () => {
+      const res: Result = evaluate('(2 + 3');
+      expect(res.ok).toBe(false);
+      if (!res.ok) expect(typeof res.error).toBe('string');
+    });
+
+    it('should gracefully handle unexpected characters when scanning input', () => {
+      const res: Result = evaluate('10 a 5');
+      expect(res.ok).toBe(false);
+    });
+  });
+});

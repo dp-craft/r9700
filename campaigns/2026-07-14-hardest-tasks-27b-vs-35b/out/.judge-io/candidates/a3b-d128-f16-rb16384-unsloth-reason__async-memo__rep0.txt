@@ -1,0 +1,77 @@
+// FILE: impl.ts
+export function createAsyncMemo<K, V>(
+  fn: (key: K) => Promise<V>
+): (key: K) => Promise<V> {
+  const cache = new Map<K, Promise<V>>();
+
+  return (key: K): Promise<V> => {
+    const cached = cache.get(key);
+    if (cached !== undefined) return cached;
+
+    const p = fn(key);
+    cache.set(key, p);
+
+    return p.catch((err): never => {
+      cache.delete(key);
+      throw err;
+    });
+  };
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it } from 'vitest';
+import { createAsyncMemo } from './impl';
+
+describe('createAsyncMemo', () => {
+  describe('concurrent dedup', () => {
+    it('should share computation when concurrent calls occur for the same key', async (): Promise<void> => {
+      let callCount = 0;
+      const memoFn = createAsyncMemo(async (key: string): Promise<number> => {
+        callCount += 1;
+        await new Promise((resolve): void => setTimeout(resolve, 20));
+        return key.length;
+      });
+
+      const p1 = memoFn('test');
+      const p2 = memoFn('test');
+      const [res1, res2] = await Promise.allSettled([p1, p2]);
+
+      expect(res1.status).toBe('fulfilled');
+      expect(res2.status).toBe('fulfilled');
+      expect(res1.value).toBe(4);
+      expect(res2.value).toBe(4);
+      expect(callCount).toBe(1);
+    });
+  });
+
+  describe('retry after rejection', () => {
+    it('should not cache failure and retry immediately on subsequent call when fn rejects', async (): Promise<void> => {
+      let callCount = 0;
+      const memoFn = createAsyncMemo(async (key: string): Promise<number> => {
+        callCount += 1;
+        if (callCount === 1) throw new Error('fail');
+        return 42;
+      });
+
+      await expect(memoFn('key')).rejects.toThrow('fail');
+      
+      await expect(memoFn('key')).resolves.toBe(42);
+      expect(callCount).toBe(2);
+    });
+  });
+
+  describe('cache hit after success', () => {
+    it('should return cached result when called repeatedly after successful resolution', async (): Promise<void> => {
+      let callCount = 0;
+      const memoFn = createAsyncMemo(async (key: string): Promise<number> => {
+        callCount += 1;
+        return key.length;
+      });
+
+      await expect(memoFn('short')).resolves.toBe(5);
+      
+      await expect(memoFn('short')).resolves.toBe(5);
+      expect(callCount).toBe(1);
+    });
+  });
+});

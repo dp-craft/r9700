@@ -1,0 +1,60 @@
+// FILE: impl.ts
+export function createAsyncMemo<K, V>(
+  fn: (key: K) => Promise<V>
+): (key: K) => Promise<V> {
+  const cache = new Map<K, Promise<V>>();
+
+  return (key: K): Promise<V> => {
+    const cached = cache.get(key);
+    if (cached !== undefined) {
+      return cached;
+    }
+
+    const promise = fn(key)
+      .catch((err: unknown): never => {
+        cache.delete(key);
+        throw err;
+      });
+
+    cache.set(key, promise);
+    return promise;
+  };
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it, vi } from 'vitest';
+
+import { createAsyncMemo } from './impl';
+
+describe('createAsyncMemo', () => {
+  it('should share computation when concurrent dedup', async (): Promise<void> => {
+    const mock = vi.fn().mockResolvedValue('ok');
+    const memo = createAsyncMemo<string, string>(mock);
+
+    const [a, b] = await Promise.all([memo('k'), memo('k')]);
+
+    expect(a).toBe('ok');
+    expect(b).toBe('ok');
+    expect(mock).toHaveBeenCalledTimes(1);
+  });
+
+  it('should retry fn when retry-after-rejection', async (): Promise<void> => {
+    const mock = vi.fn()
+      .mockRejectedValueOnce(new Error('fail'))
+      .mockResolvedValueOnce('ok');
+    const memo = createAsyncMemo<string, string>(mock);
+
+    await expect(memo('k')).rejects.toThrow('fail');
+    await expect(memo('k')).resolves.toBe('ok');
+    expect(mock).toHaveBeenCalledTimes(2);
+  });
+
+  it('should reuse value when cache-hit-after-success', async (): Promise<void> => {
+    const mock = vi.fn().mockResolvedValue('ok');
+    const memo = createAsyncMemo<string, string>(mock);
+
+    await memo('k');
+    await expect(memo('k')).resolves.toBe('ok');
+    expect(mock).toHaveBeenCalledTimes(1);
+  });
+});

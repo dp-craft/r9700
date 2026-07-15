@@ -1,0 +1,172 @@
+// FILE: impl.ts
+export type Result =
+  | { readonly ok: true; readonly value: number }
+  | { readonly ok: false; readonly error: string };
+
+type Token =
+  | { readonly kind: 'NUMBER'; readonly value: number }
+  | { readonly kind: 'PLUS' }
+  | { readonly kind: 'MINUS' }
+  | { readonly kind: 'STAR' }
+  | { readonly kind: 'SLASH' }
+  | { readonly kind: 'LPAREN' }
+  | { readonly kind: 'RPAREN' }
+  | { readonly kind: 'EOF' };
+
+interface Parser {
+  peek: () => Token;
+  consume: (k?: string) => Result<Token>;
+  expr: () => Result<number>;
+  term: () => Result<number>;
+  factor: () => Result<number>;
+}
+
+function tokenize(input: string): Result<Token[]> {
+  const out: Token[] = []; let i = 0;
+  while (i < input.length) {
+    if (input[i] === ' ') { i++; continue; }
+    if (input[i] >= '0' && input[i] <= '9') {
+      let end = i; while (end < input.length && input[end] >= '0' && input[end] <= '9') end++;
+      out.push({ kind: 'NUMBER', value: Number(input.slice(i, end)) }); i = end; continue;
+    }
+    switch (input[i]) {
+      case '+': out.push({ kind: 'PLUS' }); break; case '-': out.push({ kind: 'MINUS' }); break;
+      case '*': out.push({ kind: 'STAR' }); break; case '/': out.push({ kind: 'SLASH' }); break;
+      case '(': out.push({ kind: 'LPAREN' }); break; case ')': out.push({ kind: 'RPAREN' }); break;
+      default: return { ok: false, error: `Unexpected character: ${input[i]}` };
+    }
+    i++;
+  }
+  out.push({ kind: 'EOF' }); return { ok: true, value: out };
+}
+
+function parseTokens(tokens: Token[]): Result {
+  const p: Parser = {
+    i: 0,
+    peek: (): Token => tokens[p.i] ?? { kind: 'EOF' },
+    consume: (k?: string): Result<Token> => {
+      const t = p.peek();
+      if (k && t.kind !== k) return { ok: false, error: `Expected ${k}, got ${t.kind}` };
+      if (t.kind === 'EOF' && k !== 'EOF') return { ok: false, error: 'Unexpected end of input' };
+      p.i++; return { ok: true, value: t };
+    },
+    expr: () => expr_(p), term: () => term_(p), factor: () => factor_(p),
+  };
+  const res = p.expr();
+  if (!res.ok) return res;
+  if (p.peek().kind !== 'EOF') return { ok: false, error: 'Trailing characters' };
+  return { ok: true, value: res.value };
+}
+
+function expr_(p: Parser): Result<number> {
+  let left = p.term();
+  if (!left.ok) return left;
+  while (p.peek().kind === 'PLUS' || p.peek().kind === 'MINUS') {
+    const op = p.peek().kind;
+    p.consume();
+    const right = p.term();
+    if (!right.ok) return right;
+    left = op === 'PLUS' ? { ok: true, value: left.value + right.value } : { ok: true, value: left.value - right.value };
+  }
+  return left;
+}
+
+function term_(p: Parser): Result<number> {
+  let left = p.factor();
+  if (!left.ok) return left;
+  while (p.peek().kind === 'STAR' || p.peek().kind === 'SLASH') {
+    const op = p.peek().kind;
+    p.consume();
+    const right = p.factor();
+    if (!right.ok) return right;
+    if (op === 'SLASH' && right.value === 0) return { ok: false, error: 'Division by zero' };
+    left = op === 'STAR' ? { ok: true, value: left.value * right.value } : { ok: true, value: left.value / right.value };
+  }
+  return left;
+}
+
+function factor_(p: Parser): Result<number> {
+  if (p.peek().kind === 'LPAREN') {
+    p.consume();
+    const val = p.expr();
+    if (!val.ok) return val;
+    const rp = p.consume('RPAREN');
+    if (!rp.ok) return rp;
+    return { ok: true, value: val.value };
+  }
+  const tok = p.consume('NUMBER');
+  if (!tok.ok) return tok;
+  return { ok: true, value: tok.value };
+}
+
+export function evaluate(expr: string): Result {
+  const tokRes = tokenize(expr);
+  if (!tokRes.ok) return tokRes;
+  return parseTokens(tokRes.value);
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it } from 'vitest';
+import { evaluate } from './impl';
+
+describe('evaluate', () => {
+  it('should return success when input is a single number', () => {
+    const res = evaluate('42');
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.value).toBe(42);
+  });
+
+  it('should evaluate addition when input contains plus operator', () => {
+    const res = evaluate('10 + 5');
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.value).toBe(15);
+  });
+
+  it('should evaluate subtraction when input contains minus operator', () => {
+    const res = evaluate('10 - 5');
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.value).toBe(5);
+  });
+
+  it('should respect precedence when input contains mixed operators', () => {
+    const res = evaluate('2 + 3 * 4');
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.value).toBe(14);
+  });
+
+  it('should support left-associativity when input contains same operators', () => {
+    const res1 = evaluate('10 - 3 - 2');
+    expect(res1.ok).toBe(true);
+    if (res1.ok) expect(res1.value).toBe(5);
+    const res2 = evaluate('8 / 2 / 2');
+    expect(res2.ok).toBe(true);
+    if (res2.ok) expect(res2.value).toBe(2);
+  });
+
+  it('should handle parentheses when input contains grouped expressions', () => {
+    const res = evaluate('2 * (3 + 4)');
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.value).toBe(14);
+  });
+
+  it('should return error when input contains division by zero', () => {
+    const res = evaluate('10 / 0');
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.error).toContain('Division by zero');
+  });
+
+  it('should return error when input contains trailing characters', () => {
+    const res = evaluate('5 + ');
+    expect(res.ok).toBe(false);
+  });
+
+  it('should return error when input contains unbalanced parentheses', () => {
+    const res = evaluate('(2 + 3');
+    expect(res.ok).toBe(false);
+  });
+
+  it('should return error when input contains unexpected character', () => {
+    const res = evaluate('2 @ 3');
+    expect(res.ok).toBe(false);
+  });
+});

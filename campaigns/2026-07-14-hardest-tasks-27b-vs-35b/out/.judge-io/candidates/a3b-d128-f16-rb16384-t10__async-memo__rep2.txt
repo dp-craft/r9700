@@ -1,0 +1,71 @@
+// FILE: impl.ts
+export function createAsyncMemo<K, V>(fn: (key: K) => Promise<V>): (key: K) => Promise<V> {
+  const cache = new Map<K, Promise<V>>();
+  return (key: K): Promise<V> => {
+    const cached: Promise<V> | undefined = cache.get(key);
+    if (cached) return cached;
+
+    const p: Promise<V> = fn(key).catch((err: unknown): never => {
+      cache.delete(key);
+      throw err;
+    });
+    cache.set(key, p);
+    return p;
+  };
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it, vi } from 'vitest';
+import { createAsyncMemo } from './impl';
+
+describe('createAsyncMemo', () => {
+  it('should dedup concurrent calls when same key is requested twice simultaneously', async (): Promise<void> => {
+    const fn = vi.fn().mockResolvedValue('success');
+    const memo = createAsyncMemo(fn);
+
+    const p1: Promise<string> = memo('key1');
+    const p2: Promise<string> = memo('key1');
+
+    await p1;
+    await p2;
+
+    expect(fn).toHaveBeenCalledTimes(1);
+    expect(p1).toBe(p2);
+  });
+
+  it('should retry fn when previously cached promise rejects', async (): Promise<void> => {
+    let callCount = 0;
+    const fn = vi.fn().mockImplementation(async (): Promise<string> => {
+      callCount += 1;
+      if (callCount === 1) throw new Error('fail');
+      return 'retry-success';
+    });
+    const memo = createAsyncMemo(fn);
+
+    await expect(memo('key1')).rejects.toThrow('fail');
+    await expect(memo('key1')).resolves.toBe('retry-success');
+
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+
+  it('should cache successful results when fn resolves', async (): Promise<void> => {
+    const fn = vi.fn().mockResolvedValue('cached-value');
+    const memo = createAsyncMemo(fn);
+
+    await memo('key1');
+    const p2: Promise<string> = memo('key1');
+
+    await p2;
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it('should not cache failures when fn rejects', async (): Promise<void> => {
+    const fn = vi.fn().mockRejectedValue(new Error('always-fails'));
+    const memo = createAsyncMemo(fn);
+
+    await expect(memo('key1')).rejects.toThrow('always-fails');
+    await expect(memo('key1')).rejects.toThrow('always-fails');
+
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+});

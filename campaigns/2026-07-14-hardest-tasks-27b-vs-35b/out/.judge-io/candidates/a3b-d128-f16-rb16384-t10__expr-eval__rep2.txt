@@ -1,0 +1,196 @@
+// FILE: impl.ts
+type Token =
+  | { readonly type: 'NUM'; readonly value: number }
+  | { readonly type: 'PLUS' | 'MINUS' | 'MUL' | 'DIV' }
+  | { readonly type: 'LPAREN' | 'RPAREN' | 'EOF' };
+
+export type Result =
+  | { readonly ok: true; readonly value: number }
+  | { readonly ok: false; readonly error: string };
+
+interface ParserState {
+  readonly tokens: readonly Token[];
+  pos: number;
+}
+
+function tokenize(input: string): Token[] | Result {
+  const out: Token[] = [];
+  for (let i = 0; i < input.length; i++) {
+    const c = input[i];
+    if (/\s/.test(c)) continue;
+    if (/[0-9]/.test(c)) {
+      let j = i; while (i < input.length && /[0-9]/.test(input[i])) i++;
+      out.push({ type: 'NUM', value: Number(input.slice(j, i)) }); continue;
+    }
+    if (c === '+') out.push({ type: 'PLUS' });
+    else if (c === '-') out.push({ type: 'MINUS' });
+    else if (c === '*') out.push({ type: 'MUL' });
+    else if (c === '/') out.push({ type: 'DIV' });
+    else if (c === '(') out.push({ type: 'LPAREN' });
+    else if (c === ')') out.push({ type: 'RPAREN' });
+    else return { ok: false, error: `Unexpected char: ${c}` };
+  }
+  out.push({ type: 'EOF' });
+  return out;
+}
+
+function parseExpr(state: ParserState): Result {
+  let left = parseTerm(state);
+  while (true) {
+    const token = state.tokens[state.pos];
+    if (token?.type !== 'PLUS' && token?.type !== 'MINUS') break;
+    state.pos++;
+    const right = parseTerm(state);
+    if (!right.ok) return right;
+    left = token.type === 'PLUS' ? { ok: true, value: left.value + right.value } : { ok: true, value: left.value - right.value };
+  }
+  return left;
+}
+
+function parseTerm(state: ParserState): Result {
+  let left = parseFactor(state);
+  while (true) {
+    const token = state.tokens[state.pos];
+    if (token?.type !== 'MUL' && token?.type !== 'DIV') break;
+    state.pos++;
+    const right = parseFactor(state);
+    if (!right.ok) return right;
+    if (token.type === 'DIV' && right.value === 0) return { ok: false, error: 'Division by zero' };
+    left = token.type === 'MUL' ? { ok: true, value: left.value * right.value } : { ok: true, value: left.value / right.value };
+  }
+  return left;
+}
+
+function parseFactor(state: ParserState): Result {
+  const token = state.tokens[state.pos];
+  if (!token || token.type === 'EOF') return { ok: false, error: 'Missing operand' };
+  if (token.type === 'NUM') {
+    state.pos++;
+    return { ok: true, value: token.value };
+  }
+  if (token.type === 'LPAREN') {
+    state.pos++;
+    const res = parseExpr(state);
+    if (!res.ok) return res;
+    const close = state.tokens[state.pos];
+    if (!close || close.type !== 'RPAREN') return { ok: false, error: 'Missing closing parenthesis' };
+    state.pos++;
+    return res;
+  }
+  return { ok: false, error: `Unexpected token: ${token.type}` };
+}
+
+export function evaluate(expr: string): Result {
+  const tokensOrErr = tokenize(expr);
+  if (!tokensOrErr.ok) return tokensOrErr;
+  const state: ParserState = { tokens: tokensOrErr, pos: 0 };
+  const res = parseExpr(state);
+  if (!res.ok) return res;
+  if (state.tokens[state.pos].type !== 'EOF') return { ok: false, error: 'Unexpected trailing characters' };
+  return res;
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it } from 'vitest';
+import { evaluate } from './impl';
+
+describe('evaluate', () => {
+  describe('basic arithmetic', () => {
+    it('should return correct value when input contains simple addition', () => {
+      const res = evaluate('2 + 3');
+      expect(res.ok).toBe(true);
+      expect((res as { ok: true; value: number }).value).toBe(5);
+    });
+
+    it('should return correct value when input contains simple subtraction', () => {
+      const res = evaluate('10 - 4');
+      expect(res.ok).toBe(true);
+      expect((res as { ok: true; value: number }).value).toBe(6);
+    });
+
+    it('should return correct value when input contains simple multiplication', () => {
+      const res = evaluate('3 * 4');
+      expect(res.ok).toBe(true);
+      expect((res as { ok: true; value: number }).value).toBe(12);
+    });
+
+    it('should return correct value when input contains simple division', () => {
+      const res = evaluate('10 / 2');
+      expect(res.ok).toBe(true);
+      expect((res as { ok: true; value: number }).value).toBe(5);
+    });
+  });
+
+  describe('precedence', () => {
+    it('should apply multiplication precedence when input mixes addition and multiplication', () => {
+      const res = evaluate('2 + 3 * 4');
+      expect(res.ok).toBe(true);
+      expect((res as { ok: true; value: number }).value).toBe(14);
+    });
+
+    it('should apply division precedence when input mixes subtraction and division', () => {
+      const res = evaluate('10 - 8 / 2');
+      expect(res.ok).toBe(true);
+      expect((res as { ok: true; value: number }).value).toBe(6);
+    });
+  });
+
+  describe('left associativity', () => {
+    it('should left-associate subtraction when input contains multiple subtraction operators', () => {
+      const res = evaluate('10 - 3 - 2');
+      expect(res.ok).toBe(true);
+      expect((res as { ok: true; value: number }).value).toBe(5);
+    });
+
+    it('should left-associate division when input contains multiple division operators', () => {
+      const res = evaluate('8 / 2 / 2');
+      expect(res.ok).toBe(true);
+      expect((res as { ok: true; value: number }).value).toBe(2);
+    });
+  });
+
+  describe('parentheses', () => {
+    it('should respect grouping symbols when input contains parentheses', () => {
+      const res = evaluate('(2 + 3) * 4');
+      expect(res.ok).toBe(true);
+      expect((res as { ok: true; value: number }).value).toBe(20);
+    });
+
+    it('should respect nested grouping symbols when input contains nested parentheses', () => {
+      const res = evaluate('((10 + 5) / 3)');
+      expect(res.ok).toBe(true);
+      expect((res as { ok: true; value: number }).value).toBe(5);
+    });
+  });
+
+  describe('whitespace handling', () => {
+    it('should ignore arbitrary whitespace when input contains mixed spacing', () => {
+      const res = evaluate('  2   +   3  ');
+      expect(res.ok).toBe(true);
+      expect((res as { ok: true; value: number }).value).toBe(5);
+    });
+  });
+
+  describe('error handling', () => {
+    it('should return error when input contains division by zero', () => {
+      const res = evaluate('10 / 0');
+      expect(res.ok).toBe(false);
+      expect((res as { ok: false; error: string }).error).toBe('Division by zero');
+    });
+
+    it('should return error when input contains unbalanced parentheses', () => {
+      const res = evaluate('(2 + 3');
+      expect(res.ok).toBe(false);
+    });
+
+    it('should return error when input contains unexpected trailing characters', () => {
+      const res = evaluate('2 + 3 x');
+      expect(res.ok).toBe(false);
+    });
+
+    it('should return error when input contains missing operand', () => {
+      const res = evaluate('2 + * 3');
+      expect(res.ok).toBe(false);
+    });
+  });
+});

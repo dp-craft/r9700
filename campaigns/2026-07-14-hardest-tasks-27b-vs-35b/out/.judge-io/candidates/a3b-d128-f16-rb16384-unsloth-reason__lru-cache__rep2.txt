@@ -1,0 +1,231 @@
+// FILE: impl.ts
+import type { Clock } from '../../lib/clock';
+
+export interface LruCache<K, V> {
+  get(key: K): V | undefined;
+  set(key: K, value: V): void;
+  has(key: K): boolean;
+  readonly size: number;
+}
+
+interface Entry<V> {
+  readonly value: V;
+  readonly expiresAt: number;
+}
+
+export function createLruCache<K, V>(
+  capacity: number,
+  ttlMs: number,
+  clock: Clock
+): LruCache<K, V> {
+  const map = new Map<K, Entry<V>>();
+
+  const isExpired = (e: Entry<V>): boolean => clock.now() >= e.expiresAt;
+
+  const cleanExpiredFromFront = (): void => {
+    for (const key of map.keys()) {
+      const entry = map.get(key);
+      if (entry && isExpired(entry)) map.delete(key);
+      else return;
+    }
+  };
+
+  const evictLiveOldest = (): void => {
+    for (const key of map.keys()) {
+      const entry = map.get(key);
+      if (entry && !isExpired(entry)) return void map.delete(key);
+    }
+  };
+
+  const touchRecency = (key: K): void => {
+    const e = map.get(key);
+    if (e) map.delete(key);
+    if (e) map.set(key, e);
+  };
+
+  return {
+    get: (key: K): V | undefined => {
+      const entry = map.get(key);
+      if (entry == null || isExpired(entry)) return undefined;
+      touchRecency(key);
+      return entry.value;
+    },
+
+    set: (key: K, value: V): void => {
+      cleanExpiredFromFront();
+      if (!map.has(key) && map.size >= capacity) evictLiveOldest();
+      if (map.has(key)) map.delete(key);
+      map.set(key, { value, expiresAt: clock.now() + ttlMs });
+    },
+
+    has: (key: K): boolean => {
+      const entry = map.get(key);
+      return entry != null && !isExpired(entry);
+    },
+
+    get size(): number {
+      let count = 0;
+      for (const [, e] of map) if (!isExpired(e)) count++;
+      return count;
+    },
+  };
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it } from 'vitest';
+
+import type { Clock } from '../../lib/clock';
+
+import { createLruCache } from './impl';
+
+// Fake clock implementation for deterministic testing
+class DeterministicClock implements Clock {
+  private ms: number;
+  constructor(start: number = 0) { this.ms = start; }
+  now(): number { return this.ms; }
+  tick(delta: number): void { this.ms += delta; }
+}
+
+describe('createLruCache', () => {
+  describe('basic operations', () => {
+    it('should return stored value when requesting existing key', () => {
+      const clock = new DeterministicClock(100);
+      const cache = createLruCache<string, number>(2, 5000, clock);
+
+      cache.set('a', 42);
+      expect(cache.get('a')).toBe(42);
+    });
+
+    it('should return undefined when requesting absent key', () => {
+      const clock = new DeterministicClock();
+      const cache = createLruCache<string, string>(1, 3000, clock);
+
+      expect(cache.get('missing')).toBeUndefined();
+    });
+  });
+
+  describe('TTL expiration', () => {
+    it('should return undefined for an entry when time exceeds its TTL window', () => {
+      const clock = new DeterministicClock(100);
+      const cache = createLruCache<string, string>(2, 50, clock);
+
+      cache.set('x', 'live');
+      expect(cache.has('x')).toBe(true);
+
+      clock.tick(100); // crosses expiry threshold of 150
+      expect(cache.get('x')).toBeUndefined();
+    });
+
+    it('should exclude expired entries from the live count', () => {
+      const clock = new DeterministicClock(0);
+      const cache = createLruCache<string, string>(3, 100, clock);
+
+      cache.set('alpha', 'one');
+      expect(cache.size).toBe(1);
+
+      clock.tick(200); // expires at 100
+      expect(cache.size).toBe(0);
+    });
+
+    it('should preserve unexpired entries while dropping expired ones', () => {
+      const clock = new DeterministicClock(0);
+      const cache = createLruCache<string, string>(3, 200, clock);
+
+      cache.set('stale', 'old');
+      clock.tick(150); // not yet expired
+      
+      cache.set('fresh', 'new');
+      expect(cache.size).toBe(2);
+
+      clock.tick(100); // now 250, stale expires at 200
+      expect(cache.has('stale')).toBe(false);
+      expect(cache.has('fresh')).toBe(true);
+    });
+  });
+
+  describe('LRU recency', () => {
+    it('should update access order when retrieving an entry', () => {
+      const clock = new DeterministicClock(1000);
+      const cache = createLruCache<string, string>(2, 10000, clock);
+
+      cache.set('first', 'A');
+      cache.set('second', 'B'); // second is now LRU
+      
+      void cache.get('first'); // first becomes most recent
+      
+      cache.set('third', 'C'); // evicts LRU live entry (second)
+      
+      expect(cache.has('first')).toBe(true);
+      expect(cache.has('second')).toBe(false);
+    });
+
+    it('should refresh recency when touching an already present key during set', () => {
+      const clock = new DeterministicClock(0);
+      const cache = createLruCache<string, string>(2, 5000, clock);
+
+      cache.set('a', '1');
+      cache.set('b', '2'); // a is LRU
+      
+      cache.set('a', 'updated'); // refreshes recency of 'a'
+      
+      cache.set('c', '3'); // should evict 'b' instead of 'a'
+      
+      expect(cache.has('b')).toBe(false);
+      expect(cache.get('a')).toBe('updated');
+    });
+
+    it('should not extend TTL window when refreshing recency on get', () => {
+      const clock = new DeterministicClock(10);
+      const cache = createLruCache<string, string>(2, 50, clock);
+
+      cache.set('key', 'val'); // expires at 60
+      
+      void cache.get('key'); // refresh recency only
+      expect(cache.has('key')).toBe(true);
+    });
+  });
+
+  describe('capacity edge', () => {
+    it('should enforce exact capacity limit after insertion and expiration', () => {
+      const cap = 1;
+      const clock = new DeterministicClock(0);
+      const cache = createLruCache<string, number>(cap, 100, clock);
+
+      cache.set('only', 42); // size becomes 1
+      
+      expect(cache.size).toBeLessThanOrEqual(cap); 
+      
+      clock.tick(200); // expires at 100
+      expect(cache.size).toBe(0);
+      
+      cache.set('next', 99);
+      expect(cache.size).toBe(1);
+    });
+
+    it('should bypass expired entries during eviction calculation to avoid phantom blocks', () => {
+      const clock = new DeterministicClock(50);
+      const cache = createLruCache<string, string>(2, 40, clock); // expires at 90
+
+      cache.set('expired-soon', 'v1'); 
+      clock.tick(60); // now 110. Entry expired at 90.
+      
+      cache.set('alive-now', 'v2'); 
+      cache.set('brand-new', 'v3');
+      
+      expect(cache.size).toBeLessThanOrEqual(2);
+      expect(cache.get('brand-new')).toBe('v3');
+    });
+
+    it('should maintain strict live count under capacity boundary', () => {
+      const clock = new DeterministicClock(0);
+      const cache = createLruCache<string, string>(2, 10, clock);
+
+      cache.set('x', 'one');
+      expect(cache.size).toBeLessThanOrEqual(2);
+      
+      cache.set('y', 'two'); 
+      expect(cache.has('x')).toBe(true);
+      expect(cache.has('y')).toBe(true);
+    });
+  });
+});

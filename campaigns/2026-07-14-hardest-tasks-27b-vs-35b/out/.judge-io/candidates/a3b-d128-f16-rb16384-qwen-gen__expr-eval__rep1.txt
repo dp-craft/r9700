@@ -1,0 +1,134 @@
+// FILE: impl.ts
+export type Result =
+  | { readonly ok: true; readonly value: number }
+  | { readonly ok: false; readonly error: string };
+
+interface Token { readonly type: 'num'; readonly value: number }
+            | { readonly type: 'op'; readonly value: string }
+            | { readonly type: 'end' };
+
+interface Parser { readonly tokens: readonly Token[]; pos: number; }
+
+const tokenize = (input: string): readonly Token[] | Result => {
+  const tokens: Token[] = [];
+  let i = 0;
+  while (i < input.length) {
+    if (/\s/.test(input[i])) { i++; continue; }
+    if (/[\d]/.test(input[i])) {
+      let num = '';
+      while (i < input.length && /[\d]/.test(input[i])) { num += input[i++]; }
+      tokens.push({ type: 'num', value: Number(num) });
+    } else if (['+', '-', '*', '/'].includes(input[i])) {
+      tokens.push({ type: 'op', value: input[i] }); i++;
+    } else {
+      return { ok: false, error: `Unexpected character` };
+    }
+  }
+  tokens.push({ type: 'end' });
+  return tokens;
+};
+
+const evaluate = (expr: string): Result => {
+  const tokens = tokenize(expr);
+  if ('error' in tokens) return tokens;
+  const parser = { tokens, pos: 0 };
+  const result = exprParser(parser);
+  if (!result.ok || parser.tokens[parser.pos]?.type !== 'end') {
+    return result.ok ? { ok: false, error: 'Unexpected trailing token' } : result;
+  }
+  return result;
+};
+
+const exprParser = (p: Parser): Result => {
+  let left = termParser(p);
+  while ('ok' in left && p.tokens[p.pos]?.type === 'op') {
+    const op = p.tokens[p.pos].value;
+    if (op !== '+' && op !== '-') break;
+    p.pos++;
+    const right = termParser(p);
+    if (!right.ok) return right;
+    if (op === '+') left = { ok: true, value: left.value + right.value };
+    else left = { ok: true, value: left.value - right.value };
+  }
+  return left;
+};
+
+const termParser = (p: Parser): Result => {
+  let left = factorParser(p);
+  while ('ok' in left && p.tokens[p.pos]?.type === 'op') {
+    const op = p.tokens[p.pos].value;
+    if (op !== '*' && op !== '/') break;
+    p.pos++;
+    const right = factorParser(p);
+    if (!right.ok) return right;
+    if (op === '*') left = { ok: true, value: left.value * right.value };
+    else {
+      if (right.value === 0) return { ok: false, error: 'Division by zero' };
+      left = { ok: true, value: left.value / right.value };
+    }
+  }
+  return left;
+};
+
+const factorParser = (p: Parser): Result => {
+  if (!p.tokens[p.pos]) return { ok: false, error: 'Unexpected end' };
+  const t = p.tokens[p.pos];
+  if (t.type === 'num') { p.pos++; return { ok: true, value: t.value }; }
+  if (t.type === 'op' && t.value === '(') {
+    p.pos++;
+    const inner = exprParser(p);
+    if (!inner.ok || p.tokens[p.pos]?.type !== 'op' || p.tokens[p.pos].value !== ')') {
+      return { ok: false, error: 'Missing closing parenthesis' };
+    }
+    p.pos++;
+    return inner;
+  }
+  if (t.type === 'end') return { ok: false, error: 'Expected value' };
+  return { ok: false, error: 'Unexpected token' };
+};
+
+// FILE: impl.test.ts
+import { describe, expect, it } from 'vitest';
+import { evaluate, type Result } from './impl';
+
+describe('evaluate', () => {
+  it('should compute numeric result when expression contains basic addition', () => {
+    const result = evaluate('2 + 3');
+    expect(result).toEqual({ ok: true, value: 5 });
+  });
+
+  it('should apply multiplication precedence when operators mix', () => {
+    const result = evaluate('2 + 3 * 4');
+    expect(result).toEqual({ ok: true, value: 14 });
+  });
+
+  it('should process left-to-right when subtraction repeats', () => {
+    const result = evaluate('10 - 3 - 2');
+    expect(result).toEqual({ ok: true, value: 5 });
+  });
+
+  it('should process left-to-right when division repeats', () => {
+    const result = evaluate('8 / 2 / 2');
+    expect(result).toEqual({ ok: true, value: 2 });
+  });
+
+  it('should override natural precedence when parentheses appear', () => {
+    const result = evaluate('(2 + 3) * 4');
+    expect(result).toEqual({ ok: true, value: 20 });
+  });
+
+  it('should parse successfully when arbitrary whitespace surrounds tokens', () => {
+    const result = evaluate('  ( 1 + 2 ) * ( 3 - 1 )  ');
+    expect(result).toEqual({ ok: true, value: 6 });
+  });
+
+  it('should return error object when division by zero occurs', () => {
+    const result = evaluate('5 / 0');
+    expect(result).toMatchObject({ ok: false, error: 'Division by zero' });
+  });
+
+  it('should return error object when parentheses are unbalanced', () => {
+    const result = evaluate('(2 + 3');
+    expect(result).toMatchObject({ ok: false });
+  });
+});

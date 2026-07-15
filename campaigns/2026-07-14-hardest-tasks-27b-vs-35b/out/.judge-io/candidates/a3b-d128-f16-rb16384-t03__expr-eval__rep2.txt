@@ -1,0 +1,120 @@
+// FILE: impl.ts
+export type Result =
+  | { readonly ok: true; readonly value: number }
+  | { readonly ok: false; readonly error: string };
+
+type Token =
+  | { readonly type: 'NUMBER'; readonly value: number }
+  | { readonly type: 'PLUS' }
+  | { readonly type: 'MINUS' }
+  | { readonly type: 'STAR' }
+  | { readonly type: 'SLASH' }
+  | { readonly type: 'LPAREN' }
+  | { readonly type: 'RPAREN' }
+  | { readonly type: 'EOF' };
+
+const tokenize = (input: string): Result<Token[]> => {
+  const tokens: Token[] = [];
+  let i = 0;
+  while (i < input.length) {
+    const c = input[i];
+    if (c === ' ') i++;
+    else if (c === '+') { tokens.push({ type: 'PLUS' }); i++; }
+    else if (c === '-') { tokens.push({ type: 'MINUS' }); i++; }
+    else if (c === '*') { tokens.push({ type: 'STAR' }); i++; }
+    else if (c === '/') { tokens.push({ type: 'SLASH' }); i++; }
+    else if (c === '(') { tokens.push({ type: 'LPAREN' }); i++; }
+    else if (c === ')') { tokens.push({ type: 'RPAREN' }); i++; }
+    else if (c >= '0' && c <= '9') {
+      let n = '';
+      while (i < input.length && input[i] >= '0' && input[i] <= '9') n += input[i++];
+      tokens.push({ type: 'NUMBER', value: Number(n) });
+    } else return { ok: false, error: `Unexpected: ${c}` };
+  }
+  tokens.push({ type: 'EOF' });
+  return { ok: true, value: tokens };
+};
+
+const parseExpr = (tokens: Token[], idx: number): Result<{ value: number; idx: number }> => {
+  const left = parseTerm(tokens, idx);
+  if (!left.ok) return left;
+  let i = left.value.idx;
+  while (tokens[i]?.type === 'PLUS' || tokens[i]?.type === 'MINUS') {
+    const op = tokens[i].type; i++;
+    const right = parseTerm(tokens, i);
+    if (!right.ok) return right;
+    i = right.value.idx;
+    left.value.value = op === 'PLUS' ? left.value.value + right.value.value : left.value.value - right.value.value;
+  }
+  return { ok: true, value: left.value };
+};
+
+const parseTerm = (tokens: Token[], idx: number): Result<{ value: number; idx: number }> => {
+  const left = parseFactor(tokens, idx);
+  if (!left.ok) return left;
+  let i = left.value.idx;
+  while (tokens[i]?.type === 'STAR' || tokens[i]?.type === 'SLASH') {
+    const op = tokens[i].type; i++;
+    const right = parseFactor(tokens, i);
+    if (!right.ok) return right;
+    i = right.value.idx;
+    left.value.value = op === 'STAR' ? left.value.value * right.value.value : left.value.value / right.value.value;
+  }
+  return { ok: true, value: left.value };
+};
+
+const parseFactor = (tokens: Token[], idx: number): Result<{ value: number; idx: number }> => {
+  const tok = tokens[idx];
+  if (!tok || tok.type === 'EOF') return { ok: false, error: 'Unexpected EOF' };
+  if (tok.type === 'NUMBER') return { ok: true, value: { value: tok.value, idx: idx + 1 } };
+  if (tok.type === 'MINUS') {
+    const r = parseFactor(tokens, idx + 1);
+    return r.ok ? { ok: true, value: { value: -r.value.value, idx: r.value.idx } } : r;
+  }
+  if (tok.type === 'LPAREN') {
+    const r = parseExpr(tokens, idx + 1);
+    if (!r.ok) return r;
+    if (tokens[r.value.idx]?.type !== 'RPAREN') return { ok: false, error: 'Missing )' };
+    return { ok: true, value: { value: r.value.value, idx: r.value.idx + 1 } };
+  }
+  return { ok: false, error: `Unexpected: ${tok.type}` };
+};
+
+export const evaluate = (expr: string): Result<number> => {
+  const tokens = tokenize(expr);
+  if (!tokens.ok) return tokens;
+  const res = parseExpr(tokens.value, 0);
+  if (!res.ok) return res;
+  if (tokens.value[res.value.idx]?.type !== 'EOF') {
+    return { ok: false, error: 'Unexpected trailing tokens' };
+  }
+  return { ok: true, value: res.value.value };
+};
+
+// FILE: impl.test.ts
+import { describe, expect, it } from 'vitest';
+import { evaluate } from './impl';
+
+describe('evaluate', () => {
+  it('should return correct result when expression contains mixed operators', () => {
+    expect(evaluate('2 + 3 * 4')).toEqual({ ok: true, value: 14 });
+    expect(evaluate('10 - 8 / 2')).toEqual({ ok: true, value: 6 });
+  });
+
+  it('should evaluate left-to-right when operators have equal precedence', () => {
+    expect(evaluate('10 - 3 - 2')).toEqual({ ok: true, value: 5 });
+    expect(evaluate('8 / 2 / 2')).toEqual({ ok: true, value: 2 });
+  });
+
+  it('should resolve parentheses when expression contains them', () => {
+    expect(evaluate('(2 + 3) * 4')).toEqual({ ok: true, value: 20 });
+    expect(evaluate('((2 + 3) * (4 - 1))')).toEqual({ ok: true, value: 15 });
+  });
+
+  it('should return error when expression is malformed', () => {
+    expect(evaluate('(2 + 3').ok).toBe(false);
+    expect(evaluate('10 / 0').ok).toBe(false);
+    expect(evaluate('2 + @ 3').ok).toBe(false);
+    expect(evaluate('2 +').ok).toBe(false);
+  });
+});

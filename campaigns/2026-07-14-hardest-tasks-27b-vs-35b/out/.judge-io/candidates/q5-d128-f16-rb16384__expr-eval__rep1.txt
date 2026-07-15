@@ -1,0 +1,173 @@
+// FILE: impl.ts
+interface State {
+  pos: number;
+  input: string;
+}
+
+function peek(s: State): string | undefined {
+  return s.input[s.pos];
+}
+
+function consume(s: State, expected?: string): string | undefined {
+  const ch = s.input[s.pos];
+  if (expected !== undefined && ch !== expected) return undefined;
+  s.pos++;
+  return ch;
+}
+
+function skipWS(s: State): void {
+  while (s.pos < s.input.length && /\s/.test(s.input[s.pos])) {
+    s.pos++;
+  }
+}
+
+function parseNumber(s: State): number | undefined {
+  const start = s.pos;
+  while (s.pos < s.input.length && /\d/.test(s.input[s.pos])) {
+    s.pos++;
+  }
+  if (start === s.pos) return undefined;
+  return Number(s.input.slice(start, s.pos));
+}
+
+function parseFactor(s: State): number | undefined {
+  skipWS(s);
+  const ch = peek(s);
+  if (ch === '+' || ch === '-') {
+    consume(s);
+    const val = parseFactor(s);
+    if (val === undefined) return undefined;
+    return ch === '-' ? -val : val;
+  }
+  if (ch === '(') {
+    consume(s);
+    const val = parseExpr(s);
+    if (val === undefined) return undefined;
+    skipWS(s);
+    if (consume(s, ')') === undefined) return undefined;
+    return val;
+  }
+  return parseNumber(s);
+}
+
+function parseTerm(s: State): number | undefined {
+  let left = parseFactor(s);
+  if (left === undefined) return undefined;
+  while (true) {
+    skipWS(s);
+    const ch = peek(s);
+    if (ch !== '*' && ch !== '/') break;
+    consume(s);
+    const right = parseFactor(s);
+    if (right === undefined) return undefined;
+    if (ch === '/' && right === 0) return NaN;
+    left = ch === '/' ? Math.trunc(left / right) : left * right;
+  }
+  return left;
+}
+
+function parseExpr(s: State): number | undefined {
+  let left = parseTerm(s);
+  if (left === undefined) return undefined;
+  while (true) {
+    skipWS(s);
+    const ch = peek(s);
+    if (ch !== '+' && ch !== '-') break;
+    consume(s);
+    const right = parseTerm(s);
+    if (right === undefined) return undefined;
+    left = ch === '-' ? left - right : left + right;
+  }
+  return left;
+}
+
+export type Result =
+  | { readonly ok: true; readonly value: number }
+  | { readonly ok: false; readonly error: string };
+
+export function evaluate(expr: string): Result {
+  if (expr.trim().length === 0) {
+    return { ok: false, error: 'Empty expression' };
+  }
+  const s: State = { pos: 0, input: expr };
+  const val = parseExpr(s);
+  if (val === undefined || !Number.isFinite(val)) {
+    return { ok: false, error: Number.isNaN(val) ? 'Division by zero' : 'Malformed expression' };
+  }
+  skipWS(s);
+  if (s.pos < s.input.length) {
+    return { ok: false, error: 'Unexpected character' };
+  }
+  return { ok: true, value: val };
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it } from 'vitest';
+import { evaluate } from './impl';
+
+describe('evaluate', () => {
+  it('should return correct result for simple addition', () => {
+    const result = evaluate('2 + 3');
+    expect(result).toEqual({ ok: true, value: 5 });
+  });
+
+  it('should respect multiplication precedence over addition', () => {
+    const result = evaluate('2 + 3 * 4');
+    expect(result).toEqual({ ok: true, value: 14 });
+  });
+
+  it('should evaluate left-associative subtraction correctly', () => {
+    const result = evaluate('10 - 3 - 2');
+    expect(result).toEqual({ ok: true, value: 5 });
+  });
+
+  it('should evaluate left-associative division correctly', () => {
+    const result = evaluate('8 / 2 / 2');
+    expect(result).toEqual({ ok: true, value: 2 });
+  });
+
+  it('should handle parentheses correctly', () => {
+    const result = evaluate('(2 + 3) * 4');
+    expect(result).toEqual({ ok: true, value: 20 });
+  });
+
+  it('should handle nested parentheses', () => {
+    const result = evaluate('((2 + 3) * (4 - 1))');
+    expect(result).toEqual({ ok: true, value: 15 });
+  });
+
+  it('should handle unary minus', () => {
+    const result = evaluate('-5 + 3');
+    expect(result).toEqual({ ok: true, value: -2 });
+  });
+
+  it('should ignore arbitrary whitespace', () => {
+    const result = evaluate('  2   +   3  ');
+    expect(result).toEqual({ ok: true, value: 5 });
+  });
+
+  it('should return error on division by zero', () => {
+    const result = evaluate('10 / 0');
+    expect(result).toEqual({ ok: false, error: 'Division by zero' });
+  });
+
+  it('should return error on unbalanced parentheses', () => {
+    const result = evaluate('(2 + 3');
+    expect(result).toEqual({ ok: false, error: 'Malformed expression' });
+  });
+
+  it('should return error on missing operand', () => {
+    const result = evaluate('2 + * 3');
+    expect(result).toEqual({ ok: false, error: 'Malformed expression' });
+  });
+
+  it('should return error on unexpected character', () => {
+    const result = evaluate('2 + 3a');
+    expect(result).toEqual({ ok: false, error: 'Unexpected character' });
+  });
+
+  it('should return error on empty expression', () => {
+    const result = evaluate('   ');
+    expect(result).toEqual({ ok: false, error: 'Empty expression' });
+  });
+});

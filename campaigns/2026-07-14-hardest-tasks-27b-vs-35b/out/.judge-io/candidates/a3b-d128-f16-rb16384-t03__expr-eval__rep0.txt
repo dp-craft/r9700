@@ -1,0 +1,178 @@
+// FILE: impl.ts
+export type Result =
+  | { readonly ok: true; readonly value: number }
+  | { readonly ok: false; readonly error: string };
+
+type Token =
+  | { readonly type: 'NUMBER'; readonly value: number }
+  | { readonly type: 'PLUS' }
+  | { readonly type: 'MINUS' }
+  | { readonly type: 'STAR' }
+  | { readonly type: 'SLASH' }
+  | { readonly type: 'LPAREN' }
+  | { readonly type: 'RPAREN' }
+  | { readonly type: 'EOF' };
+
+function tokenize(input: string): readonly Token[] {
+  const tokens: Token[] = [];
+  let i = 0;
+  while (i < input.length) {
+    const ch = input[i];
+    if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r') { i++; continue; }
+    if (ch >= '0' && ch <= '9') {
+      let num = '';
+      while (i < input.length && input[i] >= '0' && input[i] <= '9') num += input[i++];
+      tokens.push({ type: 'NUMBER', value: Number(num) }); continue;
+    }
+    const map: Record<string, Token['type']> = { '+': 'PLUS', '-': 'MINUS', '*': 'STAR', '/': 'SLASH', '(': 'LPAREN', ')': 'RPAREN' };
+    const t = map[ch];
+    if (!t) return [];
+    tokens.push({ type: t }); i++;
+  }
+  tokens.push({ type: 'EOF' });
+  return tokens;
+}
+
+export function evaluate(expr: string): Result {
+  const tokens = tokenize(expr);
+  if (tokens.length === 0) return { ok: false, error: 'Empty expression' };
+  let pos = 0;
+  const peek = (): Token => tokens[pos] ?? { type: 'EOF' };
+  const consume = (): Token => tokens[pos++];
+
+  const parseExpr = (): Result => {
+    let left = parseTerm();
+    if (!left.ok) return left;
+    while (peek().type === 'PLUS' || peek().type === 'MINUS') {
+      const op = consume();
+      const right = parseTerm();
+      if (!right.ok) return right;
+      left = op.type === 'PLUS'
+        ? { ok: true, value: left.value + right.value }
+        : { ok: true, value: left.value - right.value };
+    }
+    return left;
+  };
+
+  const parseTerm = (): Result => {
+    let left = parseFactor();
+    if (!left.ok) return left;
+    while (peek().type === 'STAR' || peek().type === 'SLASH') {
+      const op = consume();
+      const right = parseFactor();
+      if (!right.ok) return right;
+      if (op.type === 'SLASH' && right.value === 0) {
+        return { ok: false, error: 'Division by zero' };
+      }
+      left = op.type === 'STAR'
+        ? { ok: true, value: left.value * right.value }
+        : { ok: true, value: left.value / right.value };
+    }
+    return left;
+  };
+
+  const parseFactor = (): Result => {
+    const token = peek();
+    if (token.type === 'NUMBER') {
+      consume();
+      return { ok: true, value: token.value };
+    }
+    if (token.type === 'MINUS') {
+      consume();
+      const val = parseFactor();
+      return val.ok ? { ok: true, value: -val.value } : val;
+    }
+    if (token.type === 'LPAREN') {
+      consume();
+      const val = parseExpr();
+      if (!val.ok) return val;
+      if (peek().type !== 'RPAREN') {
+        return { ok: false, error: 'Missing closing parenthesis' };
+      }
+      consume();
+      return val;
+    }
+    return { ok: false, error: 'Unexpected token' };
+  };
+
+  const result = parseExpr();
+  if (!result.ok) return result;
+  if (peek().type !== 'EOF') {
+    return { ok: false, error: 'Unexpected trailing token' };
+  }
+  return result;
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it } from 'vitest';
+import { evaluate } from './impl';
+
+describe('evaluate', () => {
+  it('should return success when parsing simple addition', () => {
+    expect(evaluate('2 + 3')).toEqual({ ok: true, value: 5 });
+  });
+
+  it('should return success when parsing simple subtraction', () => {
+    expect(evaluate('10 - 4')).toEqual({ ok: true, value: 6 });
+  });
+
+  it('should return success when parsing simple multiplication', () => {
+    expect(evaluate('3 * 4')).toEqual({ ok: true, value: 12 });
+  });
+
+  it('should return success when parsing simple division', () => {
+    expect(evaluate('10 / 2')).toEqual({ ok: true, value: 5 });
+  });
+
+  it('should respect precedence when mixing operators', () => {
+    expect(evaluate('2 + 3 * 4')).toEqual({ ok: true, value: 14 });
+    expect(evaluate('10 - 2 * 3')).toEqual({ ok: true, value: 4 });
+  });
+
+  it('should handle left-associativity when subtracting multiple times', () => {
+    expect(evaluate('10 - 3 - 2')).toEqual({ ok: true, value: 5 });
+  });
+
+  it('should handle left-associativity when dividing multiple times', () => {
+    expect(evaluate('8 / 2 / 2')).toEqual({ ok: true, value: 2 });
+  });
+
+  it('should evaluate expressions when parentheses are present', () => {
+    expect(evaluate('(2 + 3) * 4')).toEqual({ ok: true, value: 20 });
+    expect(evaluate('((10))')).toEqual({ ok: true, value: 10 });
+  });
+
+  it('should handle unary minus when it appears at start', () => {
+    expect(evaluate('-5')).toEqual({ ok: true, value: -5 });
+  });
+
+  it('should handle unary minus when it appears after operator', () => {
+    expect(evaluate('10 + -3')).toEqual({ ok: true, value: 7 });
+  });
+
+  it('should return error when dividing by zero', () => {
+    const res = evaluate('10 / 0');
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.error).toBe('Division by zero');
+  });
+
+  it('should return error when parentheses are unbalanced', () => {
+    const res = evaluate('(2 + 3');
+    expect(res.ok).toBe(false);
+  });
+
+  it('should return error when trailing token is unexpected', () => {
+    const res = evaluate('2 + 3 +');
+    expect(res.ok).toBe(false);
+  });
+
+  it('should return error when expression is empty', () => {
+    const res = evaluate('');
+    expect(res.ok).toBe(false);
+  });
+
+  it('should return error when encountering invalid character', () => {
+    const res = evaluate('2 @ 3');
+    expect(res.ok).toBe(false);
+  });
+});

@@ -1,0 +1,96 @@
+// FILE: impl.ts
+import type { Clock } from '../../lib/clock';
+
+interface Entry<V> {
+  readonly value: V;
+  readonly expiresAt: number;
+}
+
+export interface LruCache<K, V> {
+  get(key: K): V | undefined;
+  set(key: K, value: V): void;
+  has(key: K): boolean;
+  readonly size: number;
+}
+
+export function createLruCache<K, V>(capacity: number, ttlMs: number, clock: Clock): LruCache<K, V> {
+  const store = new Map<K, Entry<V>>();
+  let currentLive = 0;
+
+  const isExpired = (entry: Entry<V>): boolean => clock.now() >= entry.expiresAt;
+
+  const evictOldestLive = (): void => {
+    for (const key of store.keys()) {
+      const existing = store.get(key);
+      if (existing && !isExpired(existing)) {
+        store.delete(key);
+        currentLive--;
+        return;
+      }
+    }
+  };
+
+  const touchRecency = (key: K): void => {
+    const entry = store.get(key);
+    if (entry && !isExpired(entry)) {
+      store.delete(key);
+      store.set(key, entry);
+    }
+  };
+
+  return ({
+    get(key: K): V | undefined {
+      const entry = store.get(key);
+      if (!entry || isExpired(entry)) return undefined;
+      touchRecency(key);
+      return entry.value;
+    },
+    set(key: K, value: V): void {
+      const oldEntry = store.get(key);
+      if (oldEntry && !isExpired(oldEntry)) touchRecency(key);
+      else {
+        store.set(key, { value, expiresAt: clock.now() + ttlMs });
+        currentLive++;
+      }
+      while (currentLive > capacity) evictOldestLive();
+    },
+    has(key: K): boolean {
+      const entry = store.get(key);
+      return !!entry && !isExpired(entry);
+    },
+    get size(): number {
+      let count = 0;
+      for (const entry of store.values()) if (!isExpired(entry)) count++;
+      return count;
+
+// FILE: impl.test.ts
+import { describe, expect, it } from 'vitest';
+
+import type { Clock } from '../../lib/clock';
+import { createLruCache } from './impl';
+
+describe('createLruCache', () => {
+  let fakeNow = () => 1000;
+  const clock: Clock = { now: fakeNow };
+
+  describe('get', () => {
+    it('should return undefined when the key is absent', () => {
+      const store = createLruCache(3, 500, clock);
+      expect(store.get('missing')).toBe(undefined);
+    });
+
+    it('should return the value and refresh recency when the entry is live', () => {
+      const store = createLruCache(2, 500, clock); // expires at 1500
+      
+      store.set('a', 1);
+      store.set('b', 2);
+      
+      fakeNow = () => 1450; // safely before expiry
+      store.get('a'); // refresh recency of 'a' to newest in iteration order
+      
+      clock.now + ttlMs });
+    }
+
+    it('should maintain insertion order after eviction when expired entries are skipped', () => {
+      const store = createLruCache(2, 50`store.set(`1.
+</code>

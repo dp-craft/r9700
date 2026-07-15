@@ -1,0 +1,131 @@
+// FILE: impl.ts
+export type Result =
+  | { readonly ok: true; readonly value: number }
+  | { readonly ok: false; readonly error: string };
+
+type Token =
+  | { readonly type: 'num'; readonly val: number }
+  | { readonly type: 'op'; readonly op: '+' | '-' | '*' | '/' }
+  | { readonly type: 'lbr' }
+  | { readonly type: 'rbr' };
+
+interface Ctx { tokens: readonly Token[]; idx: number; }
+
+function tokenize(input: string): Result<Token[]> {
+  const out: Token[] = []; let i = 0;
+  while (i < input.length) {
+    const c = input[i];
+    if (/\s/.test(c)) { i++; continue; }
+    if (c === '+' || c === '-' || c === '*' || c === '/') { out.push({ type: 'op', op: c as '+' | '-' | '*' | '/' }); i++; }
+    else if (c === '(') { out.push({ type: 'lbr' }); i++; }
+    else if (c === ')') { out.push({ type: 'rbr' }); i++; }
+    else if (/^[\d]$/.test(c)) { let n = ''; while (i < input.length && /^[\d]$/.test(input[i])) { n += input[i]; i++; } out.push({ type: 'num', val: Number(n) }); }
+    else return { ok: false, error: `Unexpected char at ${i}` };
+  }
+  return { ok: true, value: out };
+}
+
+function peek(ctx: Ctx): Token | undefined { return ctx.tokens[ctx.idx]; }
+
+export function evaluate(expr: string): Result<number> {
+  const tokRes = tokenize(expr); if (!tokRes.ok) return tokRes;
+  const ctx: Ctx = { tokens: tokRes.value, idx: 0 };
+  const res = parseExpr(ctx);
+  if (res.ok && peek(ctx) !== undefined) return { ok: false, error: 'Unexpected trailing token' };
+  return res;
+}
+
+function parseExpr(ctx: Ctx): Result<number> {
+  let acc = parseTerm(ctx);
+  if (!acc.ok) return acc;
+  while (true) {
+    const t = peek(ctx);
+    if (t?.type !== 'op' || !(t.op === '+' || t.op === '-')) break;
+    ctx.idx++;
+    const r = parseTerm(ctx);
+    if (!r.ok) return r;
+    acc.value = t.op === '+' ? acc.value + r.value : acc.value - r.value;
+  }
+  return acc;
+}
+
+function parseTerm(ctx: Ctx): Result<number> {
+  let acc = parseFactor(ctx);
+  if (!acc.ok) return acc;
+  while (true) {
+    const t = peek(ctx);
+    if (t?.type !== 'op' || !(t.op === '*' || t.op === '/')) break;
+    ctx.idx++;
+    const r = parseFactor(ctx);
+    if (!r.ok) return r;
+    acc.value = t.op === '*' ? acc.value * r.value : acc.value / r.value;
+  }
+  return acc;
+}
+
+function parseFactor(ctx: Ctx): Result<number> {
+  const t = peek(ctx);
+  if (t?.type === 'op' && (t.op === '+' || t.op === '-')) {
+    ctx.idx++;
+    const res = parseFactor(ctx);
+    if (!res.ok) return res;
+    return { ok: true, value: t.op === '-' ? -res.value : res.value };
+  }
+  if (t?.type === 'num') { ctx.idx++; return { ok: true, value: t.val }; }
+  if (t?.type === 'lbr') {
+    ctx.idx++;
+    const inner = parseExpr(ctx);
+    if (!inner.ok) return inner;
+    const r = peek(ctx);
+    if (r?.type !== 'rbr') return { ok: false, error: 'Missing )' };
+    ctx.idx++;
+    return inner;
+  }
+  return { ok: false, error: 'Expected value or expression' };
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it } from 'vitest';
+import { evaluate } from './impl';
+
+describe('evaluate', () => {
+  it('should return the computed sum when given two positive integers', async () => {
+    const result = evaluate('2 + 3');
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe(5);
+  });
+
+  it('should respect multiplication before addition precedence when operators mix', async () => {
+    const result = evaluate('2 + 3 * 4');
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe(14);
+  });
+
+  it('should handle left associativity correctly for subtraction chains when subtracting multiple times', async () => {
+    const result = evaluate('10 - 3 - 2');
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe(5);
+  });
+
+  it('should handle left associativity correctly for division chains when dividing sequentially', async () => {
+    const result = evaluate('8 / 2 / 2');
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe(2);
+  });
+
+  it('should evaluate nested parentheses independently when grouping sub-expressions', async () => {
+    const result = evaluate('(1 + 2) * (3 + 4)');
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe(21);
+  });
+
+  it('should return an error result when given unbalanced opening parentheses', async () => {
+    const result = evaluate('(2 + 3');
+    expect(result.ok).toBe(false);
+  });
+
+  it('should return a zero-division error result when divisor reaches zero', async () => {
+    const result = evaluate('5 / 0');
+    expect(result.ok).toBe(false);
+  });
+});

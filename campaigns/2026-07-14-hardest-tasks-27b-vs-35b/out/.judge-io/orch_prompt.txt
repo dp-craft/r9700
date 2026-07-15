@@ -3,10 +3,10 @@ yourself — your ONLY job is to fan out subagents and make sure every verdict f
 
 Paths (relative to the current directory):
   out/.judge-io/rubric.txt        the scoring rubric (0-5 on design, clarity, robustness)
-  out/.judge-io/batches/*.jsonl   8 batch files; each line is one candidate: {"id":..., "spec":<path>, "code":<path>}
+  out/.judge-io/batches/*.jsonl   19 batch files; each line is one candidate: {"id":..., "spec":<path>, "code":<path>}
   out/.judge-io/results/          write verdicts here, one <id>.json per candidate
 
-For EACH of the 8 batch files, launch ONE subagent with the Task tool (model "opus", subagent_type
+For EACH of the 19 batch files, launch ONE subagent with the Task tool (model "opus", subagent_type
 "general-purpose"), all in parallel. Instruct each subagent to do exactly this for its one batch file:
 
   1. Read out/.judge-io/rubric.txt.

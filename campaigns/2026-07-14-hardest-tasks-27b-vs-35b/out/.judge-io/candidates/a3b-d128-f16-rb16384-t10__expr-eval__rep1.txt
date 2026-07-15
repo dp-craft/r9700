@@ -1,0 +1,152 @@
+// FILE: impl.ts
+export type Result =
+  | { readonly ok: true; readonly value: number }
+  | { readonly ok: false; readonly error: string };
+
+type Token =
+  | { readonly type: 'num'; readonly value: number }
+  | { readonly type: 'op'; readonly value: '+' | '-' | '*' | '/' }
+  | { readonly type: 'lparen' }
+  | { readonly type: 'rparen' };
+
+function tokenize(input: string): readonly Token[] {
+  const out: Token[] = [];
+  for (let i = 0; i < input.length; i++) {
+    const c = input[i];
+    if (c === ' ' || c === '\t') continue;
+    if (c === '(' || c === ')' || c === '+' || c === '-' || c === '*' || c === '/') {
+      out.push(c === '(' ? { type: 'lparen' } : c === ')' ? { type: 'rparen' } : { type: 'op', value: c as '+' | '-' | '*' | '/' });
+      continue;
+    }
+    if (c && c >= '0' && c <= '9') {
+      const start = i;
+      while (i < input.length) { const n = input[i]; if (typeof n !== 'string' || n < '0' || n > '9') break; i++; }
+      out.push({ type: 'num', value: Number(input.slice(start, i)) }); continue;
+    }
+    throw new Error('Invalid character');
+  }
+  return out;
+}
+
+function parseExpr(tokens: readonly Token[], ctx: { index: number }): Result {
+  let res = parseTerm(tokens, ctx);
+  if (!res.ok) return res;
+  while (ctx.index < tokens.length && tokens[ctx.index].type === 'op' && (tokens[ctx.index].value === '+' || tokens[ctx.index].value === '-')) {
+    const op = tokens[ctx.index].value;
+    const next = parseTerm(tokens, ctx);
+    if (!next.ok) return next;
+    res = op === '+' ? { ok: true, value: res.value + next.value } : { ok: true, value: res.value - next.value };
+  }
+  return res;
+}
+
+function parseTerm(tokens: readonly Token[], ctx: { index: number }): Result {
+  let res = parseFactor(tokens, ctx);
+  if (!res.ok) return res;
+  while (ctx.index < tokens.length && tokens[ctx.index].type === 'op' && (tokens[ctx.index].value === '*' || tokens[ctx.index].value === '/')) {
+    const op = tokens[ctx.index].value;
+    const next = parseFactor(tokens, ctx);
+    if (!next.ok) return next;
+    if (op === '/' && next.value === 0) return { ok: false, error: 'Division by zero' };
+    res = op === '*' ? { ok: true, value: res.value * next.value } : { ok: true, value: res.value / next.value };
+  }
+  return res;
+}
+
+function parseFactor(tokens: readonly Token[], ctx: { index: number }): Result {
+  const token = tokens[ctx.index];
+  if (!token) return { ok: false, error: 'Unexpected end of input' };
+  if (token.type === 'num') { ctx.index++; return { ok: true, value: token.value }; }
+  if (token.type === 'lparen') {
+    ctx.index++;
+    const res = parseExpr(tokens, ctx);
+    if (!res.ok) return res;
+    const close = tokens[ctx.index];
+    if (!close || close.type !== 'rparen') return { ok: false, error: 'Missing closing parenthesis' };
+    ctx.index++;
+    return res;
+  }
+  return { ok: false, error: `Unexpected token: ${token.type}` };
+}
+
+export function evaluate(input: string): Result {
+  if (input.length === 0) return { ok: false, error: 'Empty expression' };
+  try {
+    const tokens = tokenize(input);
+    const ctx = { index: 0 };
+    const res = parseExpr(tokens, ctx);
+    if (!res.ok) return res;
+    if (ctx.index < tokens.length) return { ok: false, error: 'Unexpected trailing token' };
+    return res;
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Unknown error' };
+  }
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it } from 'vitest';
+import { evaluate } from './impl';
+
+describe('evaluate', () => {
+  it('should return 5 when evaluating 10 - 3 - 2', () => {
+    expect(evaluate('10 - 3 - 2')).toEqual({ ok: true, value: 5 });
+  });
+
+  it('should return 2 when evaluating 8 / 2 / 2', () => {
+    expect(evaluate('8 / 2 / 2')).toEqual({ ok: true, value: 2 });
+  });
+
+  it('should return 4 when evaluating 10 - 3 * 2', () => {
+    expect(evaluate('10 - 3 * 2')).toEqual({ ok: true, value: 4 });
+  });
+
+  it('should return 9 when evaluating (1 + 2) * 3', () => {
+    expect(evaluate('(1 + 2) * 3')).toEqual({ ok: true, value: 9 });
+  });
+
+  it('should return 14 when evaluating 2 * (3 + 4)', () => {
+    expect(evaluate('2 * (3 + 4)')).toEqual({ ok: true, value: 14 });
+  });
+
+  it('should return 11 when evaluating 15 / 3 + 2 * 3', () => {
+    expect(evaluate('15 / 3 + 2 * 3')).toEqual({ ok: true, value: 11 });
+  });
+
+  it('should return error when evaluating unbalanced parentheses', () => {
+    const res = evaluate('(1 + 2');
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.error.length).toBeGreaterThan(0);
+  });
+
+  it('should return error when evaluating division by zero', () => {
+    const res = evaluate('10 / 0');
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.error).toBe('Division by zero');
+  });
+
+  it('should return error when evaluating empty string', () => {
+    const res = evaluate('');
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.error).toBe('Empty expression');
+  });
+
+  it('should return error when evaluating unexpected character', () => {
+    const res = evaluate('10 a 2');
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.error).toBe('Invalid character');
+  });
+
+  it('should handle arbitrary whitespace correctly', () => {
+    expect(evaluate('  2   +   3  ')).toEqual({ ok: true, value: 5 });
+  });
+
+  it('should return error when evaluating missing operand', () => {
+    const res = evaluate('10 + * 2');
+    expect(res.ok).toBe(false);
+  });
+
+  it('should return error when evaluating unexpected trailing token', () => {
+    const res = evaluate('10 + 2 abc');
+    expect(res.ok).toBe(false);
+  });
+});

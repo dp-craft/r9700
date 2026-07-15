@@ -107,6 +107,7 @@ them wastes tokens and tells you nothing. Structure/results live in the files ab
     exercises it end-to-end; report the outcome honestly (including failures).
 12. **Be interactive.** Surface concerns as they arise, recommend concrete options (best first), and
     challenge ideas during brainstorming instead of just agreeing.
+13. **Q5_K_M at f16 KV / ctx 163840 fits into VRAM** so all lower values should be accepted without testing (lower model num like Q4, or lower context or Q6 with FP8).
 
 ## Tools — the deterministic layer (use these, never hand-roll their output)
 

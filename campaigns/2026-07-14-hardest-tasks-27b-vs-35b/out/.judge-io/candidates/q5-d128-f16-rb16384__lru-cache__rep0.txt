@@ -1,0 +1,153 @@
+// FILE: impl.ts
+import type { Clock } from '../../lib/clock';
+
+interface CacheNode<V> {
+  readonly value: V;
+  readonly expiresAt: number;
+  lastAccessed: number;
+}
+
+export interface LruCache<K, V> {
+  get(key: K): V | undefined;
+  set(key: K, value: V): void;
+  has(key: K): boolean;
+  readonly size: number;
+}
+
+function isExpired(node: CacheNode<unknown>, now: number): boolean {
+  return now >= node.expiresAt;
+}
+
+function touchNode(node: CacheNode<unknown>, now: number): void {
+  node.lastAccessed = now;
+}
+
+function evictOldest<K, V>(store: Map<K, CacheNode<V>>, capacity: number, now: number): void {
+  const entries = Array.from(store.entries());
+  const expiredKeys = entries.filter(([, node]) => isExpired(node, now)).map(([key]) => key);
+  expiredKeys.forEach(k => store.delete(k));
+
+  while (store.size > capacity) {
+    let oldestKey: K | undefined;
+    let oldestAccessed = Infinity;
+    for (const [key, node] of store) {
+      if (node.lastAccessed < oldestAccessed) {
+        oldestAccessed = node.lastAccessed;
+        oldestKey = key;
+      }
+    }
+    if (oldestKey === undefined) break;
+    store.delete(oldestKey);
+  }
+}
+
+function cacheGet<K, V>(store: Map<K, CacheNode<V>>, clock: Clock, key: K): V | undefined {
+  const now = clock.now();
+  const node = store.get(key);
+  if (node === undefined || isExpired(node, now)) {
+    store.delete(key);
+    return undefined;
+  }
+  touchNode(node, now);
+  return node.value;
+}
+
+function cacheHas<K, V>(store: Map<K, CacheNode<V>>, clock: Clock, key: K): boolean {
+  const now = clock.now();
+  const node = store.get(key);
+  if (node === undefined || isExpired(node, now)) {
+    store.delete(key);
+    return false;
+  }
+  return true;
+}
+
+function cacheSize<K, V>(store: Map<K, CacheNode<V>>, clock: Clock): number {
+  const now = clock.now();
+  const expiredKeys = Array.from(store.entries())
+    .filter(([, node]) => isExpired(node, now))
+    .map(([key]) => key);
+  expiredKeys.forEach(k => store.delete(k));
+  return store.size;
+}
+
+function cacheSet<K, V>(store: Map<K, CacheNode<V>>, clock: Clock, capacity: number, ttlMs: number, key: K, value: V): void {
+  const now = clock.now();
+  if (store.has(key)) {
+    store.delete(key);
+  }
+  evictOldest(store, capacity, now);
+  store.set(key, { value, expiresAt: now + ttlMs, lastAccessed: now });
+}
+
+export function createLruCache<K, V>(capacity: number, ttlMs: number, clock: Clock): LruCache<K, V> {
+  const store = new Map<K, CacheNode<V>>();
+  return {
+    get(key: K): V | undefined { return cacheGet(store, clock, key); },
+    has(key: K): boolean { return cacheHas(store, clock, key); },
+    get size(): number { return cacheSize(store, clock); },
+    set(key: K, value: V): void { cacheSet(store, clock, capacity, ttlMs, key, value); },
+  };
+}
+
+// FILE: impl.test.ts
+import { beforeEach, describe, expect, it } from 'vitest';
+
+import type { Clock } from '../../lib/clock';
+import { createLruCache } from './impl';
+
+interface FakeClock extends Clock {
+  tick(ms: number): void;
+}
+
+const buildFakeClock = (initial: number = 0): FakeClock => {
+  let now = initial;
+  return {
+    now: () => now,
+    tick: (ms: number) => { now += ms; },
+  };
+};
+
+describe('createLruCache', () => {
+  let clock: FakeClock;
+  let cache: ReturnType<typeof createLruCache<string, number>>;
+
+  beforeEach(() => {
+    clock = buildFakeClock(0);
+    cache = createLruCache(2, 1000, clock);
+  });
+
+  describe('set', () => {
+    it('should return the stored value when capacity is available', () => {
+      cache.set('a', 1);
+      expect(cache.get('a')).toBe(1);
+    });
+
+    it('should evict the least-recently-used entry when capacity is exceeded', () => {
+      cache.set('a', 1);
+      cache.set('b', 2);
+      cache.set('c', 3);
+      expect(cache.get('a')).toBeUndefined();
+      expect(cache.get('b')).toBe(2);
+      expect(cache.get('c')).toBe(3);
+    });
+
+    it('should refresh recency and update value when an existing key is set', () => {
+      cache.set('a', 1);
+      cache.set('b', 2);
+      cache.set('a', 10);
+      cache.set('c', 3);
+      expect(cache.get('b')).toBeUndefined();
+      expect(cache.get('a')).toBe(10);
+      expect(cache.get('c')).toBe(3);
+    });
+  });
+
+  describe('get', () => {
+    it('should return undefined when the key is absent', () => {
+      expect(cache.get('x')).toBeUndefined();
+    });
+
+    it('should return undefined when the entry has expired', () => {
+      cache.set('a', 1);
+      clock.tick(1000);

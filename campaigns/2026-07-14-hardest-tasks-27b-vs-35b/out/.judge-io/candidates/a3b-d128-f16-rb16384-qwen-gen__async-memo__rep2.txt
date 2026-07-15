@@ -1,0 +1,79 @@
+// FILE: impl.ts
+export function createAsyncMemo<K extends string | number, V>(
+  fn: (key: K) => Promise<V>
+): (key: K) => Promise<V> {
+  const cache = new Map<K, Promise<V>>();
+
+  return async (key: K): Promise<V> => {
+    const cached = cache.get(key);
+    if (cached !== undefined) return cached;
+
+    const p = fn(key);
+    cache.set(key, p);
+
+    void p.then(
+      (): undefined => undefined,
+      (): void => cache.delete(key)
+    );
+
+    return p;
+  };
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it } from 'vitest';
+
+import { createAsyncMemo } from './impl';
+
+const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
+
+describe('createAsyncMemo', () => {
+  it('should dedup concurrent calls when fn is invoked for the same key', async (): Promise<void> => {
+    let callCount = 0;
+    const memoized = createAsyncMemo(
+      async (key: string): Promise<string> => {
+        callCount += 1;
+        await sleep(10);
+        return `value-${key}`;
+      }
+    );
+
+    const results: readonly string[] = await Promise.all([
+      memoized('a'),
+      memoized('a'),
+      memoized('b')
+    ]);
+
+    expect(results).toEqual(['value-a', 'value-a', 'value-b']);
+    expect(callCount).toBe(2);
+  });
+
+  it('should retry fn when a previous attempt rejects', async (): Promise<void> => {
+    let callCount = 0;
+    const memoized = createAsyncMemo(
+      async (key: string): Promise<string> => {
+        callCount += 1;
+        if (callCount === 1) throw new Error('first fail');
+        return 'recovered';
+      }
+    );
+
+    await expect(memoized('x')).rejects.toThrow('first fail');
+    await expect(memoized('x')).resolves.toBe('recovered');
+    expect(callCount).toBe(2);
+  });
+
+  it('should cache the value and skip fn on subsequent successful requests', async (): Promise<void> => {
+    let callCount = 0;
+    const memoized = createAsyncMemo(
+      async (key: string): Promise<string> => {
+        callCount += 1;
+        return `success-${key}`;
+      }
+    );
+
+    await expect(memoized('y')).resolves.toBe('success-y');
+    await expect(memoized('y')).resolves.toBe('success-y');
+    expect(callCount).toBe(1);
+  });
+});

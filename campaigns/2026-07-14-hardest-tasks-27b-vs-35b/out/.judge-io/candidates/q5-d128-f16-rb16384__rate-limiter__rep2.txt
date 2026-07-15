@@ -1,0 +1,126 @@
+// FILE: impl.ts
+import type { Clock } from '../../lib/clock';
+
+interface BucketState {
+  readonly tokens: number;
+  readonly lastRefillTime: number;
+}
+
+export interface RateLimiter {
+  tryAcquire(key: string, tokens?: number): boolean;
+}
+
+const DEFAULT_TOKENS = 1;
+
+export function createRateLimiter(
+  capacity: number, refillPerSec: number, clock: Clock
+): RateLimiter {
+  const buckets = new Map<string, BucketState>();
+  const refill = (state: BucketState): BucketState => {
+    const now = clock.now();
+    const added = ((now - state.lastRefillTime) / 1000) * refillPerSec;
+    return { tokens: Math.min(capacity, state.tokens + added), lastRefillTime: now };
+  };
+  const tryAcquire = (key: string, requested: number = DEFAULT_TOKENS): boolean => {
+    const existing = buckets.get(key);
+    const state = existing ? refill(existing) : { tokens: capacity, lastRefillTime: clock.now() };
+    if (state.tokens >= requested) {
+      buckets.set(key, { ...state, tokens: state.tokens - requested });
+      return true;
+    }
+    buckets.set(key, state);
+    return false;
+  };
+  return { tryAcquire };
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it } from 'vitest';
+import type { Clock } from '../../lib/clock';
+import { createRateLimiter } from './impl';
+
+const buildFakeClock = (startMs: number): Clock & { tick: (ms: number) => void } => {
+  let current = startMs;
+  return {
+    now: (): number => current,
+    tick: (ms: number): void => { current += ms; },
+  };
+};
+
+describe('createRateLimiter', () => {
+  it('should allow burst up to capacity when bucket is full', () => {
+    const clock = buildFakeClock(0);
+    const limiter = createRateLimiter(5, 1, clock);
+
+    expect(limiter.tryAcquire('k1')).toBe(true);
+    expect(limiter.tryAcquire('k1')).toBe(true);
+    expect(limiter.tryAcquire('k1')).toBe(true);
+    expect(limiter.tryAcquire('k1')).toBe(true);
+    expect(limiter.tryAcquire('k1')).toBe(true);
+  });
+
+  it('should reject acquisition when bucket is empty', () => {
+    const clock = buildFakeClock(0);
+    const limiter = createRateLimiter(2, 1, clock);
+
+    limiter.tryAcquire('k1');
+    limiter.tryAcquire('k1');
+
+    expect(limiter.tryAcquire('k1')).toBe(false);
+  });
+
+  it('should lazily refill tokens when time advances', () => {
+    const clock = buildFakeClock(0);
+    const limiter = createRateLimiter(2, 2, clock);
+
+    limiter.tryAcquire('k1');
+    limiter.tryAcquire('k1');
+    expect(limiter.tryAcquire('k1')).toBe(false);
+
+    clock.tick(500);
+    expect(limiter.tryAcquire('k1')).toBe(true);
+    expect(limiter.tryAcquire('k1')).toBe(false);
+
+    clock.tick(500);
+    expect(limiter.tryAcquire('k1')).toBe(true);
+  });
+
+  it('should cap token refill at capacity when elapsed time is large', () => {
+    const clock = buildFakeClock(0);
+    const limiter = createRateLimiter(3, 10, clock);
+
+    limiter.tryAcquire('k1');
+    clock.tick(10000);
+
+    expect(limiter.tryAcquire('k1')).toBe(true);
+    expect(limiter.tryAcquire('k1')).toBe(true);
+    expect(limiter.tryAcquire('k1')).toBe(false);
+  });
+
+  it('should isolate token buckets when different keys are used', () => {
+    const clock = buildFakeClock(0);
+    const limiter = createRateLimiter(1, 1, clock);
+
+    expect(limiter.tryAcquire('a')).toBe(true);
+    expect(limiter.tryAcquire('b')).toBe(true);
+    expect(limiter.tryAcquire('a')).toBe(false);
+    expect(limiter.tryAcquire('b')).toBe(false);
+  });
+
+  it('should deduct custom token amount when requested', () => {
+    const clock = buildFakeClock(0);
+    const limiter = createRateLimiter(10, 1, clock);
+
+    expect(limiter.tryAcquire('k1', 5)).toBe(true);
+    expect(limiter.tryAcquire('k1', 5)).toBe(true);
+    expect(limiter.tryAcquire('k1', 1)).toBe(false);
+  });
+
+  it('should not deduct tokens when acquisition fails', () => {
+    const clock = buildFakeClock(0);
+    const limiter = createRateLimiter(3, 1, clock);
+
+    expect(limiter.tryAcquire('k1', 5)).toBe(false);
+    expect(limiter.tryAcquire('k1', 3)).toBe(true);
+  });
+});

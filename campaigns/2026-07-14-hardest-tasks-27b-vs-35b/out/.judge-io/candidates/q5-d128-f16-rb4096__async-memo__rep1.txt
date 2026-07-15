@@ -1,0 +1,62 @@
+// FILE: impl.ts
+export function createAsyncMemo<K, V>(fn: (key: K) => Promise<V>): (key: K) => Promise<V> {
+  const cache = new Map<K, Promise<V>>();
+  return (key: K): Promise<V> => {
+    const existing = cache.get(key);
+    if (existing !== undefined) return existing;
+    const p = fn(key);
+    p.catch(() => cache.delete(key));
+    cache.set(key, p);
+    return p;
+  };
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it, vi } from 'vitest';
+import { createAsyncMemo } from './impl';
+
+describe('createAsyncMemo', () => {
+  it('should deduplicate concurrent calls for the same key when invoked simultaneously', async () => {
+    let callCount = 0;
+    const fn = vi.fn(async (_k: string): Promise<string> => {
+      callCount++;
+      await new Promise<void>(resolve => setTimeout(resolve, 10));
+      return 'result';
+    });
+    const memoized = createAsyncMemo(fn);
+    const [res1, res2] = await Promise.all([memoized('k'), memoized('k')]);
+    expect(res1).toBe('result');
+    expect(res2).toBe('result');
+    expect(callCount).toBe(1);
+  });
+
+  it('should retry the function when a previous call rejects', async () => {
+    let callCount = 0;
+    const fn = vi.fn(async (_k: string): Promise<string> => {
+      callCount++;
+      await new Promise<void>(resolve => setTimeout(resolve, 5));
+      if (callCount === 1) throw new Error('fail');
+      return 'success';
+    });
+    const memoized = createAsyncMemo(fn);
+    await expect(memoized('k')).rejects.toThrow('fail');
+    const res = await memoized('k');
+    expect(res).toBe('success');
+    expect(callCount).toBe(2);
+  });
+
+  it('should cache successful results when called sequentially', async () => {
+    let callCount = 0;
+    const fn = vi.fn(async (_k: string): Promise<string> => {
+      callCount++;
+      await new Promise<void>(resolve => setTimeout(resolve, 5));
+      return 'cached';
+    });
+    const memoized = createAsyncMemo(fn);
+    const res1 = await memoized('k');
+    const res2 = await memoized('k');
+    expect(res1).toBe('cached');
+    expect(res2).toBe('cached');
+    expect(callCount).toBe(1);
+  });
+});

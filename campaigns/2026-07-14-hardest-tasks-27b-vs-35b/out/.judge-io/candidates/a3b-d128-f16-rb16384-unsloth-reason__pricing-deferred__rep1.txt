@@ -1,0 +1,219 @@
+// FILE: types.ts
+export type Amount =
+  | { readonly kind: "fixed"; readonly value: number }
+  | { readonly kind: "percent"; readonly pct: number }
+  | { readonly kind: "deferred"; readonly load: () => Promise<number> };
+
+export interface LineItem {
+  readonly id: string;
+  readonly base: number;
+  readonly adjustment: Amount;
+}
+
+// FILE: pricing.ts
+import type { Amount, LineItem } from "./types";
+
+export const PERCENT_BASE = 100;
+
+export async function lineTotal(item: LineItem): Promise<number> {
+  const adj = item.adjustment;
+  if (adj.kind === "fixed") return item.base + adj.value;
+  if (adj.kind === "percent") return item.base + (item.base * adj.pct) / PERCENT_BASE;
+  return item.base + await adj.load();
+}
+
+export async function computeTotal(items: readonly LineItem[]): Promise<number> {
+  let total = 0;
+  for (const item of items) {
+    total += await lineTotal(item);
+  }
+  return total;
+}
+
+// FILE: report.ts
+import type { Amount, LineItem } from "./types";
+import { lineTotal } from "./pricing";
+
+const KIND_LABEL: Record<Amount["kind"], string> = {
+  fixed: "flat",
+  percent: "rate",
+  deferred: "deferred",
+};
+
+export function amountLabel(amount: Amount): string {
+  return KIND_LABEL[amount.kind];
+}
+
+export async function reportLine(item: LineItem): Promise<string> {
+  const total = await lineTotal(item);
+  return `${item.id} [${amountLabel(item.adjustment)}]: ${String(total)}`;
+}
+
+export async function buildReport(items: readonly LineItem[]): Promise<readonly string[]> {
+  return (await Promise.all(items.map(reportLine))) as readonly string[];
+}
+
+// FILE: cache.ts
+import type { Clock } from "../../lib/clock";
+
+export interface PriceCache {
+  get(key: string, compute: () => Promise<number>): Promise<number>;
+}
+
+interface CacheEntry {
+  readonly value: number;
+  readonly expiresAt: number;
+}
+
+const DEFAULT_TTL_MS = 60_000;
+
+export function createPriceCache(clock: Clock, ttlMs: number = DEFAULT_TTL_MS): PriceCache {
+  const entries = new Map<string, CacheEntry>();
+  const pending = new Map<string, Promise<number>>();
+
+  return {
+    async get(key: string, compute: () => Promise<number>): Promise<number> {
+      const hit = entries.get(key);
+      if (hit !== undefined && hit.expiresAt > clock.now()) {
+        return hit.value;
+      }
+
+      if (!pending.has(key)) {
+        pending.set(
+          key,
+          compute()
+            .then(value => {
+              pending.delete(key);
+              entries.set(key, { value, expiresAt: clock.now() + ttlMs });
+              return value;
+            })
+            .catch(err => {
+              pending.delete(key);
+              throw err;
+            })
+        );
+      }
+
+      return pending.get(key)!;
+    },
+  };
+}
+
+// FILE: pricing.test.ts
+import { describe, it, expect } from "vitest";
+import { computeTotal, lineTotal } from "./pricing";
+import { amountLabel, buildReport } from "./report";
+import { createPriceCache } from "./cache";
+
+const makeFixed = (v: number) => ({ kind: "fixed" as const, value: v });
+const makePercent = (p: number) => ({ kind: "percent" as const, pct: p });
+const makeDeferred = (fn: () => Promise<number>) => ({ kind: "deferred" as const, load: fn });
+
+describe("pricing", () => {
+  it("should add fixed value when adjustment is fixed", async () => {
+    const item = { id: "a", base: 100, adjustment: makeFixed(20) };
+    expect(await lineTotal(item)).toBe(120);
+  });
+
+  it("should apply percent rate when adjustment is percent", async () => {
+    const item = { id: "b", base: 200, adjustment: makePercent(10) };
+    expect(await lineTotal(item)).toBe(220);
+  });
+
+  it("should await deferred load and resolve total when adjustment is deferred", async () => {
+    let loaded = false;
+    const item = { id: "c", base: 150, adjustment: makeDeferred(async () => { loaded = true; return 42; }) };
+    expect(await lineTotal(item)).toBe(192);
+    expect(loaded).toBe(true);
+  });
+
+  it("should sum line totals when computing order total", async () => {
+    const items: readonly typeof import("./types").LineItem[] = [
+      { id: "a", base: 100, adjustment: makeFixed(20) },
+      { id: "b", base: 200, adjustment: makePercent(10) },
+      { id: "d", base: 50, adjustment: makeDeferred(async () => 5) },
+    ];
+    expect(await computeTotal(items)).toBe(365);
+  });
+});
+
+describe("report", () => {
+  it("should label fixed as flat and percent as rate", () => {
+    expect(amountLabel(makeFixed(5))).toBe("flat");
+    expect(amountLabel(makePercent(5))).toBe("rate");
+  });
+
+  it("should label deferred adjustment correctly", () => {
+    expect(amountLabel(makeDeferred(async () => 0))).toBe("deferred");
+  });
+
+  it("should render one line per item when building report", async () => {
+    const items: readonly typeof import("./types").LineItem[] = [{ id: "a", base: 100, adjustment: makeFixed(20) }];
+    expect(await buildReport(items)).toEqual(["a [flat]: 120"]);
+  });
+
+  it("should render deferred line with resolved total", async () => {
+    const items: readonly typeof import("./types").LineItem[] = [{ id: "e", base: 30, adjustment: makeDeferred(async () => 7) }];
+    expect(await buildReport(items)).toEqual(["e [deferred]: 37"]);
+  });
+
+  it("should resolve concurrently for multiple deferred lines", async () => {
+    const items: readonly typeof import("./types").LineItem[] = [
+      { id: "x1", base: 10, adjustment: makeDeferred(async () => 1) },
+      { id: "x2", base: 20, adjustment: makeDeferred(async () => 2) },
+    ];
+    expect(await buildReport(items)).toEqual(["x1 [deferred]: 11", "x2 [deferred]: 22"]);
+  });
+});
+
+describe("createPriceCache", () => {
+  it("should reuse cached total when entry is still fresh", async () => {
+    let calls = 0;
+    const cache = createPriceCache({ now: (): number => 0 } as unknown as import("../../lib/clock").Clock, 1000);
+    const compute = async (): Promise<number> => { calls += 1; return 42; };
+
+    expect(await cache.get("k", compute)).toBe(42);
+    expect(await cache.get("k", compute)).toBe(42);
+    expect(calls).toBe(1);
+  });
+
+  it("should recompute total when entry has expired", async () => {
+    let t = 0;
+    let calls = 0;
+    const cache = createPriceCache({ now: (): number => t } as unknown as import("../../lib/clock").Clock, 1000);
+    const compute = async (): Promise<number> => { calls += 1; return calls; };
+
+    expect(await cache.get("k", compute)).toBe(1);
+    t = 1500;
+    expect(await cache.get("k", compute)).toBe(2);
+    expect(calls).toBe(2);
+  });
+
+  it("should share single computation among concurrent get calls for same fresh key", async () => {
+    let resolveCompute: (v: number) => void;
+    const deferred = new Promise<number>(resolve => { resolveCompute = resolve; });
+
+    const cache = createPriceCache({ now: (): number => 0 } as unknown as import("../../lib/clock").Clock, 10_000);
+    const compute = async () => deferred;
+
+    const p1 = cache.get("k", compute);
+    const p2 = cache.get("k", compute);
+    resolveCompute!(42);
+
+    expect(await p1).toBe(42);
+    expect(await p2).toBe(42);
+  });
+
+  it("should never cache failed computation and should retry on subsequent get", async () => {
+    let attempts = 0;
+    const cache = createPriceCache({ now: (): number => 0 } as unknown as import("../../lib/clock").Clock, 1000);
+    const compute = async (): Promise<number> => {
+      attempts += 1;
+      if (attempts === 1) throw new Error("boom");
+      return 99;
+    };
+
+    await expect(cache.get("k", compute)).rejects.toThrow("boom");
+    await expect(cache.get("k", compute)).resolves.toBe(99);
+  });
+});

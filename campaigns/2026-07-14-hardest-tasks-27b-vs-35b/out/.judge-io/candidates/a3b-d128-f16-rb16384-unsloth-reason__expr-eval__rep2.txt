@@ -1,0 +1,122 @@
+// FILE: impl.ts
+export type Result = { readonly ok: true; value: number } | { readonly ok: false; error: string };
+
+type Token = readonly ['NUM', string] | readonly ['ADD'] | readonly ['SUB'] | readonly ['MUL'] | readonly ['DIV'] | readonly ['LPAREN'] | readonly ['RPAREN'];
+type State = { tokens: readonly Token[]; pos: number };
+
+function tokenize(src: string): readonly Token[] | Result {
+  const out: Token[] = []; let i = 0;
+  while (i < src.length) {
+    const c = src[i]; if (c === ' ') { i++; continue; }
+    switch (c) {
+      case '+': out.push(['ADD']); break; case '-': out.push(['SUB']); break;
+      case '*': out.push(['MUL']); break; case '/': out.push(['DIV']); break;
+      case '(': out.push(['LPAREN']); break; case ')': out.push(['RPAREN']); break;
+      default: if (/\d/.test(c)) { let n = ''; while (i < src.length && /\d/.test(src[i])) n += src[i++]; out.push(['NUM', n]); continue; }
+        return { ok: false, error: 'invalid character' };
+    } i++;
+  }
+  return out;
+}
+
+function factor(s: State): Result {
+  const t = s.tokens[s.pos]; if (!t) return { ok: false, error: 'missing operand' };
+  if (t[0] === 'NUM') { s.pos++; return { ok: true, value: +t[1] }; }
+  if (t[0] === 'SUB') { s.pos++; const r = factor(s); return r.ok ? { ok: true, value: -r.value } : r; }
+  if (t[0] === 'LPAREN') { s.pos++; const res = expr(s); if (!res.ok) return res; const closing = s.tokens[s.pos]; if (closing?.[0] !== 'RPAREN') return { ok: false, error: 'expected )' }; s.pos++; return res; }
+  return { ok: false, error: 'unexpected token' };
+}
+
+function term(s: State): Result {
+  let left = factor(s); while (true) { const t = s.tokens[s.pos]; if (t?.[0] !== 'MUL' && t?.[0] !== 'DIV') return left; s.pos++; const r = factor(s); if (!r.ok) return r; left = t[0] === 'MUL' ? { ok: true, value: left.value * r.value } : r.value === 0 ? { ok: false, error: 'division by zero' } : { ok: true, value: Math.trunc(left.value / r.value) }; }
+}
+
+function expr(s: State): Result {
+  let left = term(s); while (true) { const t = s.tokens[s.pos]; if (t?.[0] !== 'ADD' && t?.[0] !== 'SUB') return left; s.pos++; const r = term(s); if (!r.ok) return r; left = t[0] === 'ADD' ? { ok: true, value: left.value + r.value } : { ok: true, value: left.value - r.value }; }
+}
+
+export function evaluate(input: string): Result {
+  const tokRes = tokenize(input); if (Array.isArray(tokRes) === false) return tokRes;
+  const tokens = tokRes; if (tokens.length === 0) return { ok: false, error: 'empty input' };
+  const state: State = { tokens, pos: 0 }; const result = expr(state);
+  if (result.ok && state.pos < tokens.length) return { ok: false, error: 'unexpected trailing token' };
+  return result;
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it } from 'vitest';
+import { evaluate } from './impl';
+
+describe('evaluate', () => {
+  describe('basic arithmetic execution', () => {
+    it('should return the correct integer sum when processing standard addition operands', () => {
+      expect(evaluate('15 + 27')).toEqual({ ok: true, value: 42 });
+    });
+
+    it('should truncate the fractional part when executing integer division logic', () => {
+      expect(evaluate('7 / 2')).toEqual({ ok: true, value: 3 });
+    });
+  });
+
+  describe('operator precedence rules', () => {
+    it('should apply multiplication binding tighter than addition during mixed evaluation', () => {
+      expect(evaluate('4 + 5 * 2')).toEqual({ ok: true, value: 14 });
+    });
+
+    it('should respect left-side subtraction priority over right-side division operands', () => {
+      expect(evaluate('20 - 8 / 4')).toEqual({ ok: true, value: 18 });
+    });
+  });
+
+  describe('left associativity mechanics', () => {
+    it('should drain chained subtractions from left to right when multiple minus signs appear consecutively', () => {
+      expect(evaluate('10 - 3 - 2')).toEqual({ ok: true, value: 5 });
+    });
+
+    it('should execute sequential divisions strictly from left to right when slash operators chain together', () => {
+      expect(evaluate('64 / 8 / 2')).toEqual({ ok: true, value: 4 });
+    });
+  });
+
+  describe('parenthetical grouping behavior', () => {
+    it('should override standard precedence ordering when a subexpression is wrapped in matching delimiters', () => {
+      expect(evaluate('(1 + 2) * 3')).toEqual({ ok: true, value: 9 });
+    });
+
+    it('should correctly resolve deeply nested bracket structures containing additional mathematical operations', () => {
+      expect(evaluate('((5 - 2) * (6 / 3))')).toEqual({ ok: true, value: 6 });
+    });
+  });
+
+  describe('whitespace tolerance handling', () => {
+    it('should completely ignore arbitrary space characters surrounding numeric literals and operators', () => {
+      expect(evaluate('  8   *     6  ')).toEqual({ ok: true, value: 48 });
+    });
+  });
+
+  describe('invalid input validation pathways', () => {
+    it('should return a failure result object when zero division is detected during calculation steps', () => {
+      const res = evaluate('100 / 0'); expect(res.ok).toBe(false);
+      if (!res.ok) expect(res.error).toContain('division by zero');
+    });
+
+    it('should identify syntax traps and report missing operand states when trailing operators remain unmatched', () => {
+      const res = evaluate('5 + '); expect(res.ok).toBe(false);
+      if (!res.ok) expect(res.error).toContain('missing operand');
+    });
+
+    it('should catch grammar defects when unbalanced closing delimiters interrupt the parsing flow', () => {
+      const res = evaluate('2 + 3 )'); expect(res.ok).toBe(false);
+      if (!res.ok) expect(res.error).toContain('unexpected trailing token');
+    });
+
+    it('should block execution and report formatting failures when non-mathematical characters enter the stream', () => {
+      const res = evaluate('10 * c'); expect(res.ok).toBe(false);
+      if (!res.ok) expect(res.error).toContain('invalid character');
+    });
+
+    it('should reject purely blank payloads by returning an empty input validation failure state', () => {
+      expect(evaluate('')).toEqual({ ok: false, error: 'empty input' });
+    });
+  });
+});

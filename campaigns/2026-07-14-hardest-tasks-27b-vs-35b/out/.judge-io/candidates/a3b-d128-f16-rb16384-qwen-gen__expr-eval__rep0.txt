@@ -1,0 +1,132 @@
+// FILE: impl.ts
+export type Result =
+  | { readonly ok: true; readonly value: number }
+  | { readonly ok: false; readonly error: string };
+
+type Token = { readonly t: string; readonly v?: number };
+
+function tokenize(input: string): Array<Token> {
+  const out: Token[] = []; let i = 0;
+  while (i < input.length) {
+    const c = input[i];
+    if (c === ' ') { i++; continue; }
+    if ('+-*/'.includes(c)) { out.push({ t: c }); i++; continue; }
+    if (c === '(') { out.push({ t: '(' }); i++; continue; }
+    if (c === ')') { out.push({ t: ')' }); i++; continue; }
+    if ('0123456789'.includes(c)) { let n = 0; while (i < input.length) { const d = input[i]; if (d === undefined || d < '0' || d > '9') break; n = n * 10 + Number(d); i++; } out.push({ t: 'NUM', v: n }); }
+    else { out.push({ t: `ERR:${c}` }); break; }
+  }
+  return out;
+}
+
+export function evaluate(input: string): Result {
+  const tokens = tokenize(input); let p = 0;
+  const peek = (): Token | undefined => tokens[p];
+  const advance = (): void => { p++; };
+
+  const parseExpr = (): Result => {
+    let left = parseTerm(); if (!left.ok) return left;
+    while (true) {
+      const op = peek()?.t;
+      if (op !== '+' && op !== '-') break;
+      advance(); let right = parseTerm(); if (!right.ok) return right;
+      left = op === '+' ? { ok: true, value: left.value + right.value } : { ok: true, value: left.value - right.value };
+    }
+    return left;
+  };
+
+  const parseTerm = (): Result => {
+    let left = parseFactor(); if (!left.ok) return left;
+    while (true) {
+      const op = peek()?.t;
+      if (op !== '*' && op !== '/') break;
+      advance(); let right = parseFactor(); if (!right.ok) return right;
+      if (op === '/' && right.value === 0) return { ok: false, error: 'Division by zero' };
+      left = op === '*' ? { ok: true, value: left.value * right.value } : { ok: true, value: left.value / right.value };
+    }
+    return left;
+  };
+
+  const parseFactor = (): Result => {
+    const tok = peek(); if (tok === undefined) return { ok: false, error: 'Unexpected end of input' };
+    if (tok.t === '(') { advance(); const res = parseExpr(); if (!res.ok) return res; if (peek()?.t !== ')') return { ok: false, error: 'Missing closing parenthesis' }; advance(); return res; }
+    if (tok.t.startsWith('ERR')) return { ok: false, error: `Unexpected character '${tok.t.slice(3)}'` };
+    if (tok.t === 'NUM' && tok.v !== undefined) { advance(); return { ok: true, value: tok.v }; }
+    return { ok: false, error: `Expected number or '(', got '${tok.t}'` };
+  };
+
+  const res = parseExpr(); if (peek()) return { ok: false, error: 'Unexpected character after expression' };
+  return res;
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it } from 'vitest';
+import { evaluate } from './impl';
+
+describe('evaluate', () => {
+  it('should return parsed value when input is a valid number', () => {
+    expect(evaluate('42')).toEqual({ ok: true, value: 42 });
+  });
+
+  it('should ignore surrounding whitespace when parsing numbers', () => {
+    expect(evaluate(' 10 +  20 ')).toEqual({ ok: true, value: 30 });
+  });
+
+  describe('operator precedence', () => {
+    it('should multiply before addition when expressions contain both', () => {
+      expect(evaluate('2 + 3 * 4')).toEqual({ ok: true, value: 14 });
+    });
+
+    it('should divide before subtraction when expressions contain both', () => {
+      expect(evaluate('10 - 8 / 2')).toEqual({ ok: true, value: 6 });
+    });
+  });
+
+  describe('left-associativity', () => {
+    it('should evaluate left-to-right when multiple subtractions are present', () => {
+      expect(evaluate('10 - 3 - 2')).toEqual({ ok: true, value: 5 });
+    });
+
+    it('should evaluate left-to-right when multiple divisions are present', () => {
+      expect(evaluate('8 / 2 / 2')).toEqual({ ok: true, value: 2 });
+    });
+  });
+
+  describe('parentheses', () => {
+    it('should override precedence when parentheses enclose an addition', () => {
+      expect(evaluate('(2 + 3) * 4')).toEqual({ ok: true, value: 20 });
+    });
+
+    it('should support nested grouping when parentheses are nested', () => {
+      expect(evaluate('((1 + 2) * (3 + 4))')).toEqual({ ok: true, value: 21 });
+    });
+  });
+
+  describe('malformed input handling', () => {
+    it('should return error when dividing by zero', () => {
+      const res = evaluate('5 / 0');
+      expect(res.ok).toBe(false);
+      if (!res.ok) expect(res.error.length).toBeGreaterThan(0);
+    });
+
+    it('should return error when opening parenthesis is unclosed', () => {
+      const res = evaluate('(2 + 3');
+      expect(res.ok).toBe(false);
+    });
+
+    it('should return error when closing parenthesis lacks an opener', () => {
+      const res = evaluate('2 + 3)');
+      expect(res.ok).toBe(false);
+    });
+
+    it('should return error when operand is missing after operator', () => {
+      const res = evaluate('2 + ');
+      expect(res.ok).toBe(false);
+    });
+
+    it('should return error when unexpected character appears', () => {
+      const res = evaluate('5 $ 3');
+      expect(res.ok).toBe(false);
+    });
+  });
+});

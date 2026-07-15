@@ -1,0 +1,158 @@
+// FILE: impl.ts
+import { type Clock } from './lib/clock';
+
+const DEFAULT_TOKENS = 1;
+const MILLIS_PER_SEC = 1000;
+
+interface BucketState {
+  tokens: number;
+  lastRefillAt: number;
+}
+
+export interface RateLimiter {
+  tryAcquire(key: string, tokens?: number): boolean;
+}
+
+function refillBucket(
+  bucket: BucketState,
+  capacity: number,
+  refillPerSec: number,
+  now: number
+): void {
+  const elapsedSeconds = (now - bucket.lastRefillAt) / MILLIS_PER_SEC;
+  if (elapsedSeconds > 0) {
+    const newTokens = bucket.tokens + elapsedSeconds * refillPerSec;
+    bucket.tokens = Math.min(capacity, newTokens);
+    bucket.lastRefillAt = now;
+  }
+}
+
+export function createRateLimiter(
+  capacity: number,
+  refillPerSec: number,
+  clock: Clock
+): RateLimiter {
+  const buckets = new Map<string, BucketState>();
+
+  return {
+    tryAcquire(key: string, tokens: number = DEFAULT_TOKENS): boolean {
+      const now = clock.now();
+      let bucket = buckets.get(key);
+      if (!bucket) {
+        bucket = { tokens: capacity, lastRefillAt: now };
+        buckets.set(key, bucket);
+      }
+
+      refillBucket(bucket, capacity, refillPerSec, now);
+
+      if (bucket.tokens >= tokens) {
+        bucket.tokens -= tokens;
+        return true;
+      }
+
+      return false;
+    },
+  };
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it, vi } from 'vitest';
+
+import { type Clock } from './lib/clock';
+import { createRateLimiter, type RateLimiter } from './impl';
+
+const CAPACITY = 10;
+const REFILL_PER_SEC = 2;
+const BASE_TIME = 1_000_000_000_000;
+
+function buildClock(initialMs: number): Clock {
+  return { now: vi.fn().mockReturnValue(initialMs) };
+}
+
+describe('createRateLimiter', () => {
+  describe('first burst', () => {
+    it('should acquire exactly capacity tokens when request equals capacity', () => {
+      const clock = buildClock(BASE_TIME);
+      const limiter = createRateLimiter(CAPACITY, REFILL_PER_SEC, clock);
+
+      let acquired = 0;
+      for (let i = 0; i < CAPACITY; i++) {
+        if (limiter.tryAcquire('key')) acquired++;
+      }
+
+      expect(acquired).toBe(CAPACITY);
+    });
+
+    it('should return false when request exceeds capacity on initial call', () => {
+      const clock = buildClock(BASE_TIME);
+      const limiter = createRateLimiter(CAPACITY, REFILL_PER_SEC, clock);
+
+      expect(limiter.tryAcquire('key', CAPACITY + 1)).toBe(false);
+    });
+  });
+
+  describe('empty-bucket rejection', () => {
+    it('should return false when requesting a token from an empty bucket', () => {
+      const clock = buildClock(BASE_TIME);
+      const limiter = createRateLimiter(CAPACITY, REFILL_PER_SEC, clock);
+
+      for (let i = 0; i < CAPACITY; i++) {
+        limiter.tryAcquire('key');
+      }
+
+      expect(limiter.tryAcquire('key')).toBe(false);
+    });
+  });
+
+  describe('lazy refill over time', () => {
+    it('should restore tokens proportional to elapsed seconds when time advances', () => {
+      const clock = buildClock(BASE_TIME);
+      const limiter = createRateLimiter(CAPACITY, REFILL_PER_SEC, clock);
+
+      for (let i = 0; i < CAPACITY; i++) {
+        limiter.tryAcquire('key');
+      }
+      expect(limiter.tryAcquire('key')).toBe(false);
+
+      clock.now.mockReturnValue(BASE_TIME + 1000);
+      expect(limiter.tryAcquire('key', 2)).toBe(true);
+    });
+
+    it('should cap refilled tokens at capacity when time interval is large', () => {
+      const clock = buildClock(BASE_TIME);
+      const limiter = createRateLimiter(CAPACITY, REFILL_PER_SEC, clock);
+
+      clock.now.mockReturnValue(BASE_TIME + 10_000);
+      expect(limiter.tryAcquire('key', CAPACITY)).toBe(true);
+      expect(limiter.tryAcquire('key')).toBe(false);
+    });
+  });
+
+  describe('per-key isolation', () => {
+    it('should maintain independent token counts when keys are drained separately', () => {
+      const clock = buildClock(BASE_TIME);
+      const limiter = createRateLimiter(CAPACITY, REFILL_PER_SEC, clock);
+
+      for (let i = 0; i < CAPACITY; i++) {
+        limiter.tryAcquire('keyA');
+      }
+      expect(limiter.tryAcquire('keyA')).toBe(false);
+
+      expect(limiter.tryAcquire('keyB', CAPACITY)).toBe(true);
+    });
+
+    it('should delay successful acquisition when over-requested initially', () => {
+      const clock = buildClock(BASE_TIME);
+      const limiter = createRateLimiter(CAPACITY, REFILL_PER_SEC, clock);
+
+      expect(limiter.tryAcquire('key', CAPACITY - 1)).toBe(true);
+      expect(limiter.tryAcquire('key', 2)).toBe(false);
+      
+      clock.now.mockReturnValue(BASE_TIME + 500);
+      expect(limiter.tryAcquire('key', 2)).toBe(false);
+      
+      clock.now.mockReturnValue(BASE_TIME + 1500);
+      expect(limiter.tryAcquire('key', 2)).toBe(true);
+    });
+  });
+});

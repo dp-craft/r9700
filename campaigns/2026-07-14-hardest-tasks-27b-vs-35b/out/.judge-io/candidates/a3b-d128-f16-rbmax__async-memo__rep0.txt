@@ -1,0 +1,96 @@
+// FILE: impl.ts
+export function createAsyncMemo<K, V>(fn: (key: K) => Promise<V>): (key: K) => Promise<V> {
+  const cache = new Map<K, Promise<V>>();
+  return (key: K): Promise<V> => {
+    const existing = cache.get(key);
+    if (existing !== undefined) {
+      return existing;
+    }
+    const p = fn(key);
+    cache.set(key, p);
+    p.catch((): void => {
+      cache.delete(key);
+    });
+    return p;
+  };
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it, vi } from 'vitest';
+
+import { createAsyncMemo } from './impl';
+
+describe('createAsyncMemo', () => {
+  describe('concurrent dedup', () => {
+    it('should dedup concurrent calls when same key is used', async (): Promise<void> => {
+      const fn = vi.fn<() => Promise<string>>().mockResolvedValue('ok');
+      const memo = createAsyncMemo(fn);
+
+      const p1 = memo('key');
+      const p2 = memo('key');
+      const p3 = memo('key');
+
+      expect(p1).toBe(p2);
+      expect(p2).toBe(p3);
+      await Promise.all([p1, p2, p3]);
+      expect(fn).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('retry after rejection', () => {
+    it('should retry fn when previous call rejected', async (): Promise<void> => {
+      let callCount = 0;
+      const fn = async (): Promise<string> => {
+        callCount += 1;
+        if (callCount === 1) {
+          throw new Error('fail');
+        }
+        return 'recovered';
+      };
+      const memo = createAsyncMemo(fn);
+
+      await expect(memo('key')).rejects.toThrow('fail');
+      await expect(memo('key')).resolves.toBe('recovered');
+      expect(fn).toHaveBeenCalledTimes(2);
+    });
+
+    it('should not cache rejection promise when rejection occurs', async (): Promise<void> => {
+      const fn = vi.fn<() => Promise<string>>().mockRejectedValue(new Error('fail'));
+      const memo = createAsyncMemo(fn);
+
+      const p1 = memo('key');
+      await expect(p1).rejects.toThrow('fail');
+      const p2 = memo('key');
+
+      expect(p2).not.toBe(p1);
+      await expect(p2).rejects.toThrow('fail');
+      expect(fn).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('cache hit after success', () => {
+    it('should reuse resolved value when cache hit after success', async (): Promise<void> => {
+      const fn = vi.fn<() => Promise<string>>().mockResolvedValue('cached');
+      const memo = createAsyncMemo(fn);
+
+      const p1 = memo('key');
+      await p1;
+      const p2 = memo('key');
+
+      expect(p2).toBe(p1);
+      await expect(p2).resolves.toBe('cached');
+      expect(fn).toHaveBeenCalledTimes(1);
+    });
+
+    it('should return same promise instance when cache hit after success', async (): Promise<void> => {
+      const fn = vi.fn<() => Promise<string>>().mockResolvedValue('ok');
+      const memo = createAsyncMemo(fn);
+
+      const p1 = memo('key');
+      await p1;
+      const p2 = memo('key');
+
+      expect(p2).toBe(p1);
+    });
+  });
+});

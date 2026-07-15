@@ -1,0 +1,8 @@
+{"id": "q5-d128-f16-rb16384__expr-eval__rep0", "spec": "ts-harness/tasks/expr-eval/spec.md", "code": "out/.judge-io/candidates/q5-d128-f16-rb16384__expr-eval__rep0.txt"}
+{"id": "q5-d128-f16-rb16384__expr-eval__rep1", "spec": "ts-harness/tasks/expr-eval/spec.md", "code": "out/.judge-io/candidates/q5-d128-f16-rb16384__expr-eval__rep1.txt"}
+{"id": "q5-d128-f16-rb16384__expr-eval__rep2", "spec": "ts-harness/tasks/expr-eval/spec.md", "code": "out/.judge-io/candidates/q5-d128-f16-rb16384__expr-eval__rep2.txt"}
+{"id": "q5-d128-f16-rb16384__pricing-deferred__rep0", "spec": "ts-harness/tasks/pricing-deferred/spec.md", "code": "out/.judge-io/candidates/q5-d128-f16-rb16384__pricing-deferred__rep0.txt"}
+{"id": "q5-d128-f16-rb16384__pricing-deferred__rep1", "spec": "ts-harness/tasks/pricing-deferred/spec.md", "code": "out/.judge-io/candidates/q5-d128-f16-rb16384__pricing-deferred__rep1.txt"}
+{"id": "q5-d128-f16-rb16384__pricing-deferred__rep2", "spec": "ts-harness/tasks/pricing-deferred/spec.md", "code": "out/.judge-io/candidates/q5-d128-f16-rb16384__pricing-deferred__rep2.txt"}
+{"id": "q5-d128-f16-rb4096__lru-cache__rep0", "spec": "ts-harness/tasks/lru-cache/spec.md", "code": "out/.judge-io/candidates/q5-d128-f16-rb4096__lru-cache__rep0.txt"}
+{"id": "q5-d128-f16-rb4096__lru-cache__rep1", "spec": "ts-harness/tasks/lru-cache/spec.md", "code": "out/.judge-io/candidates/q5-d128-f16-rb4096__lru-cache__rep1.txt"}

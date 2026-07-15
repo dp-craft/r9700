@@ -1,0 +1,152 @@
+// FILE: impl.ts
+export type Result =
+  | { readonly ok: true; readonly value: number }
+  | { readonly ok: false; readonly error: string };
+
+export function evaluate(expr: string): Result {
+  let pos = 0;
+  const len = expr.length;
+
+  function skipSpace(): void {
+    while (pos < len && /\s/.test(expr[pos])) pos++;
+  }
+
+  function parseExpr(): Result {
+    const res = parseTerm();
+    if (!res.ok) return res;
+    let val = res.value;
+    while (pos < len) {
+      skipSpace();
+      if (pos >= len) break;
+      const op = expr[pos];
+      if (op !== '+' && op !== '-') break;
+      pos++;
+      const right = parseTerm();
+      if (!right.ok) return right;
+      val = op === '+' ? val + right.value : val - right.value;
+    }
+    return { ok: true, value: val };
+  }
+
+  function parseTerm(): Result {
+    const res = parseFactor();
+    if (!res.ok) return res;
+    let val = res.value;
+    while (pos < len) {
+      skipSpace();
+      if (pos >= len) break;
+      const op = expr[pos];
+      if (op !== '*' && op !== '/') break;
+      pos++;
+      const right = parseFactor();
+      if (!right.ok) return right;
+      if (op === '/' && right.value === 0) return { ok: false, error: 'Division by zero' };
+      val = op === '*' ? val * right.value : Math.trunc(val / right.value);
+    }
+    return { ok: true, value: val };
+  }
+
+  function parseFactor(): Result {
+    skipSpace();
+    if (pos >= len) return { ok: false, error: 'Unexpected end of expression' };
+    if (expr[pos] === '(') {
+      pos++;
+      const res = parseExpr();
+      if (!res.ok) return res;
+      skipSpace();
+      if (pos >= len || expr[pos] !== ')') return { ok: false, error: 'Missing closing parenthesis' };
+      pos++;
+      return res;
+    }
+    if (expr[pos] === '-') {
+      pos++;
+      const res = parseFactor();
+      if (!res.ok) return res;
+      return { ok: true, value: -res.value };
+    }
+    return parseNumber();
+  }
+
+  function parseNumber(): Result {
+    skipSpace();
+    const start = pos;
+    while (pos < len && /\d/.test(expr[pos])) pos++;
+    if (start === pos) return { ok: false, error: `Expected number, got '${expr[pos] || 'EOF'}'` };
+    return { ok: true, value: parseInt(expr.slice(start, pos), 10) };
+  }
+
+  skipSpace();
+  const res = parseExpr();
+  if (!res.ok) return res;
+  skipSpace();
+  if (pos < len) return { ok: false, error: `Unexpected character: '${expr[pos]}'` };
+  return res;
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it } from 'vitest';
+import { evaluate } from './impl';
+
+describe('evaluate', () => {
+  it('should return correct value for simple addition when operands are valid', () => {
+    const result = evaluate('2 + 3');
+    expect(result).toEqual({ ok: true, value: 5 });
+  });
+
+  it('should respect operator precedence when mixing multiplication and addition', () => {
+    const result = evaluate('2 + 3 * 4');
+    expect(result).toEqual({ ok: true, value: 14 });
+  });
+
+  it('should evaluate left-to-right for operators of equal precedence', () => {
+    const result = evaluate('10 - 3 - 2');
+    expect(result).toEqual({ ok: true, value: 5 });
+  });
+
+  it('should evaluate division left-to-right when chained', () => {
+    const result = evaluate('8 / 2 / 2');
+    expect(result).toEqual({ ok: true, value: 2 });
+  });
+
+  it('should handle parentheses correctly when grouping expressions', () => {
+    const result = evaluate('(2 + 3) * 4');
+    expect(result).toEqual({ ok: true, value: 20 });
+  });
+
+  it('should handle nested parentheses correctly', () => {
+    const result = evaluate('((2 + 3) * 4) / 2');
+    expect(result).toEqual({ ok: true, value: 10 });
+  });
+
+  it('should ignore arbitrary whitespace around tokens', () => {
+    const result = evaluate('  2   +   3  ');
+    expect(result).toEqual({ ok: true, value: 5 });
+  });
+
+  it('should return error for division by zero', () => {
+    const result = evaluate('10 / 0');
+    expect(result).toEqual({ ok: false, error: 'Division by zero' });
+  });
+
+  it('should return error for missing closing parenthesis', () => {
+    const result = evaluate('(2 + 3');
+    expect(result.ok).toBe(false);
+    expect(result.ok === false ? result.error : '').toContain('parenthesis');
+  });
+
+  it('should return error for unexpected character', () => {
+    const result = evaluate('2 + 3 * a');
+    expect(result.ok).toBe(false);
+    expect(result.ok === false ? result.error : '').toContain('Unexpected');
+  });
+
+  it('should return error for missing operand after operator', () => {
+    const result = evaluate('2 +');
+    expect(result.ok).toBe(false);
+  });
+
+  it('should handle unary minus correctly', () => {
+    const result = evaluate('-5 + 3');
+    expect(result).toEqual({ ok: true, value: -2 });
+  });
+});

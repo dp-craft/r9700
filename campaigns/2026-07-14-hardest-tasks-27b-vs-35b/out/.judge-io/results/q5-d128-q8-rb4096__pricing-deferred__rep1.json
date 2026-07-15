@@ -1,0 +1,1 @@
+{"design":4,"clarity":3,"robustness":4,"notes":"Cache correctly shares in-flight work and drops failures, but folding pending and settled states into one map behind a `\"promise\" in entry` guard is less readable than separating them."}

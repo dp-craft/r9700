@@ -1,0 +1,75 @@
+// FILE: impl.ts
+export function createAsyncMemo<K, V>(
+  fn: (key: K) => Promise<V>
+): (key: K) => Promise<V> {
+  const cache = new Map<K, Promise<V>>();
+  const memoized = (key: K): Promise<V> => {
+    const existing = cache.get(key);
+    if (existing !== undefined) return existing;
+    const p = fn(key).then(
+      (value: V): Promise<V> => {
+        cache.set(key, Promise.resolve(value));
+        return value;
+      },
+      (): void => { cache.delete(key); }
+    );
+    cache.set(key, p);
+    return p;
+  };
+  return memoized;
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it, vi } from 'vitest';
+import { createAsyncMemo } from './impl';
+
+describe('createAsyncMemo', () => {
+  it('should dedup concurrent calls when fn is invoked simultaneously', async (): Promise<void> => {
+    const fn = vi.fn(async (): Promise<string> => {
+      await new Promise((resolve: () => void): void => setTimeout(resolve, 10));
+      return 'resolved';
+    });
+    const memoized = createAsyncMemo(fn);
+    const p1 = memoized('key');
+    const p2 = memoized('key');
+    const p3 = memoized('key');
+    await Promise.all([p1, p2, p3]);
+    expect(fn).toHaveBeenCalledTimes(1);
+    expect(p1).toBe(p2);
+    expect(p1).toBe(p3);
+    await expect(p1).resolves.toBe('resolved');
+  });
+
+  it('should retry fn after a rejection when called again', async (): Promise<void> => {
+    let callCount = 0;
+    const fn = vi.fn(async (): Promise<string> => {
+      callCount += 1;
+      if (callCount === 1) throw new Error('fail');
+      return 'retry-ok';
+    });
+    const memoized = createAsyncMemo(fn);
+    await expect(memoized('k')).rejects.toThrow('fail');
+    await expect(memoized('k')).resolves.toBe('retry-ok');
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+
+  it('should cache-hit-after-success when fn resolves', async (): Promise<void> => {
+    const fn = vi.fn(async (): Promise<number> => 42);
+    const memoized = createAsyncMemo(fn);
+    const r1 = await memoized('x');
+    const r2 = await memoized('x');
+    expect(r1).toBe(42);
+    expect(r2).toBe(42);
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it('should isolate caches when keys differ', async (): Promise<void> => {
+    const fn = vi.fn(async (k: string): Promise<string> => k.toUpperCase());
+    const memoized = createAsyncMemo(fn);
+    const a = await memoized('a');
+    const b = await memoized('b');
+    expect(a).toBe('A');
+    expect(b).toBe('B');
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+});

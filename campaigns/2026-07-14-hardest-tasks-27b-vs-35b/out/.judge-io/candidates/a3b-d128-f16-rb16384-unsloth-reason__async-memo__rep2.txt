@@ -1,0 +1,69 @@
+// FILE: impl.ts
+export function createAsyncMemo<K extends string | number, V>(fn: (key: K) => Promise<V>): (key: K) => Promise<V> {
+  const pending = new Map<K, Promise<V>>();
+  const resolvedCache = new Map<K, V>();
+
+  return async (key: K): Promise<V> => {
+    const cachedValue = resolvedCache.get(key);
+    if (cachedValue !== undefined) return cachedValue;
+
+    const runningPromise = pending.get(key);
+    if (runningPromise !== undefined) return runningPromise;
+
+    const task = fn(key).then(
+      (_value: V): V => {
+        resolvedCache.set(key, _value);
+        pending.delete(key);
+        return _value;
+      },
+      (_err: unknown): never => {
+        pending.delete(key);
+        throw _err;
+      }
+    );
+
+    pending.set(key, task);
+    return task;
+  };
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it, vi } from 'vi';
+
+import { createAsyncMemo } from './impl';
+
+describe('createAsyncMemo', () => {
+  it('should return cached value when computation resolves successfully and is called again', async (): Promise<void> => {
+    const compute = vi.fn().mockResolvedValue('persisted');
+    const memoized = createAsyncMemo(compute);
+
+    await memoized('alpha');
+    await memoized('beta');
+
+    expect(compute).toHaveBeenCalledTimes(1);
+
+  it('should execute function once when concurrent requests occur for same key', async (): Promise<void> => {
+    const compute = vi.fn().mockImplementation((): Promise<string> => new Promise<string>((resolve): void => { setTimeout(() => resolve('shared'), 50); }));
+     });');
+
+    expect(compute).toHaveBeenCalledTimes(1);
+    const result1 = await firstRun;
+    const result2 = await secondRun;
+
+    expect(result1).toBe('shared');
+    expect(secondResult).toBe('shared');
+  });
+
+  it('should not cache failures and allow retry on next call when initial operation failed', async (): Promise<void> => {
+    const resolvePromise: void> => setTimeout(() => resolve('shared'), 50);));
+    
+     ();
+
+
+  it('should reject if function originally rejects') => Promise.resolve(14.
+    const compute = vi.fn().mockImplementation((async (_id): Promise<string> => {
+      if (compute.mock.calls.length <= 1) throw new Error('transient fault');
+      return 'recovered';
+    }): Promise<void>);
+    
+     ); // Ensure format matches. I'll fix the test code structure carefully.

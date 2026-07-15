@@ -1,0 +1,149 @@
+// FILE: impl.ts
+export function createAsyncMemo<K, V>(fn: (key: K) => Promise<V>): (key: K) => Promise<V> {
+  const cache = new Map<K, Promise<V>>();
+  return (key: K): Promise<V> => {
+    const existing = cache.get(key);
+    if (existing !== undefined) {
+      return existing;
+    }
+    const p = fn(key).then(
+      (value: V): V => value,
+      (error: unknown): never => {
+        cache.delete(key);
+        throw error;
+      }
+    );
+    cache.set(key, p);
+    return p;
+  };
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it, vi } from 'vitest';
+
+import { createAsyncMemo } from './impl';
+
+describe('createAsyncMemo', () => {
+  describe('concurrent dedup', () => {
+    it('should call fn only once when multiple callers request the same key concurrently', async () => {
+      let callCount = 0;
+      const fn = vi.fn(async (_key: string): Promise<string> => {
+        callCount++;
+        await new Promise(resolve => setTimeout(resolve, 10));
+        return 'result';
+      });
+
+      const memoized = createAsyncMemo(fn);
+
+      const [a, b, c] = await Promise.all([
+        memoized('key-1'),
+        memoized('key-1'),
+        memoized('key-1'),
+      ]);
+
+      expect(callCount).toBe(1);
+      expect(fn).toHaveBeenCalledTimes(1);
+      expect(a).toBe('result');
+      expect(b).toBe('result');
+      expect(c).toBe('result');
+    });
+
+    it('should call fn once per distinct key even when all arrive concurrently', async () => {
+      const fn = vi.fn(async (key: string): Promise<string> => {
+        await new Promise(resolve => setTimeout(resolve, 10));
+        return key;
+      });
+
+      const memoized = createAsyncMemo(fn);
+
+      const results = await Promise.all([
+        memoized('a'),
+        memoized('b'),
+        memoized('a'),
+        memoized('b'),
+      ]);
+
+      expect(fn).toHaveBeenCalledTimes(2);
+      expect(results).toEqual(['a', 'b', 'a', 'b']);
+    });
+  });
+
+  describe('retry-after-rejection', () => {
+    it('should not cache a rejected promise and retry fn on the next call', async () => {
+      let callCount = 0;
+      const fn = vi.fn(async (_key: string): Promise<string> => {
+        callCount++;
+        throw new Error('transient failure');
+      });
+
+      const memoized = createAsyncMemo(fn);
+
+      await expect(memoized('key-1')).rejects.toThrow('transient failure');
+      await expect(memoized('key-1')).rejects.toThrow('transient failure');
+      await expect(memoized('key-1')).rejects.toThrow('transient failure');
+
+      expect(callCount).toBe(3);
+      expect(fn).toHaveBeenCalledTimes(3);
+    });
+
+    it('should allow a later success after a prior rejection', async () => {
+      let callCount = 0;
+      const fn = vi.fn(async (_key: string): Promise<string> => {
+        callCount++;
+        if (callCount === 1) {
+          throw new Error('first fails');
+        }
+        return 'success';
+      });
+
+      const memoized = createAsyncMemo(fn);
+
+      await expect(memoized('key-1')).rejects.toThrow('first fails');
+      const result = await memoized('key-1');
+
+      expect(callCount).toBe(2);
+      expect(result).toBe('success');
+    });
+  });
+
+  describe('cache-hit-after-success', () => {
+    it('should reuse the resolved value without calling fn again', async () => {
+      let callCount = 0;
+      const fn = vi.fn(async (_key: string): Promise<string> => {
+        callCount++;
+        return 'cached-value';
+      });
+
+      const memoized = createAsyncMemo(fn);
+
+      const first = await memoized('key-1');
+      const second = await memoized('key-1');
+      const third = await memoized('key-1');
+
+      expect(callCount).toBe(1);
+      expect(fn).toHaveBeenCalledTimes(1);
+      expect(first).toBe('cached-value');
+      expect(second).toBe('cached-value');
+      expect(third).toBe('cached-value');
+    });
+
+    it('should cache independently per key', async () => {
+      const fn = vi.fn(async (key: string): Promise<string> => {
+        return `value-for-${key}`;
+      });
+
+      const memoized = createAsyncMemo(fn);
+
+      const a1 = await memoized('x');
+      const b1 = await memoized('y');
+      const a2 = await memoized('x');
+      const b2 = await memoized('y');
+
+      expect(fn).toHaveBeenCalledTimes(2);
+      expect(a1).toBe('value-for-x');
+      expect(a2).toBe('value-for-x');
+      expect(b1).toBe('value-for-y');
+      expect(b2).toBe('value-for-y');
+    });
+  });
+});

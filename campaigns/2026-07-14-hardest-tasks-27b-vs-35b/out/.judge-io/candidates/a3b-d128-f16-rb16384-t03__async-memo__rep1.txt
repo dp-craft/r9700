@@ -1,0 +1,65 @@
+// FILE: impl.ts
+export function createAsyncMemo<K, V>(fn: (key: K) => Promise<V>): (key: K) => Promise<V> {
+  const cache = new Map<K, Promise<V>>();
+  return (key: K): Promise<V> => {
+    if (cache.has(key)) return cache.get(key);
+    const p = fn(key).then(
+      (val: V): V => val,
+      (err: unknown): never => {
+        cache.delete(key);
+        throw err;
+      }
+    );
+    cache.set(key, p);
+    return p;
+  };
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it, vi } from 'vitest';
+import { createAsyncMemo } from './impl';
+
+describe('createAsyncMemo', () => {
+  it('should dedup concurrent calls when same key is requested', async (): Promise<void> => {
+    let callCount = 0;
+    const fn = vi.fn(async (key: string): Promise<string> => {
+      callCount += 1;
+      await new Promise<void>((resolve) => setTimeout(resolve, 10));
+      return `${key}-result`;
+    });
+    const memo = createAsyncMemo(fn);
+    const p1 = memo('a');
+    const p2 = memo('a');
+    const results = await Promise.all([p1, p2]);
+    expect(results).toEqual(['a-result', 'a-result']);
+    expect(callCount).toBe(1);
+  });
+
+  it('should retry fn when previous computation rejects', async (): Promise<void> => {
+    let callCount = 0;
+    const fn = vi.fn(async (key: string): Promise<string> => {
+      callCount += 1;
+      if (callCount === 1) throw new Error('fail');
+      return `${key}-ok`;
+    });
+    const memo = createAsyncMemo(fn);
+    await expect(memo('b')).rejects.toThrow('fail');
+    const result = await memo('b');
+    expect(result).toBe('b-ok');
+    expect(callCount).toBe(2);
+  });
+
+  it('should cache success and reuse value without calling fn again', async (): Promise<void> => {
+    let callCount = 0;
+    const fn = vi.fn(async (key: string): Promise<string> => {
+      callCount += 1;
+      return `${key}-cached`;
+    });
+    const memo = createAsyncMemo(fn);
+    const r1 = await memo('c');
+    const r2 = await memo('c');
+    expect(r1).toBe('c-cached');
+    expect(r2).toBe('c-cached');
+    expect(callCount).toBe(1);
+  });
+});

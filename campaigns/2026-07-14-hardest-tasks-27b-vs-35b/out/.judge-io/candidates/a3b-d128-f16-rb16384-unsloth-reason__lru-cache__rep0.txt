@@ -1,0 +1,215 @@
+// FILE: impl.ts
+import type { Clock } from '../../lib/clock';
+
+export interface LruCache<K, V> {
+  get(key: K): V | undefined;
+  set(key: K, value: V): void;
+  has(key: K): boolean;
+  readonly size: number;
+}
+
+type CacheEntry<V> = {
+  readonly createdAt: number;
+  lastAccessedAt: number;
+  value: V;
+};
+
+const isExpired = (createdAt: number, ttlMs: number, now: number): boolean =>
+  now >= createdAt + ttlMs;
+
+const findLeastRecentKey = <K extends string | number | symbol, V>(map: Map<K, CacheEntry<V>>): K | undefined => {
+  let minKey: K | undefined;
+  let minTs: number = Infinity;
+  for (const [key, entry] of map.entries()) {
+    if (entry.lastAccessedAt < minTs) {
+      minTs = entry.lastAccessedAt;
+      minKey = key;
+    }
+  }
+  return minKey;
+};
+
+export function createLruCache<K, V>(capacity: number, ttlMs: number, clock: Clock): LruCache<K, V> {
+  const store = new Map<K, CacheEntry<V>>();
+
+  const countLive = (): number => {
+    let total = 0;
+    for (const entry of store.values()) {
+      if (!isExpired(entry.createdAt, ttlMs, clock.now())) total++;
+    }
+    return total;
+  };
+
+  const evictOne = (): void => {
+    const key = findLeastRecentKey(store);
+    if (key !== undefined) store.delete(key);
+  };
+
+  const cleanupExpired = (): void => {
+    for (const key of [...store.keys()]) {
+      const entry = store.get(key);
+      if (entry !== undefined && isExpired(entry.createdAt, ttlMs, clock.now())) {
+        store.delete(key);
+      }
+    }
+  };
+
+  return {
+    get: (key: K): V | undefined => {
+      cleanupExpired();
+      const entry = store.get(key);
+      if (entry === undefined) return undefined;
+      store.set(key, { ...entry, lastAccessedAt: clock.now() });
+      return entry.value;
+    },
+
+    set: (key: K, value: V): void => {
+      const now = clock.now();
+      const existing = store.get(key);
+      store.set(key, {
+        createdAt: existing?.createdAt ?? now,
+        lastAccessedAt: now,
+        value
+      });
+
+      while (countLive() > capacity) evictOne();
+    },
+
+    has: (key: K): boolean => {
+      const entry = store.get(key);
+      if (entry === undefined) return false;
+      return !isExpired(entry.createdAt, ttlMs, clock.now());
+    },
+
+    get size(): number {
+      cleanupExpired();
+      return store.size;
+    }
+  };
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it } from 'vitest';
+
+import type { Clock } from '../../lib/clock';
+
+import { createLruCache, type LruCache } from './impl';
+
+const makeFakeClock = (initial: number): Clock & { advanceBy(ms: number): void; to(time: number): void } => {
+  let tick = initial;
+  return {
+    get now() { return tick; },
+    advanceBy(ms) { tick += ms; },
+    to(time) { tick = time; }
+  };
+};
+
+describe('createLruCache', () => {
+  describe('expiry & ttl enforcement', () => {
+    it('should return undefined when access occurs after TTL threshold', () => {
+      const clock = makeFakeClock(0);
+      const cache: LruCache<string, string> = createLruCache(10, 100, clock);
+
+      cache.set('key', 'value');
+      expect(cache.get('key')).toBe('value');
+
+      clock.advanceBy(50);
+      expect(cache.get('key')).toBe('value');
+
+      clock.advanceBy(60);
+      expect(cache.get('key')).toBe(undefined);
+    });
+
+    it('should return false for has when entry is expired', () => {
+      const clock = makeFakeClock(0);
+      const cache: LruCache<string, string> = createLruCache(5, 50, clock);
+
+      cache.set('k', 'v');
+      expect(cache.has('k')).toBe(true);
+
+      clock.to(50);
+      expect(cache.has('k')).toBe(false);
+    });
+  });
+
+  describe('eviction order & capacity edge', () => {
+    it('should evict the least-recently-used entry when inserting exceeds capacity', () => {
+      const clock = makeFakeClock(0);
+      const cache: LruCache<string, string> = createLruCache(2, 10_000, clock);
+
+      cache.set('a', 'val-a');
+      cache.set('b', 'val-b');
+
+      // Refresh recency for 'a' so 'b' becomes the LRU victim
+      clock.advanceBy(10);
+      cache.get('a');
+
+      clock.advanceBy(5);
+      cache.set('c', 'val-c');
+
+      expect(cache.has('b')).toBe(false);
+      expect(cache.get('a')).toBe('val-a');
+      expect(cache.get('c')).toBe('val-c');
+    });
+
+    it('should maintain size exactly at capacity after insertion triggers eviction', () => {
+      const clock = makeFakeClock(0);
+      const cache: LruCache<number, number> = createLruCache(3, 10_000, clock);
+
+      for (const i of [1, 2, 3]) {
+        cache.set(i, i);
+      }
+      expect(cache.size).toBe(3);
+
+      cache.set(4, 4);
+      expect(cache.size).toBe(3);
+    });
+
+    it('should refresh recency to delay eviction when a recently inserted key is accessed', () => {
+      const clock = makeFakeClock(0);
+      const cache: LruCache<string, string> = createLruCache(2, 10_000, clock);
+
+      cache.set('first', '1');
+      clock.advanceBy(5);
+      cache.set('second', '2'); // second is now newest in timestamp terms for recency
+
+      // Access first to push it ahead of second in recency order
+      clock.advanceBy(20);
+      cache.get('first');
+
+      // Force eviction by adding one more
+      clock.to(100);
+      cache.set('third', '3');
+
+      expect(cache.has('second')).toBe(false);
+      expect(cache.has('first')).toBe(true);
+    });
+  });
+
+  describe('size calculation & recycling', () => {
+    it('should exclude expired entries from size immediately after cleanup triggers read', () => {
+      const clock = makeFakeClock(0);
+      const cache: LruCache<string, string> = createLruCache(5, 20, clock);
+
+      cache.set('expire-me', 'gone');
+      clock.to(30); // expired
+
+      expect(cache.size).toBe(0);
+    });
+
+    it('should preserve original TTL when overwriting an existing key via set', () => {
+      const clock = makeFakeClock(200);
+      const cache: LruCache<string, string> = createLruCache(10, 100, clock);
+
+      cache.set('key', 'v1');
+      // Inserted at 200, expires >= 300
+
+      clock.advanceBy(50);
+      cache.set('key', 'v2'); // TTL should still be based on createdAt (200)
+      expect(cache.has('key')).toBe(true);
+
+      clock.to(300);
+      expect(cache.has('key')).toBe(false);
+    });
+  });
+});

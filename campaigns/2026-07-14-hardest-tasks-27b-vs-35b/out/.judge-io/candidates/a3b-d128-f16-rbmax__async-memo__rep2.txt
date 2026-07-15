@@ -1,0 +1,59 @@
+// FILE: impl.ts
+export function createAsyncMemo<K, V>(fn: (key: K) => Promise<V>): (key: K) => Promise<V> {
+  const cache = new Map<K, V>();
+  const inFlight = new Map<K, Promise<V>>();
+  return (key: K): Promise<V> => {
+    const cached = cache.get(key);
+    if (cached !== undefined) return Promise.resolve(cached);
+    const flight = inFlight.get(key);
+    if (flight !== undefined) return flight;
+    const p = fn(key);
+    inFlight.set(key, p);
+    void p.then(
+      (val: V) => { cache.set(key, val); inFlight.delete(key); },
+      () => { inFlight.delete(key); }
+    );
+    return p;
+  };
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it, vi } from 'vitest';
+import { createAsyncMemo } from './impl';
+
+describe('createAsyncMemo', () => {
+  describe('concurrent dedup', () => {
+    it('should run fn once when multiple callers request the same key', async (): Promise<void> => {
+      const fn = vi.fn().mockImplementation(async (k: string): Promise<string> => k);
+      const memo = createAsyncMemo(fn);
+      const [a, b] = await Promise.all([memo('x'), memo('x')]);
+      expect(a).toBe('x');
+      expect(b).toBe('x');
+      expect(fn).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('retry after rejection', () => {
+    it('should not cache failures and retry on next call', async (): Promise<void> => {
+      const fn = vi.fn().mockRejectedValueOnce(new Error('fail'));
+      fn.mockResolvedValueOnce('ok');
+      const memo = createAsyncMemo(fn);
+      await expect(memo('k')).rejects.toThrow('fail');
+      const val = await memo('k');
+      expect(val).toBe('ok');
+      expect(fn).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('cache hit after success', () => {
+    it('should reuse the resolved value without calling fn again', async (): Promise<void> => {
+      const fn = vi.fn().mockResolvedValue('cached');
+      const memo = createAsyncMemo(fn);
+      const first = await memo('k');
+      const second = await memo('k');
+      expect(first).toBe('cached');
+      expect(second).toBe('cached');
+      expect(fn).toHaveBeenCalledTimes(1);
+    });
+  });
+});
