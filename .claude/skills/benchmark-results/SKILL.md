@@ -129,6 +129,41 @@ unexplained ones stay listed as OPEN.>
 <CLAIMED numbers with sources — separate from MEASURED rows.>
 ```
 
+## Charts — generate them, then EMBED them (don't just link)
+A campaign that produces charts but never shows them is a half-written report. **Never hand-draw an
+SVG or hand-write an appendix** — the tools own that (iron rule #6).
+
+1. **Generate** (quality campaigns): `campaigns/2026-07-12-27b-finetune-quality/make_charts.py --dir out
+   --charts charts [--order …] [--calibration …]` → cell-level SVGs + `charts/appendix.md`. Per-task views:
+   the campaign's own `make_charts_detailed.py --dir out --charts charts/detailed` → `charts/detailed/`.
+   Throughput runs: `bench/lib/report.py <run_dir>` → `report.html` instead. Wire the call into the
+   campaign's `run_capture.sh` so charts regenerate with the data — a chart built from a stale
+   `summary*.json` is a correctness bug, not a cosmetic one.
+2. **Embed the decision-grade charts INLINE at the finding they support** — a chart belongs next to the
+   claim it proves, not in a pile at the end. Use a bold caption + the embed + a short interpretive
+   blockquote saying *what to read off it*:
+   ```markdown
+   **Config scorecard — quality · judge · full time · memory**
+
+   ![Config scorecard](charts/scorecard.svg)
+
+   > <what the chart shows, what it does NOT license, provenance tag>
+   ```
+   Paths are **campaign-root-relative** (`charts/x.svg`) — that is what the generated `appendix.md`
+   already assumes. Typical map: scorecard → Summary · memory/power → Health · objective breakdown →
+   the wall/capability finding · quality-vs-time + throughput + latency → the speed finding · judge →
+   Judge verdicts · task heatmap → per-task results.
+3. **Link the rest**, don't dump all of them: name the appendix-only SVGs and point at
+   `charts/appendix.md` + `charts/detailed/appendix.md`. Roughly 10–15 inline is right for a long
+   report; the reference shape is `campaigns/2026-07-14-hardest-tasks-27b-vs-35b/analysis.md`.
+4. **A caption must not out-claim the statistics.** If the doc says the configs are not resolvable
+   (overlapping CIs), every bar-chart caption must say the bar order is **not a ranking** — charts are
+   the easiest place to quietly reintroduce a ranking the data does not support. Same for
+   non-depth-matched reference lines: state the caveat *at the chart*, not only in prose.
+5. **Verify before committing**: every embedded path resolves from the campaign dir, no chart is stale
+   (regenerate and diff — it must reproduce byte-identically), and the appendix-only list matches what
+   is actually not embedded.
+
 After writing: add a `<!-- meta` block (date + one-line takeaway) at the top of the report, then
 run `docs/reindex.py` to regenerate `docs/INDEX.md` (it fails if the meta block is missing). Report
 the path to the user.

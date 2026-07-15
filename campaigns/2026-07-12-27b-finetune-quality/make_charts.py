@@ -352,6 +352,9 @@ def main():
     JUDGE_AXES = ["design", "clarity", "robustness", "correctness", "depth", "polish"]
     def jmean(row):
         return mean([row.get(a) for a in JUDGE_AXES])
+    # the chart title must name THIS campaign's axes — derive them from the data, never hardcode
+    judge_axes_used = [a for a in JUDGE_AXES
+                       if any(isinstance(j.get(a), (int, float)) for j in judg)]
     judge_mean = {}
     for c in configs:
         rows = [j for j in judg if j.get("config") == c]
@@ -375,11 +378,18 @@ def main():
     calib_files = [p.strip() for p in a.calibration.split(",") if p.strip()]
     calib = [r for p in calib_files for r in load_jsonl(p)]
     run_tasks = {t.get("task_id") for t in tss}         # compare bands over the SAME tasks the run scored
-    calib_ref = {}                  # model -> mean score % over the (intersected) calibration tasks
+    # Reference points may carry MULTIPLE reps (rows sharing model+task). Mean per (model, task) FIRST,
+    # then across tasks — otherwise a task with more reference reps silently outweighs the others.
+    # With every reference at n=1 this is identical to a plain row-wise mean.
+    per_mt = {}                     # (model, task) -> [scores across reps]
     for r in calib:
         if run_tasks and r.get("task") not in run_tasks:
             continue
-        calib_ref.setdefault(r.get("model", "?"), []).append(r.get("score"))
+        per_mt.setdefault((r.get("model", "?"), r.get("task")), []).append(r.get("score"))
+    calib_ref = {}                  # model -> [per-task means]
+    for (m, _t), v in per_mt.items():
+        if mean(v) is not None:
+            calib_ref.setdefault(m, []).append(mean(v))
     calib_ref = {k: 100 * (mean(v) or 0) for k, v in calib_ref.items() if mean(v) is not None}
     REF_ORDER = ["haiku", "sonnet", "opus"]
     refs = [(m, calib_ref[m]) for m in REF_ORDER if m in calib_ref]
@@ -416,7 +426,8 @@ def main():
     # 3. judge score
     if any(judge_mean.get(c) is not None for c in configs):
         files["quality_judge.svg"] = hbar(
-            "Open-ended quality (LLM-judge, mean of correctness/depth/clarity)",
+            "Open-ended quality (LLM-judge, mean of "
+            + ("/".join(judge_axes_used) if judge_axes_used else "judge axes") + ")",
             sorted([(c, judge_mean.get(c), S(c)) for c in configs if judge_mean.get(c) is not None],
                    key=lambda r: -(r[1] or 0)), unit="/5", fmt="{:.1f}")
     # 4. token economy
