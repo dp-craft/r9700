@@ -25,11 +25,39 @@ NOTE the grader FIX: this run used single-process vitest + a fail-loud grader + 
 so tests/edge are trustworthy (the previous run's tests/edge=0 was a harness bug). If summary.md's Health
 line flags grade_error/HARNESS rows, runaways, or GTT spill, surface them prominently.
 
+UNCERTAINTY (MANDATORY — this design is UNDERPOWERED; do not present noise as shape): summary.md has an
+"Uncertainty" section with per-cell sd/SE/95% CI, the rep noise, and a PAIRED-by-task t-test vs Q4_K_M.
+Facts you MUST honour: every 95% CI overlaps; NO paired quant Δ is significant (Q4_K_XL -10.9 t=-2.38,
+Q5_K_M -2.5 t=-0.62, Q6_K +3.7 t=+1.16, 35B-A3B -7.4 t=-3.11, all |t|<3.182); mean within-(cell,task) rep
+sd is 9.6 pts; the design resolves only >~10 pts (Δ=10 needs ~8 tasks, Δ=5 ~31 tasks — we have 4).
+Therefore: (1) do NOT rank the quants or call any cell "best"/"worst" — the ordering 78/67/76/82 is NOT
+resolvable; (2) state (a) as a BOUNDED NULL RESULT: "no detectable precision effect; any effect is smaller
+than our ~10-pt resolution", and note the non-monotonic shape is exactly what noise looks like (it does not
+prove precision is useless, it fails to detect an effect); (3) 35B-A3B -7.4 (t=-3.11, p~0.053, negative on
+all 4 tasks) is the ONLY near-significant signal — report it as "suggestive, not significant"; (4) quote
+every Δ with its verdict; (5) name underpowering as the top limitation and recommend MORE TASKS (~8+), not
+more reps (task-to-task variance dominates).
+
+TIER + REFERENCE COMPARABILITY (MANDATORY — a previous draft got this wrong): TIER is a DIFFICULTY CLASS =
+the weakest REFERENCE tier that yields a strictly-clean hard_pass. It is NOT a score band — a task can be
+tier opus while everyone scores 60-90% on partial credit. EXPLAIN this where the ladder is discussed.
+Use the MEASURED evidence printed in each per-task header, not the label. Specifically: async-memo's "opus"
+label is CORRECT (opus 100% is the only hard-pass; haiku 91%/sonnet 87% do NOT hard-pass) — do NOT claim it
+should be re-labelled just because haiku's SCORE is high; that conflates score with hard-pass. But lru-cache's
+"sonnet" label IS contradicted by data (sonnet scores 95% yet does NOT hard-pass; nobody does) — report it as
+a ceiling task and flag the label for correction. ALSO: the references are NOT depth-matched — one-shot on a
+~550-620 token prompt vs the local cells' ~132.9k tokens (~213x deeper), and n=1 vs local n=3 (a single
+reference carries ~+/-19 pts at the measured rep noise). So (c)/(d): do NOT state "best local 82 vs haiku 83
+(delta -1)" as a like-for-like capability gap or say the 27B is "tied with haiku". The defensible reading is
+"indistinguishable from haiku within noise, while carrying 213x more context" — which if anything favours the
+27B. The binary->fractional re-grade correction itself REMAINS VALID and important (the old ladder's
+"27B beats sonnet" reading is still dead); only its precision was overstated.
+
 PER-REP DETAIL (MANDATORY — the user wants to see all reps, not just means): summary.md ends with a
 "Per-rep detail" section — one table per hardest task listing EVERY local rep (rep 0/1/2, full objective
 vector), a mean row, and the haiku/sonnet/opus one-shot references in the same columns. INLINE these
 per-task tables VERBATIM in analysis.md under a "Per-rep results (all 3 reps + reference ladder)" section —
-do NOT collapse them to means. Call out rep-to-rep spread where reps disagree, and note any 
+do NOT collapse them to means. Call out rep-to-rep spread where reps disagree, and note any `— (no calib)`
 reference gaps (e.g. opus on lru-cache/rate-limiter, README add-on D).
 
 JUDGE DETAIL: appendix.md ends with the full blind-judge verdict table + "Judge mean by task". Add a
