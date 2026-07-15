@@ -1,0 +1,32 @@
+// FILE: impl.ts
+export function createAsyncMemo<K, V>(fn: (key: K) => Promise<V>): (key: K) => Promise<V> {
+  const cache = new Map<K, Promise<V>>();
+  return (key: K): Promise<V> => {
+    const existing = cache.get(key);
+    if (existing !== undefined) {
+      return existing;
+    }
+    const pending = fn(key);
+    cache.set(key, pending);
+    void pending.catch((): void => {
+      cache.delete(key);
+    });
+    return pending;
+  };
+}
+// FILE: impl.test.ts
+import { describe, it, expect } from "vitest";
+import { createAsyncMemo } from "./impl";
+
+describe("createAsyncMemo", () => {
+  it("should reuse the value when the key resolved before", async () => {
+    let calls = 0;
+    const memo = createAsyncMemo<string, number>(async () => {
+      calls += 1;
+      return 5;
+    });
+    await memo("a");
+    await memo("a");
+    expect(calls).toBe(1);
+  });
+});

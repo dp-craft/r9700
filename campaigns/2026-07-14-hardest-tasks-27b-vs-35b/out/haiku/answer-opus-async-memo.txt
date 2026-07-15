@@ -1,0 +1,107 @@
+// FILE: impl.ts
+/**
+ * Async memoizer with in-flight dedup that does NOT cache rejections.
+ *
+ * - Dedup: concurrent callers for a key share the one stored in-flight promise,
+ *   so `fn` runs exactly once while the computation is pending.
+ * - Don't cache failures: when the stored promise rejects, its entry is removed
+ *   (guarded so a later retry's promise is never clobbered), so a subsequent
+ *   call re-invokes `fn`.
+ * - Cache successes: a resolved promise stays in the map and is reused.
+ *
+ * Ordering note: the cleanup handler is registered on `pending` before the
+ * caller receives it, so the delete runs before any caller-driven retry.
+ */
+export function createAsyncMemo<K, V>(
+  fn: (key: K) => Promise<V>,
+): (key: K) => Promise<V> {
+  const cache = new Map<K, Promise<V>>();
+  return (key: K): Promise<V> => {
+    const existing = cache.get(key);
+    if (existing !== undefined) {
+      return existing;
+    }
+    const pending = fn(key);
+    cache.set(key, pending);
+    void pending.catch((): void => {
+      if (cache.get(key) === pending) {
+        cache.delete(key);
+      }
+    });
+    return pending;
+  };
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it } from "vitest";
+
+import { createAsyncMemo } from "./impl";
+
+interface Deferred<T> {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+}
+
+function defer<T>(): Deferred<T> {
+  let resolve: (value: T) => void = (): void => {};
+  const promise = new Promise<T>((res): void => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}
+
+describe("createAsyncMemo", () => {
+  it("should run fn once when concurrent calls share a key", async (): Promise<void> => {
+    const d = defer<string>();
+    let calls = 0;
+    const fn = (key: string): Promise<string> => {
+      calls += 1;
+      return d.promise.then((v): string => `${v}:${key}`);
+    };
+    const memo = createAsyncMemo(fn);
+    const p1 = memo("k");
+    const p2 = memo("k");
+    d.resolve("done");
+    expect(await p1).toBe("done:k");
+    expect(await p2).toBe("done:k");
+    expect(calls).toBe(1);
+  });
+
+  it("should retry fn when the previous computation rejected", async (): Promise<void> => {
+    let calls = 0;
+    const fn = (key: string): Promise<string> => {
+      calls += 1;
+      return calls === 1
+        ? Promise.reject(new Error("boom"))
+        : Promise.resolve(`ok:${key}`);
+    };
+    const memo = createAsyncMemo(fn);
+    await expect(memo("k")).rejects.toThrow("boom");
+    await expect(memo("k")).resolves.toBe("ok:k");
+    expect(calls).toBe(2);
+  });
+
+  it("should reuse the cached value when called again after success", async (): Promise<void> => {
+    let calls = 0;
+    const fn = (key: string): Promise<string> => {
+      calls += 1;
+      return Promise.resolve(`ok:${key}`);
+    };
+    const memo = createAsyncMemo(fn);
+    expect(await memo("k")).toBe("ok:k");
+    expect(await memo("k")).toBe("ok:k");
+    expect(calls).toBe(1);
+  });
+
+  it("should compute independently when keys differ", async (): Promise<void> => {
+    let calls = 0;
+    const fn = (key: string): Promise<string> => {
+      calls += 1;
+      return Promise.resolve(`ok:${key}`);
+    };
+    const memo = createAsyncMemo(fn);
+    expect(await memo("a")).toBe("ok:a");
+    expect(await memo("b")).toBe("ok:b");
+    expect(calls).toBe(2);
+  });
+});

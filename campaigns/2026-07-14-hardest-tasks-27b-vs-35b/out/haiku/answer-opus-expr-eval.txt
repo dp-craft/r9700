@@ -1,0 +1,216 @@
+// FILE: impl.ts
+export type Result =
+  | { readonly ok: true; readonly value: number }
+  | { readonly ok: false; readonly error: string };
+
+type Token =
+  | { readonly kind: "num"; readonly value: number }
+  | { readonly kind: "op"; readonly value: string }
+  | { readonly kind: "lparen" }
+  | { readonly kind: "rparen" };
+
+/** Internal-only signal; caught in `evaluate`, never escapes to the caller. */
+class ParseError extends Error {}
+
+function isDigit(c: string): boolean {
+  return c >= "0" && c <= "9";
+}
+
+function isSpace(c: string): boolean {
+  return c === " " || c === "\t" || c === "\n" || c === "\r";
+}
+
+function readNumber(expr: string, start: number): readonly [Token, number] {
+  let i = start;
+  while (i < expr.length) {
+    const c = expr[i];
+    if (c === undefined || !isDigit(c)) break;
+    i += 1;
+  }
+  return [{ kind: "num", value: Number(expr.slice(start, i)) }, i];
+}
+
+function readSymbol(c: string): Token {
+  if (c === "(") return { kind: "lparen" };
+  if (c === ")") return { kind: "rparen" };
+  if (c === "+" || c === "-" || c === "*" || c === "/") return { kind: "op", value: c };
+  throw new ParseError(`unexpected character: ${c}`);
+}
+
+function tokenize(expr: string): readonly Token[] {
+  const tokens: Token[] = [];
+  let i = 0;
+  while (i < expr.length) {
+    const c = expr[i];
+    if (c === undefined) break;
+    if (isSpace(c)) {
+      i += 1;
+    } else if (isDigit(c)) {
+      const [tok, next] = readNumber(expr, i);
+      tokens.push(tok);
+      i = next;
+    } else {
+      tokens.push(readSymbol(c));
+      i += 1;
+    }
+  }
+  return tokens;
+}
+
+class Parser {
+  private pos = 0;
+
+  constructor(private readonly tokens: readonly Token[]) {}
+
+  private peek(): Token | undefined {
+    return this.tokens[this.pos];
+  }
+
+  private take(): Token | undefined {
+    const t = this.tokens[this.pos];
+    this.pos += 1;
+    return t;
+  }
+
+  parse(): number {
+    const value = this.expr();
+    if (this.pos !== this.tokens.length) throw new ParseError("unexpected trailing input");
+    return value;
+  }
+
+  private isOp(t: Token | undefined, a: string, b: string): t is Token {
+    return t !== undefined && t.kind === "op" && (t.value === a || t.value === b);
+  }
+
+  private expr(): number {
+    let value = this.term();
+    let t = this.peek();
+    while (this.isOp(t, "+", "-") && t.kind === "op") {
+      this.pos += 1;
+      const rhs = this.term();
+      value = t.value === "+" ? value + rhs : value - rhs;
+      t = this.peek();
+    }
+    return value;
+  }
+
+  private term(): number {
+    let value = this.factor();
+    let t = this.peek();
+    while (this.isOp(t, "*", "/") && t.kind === "op") {
+      this.pos += 1;
+      value = this.apply(t.value, value, this.factor());
+      t = this.peek();
+    }
+    return value;
+  }
+
+  private apply(op: string, a: number, b: number): number {
+    if (op === "*") return a * b;
+    if (b === 0) throw new ParseError("division by zero");
+    return Math.trunc(a / b);
+  }
+
+  private factor(): number {
+    const t = this.take();
+    if (t === undefined) throw new ParseError("missing operand");
+    if (t.kind === "num") return t.value;
+    if (t.kind === "op" && t.value === "-") return -this.factor();
+    if (t.kind === "op" && t.value === "+") return this.factor();
+    if (t.kind === "lparen") return this.parenExpr();
+    throw new ParseError("missing operand");
+  }
+
+  private parenExpr(): number {
+    const value = this.expr();
+    const close = this.take();
+    if (close === undefined || close.kind !== "rparen") {
+      throw new ParseError("unbalanced parentheses");
+    }
+    return value;
+  }
+}
+
+export function evaluate(expr: string): Result {
+  try {
+    const value = new Parser(tokenize(expr)).parse();
+    return { ok: true, value };
+  } catch (err) {
+    if (err instanceof ParseError) return { ok: false, error: err.message };
+    return { ok: false, error: "invalid expression" };
+  }
+}
+
+// FILE: impl.test.ts
+import { describe, it, expect } from "vitest";
+import { evaluate, type Result } from "./impl";
+
+function value(expr: string): number {
+  const r: Result = evaluate(expr);
+  if (r.ok === false) throw new Error(`unexpected error: ${r.error}`);
+  return r.value;
+}
+
+function error(expr: string): string {
+  const r: Result = evaluate(expr);
+  if (r.ok === true) throw new Error(`expected an error, got ${r.value}`);
+  return r.error;
+}
+
+describe("evaluate", () => {
+  it("should evaluate a single number when given one operand", () => {
+    expect(value("42")).toBe(42);
+  });
+
+  it("should ignore whitespace when tokens are surrounded by spaces", () => {
+    expect(value("  1 +\t2 \n")).toBe(3);
+  });
+
+  it("should bind multiplication tighter than addition when precedence applies", () => {
+    expect(value("2 + 3 * 4")).toBe(14);
+  });
+
+  it("should bind division tighter than subtraction when precedence applies", () => {
+    expect(value("20 - 8 / 4")).toBe(18);
+  });
+
+  it("should subtract left-to-right when operators are left-associative", () => {
+    expect(value("10 - 3 - 2")).toBe(5);
+  });
+
+  it("should divide left-to-right when operators are left-associative", () => {
+    expect(value("8 / 2 / 2")).toBe(2);
+  });
+
+  it("should override precedence when parentheses group a sub-expression", () => {
+    expect(value("(2 + 3) * 4")).toBe(20);
+  });
+
+  it("should evaluate nested parentheses when they are balanced", () => {
+    expect(value("2 * (3 + (4 - 1))")).toBe(12);
+  });
+
+  it("should negate the operand when a leading minus is applied", () => {
+    expect(value("-5 + 3")).toBe(-2);
+  });
+
+  it("should return an error when dividing by zero", () => {
+    expect(error("1 / 0")).toMatch(/division by zero/);
+  });
+
+  it("should return an error when parentheses are unbalanced", () => {
+    expect(error("(1 + 2")).toMatch(/unbalanced/);
+  });
+
+  it("should return an error when an operand is missing", () => {
+    expect(error("1 +")).toMatch(/missing operand/);
+  });
+
+  it("should return an error when an unexpected character appears", () => {
+    expect(error("1 & 2")).toMatch(/unexpected character/);
+  });
+
+  it("should return an error when the input is empty", () => {
+    expect(error("   ")).toMatch(/missing operand/);
+  });
+});

@@ -92,6 +92,21 @@ them wastes tokens and tells you nothing. Structure/results live in the files ab
    Legit hand-written exception (must be stated): a **quality** campaign's driver, because
    `gen_campaign.py` only emits *throughput* probes — reuse `capture.py`+`graders/` (finetune-quality
    pattern), don't reinvent them.
+7. **VRAM: measure, never calculate.** A reported VRAM/GTT *usage* number comes from an actual
+   sample (`bench/lib/vram_sampler.py`), tagged `MEASURED`. Never present a calculated estimate as
+   usage. (Calculators — `gguf_kv.py`, `gen_campaign.py vram-ctx` — are pre-flight planning bounds /
+   guards only, never the reported figure.)
+8. **Honor the user's stated values.** When the user fixes a number or parameter, accept and use it.
+   Raise a concern *once* if you have one, then comply — never re-litigate it turn after turn.
+9. **Change only what was approved — minimal scope.** Touch exactly what was agreed, nothing more.
+   Brainstorming is not approval to code: a brainstorm/design turn yields a plan, not edits. Before
+   changing anything not explicitly approved, ask first. Prefer the smallest solution that works.
+10. **Think before implementing.** Before editing, trace the connected code, data flow, downstream
+    consequences, logical gaps, and consistency with existing behavior. Plan, then act.
+11. **Stress-test after implementing.** Follow every non-trivial change with a stress test that
+    exercises it end-to-end; report the outcome honestly (including failures).
+12. **Be interactive.** Surface concerns as they arise, recommend concrete options (best first), and
+    challenge ideas during brainstorming instead of just agreeing.
 
 ## Tools — the deterministic layer (use these, never hand-roll their output)
 

@@ -1,0 +1,44 @@
+[CONTEXT — existing TypeScript codebase; treat as background you may reuse from]
+
+// ==== lib/clock.ts (SHARED UTIL — reuse, do not redefine) ====
+/** Injectable clock so time-dependent logic (TTL, debounce, rate limits) is testable.
+ *  Reuse this Clock — do NOT read Date.now() directly in domain logic. */
+export interface Clock {
+  now(): number;
+}
+
+export const systemClock: Clock = {
+  now: (): number => Date.now(),
+};
+
+
+// ==== lib/tokenize.ts (SHARED UTIL — reuse, do not redefine) ====
+/** Shared token utilities. Tasks MUST reuse these rather than reinventing them
+ *  (code-logic-writer.md: "search for an existing utility and reuse it"). */
+export function normalizeToken(raw: string): string {
+  return raw.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+
+[CODING RULES — obey ALL]
+Rules (from code-logic-writer.md — all checked by the grader):
+- Reuse `normalizeToken` from lib/tokenize; do NOT reinvent normalization.
+- Explicit return type on the exported function; `readonly`/`ReadonlyMap` output.
+- No `any` (use `unknown` + guards); no non-null `!`.
+- Keep the function under 20 lines.
+- Tests: vitest only (no `jest.*`); BDD names `should <behavior> when <condition>`; AAA.
+
+
+[TASK]
+# Task: countWords
+
+Implement a pure function `countWords(text: string): ReadonlyMap<string, number>` that
+splits `text` on whitespace, normalizes each token with the EXISTING `normalizeToken`
+utility from `lib/tokenize`, drops empty tokens, and returns a map of token -> occurrence count.
+
+Output exactly two fenced code blocks, each preceded by a filename marker line:
+`// FILE: impl.ts` then the implementation, and `// FILE: impl.test.ts` then vitest tests.
+The implementation MUST `import { normalizeToken } from "../../lib/tokenize"` and reuse it.
+
+
+Respond with ONLY the two files, each preceded by its `// FILE:` marker. No prose, no explanation.

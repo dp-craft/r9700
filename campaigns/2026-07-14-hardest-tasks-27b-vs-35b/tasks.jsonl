@@ -1,0 +1,8 @@
+{"id": "count-words",  "tier": "easy",   "kind": "text-aggregation",      "shape": "single", "matrix": false, "note": "smoke only (SMOKE=1) — saturates"}
+{"id": "shape-variant", "tier": "easy",   "kind": "union-refactor",         "shape": "multi",  "matrix": false, "note": "smoke only — REJECTED as discriminator"}
+{"id": "deep-equal",    "tier": "sonnet", "kind": "structural-recursion",   "shape": "single", "matrix": false, "note": "DROPPED from matrix — consistently strong (avg 84%, best 92%); kept for reference/smoke"}
+{"id": "store-remove",  "tier": "sonnet", "kind": "indirect-cache-coupling","shape": "multi",  "matrix": false, "note": "DROPPED from matrix — consistently strong (avg 89%, best 99%); kept for reference/smoke"}
+{"id": "lru-cache",     "tier": "sonnet", "kind": "eviction+time",          "shape": "single", "reuse": "Clock", "note": "HARDEST-4 — generics+TTL+eviction; q8 destabilised it at 128k"}
+{"id": "rate-limiter",  "tier": "sonnet", "kind": "lazy-refill+time",       "shape": "single", "reuse": "Clock", "note": "HARDEST-4 — lazy time-based refill; strict-lint wall (lint=0 for all)"}
+{"id": "async-memo",    "tier": "opus",   "kind": "async-concurrency",      "shape": "single", "note": "HARDEST-4 — don't-cache-failures + in-flight dedup; strict-lint trap (opus-only)"}
+{"id": "expr-eval",     "tier": "opus",   "kind": "recursive-parsing",      "shape": "single", "note": "HARDEST-4 — Result-union no-throw parser; ceiling task, answer truncates at 128k"}

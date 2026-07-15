@@ -1,0 +1,53 @@
+[CONTEXT — existing TypeScript codebase; treat as background you may reuse from]
+
+// ==== lib/clock.ts (SHARED UTIL — reuse, do not redefine) ====
+/** Injectable clock so time-dependent logic (TTL, debounce, rate limits) is testable.
+ *  Reuse this Clock — do NOT read Date.now() directly in domain logic. */
+export interface Clock {
+  now(): number;
+}
+
+export const systemClock: Clock = {
+  now: (): number => Date.now(),
+};
+
+
+// ==== lib/tokenize.ts (SHARED UTIL — reuse, do not redefine) ====
+/** Shared token utilities. Tasks MUST reuse these rather than reinventing them
+ *  (code-logic-writer.md: "search for an existing utility and reuse it"). */
+export function normalizeToken(raw: string): string {
+  return raw.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+
+[CODING RULES — obey ALL]
+Rules (graded — from code-logic-writer.md):
+- NO `any`, no non-null `!`; explicit return types; `readonly` on the Result fields.
+- Do NOT throw to the caller — return a Result. (Internal throw+catch is fine if it never escapes.)
+- Keep every function under 20 lines — split tokenizing / expr / term / factor.
+- No magic numbers beyond indices.
+- vitest tests only (no `jest.*`); BDD names `should <behavior> when <condition>`; cover precedence,
+  left-associativity, parentheses, and at least one error case.
+
+
+[TASK]
+# Task: evaluate — a safe arithmetic expression evaluator
+
+Implement `evaluate(expr: string): Result` where
+
+```
+type Result =
+  | { readonly ok: true; readonly value: number }
+  | { readonly ok: false; readonly error: string };
+```
+
+It evaluates integer arithmetic with `+ - * /`, parentheses, and arbitrary whitespace, using the usual
+precedence (`*`/`/` bind tighter than `+`/`-`) and LEFT associativity (`10-3-2` is `5`, `8/2/2` is `2`).
+On ANY malformed input — unbalanced parentheses, a missing operand, an unexpected character, or division
+by zero — it must return `{ ok: false, error }` rather than throwing to the caller.
+
+Output exactly two files with `// FILE:` markers: `impl.ts` (exporting `Result` and `evaluate`) then
+`impl.test.ts`.
+
+
+Respond with ONLY the two files, each preceded by its `// FILE:` marker. No prose, no explanation.

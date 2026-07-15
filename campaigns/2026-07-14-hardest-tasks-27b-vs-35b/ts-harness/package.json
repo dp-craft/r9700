@@ -1,0 +1,20 @@
+{
+  "name": "qwen-quality-ts-harness",
+  "private": true,
+  "type": "module",
+  "description": "Minimal strict TypeScript TDD+lint grading harness for the 27B quality-at-depth campaign. Grader runs tsc + eslint + vitest on model-produced code. Deps pinned to the AiChatney toolchain versions.",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run --reporter=dot --no-color"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@stylistic/eslint-plugin": "^5.10.0",
+    "@vitest/coverage-v8": "^4.0.18",
+    "eslint": "^9.39.4",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.61.1",
+    "vitest": "^4.0.18"
+  }
+}

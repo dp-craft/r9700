@@ -1,0 +1,115 @@
+[EXISTING CODEBASE — these files compile green today; edit them for the task]
+
+// ==== shape.ts ====
+export type Shape =
+  | { readonly kind: "circle"; readonly radius: number }
+  | { readonly kind: "rect"; readonly width: number; readonly height: number };
+
+export function assertNever(x: never): never {
+  throw new Error(`unhandled shape: ${JSON.stringify(x)}`);
+}
+
+// ==== area.ts ====
+import { assertNever, type Shape } from "./shape";
+
+const CIRCLE_AREA_FACTOR = Math.PI;
+
+export function area(shape: Shape): number {
+  switch (shape.kind) {
+    case "circle":
+      return CIRCLE_AREA_FACTOR * shape.radius * shape.radius;
+    case "rect":
+      return shape.width * shape.height;
+    default:
+      return assertNever(shape);
+  }
+}
+
+// ==== format.ts ====
+import { assertNever, type Shape } from "./shape";
+
+export function format(shape: Shape): string {
+  switch (shape.kind) {
+    case "circle":
+      return `circle(r=${String(shape.radius)})`;
+    case "rect":
+      return `rect(${String(shape.width)}x${String(shape.height)})`;
+    default:
+      return assertNever(shape);
+  }
+}
+
+// ==== scale.ts ====
+import { assertNever, type Shape } from "./shape";
+
+export function scale(shape: Shape, factor: number): Shape {
+  switch (shape.kind) {
+    case "circle":
+      return { kind: "circle", radius: shape.radius * factor };
+    case "rect":
+      return { kind: "rect", width: shape.width * factor, height: shape.height * factor };
+    default:
+      return assertNever(shape);
+  }
+}
+
+// ==== area.test.ts ====
+import { describe, it, expect } from "vitest";
+import { area } from "./area";
+
+describe("area", () => {
+  it("should compute rectangle area when given a rect", () => {
+    expect(area({ kind: "rect", width: 3, height: 4 })).toBe(12);
+  });
+});
+
+// ==== format.test.ts ====
+import { describe, it, expect } from "vitest";
+import { format } from "./format";
+
+describe("format", () => {
+  it("should render a circle when given a circle", () => {
+    expect(format({ kind: "circle", radius: 2 })).toBe("circle(r=2)");
+  });
+});
+
+// ==== scale.test.ts ====
+import { describe, it, expect } from "vitest";
+import { scale } from "./scale";
+
+describe("scale", () => {
+  it("should scale rectangle dimensions when factor is positive", () => {
+    expect(scale({ kind: "rect", width: 2, height: 3 }, 2)).toEqual({ kind: "rect", width: 4, height: 6 });
+  });
+});
+
+
+[CODING RULES — obey ALL]
+Rules (graded — from code-logic-writer.md):
+- Reuse the existing `assertNever` from `./shape`; keep every exhaustiveness `default`.
+- NO `any`, no `!`; explicit return types; `readonly` on the new variant's fields.
+- No magic numbers — name the `0.5` triangle-area factor as a `const`.
+- Keep every function under 20 lines.
+- vitest tests only (no `jest.*`); BDD names `should <behavior> when <condition>`.
+
+[TASK]
+# Task: add a `triangle` variant to the Shape union (type propagation + a cross-cutting rule)
+
+The codebase defines a discriminated union `Shape` (`shape.ts`) consumed by `area.ts`, `format.ts`, and
+`scale.ts`, each of which switches on `shape.kind` with an exhaustiveness `default: assertNever(shape)`.
+
+Make TWO changes:
+1. Add a new variant `{ readonly kind: "triangle"; readonly base: number; readonly height: number }` to
+   `Shape`, and handle it everywhere:
+   - `area`  → `0.5 * base * height`
+   - `format` → a string containing the word `triangle`
+   - `scale` → scale `base` and `height` by the factor (return a triangle)
+2. Add a cross-cutting rule to `scale` for ALL variants: if `factor` is negative, return the shape
+   UNCHANGED (do not scale).
+
+Every exhaustiveness check must stay satisfied so `tsc --strict` is clean, ALL existing tests must keep
+passing, and the lint rules (below) must hold. Output the full new content of every file you change with
+`// FILE: <name>` markers (`shape.ts`, `area.ts`, `format.ts`, `scale.ts`), plus a new `// FILE: shape.test.ts`
+with tests for the triangle and the negative-factor rule.
+
+Respond with ONLY the changed files, each preceded by its `// FILE: <name>` marker. No prose.

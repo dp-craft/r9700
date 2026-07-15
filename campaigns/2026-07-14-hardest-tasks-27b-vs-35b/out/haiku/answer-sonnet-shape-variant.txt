@@ -1,0 +1,105 @@
+// FILE: shape.ts
+export type Shape =
+  | { readonly kind: "circle"; readonly radius: number }
+  | { readonly kind: "rect"; readonly width: number; readonly height: number }
+  | { readonly kind: "triangle"; readonly base: number; readonly height: number };
+
+export function assertNever(x: never): never {
+  throw new Error(`unhandled shape: ${JSON.stringify(x)}`);
+}
+
+// FILE: area.ts
+import { assertNever, type Shape } from "./shape";
+
+const CIRCLE_AREA_FACTOR = Math.PI;
+const TRIANGLE_AREA_FACTOR = 0.5;
+
+export function area(shape: Shape): number {
+  switch (shape.kind) {
+    case "circle":
+      return CIRCLE_AREA_FACTOR * shape.radius * shape.radius;
+    case "rect":
+      return shape.width * shape.height;
+    case "triangle":
+      return TRIANGLE_AREA_FACTOR * shape.base * shape.height;
+    default:
+      return assertNever(shape);
+  }
+}
+
+// FILE: format.ts
+import { assertNever, type Shape } from "./shape";
+
+export function format(shape: Shape): string {
+  switch (shape.kind) {
+    case "circle":
+      return `circle(r=${String(shape.radius)})`;
+    case "rect":
+      return `rect(${String(shape.width)}x${String(shape.height)})`;
+    case "triangle":
+      return `triangle(b=${String(shape.base)}, h=${String(shape.height)})`;
+    default:
+      return assertNever(shape);
+  }
+}
+
+// FILE: scale.ts
+import { assertNever, type Shape } from "./shape";
+
+export function scale(shape: Shape, factor: number): Shape {
+  if (factor < 0) {
+    return shape;
+  }
+  switch (shape.kind) {
+    case "circle":
+      return { kind: "circle", radius: shape.radius * factor };
+    case "rect":
+      return { kind: "rect", width: shape.width * factor, height: shape.height * factor };
+    case "triangle":
+      return { kind: "triangle", base: shape.base * factor, height: shape.height * factor };
+    default:
+      return assertNever(shape);
+  }
+}
+
+// FILE: shape.test.ts
+import { describe, it, expect } from "vitest";
+import { area } from "./area";
+import { format } from "./format";
+import { scale } from "./scale";
+import type { Shape } from "./shape";
+
+describe("triangle shape", () => {
+  it("should compute triangle area when given base and height", () => {
+    expect(area({ kind: "triangle", base: 4, height: 5 })).toBe(10);
+  });
+
+  it("should render a triangle when given a triangle", () => {
+    expect(format({ kind: "triangle", base: 4, height: 5 })).toContain("triangle");
+  });
+
+  it("should scale triangle base and height when factor is positive", () => {
+    expect(scale({ kind: "triangle", base: 4, height: 5 }, 2)).toEqual({
+      kind: "triangle",
+      base: 8,
+      height: 10,
+    });
+  });
+});
+
+describe("scale with negative factor", () => {
+  it("should return the shape unchanged when factor is negative for a circle", () => {
+    const circle: Shape = { kind: "circle", radius: 3 };
+    expect(scale(circle, -2)).toEqual(circle);
+  });
+
+  it("should return the shape unchanged when factor is negative for a rect", () => {
+    const rect: Shape = { kind: "rect", width: 2, height: 3 };
+    expect(scale(rect, -1)).toEqual(rect);
+  });
+
+  it("should return the shape unchanged when factor is negative for a triangle", () => {
+    const triangle: Shape = { kind: "triangle", base: 4, height: 5 };
+    expect(scale(triangle, -1)).toEqual(triangle);
+  });
+});

@@ -1,0 +1,84 @@
+// FILE: impl.ts
+/** Structural deep-equality for `unknown` inputs.
+ *  Primitives compare by value (NaN equals NaN); arrays and plain objects
+ *  compare recursively; an array is never equal to a plain object. */
+
+type PlainObject = Record<string, unknown>;
+
+function isPlainObject(value: unknown): value is PlainObject {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function samePrimitive(a: unknown, b: unknown): boolean {
+  if (typeof a === "number" && typeof b === "number") {
+    return a === b || (Number.isNaN(a) && Number.isNaN(b));
+  }
+  return a === b;
+}
+
+function arraysEqual(a: readonly unknown[], b: readonly unknown[]): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((item, index): boolean => deepEqual(item, b[index]));
+}
+
+function objectsEqual(a: PlainObject, b: PlainObject): boolean {
+  const aKeys = Object.keys(a);
+  if (aKeys.length !== Object.keys(b).length) return false;
+  return aKeys.every((key): boolean =>
+    Object.prototype.hasOwnProperty.call(b, key) && deepEqual(a[key], b[key]),
+  );
+}
+
+export function deepEqual(a: unknown, b: unknown): boolean {
+  if (Array.isArray(a) || Array.isArray(b)) {
+    return Array.isArray(a) && Array.isArray(b) && arraysEqual(a, b);
+  }
+  if (isPlainObject(a) || isPlainObject(b)) {
+    return isPlainObject(a) && isPlainObject(b) && objectsEqual(a, b);
+  }
+  return samePrimitive(a, b);
+}
+
+// FILE: impl.test.ts
+import { describe, expect, it } from "vitest";
+
+import { deepEqual } from "./impl";
+
+describe("deepEqual", () => {
+  it("should treat NaN as equal to NaN when comparing numbers", () => {
+    expect(deepEqual(NaN, NaN)).toBe(true);
+  });
+
+  it("should distinguish differing primitive types when values look alike", () => {
+    expect(deepEqual(1, "1")).toBe(false);
+    expect(deepEqual(0, false)).toBe(false);
+  });
+
+  it("should compare nested structures recursively when deeply equal", () => {
+    expect(deepEqual({ a: [1, { b: 2 }] }, { a: [1, { b: 2 }] })).toBe(true);
+  });
+
+  it("should return false when nested array values differ", () => {
+    expect(deepEqual([1, [2, 3]], [1, [2, 4]])).toBe(false);
+  });
+
+  it("should return false when object key counts mismatch", () => {
+    expect(deepEqual({ a: 1 }, { a: 1, b: 2 })).toBe(false);
+  });
+
+  it("should reject an array versus a plain object with matching indices", () => {
+    expect(deepEqual([1, 2], { 0: 1, 1: 2 })).toBe(false);
+  });
+
+  it("should return false when comparing null to an empty object", () => {
+    expect(deepEqual(null, {})).toBe(false);
+  });
+
+  it("should return true when comparing null to null", () => {
+    expect(deepEqual(null, null)).toBe(true);
+  });
+
+  it("should differentiate arrays of unequal length", () => {
+    expect(deepEqual([1, 2, 3], [1, 2])).toBe(false);
+  });
+});

@@ -1,0 +1,82 @@
+// FILE: impl.ts
+export type Result =
+  | { readonly ok: true; readonly value: number }
+  | { readonly ok: false; readonly error: string };
+
+interface Parsed {
+  readonly value: number;
+  readonly pos: number;
+}
+
+class ParseError extends Error {}
+
+function tokenize(expr: string): string[] {
+  return expr.match(/\d+|[+\-*/()]|\S/g) ?? [];
+}
+
+function parseFactor(tokens: string[], start: number): Parsed {
+  const tok = tokens[start];
+  if (tok === "(") {
+    const inner = parseExpr(tokens, start + 1);
+    if (tokens[inner.pos] !== ")") {
+      throw new ParseError("expected )");
+    }
+    return { value: inner.value, pos: inner.pos + 1 };
+  }
+  if (tok !== undefined && /^\d+$/.test(tok)) {
+    return { value: Number(tok), pos: start + 1 };
+  }
+  throw new ParseError(`unexpected token: ${tok ?? "end"}`);
+}
+
+function parseTerm(tokens: string[], start: number): Parsed {
+  let acc = parseFactor(tokens, start);
+  while (tokens[acc.pos] === "*" || tokens[acc.pos] === "/") {
+    const op = tokens[acc.pos];
+    const rhs = parseFactor(tokens, acc.pos + 1);
+    if (op === "/" && rhs.value === 0) {
+      throw new ParseError("division by zero");
+    }
+    const value = op === "*" ? acc.value * rhs.value : acc.value / rhs.value;
+    acc = { value, pos: rhs.pos };
+  }
+  return acc;
+}
+
+function parseExpr(tokens: string[], start: number): Parsed {
+  let acc = parseTerm(tokens, start);
+  while (tokens[acc.pos] === "+" || tokens[acc.pos] === "-") {
+    const op = tokens[acc.pos];
+    const rhs = parseTerm(tokens, acc.pos + 1);
+    const value = op === "+" ? acc.value + rhs.value : acc.value - rhs.value;
+    acc = { value, pos: rhs.pos };
+  }
+  return acc;
+}
+
+export function evaluate(expr: string): Result {
+  try {
+    const tokens = tokenize(expr);
+    const parsed = parseExpr(tokens, 0);
+    if (parsed.pos !== tokens.length) {
+      throw new ParseError("trailing tokens");
+    }
+    return { ok: true, value: parsed.value };
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "parse error";
+    return { ok: false, error: message };
+  }
+}
+// FILE: impl.test.ts
+import { describe, it, expect } from "vitest";
+import { evaluate } from "./impl";
+
+describe("evaluate", () => {
+  it("should add two numbers when given a simple sum", () => {
+    const r = evaluate("2 + 3");
+    expect(r.ok && r.value).toBe(5);
+  });
+  it("should return an error when the input is empty", () => {
+    expect(evaluate("").ok).toBe(false);
+  });
+});

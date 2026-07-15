@@ -1,0 +1,44 @@
+[CONTEXT — existing TypeScript codebase; treat as background you may reuse from]
+
+// ==== lib/clock.ts (SHARED UTIL — reuse, do not redefine) ====
+/** Injectable clock so time-dependent logic (TTL, debounce, rate limits) is testable.
+ *  Reuse this Clock — do NOT read Date.now() directly in domain logic. */
+export interface Clock {
+  now(): number;
+}
+
+export const systemClock: Clock = {
+  now: (): number => Date.now(),
+};
+
+
+// ==== lib/tokenize.ts (SHARED UTIL — reuse, do not redefine) ====
+/** Shared token utilities. Tasks MUST reuse these rather than reinventing them
+ *  (code-logic-writer.md: "search for an existing utility and reuse it"). */
+export function normalizeToken(raw: string): string {
+  return raw.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+
+[CODING RULES — obey ALL]
+Rules (graded — from code-logic-writer.md):
+- NO `any` (inputs are `unknown` — use type guards); no non-null `!`; explicit return types.
+- Keep every function under 20 lines.
+- vitest tests only (no `jest.*`); BDD names `should <behavior> when <condition>`; cover NaN, nested
+  structures, a key-count mismatch, and array-vs-object.
+
+
+[TASK]
+# Task: deepEqual — structural equality
+
+Implement `deepEqual(a: unknown, b: unknown): boolean` — true iff `a` and `b` are structurally equal:
+- primitives compare by value, and `NaN` equals `NaN`;
+- objects/arrays compare recursively (same keys, deeply-equal values; same length for arrays);
+- an array is NOT equal to a plain object even with matching indices;
+- `null` is not equal to `{}`.
+
+Inputs are `unknown` — you must narrow with type guards, not `any`. Output exactly two files with
+`// FILE:` markers: `impl.ts` (exporting `deepEqual`) then `impl.test.ts`.
+
+
+Respond with ONLY the two files, each preceded by its `// FILE:` marker. No prose, no explanation.

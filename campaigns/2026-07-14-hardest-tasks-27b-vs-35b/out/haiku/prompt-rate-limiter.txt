@@ -1,0 +1,54 @@
+[CONTEXT — existing TypeScript codebase; treat as background you may reuse from]
+
+// ==== lib/clock.ts (SHARED UTIL — reuse, do not redefine) ====
+/** Injectable clock so time-dependent logic (TTL, debounce, rate limits) is testable.
+ *  Reuse this Clock — do NOT read Date.now() directly in domain logic. */
+export interface Clock {
+  now(): number;
+}
+
+export const systemClock: Clock = {
+  now: (): number => Date.now(),
+};
+
+
+// ==== lib/tokenize.ts (SHARED UTIL — reuse, do not redefine) ====
+/** Shared token utilities. Tasks MUST reuse these rather than reinventing them
+ *  (code-logic-writer.md: "search for an existing utility and reuse it"). */
+export function normalizeToken(raw: string): string {
+  return raw.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+
+[CODING RULES — obey ALL]
+Rules (graded — from code-logic-writer.md):
+- Reuse `Clock` from `../../lib/clock`; never call `Date.now()`.
+- Explicit return types; `readonly` where applicable; NO `any`, no `!`; named constants (no magic numbers).
+- Keep every function under 20 lines — split refill from acquire.
+- vitest only (no `jest.*`); BDD names `should <behavior> when <condition>`; inject a FAKE clock to drive
+  refill deterministically; cover first-burst, lazy refill over time, empty-bucket rejection, and per-key isolation.
+
+
+[TASK]
+# Task: createRateLimiter (token bucket, lazy refill, per-key)
+
+Implement a per-key token-bucket rate limiter:
+
+`createRateLimiter(capacity: number, refillPerSec: number, clock: Clock): RateLimiter`
+
+where:
+```
+interface RateLimiter {
+  tryAcquire(key: string, tokens?: number): boolean;  // tokens defaults to 1
+}
+```
+Semantics: each key has its own bucket that starts FULL (`capacity` tokens). Refill is LAZY — computed
+from elapsed time on each call (`elapsedSeconds * refillPerSec`, capped at `capacity`), never a background
+timer. `tryAcquire` returns true and deducts `tokens` if the (refilled) bucket has enough, else returns
+false and deducts nothing. Buckets for different keys are independent.
+
+Reuse the existing `Clock` from the codebase (`lib/clock`) for all time reads — do NOT call `Date.now()`.
+Output exactly two files with `// FILE:` markers: `impl.ts` then `impl.test.ts`.
+
+
+Respond with ONLY the two files, each preceded by its `// FILE:` marker. No prose, no explanation.

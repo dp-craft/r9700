@@ -1,0 +1,34 @@
+// FILE: impl.ts
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+export function deepEqual(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) {
+    return true;
+  }
+  if (!isRecord(a) || !isRecord(b)) {
+    return false;
+  }
+  if (Array.isArray(a) !== Array.isArray(b)) {
+    return false;
+  }
+  const keysA = Object.keys(a);
+  const keysB = Object.keys(b);
+  if (keysA.length !== keysB.length) {
+    return false;
+  }
+  return keysA.every((key): boolean => deepEqual(a[key], b[key]));
+}
+// FILE: impl.test.ts
+import { describe, it, expect } from "vitest";
+import { deepEqual } from "./impl";
+
+describe("deepEqual", () => {
+  it("should return true when two nested objects match", () => {
+    expect(deepEqual({ a: 1, b: { c: 2 } }, { a: 1, b: { c: 2 } })).toBe(true);
+  });
+  it("should return false when a nested value differs", () => {
+    expect(deepEqual({ a: { c: 2 } }, { a: { c: 3 } })).toBe(false);
+  });
+});
