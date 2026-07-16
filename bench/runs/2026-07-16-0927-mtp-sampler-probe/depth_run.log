@@ -1,0 +1,34 @@
+prompt: 522260 chars (~130565k tok)
+=== mtp0 : loading (pays the ~7-min cold 133k prefill once) ===
+=== mtp0 : priming prefix cache ===
+=== mtp0 : pp=0.0 rep=1 (cached prefill) ===
+=== mtp0 : pp=0.01 rep=1 (cached prefill) ===
+=== mtp0 : pp=1.5 rep=1 (cached prefill) ===
+=== mtp0 : pp=0.0 rep=2 (cached prefill) ===
+=== mtp0 : pp=0.01 rep=2 (cached prefill) ===
+=== mtp0 : pp=1.5 rep=2 (cached prefill) ===
+=== mtp1-nmax2 : loading (pays the ~7-min cold 133k prefill once) ===
+=== mtp1-nmax2 : priming prefix cache ===
+=== mtp1-nmax2 : pp=0.0 rep=1 (cached prefill) ===
+=== mtp1-nmax2 : pp=0.01 rep=1 (cached prefill) ===
+=== mtp1-nmax2 : pp=1.5 rep=1 (cached prefill) ===
+=== mtp1-nmax2 : pp=0.0 rep=2 (cached prefill) ===
+=== mtp1-nmax2 : pp=0.01 rep=2 (cached prefill) ===
+=== mtp1-nmax2 : pp=1.5 rep=2 (cached prefill) ===
+=== mtp1-nmax3 : loading (pays the ~7-min cold 133k prefill once) ===
+=== mtp1-nmax3 : priming prefix cache ===
+=== mtp1-nmax3 : pp=0.0 rep=1 (cached prefill) ===
+=== mtp1-nmax3 : pp=0.01 rep=1 (cached prefill) ===
+=== mtp1-nmax3 : pp=1.5 rep=1 (cached prefill) ===
+=== mtp1-nmax3 : pp=0.0 rep=2 (cached prefill) ===
+=== mtp1-nmax3 : pp=0.01 rep=2 (cached prefill) ===
+=== mtp1-nmax3 : pp=1.5 rep=2 (cached prefill) ===
+=== mtp1-nmax4 : loading (pays the ~7-min cold 133k prefill once) ===
+=== mtp1-nmax4 : priming prefix cache ===
+=== mtp1-nmax4 : pp=0.0 rep=1 (cached prefill) ===
+=== mtp1-nmax4 : pp=0.01 rep=1 (cached prefill) ===
+=== mtp1-nmax4 : pp=1.5 rep=1 (cached prefill) ===
+=== mtp1-nmax4 : pp=0.0 rep=2 (cached prefill) ===
+=== mtp1-nmax4 : pp=0.01 rep=2 (cached prefill) ===
+=== mtp1-nmax4 : pp=1.5 rep=2 (cached prefill) ===
+wrote /home/dev/work/dp-craft/amd/bench/runs/2026-07-16-0927-mtp-sampler-probe/results_depth.jsonl (28 rows)
