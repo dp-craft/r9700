@@ -189,6 +189,16 @@ def main():
                            "predicted_n": tm.get("predicted_n"), "predicted_ms": tm.get("predicted_ms"),
                            "prompt_per_token_ms": tm.get("prompt_per_token_ms"),
                            "predicted_per_token_ms": tm.get("predicted_per_token_ms"),
+                           # ---- speculative decoding (MTP): promoted from timings so aggregate.py /
+                           # charts can read acceptance without digging into the raw blob. draft_n/
+                           # draft_n_accepted are 0/absent when the server ran with --spec-type none;
+                           # acceptance is the single number that decides whether a sampler change hurt
+                           # SPECULATION (draft rejection) vs added a fixed host cost (see
+                           # docs/analysis/2026-07-16-0927-mtp-sampler-tax.md).
+                           "draft_n": tm.get("draft_n"),
+                           "draft_n_accepted": tm.get("draft_n_accepted"),
+                           "draft_acceptance_pct": (round(100 * tm["draft_n_accepted"] / tm["draft_n"], 2)
+                                                    if tm.get("draft_n") else None),
                            # ---- latency ----
                            "ttft_s": round(ttft, 3) if ttft is not None else None,
                            "ttfa_s": round(ttfa, 3) if ttfa is not None else None,
