@@ -12,6 +12,16 @@
 # Knobs (env): BACKEND=rocm|vulkan (or LLAMA_SERVER=/path for any build, e.g. CUDA on NVIDIA)
 #   MODEL CTX(65536) NP(1) UB(2048) B(8192) FA(on) KV(f16|q8_0) MTP(0|1 → --spec-type draft-mtp)
 #   NGL(99) PORT(8080) WAIT(420s) EXTRA_ARGS
+#
+# MTP draft-length defaults (this script sets NONE of these, so llama.cpp's compiled-in values
+# apply — at our build b9950/961e4b26a: n_max=3, n_min=0, p_min=0.0). The ONLY live draft-length
+# lever on the --spec-type draft-mtp path is --spec-draft-n-max (via EXTRA_ARGS): the MTP loop
+# drafts greedily (top_k=1) and stops purely on n_max. --spec-draft-p-min is UNWIRED for MTP
+# (post-merge TODO, llama.cpp PR #22673) — setting it does nothing here; do not cargo-cult it.
+# Our n_max sweep peaks at 2–3 (default 3 is fine). Also note: any penalty sampler on the request
+# (presence/frequency/repeat) costs a fixed ~2 ms/token of host work, worst under MTP — keep them
+# at 0 for coding. Full account: docs/analysis/2026-07-16-0927-mtp-sampler-tax.md +
+# docs/research/2026-07-16-1016-spec-draft-p-min-mtp.md.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
