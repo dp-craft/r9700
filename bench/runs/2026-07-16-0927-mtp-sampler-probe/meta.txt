@@ -25,8 +25,17 @@ regenerate: ./probe.sh    (~12 min: 10 server loads + 26 requests)
 LIMITS — read before quoting any number:
   * n=1 on most cells. Decisive on MECHANISM (the pp=0.01 cell is sha1-identical, which no amount
     of noise can manufacture); NOT authoritative on MAGNITUDE.
-  * ctx 4096 vs the campaign's ~132.9k. MTP's own benefit is known to GROW with depth
-    (docs/analysis/2026-07-11-2200-deep-context-35b.md: +14% -> +35% decode, 8K -> 200K), and the
-    campaign's deep cells imply a LARGER tax (+4.16 ms/tok) than this probe measures (+2.0 ms/tok).
-    The depth-confirm at 133k is the open item.
+  * ctx 4096 here — but the depth-confirm at ~132.9k HAS BEEN RUN (results_depth.jsonl,
+    depth_probe.sh). Result: the pure tax is ~2 ms/tok at BOTH depths (not depth-scaling); the
+    campaign's implied +4.16 was a pp=1.5 figure that stacks the tax + genuine rejection. So the
+    shallow rows below are safe to read for the tax magnitude; see the analysis doc's depth section.
   * GTT figures here are at ctx 4096 and are NOT the campaign's spill. Idle GTT baseline = 79 MiB.
+
+--- ad-hoc sub-experiment 2026-07-16: --spec-draft-backend-sampling (does it cut the tax?) ---
+35B MoE, MTP on, ctx 4096, KV f16, seed 42, temp 0.6, 600 tok, pp0 vs pp0.01 (the clean tax pair):
+  --spec-draft-backend-sampling     : pp0 158.9 -> pp0.01 115.1 t/s  (-27.6%)   [props backend_sampling=False]
+  --no-spec-draft-backend-sampling  : pp0 149.7 -> pp0.01 108.8 t/s  (-27.3%)   [props backend_sampling=False]
+Verdict: backend-sampling is NOT a lever for this tax (unchanged either way). Acceptance 69.1% and
+reply sha1 30303b0c identical across all four. The tax is on target-model VERIFICATION sampling, not
+draft sampling; the MTP draft is greedy top_k=1 (see docs/research/2026-07-16-1016-spec-draft-p-min-mtp.md).
+Reproduce: boot with EXTRA_ARGS="<mode>", then curl pp0 / pp0.01 as in probe.sh's ask().
