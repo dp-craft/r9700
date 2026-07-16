@@ -1,6 +1,6 @@
 <!-- meta
 date: 2026-07-16 09:27
-takeaway: **Refutes the 27b-vs-35b campaign's `presence_penalty × MTP` mechanism.** Enabling ANY penalty sampler (presence/frequency/repeat) costs a **fixed ~2 ms/token of host work** — MEASURED at +1.95/+2.07/+1.97 ms/tok across 35B-MTP-on, 35B-MTP-off and 27B-dense — while draft acceptance is **unchanged** (`pp=0.01` emits a **sha1-identical** reply with identical 585/404 draft counts and still loses 29% decode). It is not a rejection effect and not an MTP interaction: MTP shortens the step (6.2 ms) so the same fixed tax eats −29% there vs −8% on the 27B's 17 ms step — **Amdahl, not interaction**. `min_p` is free; `top_k 40`/`top_p 1.0` are ~free. Also: `--spec-draft-n-max 3` (llama.cpp's default) is already optimal (n-max 8 → 80 t/s, *worse than MTP off*), **MTP is not output-preserving** (MTP on/off diverge at a fixed seed), and **MTP costs ~84 MiB GTT** — a lead on the campaign's unattributed spill.
+takeaway: **Corrects the 27b-vs-35b campaign's `presence_penalty × MTP` mechanism.** Enabling ANY penalty sampler (presence/frequency/repeat) costs a **fixed ~2 ms/token of host work** — MEASURED +1.95/+2.07/+1.97 ms/tok across 35B-MTP-on/off and 27B-dense, and **CONFIRMED at ~132.9k depth (+1.3–1.9 ms/tok, depth-invariant)** — while draft acceptance is **unchanged**: `pp=0.01` emits a **sha1-identical** reply with identical draft counts and acceptance to the decimal, yet loses ~30% decode. Not an MTP interaction — MTP just shortens the step so the same fixed tax eats a bigger fraction (Amdahl). The campaign's implied +4.16 ms/tok was a **pp=1.5** figure that stacks the fixed tax **plus** genuine draft rejection at high penalty (the minority component the campaign over-generalized to the whole effect); the pure tax is ~2 ms at every depth, not 4, and session-degradation is excluded. `min_p` is free; `top_k 40`/`top_p 1.0` ~free. Also: `--spec-draft-n-max` 2–3 optimal shallow AND at depth (n-max 8 → 80 t/s, *worse than MTP off*), **MTP is not output-preserving** (on/off diverge at a fixed seed), and **MTP costs ~84 MiB GTT** — a lead on the campaign's unattributed spill.
 -->
 
 # Analysis: the penalty-sampler tax — what actually costs `presence_penalty` its 30% (and what MTP has to do with it) — R9700 (gfx1201)
@@ -23,7 +23,7 @@ takeaway: **Refutes the 27b-vs-35b campaign's `presence_penalty × MTP` mechanis
 
 ## Summary — the answer in one table
 
-The campaign published: *"`presence_penalty` re-weights logits after the draft was produced, so it systematically rejects draft tokens; rejection means the speculation is wasted."* **That mechanism is refuted.** Set `presence_penalty` to **0.01** — a value too small to change any token — and the model emits a **sha1-identical reply** from **identical draft counts**, and still loses **29% of decode**.
+The campaign published: *"`presence_penalty` re-weights logits after the draft was produced, so it systematically rejects draft tokens; rejection means the speculation is wasted."* **The dominant cost is not rejection.** Set `presence_penalty` to **0.01** — a value too small to change any token — and the model emits a **sha1-identical reply** from **identical draft counts**, and still loses **29% of decode**. (Rejection *does* appear at large penalties — pp 1.5 genuinely lowers acceptance — but it is the minority component, riding on top of a fixed host tax the campaign missed entirely; see the depth-confirm section.)
 
 | cell (35B MoE, MTP on) | decode t/s | draft_n / accepted | acceptance | reply sha1 | verdict |
 |---|--:|---|--:|---|---|
@@ -121,10 +121,68 @@ Per-cell means over the active window, `bench/lib/vram_sampler.py`. **Idle GTT b
 
 ---
 
+## Depth confirm at ~132.9k tokens — the tax is ~2 ms/tok, depth-invariant
+
+**MEASURED** — `results_depth.jsonl` (24 rows + 4 cache-prime), regenerate with `./depth_probe.sh`.
+Same 35B-A3B at the campaign's operating point: **ctx 163840, KV f16, `--reasoning-budget 16384`,
+temp 1.0** (so pp 0 vs pp 1.5 reproduces the campaign's `t10`-vs-`qwen-gen` contrast). The 133k prefill
+is paid once per server load; the prefix cache (keyed on prompt tokens, not sampler params) then
+carries the whole pp sweep for ~seconds each. pp 0 and pp 0.01 are compared **at the same seed**, so
+the byte-identity check is exact.
+
+**The clean tax, from the byte-identical pairs (same seed → same tokens → acceptance equal to the decimal):**
+
+| config | pp 0 → pp 0.01 | **Δ (byte-identical)** | acceptance |
+|---|---|--:|---|
+| MTP-off, r1 / r2 | 70.4→64.3 / 69.5→63.8 t/s | **+1.37 / +1.29 ms/tok** | n/a (no MTP) |
+| MTP-on n-max 3, r1 / r2 | 114.0→93.3 / 96.3→82.9 t/s | **+1.94 / +1.69 ms/tok** | **83.09→83.09 / 63.75→63.75** (unchanged) |
+
+**The tax is ~1.3–1.9 ms/token at 133k — the same ~2 ms as the shallow probe (+1.95/+2.07).** It does
+**not** grow with depth. Acceptance is unchanged to the decimal in the identical pairs, so the
+mechanism — a fixed host cost, not draft rejection — is **confirmed at the campaign's real depth**.
+
+**The +2.0-vs-+4.16 gap is resolved — and it was never depth.** The campaign's implied +4.16 ms/tok came
+from `t10` vs `qwen-gen`, i.e. **pp 0 vs pp 1.5**, and at pp 1.5 acceptance *genuinely* drops:
+
+| config | pp 0 → pp 1.5 | Δ total | acceptance |
+|---|---|--:|---|
+| MTP-on n-max 3, r1 / r2 | 114.0→82.5 / 96.3→70.9 t/s | +3.35 / +3.72 ms/tok | **83→66 / 64→47** (real rejection) |
+
+So the campaign's larger figure is **two effects stacked**: the ~2 ms fixed branch tax **plus** genuine
+draft rejection at high penalty (~40–55% of the pp-1.5 excess, though the split is noisy — see below).
+**This partly rehabilitates the campaign's instinct:** rejection *is* real at pp 1.5 — it is just the
+*minority, penalty-magnitude-dependent* component, riding on top of the fixed tax the campaign missed
+entirely. At pp 0.01 (realistic "just switched the sampler on") there is **zero** rejection and the tax
+is the whole story. **Session degradation is excluded** — this run was fresh and reproduced the effect.
+
+**n-max at depth (Tier B) — the shallow "default 3 is optimal" broadly holds, but 2 edges ahead:**
+
+| `--spec-draft-n-max` | decode t/s (pp 0, mean n=2) | acceptance |
+|--:|--:|--:|
+| 2 | **108.2** (reps 105, 112) | 85% |
+| 3 (default) | 105.2 (reps 114, 96) | 73% |
+| 4 | 99.0 (reps 108, 90) | 63% |
+
+Acceptance falls monotonically with draft width at depth just as it did shallow. Decode peaks at
+n-max 2–3, n-max 4 is worse — **no dramatic depth shift**. ⚠ But the MoE's **run-to-run acceptance
+noise is severe** (n-max 3 swings 83%↔64% between two seeds → 114↔96 t/s), so n=2 **cannot resolve
+2-vs-3**. Takeaway: the llama.cpp default 3 remains a safe choice at depth; a hint that 2 is marginally
+better is unresolved. (This same MoE variance is the campaign's run-to-run fluctuation, now visible in
+*speed* as well as quality.)
+
+⚠ **One caveat on the identity check itself:** at **temp 1.0** (higher than the shallow probe's 0.6),
+pp 0.01 occasionally flips a token where the shallow run stayed identical — the n-max 2 pairs and one
+n-max 4 pair diverged. Where they diverge, decode is slow anyway; where they stay identical (all MTP-off,
+all n-max 3), the tax is clean. The mechanism does not depend on identity holding everywhere — only on
+it holding *somewhere* with acceptance pinned, which it does.
+
+---
+
 ## What this does NOT settle
 
-- **Magnitude at depth.** This probe measures **+2.0 ms/tok**; the campaign's deep cells imply **+4.16 ms/tok** (t10 115.7 → qwen-gen 78.1 t/s = 8.64 → 12.80 ms). Same sign, same order, **~2× apart**. Either depth roughly doubles the tax, or part of the campaign's gap is the session-degradation confound after all. **Unresolved — this is the reason to run the 133k depth-confirm.**
-- **n=1 on most cells.** The mechanism rests on the sha1-identical pair (n=2, replicated), which is qualitative and safe. Every *magnitude* here is a single sample.
+- ~~**Magnitude at depth.**~~ **RESOLVED** (depth confirm above): the pure branch tax is **~2 ms/tok at both depths**; the campaign's +4.16 was a pp-1.5 measurement that additionally includes real acceptance loss. Not depth-scaling, not session degradation.
+- **n=2, one prompt.** The clean tax rests on the byte-identical pairs (exact); the n-max curve and the pp-1.5 rejection split are muddied by the MoE's large seed-to-seed acceptance variance. Resolving n-max 2-vs-3 at depth would need ~5+ reps.
+- **Host generality.** The ~2 ms/token is a **Ryzen 5 3600** number. It should shrink on a faster host and grow relative to a faster GPU. Untested — one data point, one box.
 - **Host generality.** The ~2 ms/token is a **Ryzen 5 3600** number. It should shrink on a faster host and grow relative to a faster GPU. Untested — one data point, one box.
 - **Why the penalties branch costs ~2 ms.** Inferred to be the per-position scan the penalties sampler performs over the 151k-token vocabulary (llama.cpp skips the branch entirely when all penalties are neutral). **Not verified** — that needs a profiler or the source, and this box has binaries only.
 - **`--spec-draft-backend-sampling`.** Defaults to enabled, but `/props` reports `backend_sampling: false`. If draft sampling could actually be offloaded, it might cut the tax. **Untested — the most promising unexplored lever.**
@@ -153,7 +211,7 @@ Per-cell means over the active window, `bench/lib/vram_sampler.py`. **Idle GTT b
 
 ## Recommended next steps
 
-1. **Depth-confirm at ~133k** — the one open question that changes a number. Cells: `{MTP on, off} × {pp 0.0, 0.01, 1.5}` plus `n-max {2,3,4}`, logging acceptance. Resolves the +2.0 vs +4.16 ms/tok gap **and** finishes off the session-degradation confound. *(This is the run worth GPU time.)*
+1. ✅ **DONE — depth-confirm at ~133k** (`depth_probe.sh` → `results_depth.jsonl`, `{MTP on n-max 2/3/4, off} × {pp 0, 0.01, 1.5} × 2`). The tax is **~2 ms/tok, depth-invariant**; the +4.16 figure was a pp-1.5 measurement that stacks the tax + genuine rejection; session degradation excluded. See the depth-confirm section. Remaining: n-max 2-vs-3 at depth is within the MoE's acceptance noise (would need ~5+ reps).
 2. **Extend `openai_probe.py`** with `--sampler` + acceptance capture, then retire `probe.sh` into it.
 3. **Surface acceptance in `aggregate.py`** — the data is already on all 210 rows.
 4. **Test `--no-spec-draft-backend-sampling`** — cheap, and the only plausible lever that could remove the tax.

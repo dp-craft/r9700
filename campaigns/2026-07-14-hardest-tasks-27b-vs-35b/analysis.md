@@ -222,9 +222,9 @@ Five sampling points on the 35B-A3B, all at budget 16384, all on the identical p
   - **The advice survives, the mechanism does not:** *applying a vendor preset from the wrong section is worse than any quantisation choice in this campaign.* The presets cost ~15 pts; the entire Q4→Q6 ladder spans 11 pts and is not resolvable. **Sampling hygiene dominates quant shopping** — but pick the recipe **whole**, and do not attribute the damage to any one knob.
 - **The Unsloth-only preset is the single worst configuration tested** — and it has the weakest provenance. Our research doc verified that Qwen's card lists **three** parameter sets while Unsloth's lists **four**, adding this `top_k 40 / top_p 1.0 / min_p 0.0 / pp 2.0` set while attributing the whole block to the Qwen team. **INFERRED:** treat Unsloth-only recipes as unattributed until Qwen documents them. (Its Δ −14.5 is *not* significant at t=−1.84 — large and unresolved.)
 
-### The penalty-sampler tax — ⚠ MECHANISM REFUTED 2026-07-16 (was: "the presence_penalty × MTP interaction")
+### The penalty-sampler tax — ⚠ MECHANISM CORRECTED 2026-07-16 (was: "the presence_penalty × MTP interaction")
 
-**The decode effect is real. The published mechanism was wrong, and there is no MTP interaction.**
+**The decode effect is real. The dominant cause is a fixed host tax, not draft rejection, and there is no MTP interaction** (rejection is a real but *minority* contributor at high presence_penalty — see the depth note).
 
 **MEASURED, the effect (unchanged), across seven 35B cells:**
 
@@ -285,14 +285,19 @@ decisive cell sets `presence_penalty = 0.01` — too small to change any token �
   reproduced the tax at full magnitude.
 
 > **⚠ CAVEAT — these are OTHER measurements, NOT reproducible within this test set.** The mechanism
-> above comes from a **separate scouting probe at ctx 4096 on a ~24-token prompt, n=1–2**, versus this
-> campaign's **~132.9k tokens, n=15/cell**. **No number from it may be substituted into a table here.**
-> It settles a *mechanism* (its decisive cell is byte-identical, which noise cannot manufacture); it does
-> **not** settle *magnitude* at depth — and the two disagree by ~2×: the probe measures **+2.0 ms/tok**,
-> this campaign's cells imply **+4.16 ms/tok**. Either depth roughly doubles the tax, or part of this
-> campaign's gap is session degradation after all. **Unresolved — see further-tests #2.**
+> comes from a **separate probe** (a shallow scout at ctx 4096 **and** a depth-confirm at the campaign's
+> ~132.9k / budget 16384 operating point), versus this campaign's n=15/cell graded design. **No number
+> from it may be substituted into a table here.** What it establishes:
+> - **The pure branch tax is ~2 ms/token at BOTH depths** (shallow +1.95/+2.07; deep +1.3–1.9, from
+>   byte-identical pp0-vs-pp0.01 pairs). **It does not grow with depth.**
+> - **This campaign's implied +4.16 ms/tok is a pp-1.5 figure**, and pp 1.5 *does* genuinely lower MTP
+>   acceptance (83%→66% at depth) — so it stacks the ~2 ms fixed tax **plus** real draft rejection. The
+>   campaign's original "pp rejects drafts" instinct was **partly right for pp 1.5** (the minority
+>   component) but wrong that rejection was the *whole* effect; at pp 0.01 there is **zero** rejection
+>   and the tax is everything. **The +2-vs-+4 gap is resolved and it was never depth-scaling.**
+> - **Session degradation is excluded** — the depth-confirm ran fresh and reproduced the tax.
 > Full detail, data and limits: **`docs/analysis/2026-07-16-0927-mtp-sampler-tax.md`**
-> (data: `bench/runs/2026-07-16-0927-mtp-sampler-probe/`).
+> (data: `bench/runs/2026-07-16-0927-mtp-sampler-probe/`, `results.jsonl` + `results_depth.jsonl`).
 
 **Two further corrections from the same probe, both relevant here:**
 
@@ -470,7 +475,7 @@ bash bench/engine-bench/serve_llamacpp.sh \
 **Tier 1 — these change conclusions.**
 
 1. **Add tasks, not reps.** The single change that would make the quant and model axes conclusive. **~15 hardest tasks resolves Δ=10 pts; ~60 resolves Δ=5** (digest, INFERRED). Reps do not help — task-to-task variance dominates. Every future run of this design should spend its GPU budget on task breadth. *(Cost: linear in tasks; no new infrastructure — `tasks.jsonl` + `eval-design.md` already define the pattern.)*
-2. ⚠ **REVISED — the mechanism is settled; only the DEPTH magnitude is open.** The original "4-cell {MTP on/off} × {pp 0/1.5} throughput run" is **withdrawn**: throughput cannot separate rejection from overhead, and a scouting probe already did (2026-07-16, `docs/analysis/2026-07-16-0927-mtp-sampler-tax.md`) — the pp tax is a fixed ~2 ms/tok host cost, not draft rejection, with **no** MTP interaction. **What remains** is that the probe (ctx 4096) measures **+2.0 ms/tok** while this campaign's deep cells imply **+4.16 ms/tok**. The **depth-confirm** resolves it: `{MTP on, off} × {pp 0.0, 0.01, 1.5}` + `n-max {2,3,4}` at ~132.9k, **logging `draft_n_accepted`** (already captured — just surface it). Also closes the last of the session-degradation confound. *(Cost: ~1 hour; the one run worth GPU time here.)*
+2. ✅ **DONE — the pp×MTP question is fully settled.** The original "4-cell throughput run" was **withdrawn** (throughput cannot separate rejection from overhead) and replaced by an instrumented probe — shallow (ctx 4096) **and** depth-confirmed at this campaign's ~132.9k / budget 16384 operating point (`docs/analysis/2026-07-16-0927-mtp-sampler-tax.md`, `bench/runs/2026-07-16-0927-mtp-sampler-probe/depth_probe.sh`). Result: the pp tax is a **fixed ~2 ms/tok host cost, depth-invariant**, with **no** MTP interaction; the campaign's +4.16 was a pp-1.5 figure stacking that tax + genuine rejection; session degradation excluded. **Only residual:** n-max 2-vs-3 at depth sits inside the MoE's acceptance noise (needs ~5+ reps) — low value.
 3. ✅ **DONE — the sampling axis has its own baseline.** `aggregate.py` now takes **`--baseline`** (default = the quant ladder's Q4_K_M; guard rejects an unknown label). Reading the sampling axis within-model: `python3 aggregate.py --baseline a3b-d128-f16-rb16384` (whole preset) and `--baseline a3b-d128-f16-rb16384-t10` (pp isolated from temp). **Result:** *"temp 0.3 is significantly worse"* was an artifact of the wrong baseline and is **withdrawn** (−7.5, t=−2.60, ns); only the whole `qwen-gen` preset survives (−15.4, t=−3.41). No GPU time. The re-baseline also **resolved model × budget** (35B −4.3, t=−5.45, SIGNIFICANT).
 4. **Break the sampling × model confound — narrowed by #2/#3.** The *decode-tax* half of the confound is now broken (it reproduces on the dense 27B). What is still MoE-only is the **quality** half: run temp {0.3, 0.6, 1.0} on the **dense 27B Q4_K_M** to see if temperature moves TS% the way it (weakly, unresolvably) does on the MoE. **Cheaper than first stated: `un-d128-f16-rb16384` already IS the 27B temp-0.6 / budget-16384 point, so only temp 0.3 and 1.0 are new — 2 cells, not 3.** ⚠ Do **not** reuse `configs_sampling.jsonl` as-is: it scaffolds temp {0.3,0.6,0.9} at budget 4096, which matches neither the 35B arm (temp {0.3,0.6,1.0} / budget 16384) nor `un-d128-f16-rb16384`. *(Cost: 2 cells × 5 tasks × 3 reps.)*
 
@@ -491,7 +496,7 @@ bash bench/engine-bench/serve_llamacpp.sh \
 **What is missing from the data — the gaps, stated plainly:**
 
 - **No temperature × budget cell** (all sampling at 16384) and **no sampling-QUALITY cell on the dense model** (all sampling on the MoE) — items 3 and 4. *(The sampling-SPEED mechanism is now covered on the 27B by the 2026-07-16 probe.)*
-- **No MTP-off cell IN THIS CAMPAIGN.** MTP is on in all 14 cells. It was entangled with the 35B's speed story and the pp anomaly; the 2026-07-16 probe added the MTP-off arm (at ctx 4096) and disentangled both — but at depth an MTP-off arm is still absent here.
+- **No MTP-off cell IN THIS CAMPAIGN** (but the gap is now closed externally). MTP is on in all 14 cells. It was entangled with the 35B's speed story and the pp anomaly; the 2026-07-16 probe added the MTP-off arm **at both ctx 4096 and ~132.9k** and disentangled both — the pp tax reproduces MTP-off, so it is not an MTP effect.
 - **~~No significance test between sampling cells~~ — FIXED.** `aggregate.py --baseline` now prints within-model paired tests (2026-07-16). Still absent: significance between **budget** cells beyond the two now surfaced, and on the **judge** scores.
 - **No test of rep-sd differences.** "The MoE is noisier" is monotone across seven pairings and formally untested.
 - **No coding-specific external quant benchmark exists to anchor our null against.** Tier-1 Q4–Q6 comparisons are perplexity/KLD on wikitext, not pass-rates on code.
