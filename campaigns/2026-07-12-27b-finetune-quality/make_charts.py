@@ -56,12 +56,39 @@ def esc(s):
     return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
+_W_NARROW = set("iljtfrI.-_ '()[]|!;:,")
+_W_WIDE = set("MWmw@%")
+
+def text_w(s, fs):
+    """Approximate rendered width of `s` at font-size `fs` in the sans stack set by _style().
+    Per-glyph-class advances, calibrated against headless-Chrome renders of this repo's actual
+    labels (within ~4% for those, and never under for wide-glyph strings). The 1.08 factor is
+    slack: over-reserving costs a few px of gutter, under-reserving CLIPS the label off the
+    canvas — which is what made every `a3b-d128-f16-rb16384-*` cell unreadable."""
+    s = str(s)
+    w = sum(0.31 if c in _W_NARROW else 0.95 if c in _W_WIDE
+            else 0.70 if c.isupper() else 0.60 for c in s)
+    return fs * w * 1.08
+
+
+def gutter(labels, fs, pad=12, lo=110):
+    """Left label column wide enough for the LONGEST label — never a fixed guess."""
+    return max(lo, int(max([text_w(l, fs) for l in labels] + [0]) + pad))
+
+
+def fit_w(w, pad_l, pad_r, min_plot=300):
+    """Grow the canvas so a long-label gutter never eats the plot area. `w` is a MINIMUM."""
+    return max(w, pad_l + pad_r + min_plot)
+
+
 def hbar(title, rows, unit="", fmt="{:.0f}", w=720, sub="", refs=None):
     """rows: list of (label, value, slot_idx). One axis (x=value). Direct value labels.
     refs: optional [(label, value)] drawn as vertical dashed reference lines (e.g. haiku/sonnet/opus
     capability bands) sharing the bar x-scale."""
     rows = [r for r in rows if isinstance(r[1], (int, float))]
-    pad_l, pad_r, top, rh, gap = 168, 74, 54, 26, 12
+    pad_r, top, rh, gap = 74, 54, 26, 12
+    pad_l = gutter([r[0] for r in rows], 12.5)
+    w = fit_w(w, pad_l, pad_r)
     h = top + len(rows) * (rh + gap) + 24
     refs = [(l, v) for l, v in (refs or []) if isinstance(v, (int, float))]
     vmax = max([r[1] for r in rows] + [v for _, v in refs] + [1e-9]) * 1.12
@@ -85,7 +112,9 @@ def hbar(title, rows, unit="", fmt="{:.0f}", w=720, sub="", refs=None):
 def stacked_tokens(title, rows, w=720):
     """rows: (label, think, answer, slot). think solid, answer at .55 opacity, 2px gap; total labeled."""
     rows = [r for r in rows if isinstance(r[1], (int, float))]
-    pad_l, pad_r, top, rh, gap = 168, 96, 66, 26, 12
+    pad_r, top, rh, gap = 96, 66, 26, 12
+    pad_l = gutter([r[0] for r in rows], 12.5)
+    w = fit_w(w, pad_l, pad_r)
     h = top + len(rows) * (rh + gap) + 24
     vmax = max([(r[1] or 0) + (r[2] or 0) for r in rows] + [1e-9]) * 1.14
     plot_w = w - pad_l - pad_r
@@ -107,7 +136,9 @@ def dumbbell(title, rows, w=720):
     answer generation, ending in a square marker labeled with the full time."""
     rows = [(r if len(r) == 5 else (r[0], r[1], r[2], None, r[3])) for r in rows]
     rows = [r for r in rows if isinstance(r[1], (int, float)) and isinstance(r[2], (int, float))]
-    pad_l, pad_r, top, rh, gap = 168, 96, 66, 24, 16
+    pad_r, top, rh, gap = 96, 66, 24, 16
+    pad_l = gutter([r[0] for r in rows], 12.5)
+    w = fit_w(w, pad_l, pad_r)
     h = top + len(rows) * (rh + gap) + 34
     vmax = max([(r[3] if isinstance(r[3], (int, float)) else r[2]) for r in rows] + [1e-9]) * 1.12
     plot_w = w - pad_l - pad_r
@@ -146,7 +177,9 @@ def spread(title, rows, w=720, sub="", refs=None):
     refs: optional [(label, value)] vertical dashed lines, sharing the x-scale."""
     rows = [r for r in rows if isinstance(r[1], (int, float)) and isinstance(r[3], (int, float))]
     refs = [(l, v) for l, v in (refs or []) if isinstance(v, (int, float))]
-    pad_l, pad_r, top, rh, gap = 168, 84, 66, 24, 16
+    pad_r, top, rh, gap = 84, 66, 24, 16
+    pad_l = gutter([r[0] for r in rows], 12.5)
+    w = fit_w(w, pad_l, pad_r)
     h = top + len(rows) * (rh + gap) + 34
     vmax = max([r[3] for r in rows] + [v for _, v in refs] + [1e-9]) * 1.12
     plot_w = w - pad_l - pad_r
@@ -229,12 +262,19 @@ def scatter_quality_cost(title, pts, w=720, h=470,
 
 
 def small_multiples(title, panels, w=720):
-    """panels: list of (panel_title, unit, fmt, [(label,val,slot)]). Each its own x-scale."""
+    """panels: list of (panel_title, unit, fmt, [(label,val,slot)]). Each its own x-scale.
+    The label column is sized to the longest label across ALL panels so every panel's rows stay
+    aligned; the canvas grows to match. Labels are never truncated — cell labels differ only in
+    their SUFFIX (…-rb16384-t03 vs …-rb16384-qwen-gen), so a head-slice erases the distinction."""
+    import math
     cols = 2
-    pw = w // cols
+    labs = [r[0] for _, _, _, rows in panels for r in rows]
+    lab_w = gutter(labs, 10.5, pad=8, lo=70)
+    val_w = 62                                    # direct value label to the right of each bar
+    pw = max(w // cols, lab_w + 6 + 120 + val_w)  # ≥120px of bar per panel
+    w = pw * cols
     per_rows = max(len(p[3]) for p in panels)
     ph = 40 + per_rows * 22 + 20
-    import math
     prows = math.ceil(len(panels) / cols)
     h = 52 + prows * ph
     b = [f'<text x="20" y="26" class="t" font-size="15">{esc(title)}</text>',
@@ -245,13 +285,14 @@ def small_multiples(title, panels, w=720):
         rows = [r for r in rows if isinstance(r[1], (int, float))]
         vmax = max([r[1] for r in rows] + [1e-9]) * 1.15
         b.append(f'<text x="{ox}" y="{oy}" class="t" font-size="12.5">{esc(pt)}</text>')
-        bw_area = pw - 150
+        bar_x = ox + lab_w + 6
+        bw_area = pw - lab_w - 22 - val_w
         for i, (lab, val, slot) in enumerate(rows):
             y = oy + 12 + i * 22
             bw = max(2, bw_area * val / vmax)
-            b.append(f'<text x="{ox+92}" y="{y+9}" text-anchor="end" class="lab" font-size="10.5">{esc(lab[:12])}</text>')
-            b.append(f'<rect x="{ox+98}" y="{y}" width="{bw:.1f}" height="13" rx="3" fill="var(--s{slot+1})"/>')
-            b.append(f'<text x="{ox+98+bw+5:.1f}" y="{y+10}" class="val" font-size="10.5">{fmt.format(val)}{unit}</text>')
+            b.append(f'<text x="{ox+lab_w}" y="{y+9}" text-anchor="end" class="lab" font-size="10.5">{esc(lab)}</text>')
+            b.append(f'<rect x="{bar_x}" y="{y}" width="{bw:.1f}" height="13" rx="3" fill="var(--s{slot+1})"/>')
+            b.append(f'<text x="{bar_x+bw+5:.1f}" y="{y+10}" class="val" font-size="10.5">{fmt.format(val)}{unit}</text>')
     return svg(w, int(h), "".join(b))
 
 
@@ -319,7 +360,9 @@ def line_panels(title, xlabel, panels, w=720, refs=None, ref_titles=None):
 
 def heatmap(title, configs, tasks, cell, w=760):
     """cell(config,task) -> (fill_css, label). Status-colored pass/fail/partial grid."""
-    pad_l, top = 168, 90
+    pad_l = gutter(configs, 12)
+    top = 90 + int(max([text_w(t, 9.5) for t in tasks] + [0]) * 0.64)   # rotated -40° headers need vertical room
+    w = fit_w(w, pad_l, 20, min_plot=64 * max(len(tasks), 1))
     cw = (w - pad_l - 20) // max(len(tasks), 1)
     ch = 30
     h = top + len(configs) * (ch + 4) + 20
@@ -327,7 +370,7 @@ def heatmap(title, configs, tasks, cell, w=760):
          '<text x="20" y="44" class="mut" font-size="11">green = pass · red = fail · amber = truncated/partial · shaded = judge score</text>']
     for j, t in enumerate(tasks):                      # rotated column headers
         x = pad_l + j * cw + cw / 2
-        b.append(f'<text x="{x:.1f}" y="{top-6}" text-anchor="start" class="mut" font-size="9.5" transform="rotate(-40 {x:.1f} {top-6})">{esc(t[:16])}</text>')
+        b.append(f'<text x="{x:.1f}" y="{top-6}" text-anchor="start" class="mut" font-size="9.5" transform="rotate(-40 {x:.1f} {top-6})">{esc(t)}</text>')
     for i, c in enumerate(configs):
         y = top + i * (ch + 4)
         b.append(f'<text x="{pad_l-10}" y="{y+ch*0.66}" text-anchor="end" class="lab" font-size="12">{esc(c)}</text>')
