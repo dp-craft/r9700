@@ -14,13 +14,17 @@
 #   NGL(99) PORT(8080) WAIT(420s) EXTRA_ARGS
 #
 # MTP draft-length defaults (this script sets NONE of these, so llama.cpp's compiled-in values
-# apply — at our build b9950/961e4b26a: n_max=3, n_min=0, p_min=0.0). The ONLY live draft-length
-# lever on the --spec-type draft-mtp path is --spec-draft-n-max (via EXTRA_ARGS): the MTP loop
-# drafts greedily (top_k=1) and stops purely on n_max. --spec-draft-p-min is UNWIRED for MTP
-# (post-merge TODO, llama.cpp PR #22673) — setting it does nothing here; do not cargo-cult it.
-# Our n_max sweep peaks at 2–3 (default 3 is fine). Also note: any penalty sampler on the request
-# (presence/frequency/repeat) costs a fixed ~2 ms/token of host work, worst under MTP — keep them
-# at 0 for coding. Full account: docs/analysis/2026-07-16-0927-mtp-sampler-tax.md +
+# apply — at our build b9950/961e4b26a: n_max=3, n_min=0, p_min=0.0). Both draft-length levers are
+# LIVE on the --spec-type draft-mtp path (via EXTRA_ARGS), MEASURED on this box 2026-07-16:
+#   --spec-draft-n-max  : hard cap on drafted tokens/pass. Our sweep peaks at 2–3 (default 3 is fine).
+#   --spec-draft-p-min  : draft-confidence early-stop. Raising it 0->0.99 cuts drafted-tok/pass
+#                         2.98->0.46, lifts acceptance 69%->100%, and LOWERS decode (160->106 t/s) —
+#                         so leave it at 0 for throughput. It is NOT unwired for MTP (an earlier
+#                         source-read claimed so; the test refuted it). It does not reduce run-to-run
+#                         fluctuation (6/6 distinct replies at every level). Do not set it for speed.
+# Also: any penalty sampler on the request (presence/frequency/repeat) costs a fixed ~2 ms/token of
+# host work, worst under MTP — keep them at 0 for coding.
+# Full account: bench/runs/2026-07-16-1111-spec-draft-pmin-mtp/analysis.md +
 # docs/research/2026-07-16-1016-spec-draft-p-min-mtp.md.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

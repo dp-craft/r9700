@@ -2,13 +2,25 @@
 date: 2026-07-16 10:16
 slug: spec-draft-p-min-mtp
 title: llama.cpp --spec-draft-p-min and the MTP path (default, semantics, applicability)
-takeaway: On our build b9950 (commit 961e4b26a) the --spec-draft-p-min default is 0.0f (NOT 0.75) — 0.75 was the mid-2025/b6000-era default, since changed 0.9→0.75→0.0. More decisively: p_min is NOT consulted on the --spec-type draft-mtp path at all (an explicit post-merge TODO in the MTP PR #22673; the MTP draft loop stops purely on n_max, and drafts greedily with top_k=1). So for every Qwen3.6 MTP config in this repo, setting --spec-draft-p-min has ZERO effect — the only live draft-length lever is --spec-draft-n-max (default 3; our own n_max sweep peaks at 2-3). Recommendation: do NOT set --spec-draft-p-min; if we want to tune MTP draft depth, sweep --spec-draft-n-max instead. Verification DOES run the full sampler chain (penalties+temp), so penalties can reject drafts on the classic path — but our local probe shows pp's decode cost is host-side sampler compute, not rejection.
+takeaway: ⚠ CORRECTED 2026-07-16 by measurement — the original "p_min is inert on MTP" conclusion (from source-reading) is FALSE on our build. Test bench/runs/2026-07-16-1111-spec-draft-pmin-mtp/ shows --spec-draft-p-min IS live on the --spec-type draft-mtp path at b9950: raising it 0->0.99 cuts drafted-tok/pass 2.98->0.46, lifts acceptance 69%->100%, changes the output, and LOWERS decode 160->106 t/s. It does NOT reduce run-to-run fluctuation (6/6 distinct replies at every level, both 35B and 27B). Still true: default at our commit is 0.0f (NOT 0.75 — that was the b6000 default; history 0.9→0.75→0.0). Corrected recommendation: do NOT set --spec-draft-p-min for throughput (it costs decode) and it is not a fluctuation remedy; --spec-draft-n-max remains the draft-depth lever (peaks 2-3). Penalty samplers still cost ~2 ms/token host work under MTP; keep them 0 for coding.
 -->
 
 # Research: llama.cpp `--spec-draft-p-min` and the MTP path
 
-- **Date:** 2026-07-16 10:16   · **Question:** Is `--spec-draft-p-min 0.75` set in our stack, where does 0.75 come from, and should we set it for the Qwen3.6 MTP configs?
-- **Confidence:** high (the two load-bearing facts — our build's default, and MTP non-applicability — are line-verified against source at our exact commit and against the MTP PR)   · **Sources:** 8 (Tier-1: 8, Tier-2: 2 anecdotal, flagged)
+> ## ⚠ ERRATUM — 2026-07-16, corrected by measurement
+> **This report's central claim ("`--spec-draft-p-min` is inert on the MTP path") is WRONG on our build.** It was a source-reading (PR #22673 TODO + master `speculative.cpp`); a direct test on b9950 (`bench/runs/2026-07-16-1111-spec-draft-pmin-mtp/analysis.md`) refutes it. Measured, 35B-A3B, `--spec-type draft-mtp`, seed 42:
+>
+> | p_min | draft tok/pass | acceptance | decode t/s | reply |
+> |--:|--:|--:|--:|--|
+> | 0.0 | 2.98 | 69% | 159.9 | ref |
+> | 0.5 | 2.10 | 82% | 146.9 | changed |
+> | 0.9 | 1.05 | 99% | 125.9 | changed |
+> | 0.99 | 0.46 | 100% | 106.5 | changed |
+>
+> **p_min is live and gates draft depth exactly as documented — it just *costs* decode on our workload, and does NOT reduce fluctuation** (6/6 distinct replies across seeds 42–47 at every level, 35B and 27B). Either our commit `961e4b26a` re-enabled p_min for MTP after the PR, or the master snapshot the subagents read differs from our build; **empirics on our build govern (iron rules 2, 7).** Read the source-based findings below as "what the source text said", now superseded by the test. The *default* finding (0.0f at our commit, not 0.75) is unaffected and still correct.
+
+- **Date:** 2026-07-16 10:16 (research) · **Corrected:** 2026-07-16 (measured)   · **Question:** Is `--spec-draft-p-min 0.75` set in our stack, where does 0.75 come from, and should we set it for the Qwen3.6 MTP configs?
+- **Confidence:** ~~high~~ → **the MTP-applicability finding was WRONG** (see erratum); the default-value and semantics findings hold   · **Sources:** 8 (Tier-1: 8, Tier-2: 2 anecdotal, flagged) + 1 local measurement (this build)
 
 ## Summary
 
