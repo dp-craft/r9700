@@ -10,11 +10,20 @@ Usage (from a run script):
     ... run the benchmark ...
     kill $SAMPLER_PID
 
-CSV columns: unix_ts, vram_used_mib, vram_total_mib, gtt_used_mib, power_w
+CSV columns: unix_ts, vram_used_mib, vram_total_mib, gtt_used_mib, power_w, temp_c, sclk_mhz,
+             mclk_mhz, gpu_busy_pct
 gtt_used_mib = GPU-accessible SYSTEM RAM in use. On a healthy VRAM-only run it stays ~flat at the
 idle baseline; a rising GTT figure means the model/KV spilled into host RAM (the freeze risk) and
 the run is NOT VRAM-only. Summary appended as a final comment line on SIGTERM/INT:
 '# load_vram_used_mib=<first sample> peak_vram_used_mib=... peak_gtt_used_mib=... avg_power_w=... samples=...'
+
+gpu_busy_pct + mclk_mhz exist to separate the two ways a run can be slow, which sclk alone CANNOT
+distinguish (2026-07-16): a GPU that is DOWNCLOCKED (thermal/power limit → low sclk, but busy%
+stays high) versus a GPU that is STARVED by a CPU-bound host loop (low sclk AND low busy% — the
+DPM governor drops the clock because there is no work queued). The pp>0 / MTP decode collapse is
+exactly this ambiguity: ~58% sclk at ~62% power reads as "throttling" until busy% shows the GPU is
+simply idle-waiting on the host sampler. mclk is the companion read: a memory-bound decode holds
+mclk pinned high even when sclk sags.
 """
 import argparse, json, shutil, signal, subprocess, sys, time
 
@@ -25,7 +34,7 @@ def _digits(s):
 
 def read_amd():
     out = subprocess.run(["rocm-smi", "--showmeminfo", "vram", "gtt", "--showpower",
-                          "--showtemp", "--showclocks", "--json"],
+                          "--showtemp", "--showclocks", "--showuse", "--json"],
                          capture_output=True, text=True, timeout=10).stdout
     card = next(iter(json.loads(out).values()))
     used = int(card["VRAM Total Used Memory (B)"]) // 2**20
@@ -50,17 +59,26 @@ def read_amd():
     for k, v in card.items():
         if "sclk" in k.lower() and "clock" in k.lower():
             sclk = _digits(v); break
-    return used, total, gtt, power, temp, sclk
+    mclk = None                                   # memory clock (MHz)
+    for k, v in card.items():
+        if "mclk" in k.lower() and "clock" in k.lower():
+            mclk = _digits(v); break
+    busy = None                                   # "GPU use (%)" — 0 when the host starves the GPU
+    for k, v in card.items():
+        if "use" in k.lower() and "%" in k:
+            busy = _digits(v); break
+    return used, total, gtt, power, temp, sclk, mclk, busy
 
 def read_nvidia():
     out = subprocess.run(["nvidia-smi",
-                          "--query-gpu=memory.used,memory.total,power.draw,temperature.gpu,clocks.sm",
+                          "--query-gpu=memory.used,memory.total,power.draw,temperature.gpu,clocks.sm,"
+                          "clocks.mem,utilization.gpu",
                           "--format=csv,noheader,nounits"],
                          capture_output=True, text=True, timeout=10).stdout
     parts = [x.strip() for x in out.splitlines()[0].split(",")]
-    used, total, power, temp, sclk = parts[0], parts[1], parts[2], parts[3], parts[4]
+    used, total, power, temp, sclk, mclk, busy = parts[:7]
     return (int(float(used)), int(float(total)), None, float(power),  # no GTT concept on NVIDIA
-            _digits(temp), _digits(sclk))
+            _digits(temp), _digits(sclk), _digits(mclk), _digits(busy))
 
 def main():
     ap = argparse.ArgumentParser()
@@ -84,13 +102,15 @@ def main():
 
     def _n(x): return "" if x is None else x
     with open(a.out, "w") as f:
-        f.write("unix_ts,vram_used_mib,vram_total_mib,gtt_used_mib,power_w,temp_c,sclk_mhz\n")
+        f.write("unix_ts,vram_used_mib,vram_total_mib,gtt_used_mib,power_w,temp_c,sclk_mhz,"
+                "mclk_mhz,gpu_busy_pct\n")
         while not stop:
             try:
-                used, total, gtt, power, temp, sclk = reader()
-                f.write(f"{time.time():.1f},{used},{total},{_n(gtt)},{_n(power)},{_n(temp)},{_n(sclk)}\n")
+                used, total, gtt, power, temp, sclk, mclk, busy = reader()
+                f.write(f"{time.time():.1f},{used},{total},{_n(gtt)},{_n(power)},{_n(temp)},"
+                        f"{_n(sclk)},{_n(mclk)},{_n(busy)}\n")
                 f.flush()
-                rows.append((used, gtt, power, temp, sclk))
+                rows.append((used, gtt, power, temp, sclk, mclk, busy))
             except Exception:
                 pass  # transient smi hiccup — keep sampling
             # sleep in small slices so signals interrupt promptly
@@ -107,6 +127,8 @@ def main():
             f.write(f"# load_vram_used_mib={rows[0][0]} peak_vram_used_mib={max(r[0] for r in rows)} "
                     f"peak_gtt_used_mib={_peak(1)} avg_power_w={_avg(2)} peak_power_w={_peak(2)} "
                     f"peak_temp_c={_peak(3)} avg_sclk_mhz={_avg(4)} peak_sclk_mhz={_peak(4)} "
+                    f"avg_mclk_mhz={_avg(5)} peak_mclk_mhz={_peak(5)} "
+                    f"avg_gpu_busy_pct={_avg(6)} peak_gpu_busy_pct={_peak(6)} "
                     f"samples={len(rows)}\n")
 
 if __name__ == "__main__":

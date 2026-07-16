@@ -1,0 +1,32 @@
+run:        2026-07-16 09:27  mtp-sampler-probe (scouting probe, NOT a campaign)
+question:   does presence_penalty cost decode by REJECTING MTP drafts (the 27b-vs-35b campaign's
+            published mechanism), or by some other route? Instrumented with acceptance rate,
+            reply sha1, and host CPU-seconds — none of which the campaign read.
+verdict:    mechanism REFUTED. The cost is a fixed ~2 ms/token of host work incurred by the
+            penalties sampler branch; draft acceptance is unaffected. See the analysis doc.
+
+host:       AMD Radeon AI PRO R9700 (gfx1201), 32624 MiB · HSA_OVERRIDE_GFX_VERSION=12.0.1
+            ROCm-SMI 7.8.0 · Ubuntu 24.04 · kernel 6.17 · Ryzen 5 3600 (6c/12t), 31 GB RAM, no swap
+engine:     llama.cpp b9950-961e4b26a, Vulkan/RADV (bench/llamacpp-vulkan/llama-server)
+launcher:   bench/engine-bench/serve_llamacpp.sh (MTP=1 -> --spec-type draft-mtp)
+models:     Qwen3.6-27B-MTP-Q4_K_M.gguf (dense; blk.64.nextn.*, qwen35.nextn_predict_layers)
+            Qwen3.6-35B-A3B-UD-Q4_K_M.gguf (MoE; blk.40.nextn.*, qwen35moe.nextn_predict_layers)
+fixed:      ctx 4096 · KV f16 · -ub 2048 -b 4096 -fa on -ngl 99 -np 1 · seed 42
+            temp 0.6 / top_p 0.95 / top_k 20 unless the cell's `sampler` field says otherwise
+prompt:     one ~24-token instruction ("Write a TypeScript function that debounces an async call.")
+            -> max_tokens 600 (35B) / 300 (27B dense). SHALLOW BY DESIGN: this probe tests a
+            mechanism, not the campaign's operating point.
+reps:       n=1 per cell, except the decisive pp=0.0 / pp=0.01 pair which is n=2 (repA/repB,
+            interleaved) to bound run-to-run noise (measured: ~0.5% on decode t/s).
+sampling:   bench/lib/vram_sampler.py --interval 0.5, one CSV per cell (gpu_<label>.csv);
+            row.py averages over the ACTIVE window only (gpu_busy_pct > 10).
+regenerate: ./probe.sh    (~12 min: 10 server loads + 26 requests)
+
+LIMITS — read before quoting any number:
+  * n=1 on most cells. Decisive on MECHANISM (the pp=0.01 cell is sha1-identical, which no amount
+    of noise can manufacture); NOT authoritative on MAGNITUDE.
+  * ctx 4096 vs the campaign's ~132.9k. MTP's own benefit is known to GROW with depth
+    (docs/analysis/2026-07-11-2200-deep-context-35b.md: +14% -> +35% decode, 8K -> 200K), and the
+    campaign's deep cells imply a LARGER tax (+4.16 ms/tok) than this probe measures (+2.0 ms/tok).
+    The depth-confirm at 133k is the open item.
+  * GTT figures here are at ctx 4096 and are NOT the campaign's spill. Idle GTT baseline = 79 MiB.

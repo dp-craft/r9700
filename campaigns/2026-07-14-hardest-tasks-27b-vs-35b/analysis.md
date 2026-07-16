@@ -2,7 +2,7 @@
 date: 2026-07-15 22:00
 slug: hardest-tasks-27b-vs-35b
 title: Hardest tasks at 128k — 27B quant ladder, reasoning budget, and 35B-A3B sampling (R9700)
-takeaway: 14 cells x 5 tasks x 3 reps = 210 replies at ~132.9k tokens. Three axes, one clear answer each. QUANT: bounded null — Q4_K_M 78.3, Q4_K_XL 69.8, Q5_K_M 76.5, Q6_K 80.9 TS%, no paired delta significant, design resolves only >=12 pts; the accidental KV control (Q5_K_M f16 74.3 vs q8_0 76.5) bounds the README's KV confound as negligible. BUDGET: 4096 to 16384 buys +0.3 pts on the 27B (t=0.37, ns) for +60s; above ~4k the budget stops binding — 14 of 15 35B replies are IDENTICAL between 16384 and unlimited, and the one reply unlimited freed ran away to 31,093 think tokens and fell 77 to 45. Refutes our own sourced hypothesis that truncated thinking drives the wall. SAMPLING (35B): temp 0.6 (Qwen's coding recipe) is the best point at 77.5; temp 0.3 is 70.0 (delta -8.3 vs Q4_K_M, t=-4.11, SIGNIFICANT) and no steadier — "low temp = stable" is folklore, refuted. The two presence_penalty>0 vendor presets are the two worst cells (62.1 / 63.0) AND lose ~40% decode (78.1/72.6 vs 115.7-120.2 t/s) — pp appears to break MTP acceptance. STABLE: the wall is cleanliness (lint 0.36, types 0.47) not logic (tests 0.84, reuse 0.99); 35B is ~2.6-3.7x faster to a full answer; reruns pay (delta rerun +4.6..+17.5). GTT spill 1551-2841 MiB in ALL 14 cells. References are NOT depth-matched (~213x shallower) — no bare local-vs-reference delta is a capability gap.
+takeaway: 14 cells x 5 tasks x 3 reps = 210 replies at ~132.9k tokens. Three axes, one clear answer each. QUANT: bounded null — Q4_K_M 78.3, Q4_K_XL 69.8, Q5_K_M 76.5, Q6_K 80.9 TS%, no paired delta significant, design resolves only >=12 pts; the accidental KV control (Q5_K_M f16 74.3 vs q8_0 76.5) bounds the README's KV confound as negligible. BUDGET: 4096 to 16384 buys +0.3 pts on the 27B (t=0.37, ns) for +60s; above ~4k the budget stops binding — 14 of 15 35B replies are IDENTICAL between 16384 and unlimited, and the one reply unlimited freed ran away to 31,093 think tokens and fell 77 to 45. Refutes our own sourced hypothesis that truncated thinking drives the wall. The MoE, unlike the dense 27B, DOES benefit from a bigger budget (35B rb4096 vs rb16384 -4.3, t=-5.45, SIGNIFICANT — surfaced by the 2026-07-16 --baseline re-analysis). SAMPLING (35B): temp 0.6 (Qwen's coding recipe) is the best point at 77.5; use the recipe WHOLE. CORRECTED 2026-07-16 (re-baselined within-model): temp 0.3's "significant" deficit was a wrong-baseline artifact and is WITHDRAWN (-7.5, t=-2.60, ns); only the whole general-mode preset survives (-15.4, t=-3.41). The presence_penalty>0 presets lose ~30-40% decode — but the mechanism ("pp breaks MTP acceptance") is REFUTED: it is a fixed ~2 ms/tok host tax on the penalties sampler, no MTP interaction, acceptance untouched (see docs/analysis/2026-07-16-0927-mtp-sampler-tax.md). STABLE: the wall is cleanliness (lint 0.36, types 0.47) not logic (tests 0.84, reuse 0.99); 35B is ~2.6-3.7x faster to a full answer; reruns pay (delta rerun +4.6..+17.5). GTT spill 1551-2841 MiB in ALL 14 cells. References are NOT depth-matched (~213x shallower) — no bare local-vs-reference delta is a capability gap.
 -->
 
 # Benchmark: Hardest tasks at 128k — 27B quant ladder, reasoning budget, and 35B-A3B sampling — R9700 (gfx1201)
@@ -24,9 +24,9 @@ takeaway: 14 cells x 5 tasks x 3 reps = 210 replies at ~132.9k tokens. Three axe
 
 2. **The reasoning budget is a no-op above ~4k — and the "truncated thinking" hypothesis is dead.** Our own sourced research (`docs/research/2026-07-15-1000-*`, Finding 3) argued that `--reasoning-budget 4096` truncates thinking ~8× below Qwen's guidance and was "a strong candidate cause of both the lint/types wall and the run-to-run fluctuation". **It is not.** Quadrupling the budget on the 27B moved quality by **+0.3 pts** (paired Δ, t=0.37, ns; per-task −2, +0, +0, +1, +3) and cost **+60 s per reply** (156.9 → 216.7 s). The mechanism is visible in the per-rep tables: at 16384 the models *choose* to think **~3.6k–11.6k** tokens per reply (cell means 5.7k–9.2k) — the cap stops binding, so **14 of the 35B's 15 replies are identical between budget 16384 and unlimited**. The single reply that unlimited actually freed ran to **31,093 think tokens** and collapsed from **77 → 45**.
 
-3. **Sampling is the one axis with a real, actionable signal — and it says "do what the vendor says".** On the 35B-A3B at budget 16384: **temp 0.6 → 77.5** (Qwen's precise-coding recipe), **temp 0.3 → 70.0**, **temp 1.0 → 68.4**, **Qwen "thinking general" preset (temp 1.0 / pp 1.5) → 62.1**, **Unsloth-only preset (temp 1.0 / top_p 1.0 / top_k 40 / min_p 0.0 / pp 2.0) → 63.0**. Two of these clear the digest's significance bar (see below), and both vendor presets carry a **presence_penalty > 0** — the two worst cells in the campaign. **Temp 0.3 was also no steadier than 0.6** (rep sd 11.2 vs 11.1): the "lower temperature stabilises output" folklore is refuted on its own terms.
+3. **Sampling is the one axis with a real, actionable signal — and it says "use the vendor's coding recipe, whole".** On the 35B-A3B at budget 16384: **temp 0.6 → 77.5** (Qwen's precise-coding recipe, the best point), **temp 0.3 → 70.0**, **temp 1.0 → 68.4**, **Qwen "thinking general" preset (temp 1.0 / pp 1.5) → 62.1**, **Unsloth-only preset (temp 1.0 / top_p 1.0 / top_k 40 / min_p 0.0 / pp 2.0) → 63.0**. ⚠ **CORRECTED 2026-07-16:** re-baselined **within-model** (`aggregate.py --baseline`), **only the whole general-mode preset is significant** (−15.4, t=−3.41 vs the coding recipe). The earlier "temp 0.3 is significantly worse" was a **wrong-baseline artifact** (it was measured against the 27B) and is **withdrawn** (−7.5, t=−2.60, ns). What survives cleanly: temp 0.3 bought **no** stability (rep sd 11.2 vs 11.1) — the "lower temperature stabilises output" folklore is refuted on its own terms — and **the vendor's coding recipe wins on every metric**. Pick it whole; do not tune individual knobs on this evidence.
 
-4. **presence_penalty costs ~40% of decode throughput, not just quality.** The only two cells with `presence_penalty > 0` are the only two 35B cells below 80 decode tok/s: **78.1** (pp 1.5) and **72.6** (pp 2.0) against **115.7–120.2** for every pp = 0 cell (MEASURED). Perfect separation across seven cells. **INFERRED:** presence_penalty distorts the sampled distribution away from the MTP draft's predictions, so speculative tokens get rejected and the speedup collapses. Untested — and the highest-value cheap experiment left.
+4. **presence_penalty costs ~30–40% of decode throughput — but NOT by the mechanism first published.** The only two cells with `presence_penalty > 0` are the only two 35B cells below 80 decode tok/s: **78.1** (pp 1.5) and **72.6** (pp 2.0) against **115.7–120.2** for every pp = 0 cell (MEASURED). ⚠ **The mechanism "pp rejects MTP drafts" is REFUTED** (2026-07-16): draft acceptance barely moves (81.5% → 77.4%), a `pp = 0.01` cell that changes **no token** still loses ~30% decode, and the cost reproduces with **MTP off** and on the **dense 27B**. It is a **fixed ~2 ms/token host cost** of switching on the penalties sampler — Amdahl's law, not an MTP interaction. Full account: `docs/analysis/2026-07-16-0927-mtp-sampler-tax.md`. **Bottom line unchanged: keep `presence_penalty = 0` for coding.**
 
 5. **The wall is cleanliness, not logic — and it is the same wall at every setting.** Fractional means across cells: **lint 0.36 · types 0.47** against **tests 0.84 · edge 0.87 · reuse 0.99** (MEASURED). No quant, no budget and no sampling point moves it. It binds the references too: **opus's** per-task lint runs **0.40–0.87** and opus hard-passes only **1 of 5** tasks.
 
@@ -42,24 +42,24 @@ The single most useful table in this report. "Stable" = survives the digest's ow
 |---|---|---|
 | The wall is cleanliness, not logic | **STABLE** | lint 0.36 · types 0.47 vs tests 0.84 · edge 0.87 · reuse 0.99; holds in all 14 cells and in the references |
 | 35B-A3B is far faster | **STABLE** | decode 115.7–120.2 vs 32.6–46.1 t/s; full answer 60.9 s (a3b rb4096) vs 212.6 s (Q6_K) — orders above noise |
-| `presence_penalty > 0` costs decode throughput | **STABLE** (mechanism INFERRED) | 78.1 / 72.6 t/s vs 115.7–120.2; perfect separation, 7 cells |
+| `presence_penalty > 0` costs decode throughput | **STABLE** (mechanism CORRECTED 2026-07-16) | 78.1 / 72.6 t/s vs 115.7–120.2. **Not** draft rejection — a fixed ~2 ms/tok host tax on the penalties sampler; reproduces MTP-off + on the 27B (`2026-07-16-0927-mtp-sampler-tax.md`) |
 | Budget > 4096 does not pay on the 27B | **STABLE** | paired Δ +0.3, t=0.37, ns, **sd 1.8** — a tight null, not an underpowered one |
 | Unlimited budget is harmful | **STABLE** | 14/15 replies identical to rb16384; the one freed reply ran to 31,093 tok and fell 77→45; runaway 7% |
 | Reruns pay | **STABLE** | Δ rerun +4.6 … +17.5 pts across all cells; hard@R 20% vs hard@1 7% |
 | GTT spill | **STABLE** (MEASURED) | 1551–2841 MiB, all 14 cells |
 | Per-rep determinism at a fixed seed | **STABLE** | replies are identical across cells wherever the budget did not bind |
 | Q5_K_M at f16 KV / ctx 163840 fits | **STABLE** (MEASURED) | peak VRAM **31918** MiB of 32624; 0 failures |
-| Temp 0.6 beats temp 0.3 on the 35B | **SIGNIFICANT vs the Q4_K_M baseline only** | t03 meanΔ −8.3, t=−4.11 vs Q4_K_M; no direct t03-vs-t06 test is printed |
-| Qwen "thinking general" preset is worse | **SIGNIFICANT vs the Q4_K_M baseline only** | qwen-gen meanΔ −16.2, t=−3.08 vs Q4_K_M |
+| Temp 0.6 beats temp 0.3 on the 35B | ⚠ **WITHDRAWN 2026-07-16 — NOT resolvable** | Within-model (`--baseline a3b-…-rb16384`): t03 meanΔ −7.5, t=−2.60 < 2.776, **ns**. The old "−8.3, t=−4.11" was vs the 27B Q4_K_M (wrong model) |
+| Qwen "thinking general" **preset** is worse | **SIGNIFICANT (within-model, corrected)** | qwen-gen meanΔ **−15.4, t=−3.41** vs the 35B coding recipe. Splits ~−9 temp / −6 pp; **neither component alone is resolvable** |
 | **The quant ladder** | **NOT RESOLVABLE** | all paired Δ ns (\|t\| ≤ 1.98 < 2.776); all CIs overlap; resolution ≳12 pts |
 | **27B vs 35B-A3B quality** | **NOT RESOLVABLE** | paired Δ −5.1, t=−1.70, ns |
 | **KV f16 vs q8_0** | **NOT RESOLVABLE** (and bounded small) | Q5_K_M 74.3 (f16) vs 76.5 (q8_0); no test printed; CIs overlap |
-| Budget 4096→16384 on the **35B** | **NOT RESOLVABLE** | 73.3 → 77.5 raw; no direct test printed |
+| Budget 4096→16384 on the **35B** | ⚠ **RESOLVED 2026-07-16 — SIGNIFICANT** | Within-model paired: **−4.3, t=−5.45** (`--baseline a3b-…-rb16384`). The MoE genuinely benefits from a bigger budget; the dense 27B does not (+0.3, ns) |
 | More budget steadies the 35B | **NOT RESOLVABLE** | rep sd 15.7 → 11.1 → 12.6; sd from 3 reps is itself noisy; no test |
 | The judge separates the cells | **NOT RESOLVABLE** | 2.7–3.6 band on 0–5; no significance test run |
-| The Unsloth-only preset is worse | **NOT SIGNIFICANT** | meanΔ −15.3 but t=−2.10 < 2.776 — large and unresolved |
+| The Unsloth-only preset is worse | **NOT SIGNIFICANT** | Within-model: meanΔ −14.5, t=−1.84 < 2.776 — large and unresolved |
 
-> **Every comparison the digest marks SIGNIFICANT is listed above — there are exactly two, and both are sampling cells measured against the Q4_K_M baseline.** Everything else in this campaign is *not* significant. Where a Δ is large but not significant (Unsloth preset −15.3; Q4_K_XL −8.5) that means **unresolved**, not "no effect".
+> **⚠ Updated 2026-07-16 after within-model re-baselining (`aggregate.py --baseline`).** The **default** digest (vs Q4_K_M) marks exactly two comparisons SIGNIFICANT — both sampling cells — but one of those, *"temp 0.3 vs Q4_K_M"*, is a **cross-model artifact** and does **not** survive within-model (see the two withdrawn/corrected rows above). The comparisons that are **genuinely** significant after correction: the whole **general-mode preset** (−15.4, t=−3.41, within-model) and the **35B budget** 4096→16384 (−4.3, t=−5.45). Everything else is *not* significant — a large-but-unresolved Δ (Unsloth preset −14.5; Q4_K_XL −8.5) means **unresolved**, not "no effect".
 
 ---
 
@@ -195,27 +195,38 @@ This axis was designed to test a **sourced** hypothesis from our own research do
 
 Five sampling points on the 35B-A3B, all at budget 16384, all on the identical prompt. Three form a clean single-variable temperature axis (everything else pinned at Qwen's coding recipe); two are vendor presets carried whole (which move temperature **and** presence_penalty together, so they are labelled points, not axis points).
 
-| cell | temp | top_p | top_k | pp | TS % | rep sd | judge/5 | decode t/s | Δ vs Q4_K_M (paired) | source of the recipe |
+| cell | temp | top_p | top_k | pp | TS % | rep sd | judge/5 | decode t/s | **Δ vs `t06` (within-model, paired)** | source of the recipe |
 |---|--:|--:|--:|--:|--:|--:|--:|--:|---|---|
-| `a3b-…-rb16384` | **0.6** | 0.95 | 20 | 0.0 | **77.5** | 11.1 | 3.3 | 120.1 | −0.8, t=−0.26, ns | **Qwen: "thinking, precise coding"** |
-| `a3b-…-t03` | 0.3 | 0.95 | 20 | 0.0 | **70.0** | 11.2 | 3.1 | 120.2 | **−8.3, t=−4.11, SIGNIFICANT** | **nobody** — a folklore probe |
-| `a3b-…-t10` | 1.0 | 0.95 | 20 | 0.0 | **68.4** | 12.1 | 3.1 | 115.7 | −9.9, t=−1.41, ns | temp from Qwen "thinking, general" |
-| `a3b-…-qwen-gen` | 1.0 | 0.95 | 20 | **1.5** | **62.1** | 13.5 | 3.0 | **78.1** | **−16.2, t=−3.08, SIGNIFICANT** | Qwen: "thinking, general" (whole preset) |
-| `a3b-…-unsloth-reason` | 1.0 | **1.0** | **40** | **2.0** | **63.0** | **16.3** | **2.7** | **72.6** | −15.3, t=−2.10, ns | **Unsloth card only** — Qwen does not document it |
+| `a3b-…-rb16384` (**`t06`**) | **0.6** | 0.95 | 20 | 0.0 | **77.5** | 11.1 | 3.3 | 120.1 | — (baseline) | **Qwen: "thinking, precise coding"** |
+| `a3b-…-t03` | 0.3 | 0.95 | 20 | 0.0 | **70.0** | 11.2 | 3.1 | 120.2 | −7.5, t=−2.60, **ns** | **nobody** — a folklore probe |
+| `a3b-…-t10` | 1.0 | 0.95 | 20 | 0.0 | **68.4** | 12.1 | 3.1 | 115.7 | −9.1, t=−1.11, ns | temp from Qwen "thinking, general" |
+| `a3b-…-qwen-gen` | 1.0 | 0.95 | 20 | **1.5** | **62.1** | 13.5 | 3.0 | **78.1** | **−15.4, t=−3.41, SIGNIFICANT** | Qwen: "thinking, general" (whole preset) |
+| `a3b-…-unsloth-reason` | 1.0 | **1.0** | **40** | **2.0** | **63.0** | **16.3** | **2.7** | **72.6** | −14.5, t=−1.84, ns | **Unsloth card only** — Qwen does not document it |
 
-**Read carefully: the paired tests printed by the digest are against `Q4_K_M`, a different model.** There is **no printed significance test between the sampling cells themselves** (e.g. t03 vs t06). So the honest statement is: *two sampling cells differ significantly from the 27B Q4_K_M baseline, and the raw sampling ordering is consistent across every metric we have.* Fixing this is the top item on the further-tests list.
+> **⚠ CORRECTED 2026-07-16 — this table's Δ column was re-baselined, and one verdict flipped.**
+> It previously tested every sampling cell against **`Q4_K_M` — a different model** (27B dense vs 35B
+> MoE), making each "sampling" verdict a cross-model comparison. `aggregate.py` now takes
+> **`--baseline`** (further-test #3, done; re-analysis, no GPU time) and the column above is
+> `--baseline a3b-d128-f16-rb16384`, i.e. **the same model at the vendor's coding temperature**.
+> **What changed: `t03` was published as `−8.3, t=−4.11, SIGNIFICANT` and is now `−7.5, t=−2.60,
+> NOT significant`** (crit 2.776, n=5 tasks). *"Temperature 0.3 is significantly worse"* was an
+> **artifact of the wrong baseline** and is hereby withdrawn. Only the whole `qwen-gen` **preset**
+> survives as significant. Regenerate: `python3 aggregate.py --baseline a3b-d128-f16-rb16384`.
 
 **What the sweep shows:**
 
 - **Qwen's documented coding recipe (temp 0.6 / pp 0.0) is the best point on every metric simultaneously** — TS 77.5, judge 3.3, full decode speed. It is not a coincidence that the vendor's number wins; it is the number the model was tuned for. (CLAIMED, verified: the [Qwen3.6-35B-A3B card](https://huggingface.co/Qwen/Qwen3.6-35B-A3B) lists `temperature 0.6 / top_p 0.95 / top_k 20 / min_p 0.0 / presence_penalty 0.0` and labels it for **"precise coding tasks"**; [Unsloth's Qwen3.6 docs](https://unsloth.ai/docs/models/qwen3.6) carry the same values in their thinking-mode table, without that coding-specific label. The "precise coding" attribution is Qwen's.)
-- **Temperature 0.3 is folklore, and the folklore is wrong twice.** It is documented by **neither** vendor. It scored **70.0** — the only sampling cell whose Δ vs the baseline is significant — **and it was no steadier than 0.6** (rep sd **11.2 vs 11.1**). The intuition "lower temperature = more deterministic = more reliable code" fails on its own terms here: it bought no stability and cost quality. **This kills the cheapest folk remedy for our fluctuation problem.**
-- **The two presence_penalty presets are the campaign's floor — on quality, on judge score, on stability, and on speed.** 62.1 / 63.0 TS, judge 3.0 / **2.7** (the worst of 14 cells), rep sd 13.5 / **16.3** (the worst), decode **78.1 / 72.6**. Both are *documented vendor settings* — just not for this job: Qwen's pp 1.5 belongs to **"thinking, general"**, and Qwen explicitly drops pp to **0.0** for precise coding. Unsloth's own docs carry the same caveat — a higher presence_penalty "may result in slight decrease in performance" (CLAIMED, [unsloth.ai/docs/models/qwen3.6](https://unsloth.ai/docs/models/qwen3.6)).
-  - **INFERRED, and important:** *applying a vendor preset from the wrong section is worse than any quantisation choice in this campaign.* The pp presets cost ~15 pts; the entire Q4→Q6 ladder spans 11 pts and is not resolvable. **Sampling hygiene dominates quant shopping.**
-- **The Unsloth-only preset is the single worst configuration tested** — and it has the weakest provenance. Our research doc verified that Qwen's card lists **three** parameter sets while Unsloth's lists **four**, adding this `top_k 40 / top_p 1.0 / min_p 0.0 / pp 2.0` set while attributing the whole block to the Qwen team. **INFERRED:** treat Unsloth-only recipes as unattributed until Qwen documents them. (Its Δ −15.3 is *not* significant at t=−2.10 — large and unresolved.)
+- **Temperature 0.3 is folklore, and it bought nothing — but it is NOT resolvably worse.** It is documented by **neither** vendor. It scored **70.0** and **was no steadier than 0.6** (rep sd **11.2 vs 11.1**), so the intuition "lower temperature = more deterministic = more reliable code" fails on its own terms: it bought **no stability**. ⚠ **CORRECTED:** the claim that it *cost quality significantly* does not survive re-baselining (−7.5, t=−2.60, ns — see the box above). The honest reading is **"temp 0.3 is not documented, buys no stability, and shows no measurable gain"** — a reason not to bother, not evidence of harm.
+- **The two presence_penalty presets are the campaign's quality floor — but pp is NOT established as the cause.** 62.1 / 63.0 TS, judge 3.0 / **2.7** (the worst of 14 cells), rep sd 13.5 / **16.3** (the worst), decode **78.1 / 72.6**. Both are *documented vendor settings* — just not for this job: Qwen's pp 1.5 belongs to **"thinking, general"**, and Qwen explicitly drops pp to **0.0** for precise coding. Unsloth's own docs carry the same caveat — a higher presence_penalty "may result in slight decrease in performance" (CLAIMED, [unsloth.ai/docs/models/qwen3.6](https://unsloth.ai/docs/models/qwen3.6)).
+  - ⚠ **CORRECTED — the causal attribution to `presence_penalty` was wrong.** Both pp>0 cells **also run temperature 1.0**; `unsloth-reason` additionally moves `top_p 0.95→1.0` and `top_k 20→40`. `t10` (temp 1.0, pp 0.0) is the single-variable control and it was **sitting in the data unused**. Splitting the preset against it (MEASURED, `--baseline a3b-d128-f16-rb16384-t10`): **pp alone −6.3, t=−0.54, ns** · **temp alone −9.1, t=−1.11, ns** · **both together −15.4, t=−3.41, SIGNIFICANT**. The **preset as a whole** is significantly worse than the coding recipe; it splits ~**−9 temp / −6 pp** and **neither component is resolvable**. "presence_penalty is the campaign's floor" is largely a **temperature-1.0 side effect**.
+  - **The advice survives, the mechanism does not:** *applying a vendor preset from the wrong section is worse than any quantisation choice in this campaign.* The presets cost ~15 pts; the entire Q4→Q6 ladder spans 11 pts and is not resolvable. **Sampling hygiene dominates quant shopping** — but pick the recipe **whole**, and do not attribute the damage to any one knob.
+- **The Unsloth-only preset is the single worst configuration tested** — and it has the weakest provenance. Our research doc verified that Qwen's card lists **three** parameter sets while Unsloth's lists **four**, adding this `top_k 40 / top_p 1.0 / min_p 0.0 / pp 2.0` set while attributing the whole block to the Qwen team. **INFERRED:** treat Unsloth-only recipes as unattributed until Qwen documents them. (Its Δ −14.5 is *not* significant at t=−1.84 — large and unresolved.)
 
-### The presence_penalty × MTP interaction — the sharpest unexplained result
+### The penalty-sampler tax — ⚠ MECHANISM REFUTED 2026-07-16 (was: "the presence_penalty × MTP interaction")
 
-**MEASURED, perfect separation across seven 35B cells:**
+**The decode effect is real. The published mechanism was wrong, and there is no MTP interaction.**
+
+**MEASURED, the effect (unchanged), across seven 35B cells:**
 
 | presence_penalty | cells | decode t/s |
 |---|---|---|
@@ -223,9 +234,75 @@ Five sampling points on the 35B-A3B, all at budget 16384, all on the identical p
 | **1.5** | qwen-gen | **78.1** |
 | **2.0** | unsloth-reason | **72.6** |
 
-- Same model, same weights, same KV, same budget, same backend. The only thing that changed is a sampler penalty — and **~40% of decode throughput disappeared**.
-- **INFERRED mechanism:** MTP speculative decoding only wins when the sampled token matches the draft's proposal. `presence_penalty` re-weights logits *after* the draft was produced, so it systematically rejects draft tokens; rejection means the speculation is wasted and decode falls back toward the unaccelerated rate. The size of the drop is consistent with that (the 35B's ~120 t/s is largely an MTP effect).
-- **This is untested and it matters beyond this box:** if true, any sampler that perturbs logits (presence/frequency/repetition penalties, aggressive min_p) silently taxes every MTP deployment. **One MTP-on/off × pp-on/off run answers it.** See further-tests #2.
+> **⚠ This section previously read:** *"MTP speculative decoding only wins when the sampled token
+> matches the draft's proposal. `presence_penalty` re-weights logits after the draft was produced, so
+> it systematically rejects draft tokens… any sampler that perturbs logits silently taxes every MTP
+> deployment. This is untested — one MTP-on/off × pp-on/off run answers it."*
+>
+> **It was not untested — it was already answerable from this campaign's own data.** `draft_n` and
+> `draft_n_accepted` are present on **210/210** rows of `out/outputs.jsonl` (`capture.py` stores
+> llama.cpp's whole `timings` blob); the digest simply never surfaced them. **Rejection does not
+> explain the drop:**
+>
+> | cell | temp | pp | **draft acceptance** | decode |
+> |---|--:|--:|--:|--:|
+> | `t10` | 1.0 | 0.0 | **81.5%** | 115.7 |
+> | `qwen-gen` | 1.0 | 1.5 | **77.4%** | **78.1** |
+>
+> Acceptance moves **4 points**; decode drops **32%**. Backing out the MTP geometry (**k = 3.00
+> draft tokens/pass, exactly, in every one of the 14 cells** — which validates the model; tokens
+> emitted per verify pass = 3·acceptance + 1), pure rejection predicts `qwen-gen` at **111.6 t/s**.
+> It measures **78.1**. **Acceptance explains ~11% of the drop.** The rest is the verify pass itself
+> getting **43% more expensive** (29.8 → 42.5 ms/pass) — the fixed host tax, not rejection.
+
+**The actual mechanism (MEASURED — but by OTHER measurements, see the caveat below):** enabling **any**
+penalty sampler adds a **fixed ~2 ms/token of host work**, and draft acceptance is untouched. The
+decisive cell sets `presence_penalty = 0.01` — too small to change any token — and the model emits a
+**sha1-identical reply** from **identical 585/404 draft counts**, and still loses **29% of decode**.
+`min_p 0.05`, an equally inert *non-penalty* sampler, costs **nothing**.
+
+| config | step time (pp off → on) | **Δ host CPU** | decode | damage |
+|---|---|--:|---|--:|
+| **27B dense**, MTP on | 16.97 → 18.43 ms | **+1.97 ms/tok** | 58.9 → 54.2 | **−7.9%** |
+| **35B MoE**, MTP **off** | 9.30 → 11.17 ms | **+2.07 ms/tok** | 107.6 → 89.5 | **−16.8%** |
+| **35B MoE**, MTP **on** | 6.21 → 8.69 ms | **+1.95 ms/tok** | 161.1 → 115.1 | **−28.6%** |
+
+- **There is no MTP × pp interaction — it is Amdahl's law.** One constant tax (+~2 ms/tok) lands on
+  every token regardless of MTP. MTP's only role is to make the step *short* (6.2 ms), so the same
+  constant eats a bigger fraction. The 27B looks immune purely because its step is 17 ms.
+  **The faster your decode, the worse `presence_penalty` looks.**
+- **Not "CPU-bound".** The server uses **0.64 → 0.69 of 12 threads** — nowhere near saturated. The
+  host work sits on the **critical path of a serial loop** (GPU forward → host sample → GPU forward),
+  so ~2 ms of single-threaded sampler time lands directly on wall-clock. The GPU then idle-waits and
+  the DPM governor drops sclk/power — **the low clock (~58% sclk, ~62% power in this campaign's
+  `gpu_*.csv`) is a consequence of the stall, not its cause.**
+- **The generalization was too strong.** It is *not* "any sampler that perturbs logits taxes every MTP
+  deployment" — `min_p` perturbs and is free, and `pp=0.01` perturbs nothing and is not. It is:
+  **enabling any penalty sampler costs a fixed per-token host cost, worst on fast GPUs / fast models /
+  speculative decoding, and shrinking on faster host CPUs.**
+- **The session-degradation confound is excluded.** These two pp cells were the last of a ~5-hour
+  session, so "the box was tired" was live. The follow-up ran them **fresh and interleaved** and
+  reproduced the tax at full magnitude.
+
+> **⚠ CAVEAT — these are OTHER measurements, NOT reproducible within this test set.** The mechanism
+> above comes from a **separate scouting probe at ctx 4096 on a ~24-token prompt, n=1–2**, versus this
+> campaign's **~132.9k tokens, n=15/cell**. **No number from it may be substituted into a table here.**
+> It settles a *mechanism* (its decisive cell is byte-identical, which noise cannot manufacture); it does
+> **not** settle *magnitude* at depth — and the two disagree by ~2×: the probe measures **+2.0 ms/tok**,
+> this campaign's cells imply **+4.16 ms/tok**. Either depth roughly doubles the tax, or part of this
+> campaign's gap is session degradation after all. **Unresolved — see further-tests #2.**
+> Full detail, data and limits: **`docs/analysis/2026-07-16-0927-mtp-sampler-tax.md`**
+> (data: `bench/runs/2026-07-16-0927-mtp-sampler-probe/`).
+
+**Two further corrections from the same probe, both relevant here:**
+
+- **`--spec-draft-n-max 3` (llama.cpp's default) is already optimal** — n-max 8 collapses to 80 t/s,
+  *worse than turning MTP off*. This campaign never varied it; the default was the right choice.
+- ⚠ **MTP is NOT output-preserving.** At a fixed seed, MTP-on and MTP-off emit **different text**
+  (batch-shape change → floating-point non-associativity; the known mechanism — CLAIMED, vLLM
+  [#27433](https://github.com/vllm-project/vllm/issues/27433), open, already cited below). **All 14
+  cells here are MTP-on, so nothing within this campaign is confounded by it** — but "MTP is free
+  speed" is false in principle, and an MTP-off arm would not reproduce these replies.
 
 ![Fluctuation](charts/fluctuation.svg)
 
@@ -241,14 +318,14 @@ Systematically, from the cells we actually have:
 |---|---|---|
 | **quant × budget** | Yes — Q4_K_M and Q5_K_M f16 each at 4096 and 16384 | **No interaction.** The budget null replicates on both quants (+0.3 and +3.2 raw, both unresolved). The budget conclusion is not a Q4_K_M artifact |
 | **quant × KV** | Yes — Q5_K_M at f16 and q8_0, same budget | **No interaction.** 74.3 vs 76.5; the README's flagged confound is bounded below the noise floor |
-| **model × budget** | Yes — 27B and 35B each at 4096 and 16384 | **Possibly asymmetric, unresolved.** 27B +0.3 (sd 1.8, a tight null); 35B +4.2 (no test, wide CIs). The 35B thinks more when freed (8541 vs 6834 mean tokens). **Cannot conclude** |
+| **model × budget** | Yes — 27B and 35B each at 4096 and 16384 | ⚠ **RESOLVED 2026-07-16 — the asymmetry is real.** Was "possibly asymmetric, unresolved (no test)". The paired test existed all along, it was just never run against the right baseline: **35B rb4096 vs rb16384 = −4.3, t=−5.45, SIGNIFICANT** (`--baseline a3b-d128-f16-rb16384`), while the **27B is a tight null** (+0.3, sd 1.8). **The MoE genuinely benefits from a bigger thinking budget and the dense 27B does not** — it thinks more when freed (8541 vs 6834 mean tokens). Saturating: rbmax vs rb16384 = −2.1, ns. ⚠ One of 13 printed comparisons (p≈0.005; survives a Bonferroni look at 0.065, marginal) |
 | **budget × fluctuation** | Yes | **27B: no change** (4.9 → 5.2). **35B: 15.7 → 11.1 → 12.6**, directionally lower, untested. The 35B is noisier than the 27B at *every* budget — capacity/MoE, not budget, drives its variance |
-| **temperature × budget** | **NO** | ⚠ **A gap.** All five sampling cells run at budget 16384 only. We cannot say whether temp 0.3's deficit would appear at 4096, or whether temp 1.0 needs more budget |
-| **sampling × model** | **NO** | ⚠ **A gap, and a confound.** *Every* sampling cell is the 35B-A3B. The temperature and presence_penalty findings are **not established for the dense 27B** — they may be MoE-specific |
-| **presence_penalty × MTP** | **NO** | ⚠ **The best hypothesis in the campaign.** Perfectly separated in the data, mechanically plausible, and one cheap run from being settled |
+| **temperature × budget** | **NO** | ⚠ **A gap.** All five sampling cells run at budget 16384 only. We cannot say whether temp 0.3 or temp 1.0 behaves differently at 4096 |
+| **sampling × model** | **NO** | ⚠ **A gap, and a confound.** *Every* sampling cell is the 35B-A3B. The temperature and presence_penalty *quality* findings are **not established for the dense 27B**. (The *decode*-tax mechanism now **is** — it reproduces on the 27B, see the refutation above.) |
+| **presence_penalty × MTP** | ⚠ **SETTLED — no interaction** | ⚠ **REFUTED 2026-07-16.** Was "the best hypothesis in the campaign — one cheap run from being settled". It is settled, and there is **no interaction**: the pp decode cost is a **fixed ~2 ms/tok host tax** (Amdahl), reproduces with MTP **off** and on the dense 27B, and leaves draft acceptance untouched. See the refutation above + `docs/analysis/2026-07-16-0927-mtp-sampler-tax.md` |
 | **quant × sampling** | **NO** | Untested. If sampling hygiene dominates quant choice (as the effect sizes suggest), this is the more valuable of the two axes to extend |
 
-**The connective insight (INFERRED):** the three axes are not equal citizens. **Sampling moved quality by ~15 pts; the entire quant ladder moved it by 11 pts and could not be resolved; the budget moved it by ~0.** Effort spent shopping for quants would have been better spent checking that the sampler matches the vendor's *task-specific* recipe — and that conclusion transfers off this box.
+**The connective insight (INFERRED):** the three axes are not equal citizens. **The full sampling *preset* moved quality by ~15 pts (temp+pp jointly, only the joint move is resolvable); the entire quant ladder moved it by 11 pts and could not be resolved; the budget moved it by ~0 on the dense 27B but a resolvable −4.3 on the MoE.** Effort spent shopping for quants would have been better spent checking that the sampler matches the vendor's *task-specific* recipe — and that conclusion transfers off this box.
 
 ---
 
@@ -379,8 +456,8 @@ bash bench/engine-bench/serve_llamacpp.sh \
 
 **Explicitly do not:**
 
-- **Do not set `presence_penalty > 0` for coding.** It is the largest quality loss in this campaign (~15 pts) *and* costs ~40% of decode throughput. Both vendor presets that carry it are documented for **general / non-thinking** use, not coding.
-- **Do not lower temperature below 0.6 to "stabilise" output.** Temp 0.3 scored 8.3 pts below the baseline (the only significant sampling result) and was **not** steadier (rep sd 11.2 vs 11.1). It is documented by neither vendor.
+- **Do not set `presence_penalty > 0` for coding** — for **two independent reasons**. (1) *Speed:* it switches on the penalties sampler, a **fixed ~2 ms/token host tax** that costs up to ~30% of decode on the fast MoE (worst under MTP; refuted mechanism, real effect — see the tax section). (2) *Quality:* the whole general-mode preset that carries it is ~15 pts worse than the coding recipe. ⚠ **Attribution note:** the quality loss is temp+pp *jointly*; pp *alone* is not resolvably worse (−6.3, ns). Use Qwen's coding recipe **whole** (pp 0.0); do not go hunting for a "good" pp value — any pp≠0 pays the speed tax for no established quality gain.
+- **Do not lower temperature below 0.6 to "stabilise" output.** Temp 0.3 is documented by neither vendor, bought **no** stability (rep sd 11.2 vs 11.1), and showed **no resolvable quality change** (−7.5, t=−2.60, ns — the earlier "significant" reading was a wrong-baseline artifact, withdrawn 2026-07-16). No reason to bother, no evidence of harm.
 - **Do not pay for Q5_K_M or Q6_K on this workload** (INFERRED from the null plus the cost): +36% wall time at Q6_K for Δ+2.6 pts, ns.
 - **Do not use `--reasoning-budget -1`** at this depth: it changed 1 reply in 15, and that reply ran away.
 
@@ -393,13 +470,13 @@ bash bench/engine-bench/serve_llamacpp.sh \
 **Tier 1 — these change conclusions.**
 
 1. **Add tasks, not reps.** The single change that would make the quant and model axes conclusive. **~15 hardest tasks resolves Δ=10 pts; ~60 resolves Δ=5** (digest, INFERRED). Reps do not help — task-to-task variance dominates. Every future run of this design should spend its GPU budget on task breadth. *(Cost: linear in tasks; no new infrastructure — `tasks.jsonl` + `eval-design.md` already define the pattern.)*
-2. **Settle presence_penalty × MTP — the cheapest high-value run in the queue.** 4 cells: {MTP on, off} × {pp 0.0, 1.5} on the 35B-A3B, 1 task, 3 reps. If pp really breaks speculative acceptance, that finding applies to **every MTP deployment**, not just ours — and it is currently a perfectly-separated pattern with no test behind it. *(Cost: ~1 hour.)*
-3. **Give the sampling axis its own baseline.** Every sampling cell is currently tested against `Q4_K_M` — a **different model**. Re-run `aggregate.py` with `a3b-d128-f16-rb16384` as the paired baseline so t03/t10/qwen-gen/unsloth-reason are tested against *the same model at the vendor's temperature*. **This is a re-analysis, not a re-run — no GPU time.** ⚠ Until it is done, "temp 0.3 is significantly worse" is a claim about temp-0.3-35B vs Q4_K_M-27B and must be read that way.
-4. **Break the sampling × model confound.** All five sampling points are the MoE. Run temp {0.3, 0.6, 1.0} on the **dense 27B Q4_K_M**. If the temperature effect is MoE-specific, that reframes the whole axis-3 conclusion; if it replicates, we have a transferable rule. *(Cost: 3 cells × 5 tasks × 3 reps.)*
+2. ⚠ **REVISED — the mechanism is settled; only the DEPTH magnitude is open.** The original "4-cell {MTP on/off} × {pp 0/1.5} throughput run" is **withdrawn**: throughput cannot separate rejection from overhead, and a scouting probe already did (2026-07-16, `docs/analysis/2026-07-16-0927-mtp-sampler-tax.md`) — the pp tax is a fixed ~2 ms/tok host cost, not draft rejection, with **no** MTP interaction. **What remains** is that the probe (ctx 4096) measures **+2.0 ms/tok** while this campaign's deep cells imply **+4.16 ms/tok**. The **depth-confirm** resolves it: `{MTP on, off} × {pp 0.0, 0.01, 1.5}` + `n-max {2,3,4}` at ~132.9k, **logging `draft_n_accepted`** (already captured — just surface it). Also closes the last of the session-degradation confound. *(Cost: ~1 hour; the one run worth GPU time here.)*
+3. ✅ **DONE — the sampling axis has its own baseline.** `aggregate.py` now takes **`--baseline`** (default = the quant ladder's Q4_K_M; guard rejects an unknown label). Reading the sampling axis within-model: `python3 aggregate.py --baseline a3b-d128-f16-rb16384` (whole preset) and `--baseline a3b-d128-f16-rb16384-t10` (pp isolated from temp). **Result:** *"temp 0.3 is significantly worse"* was an artifact of the wrong baseline and is **withdrawn** (−7.5, t=−2.60, ns); only the whole `qwen-gen` preset survives (−15.4, t=−3.41). No GPU time. The re-baseline also **resolved model × budget** (35B −4.3, t=−5.45, SIGNIFICANT).
+4. **Break the sampling × model confound — narrowed by #2/#3.** The *decode-tax* half of the confound is now broken (it reproduces on the dense 27B). What is still MoE-only is the **quality** half: run temp {0.3, 0.6, 1.0} on the **dense 27B Q4_K_M** to see if temperature moves TS% the way it (weakly, unresolvably) does on the MoE. **Cheaper than first stated: `un-d128-f16-rb16384` already IS the 27B temp-0.6 / budget-16384 point, so only temp 0.3 and 1.0 are new — 2 cells, not 3.** ⚠ Do **not** reuse `configs_sampling.jsonl` as-is: it scaffolds temp {0.3,0.6,0.9} at budget 4096, which matches neither the 35B arm (temp {0.3,0.6,1.0} / budget 16384) nor `un-d128-f16-rb16384`. *(Cost: 2 cells × 5 tasks × 3 reps.)*
 
 **Tier 2 — these close known gaps.**
 
-5. **Characterise the GTT spill.** Present in all 14 cells *including* the one with 5.4 GiB of VRAM headroom, so it is not a capacity problem. Bisect: MTP on/off, prefix cache on/off, ctx 163840 vs 65536, Vulkan vs ROCm/HIP. **Until it is attributed, nothing here is safe unattended on a no-swap host.**
+5. **Characterise the GTT spill — one bisect arm now has a partial answer.** Present in all 14 cells *including* the one with 5.4 GiB of VRAM headroom, so it is not a capacity problem. The 2026-07-16 probe ran the MTP-on/off arm at **ctx 4096**: **MTP costs ~84 MiB of GTT on the 35B** (224–234 MiB on vs 144–146 off; idle baseline 79). That is a real, attributable MTP cost — but a few hundred MiB at ctx 4096 is **not** this campaign's ctx-163840 spill, so it narrows the suspect list without closing the item. Still to bisect at depth: prefix cache on/off, ctx 163840 vs 65536, Vulkan vs ROCm/HIP. **Until it is attributed at depth, nothing here is safe unattended on a no-swap host.**
 6. **Correct the tier labels in `tasks.jsonl`.** `async-memo` and `pricing-deferred` measure as `sonnet`, not `opus`; `expr-eval` should read `≥opus` (no reference hard-passes it). The labels disagree with the measurement in 2 of 5 cases and the digest prints a ⚠ for them.
 7. **Test the repair arm (add-on B, `run_repair.sh` — already written, never run).** The wall is *one lint error* wide on the best replies (97% + judge 4·4·4, failed on lint 0.80). One `eslint --fix`-style turn feeding `tsc`/`eslint` errors back is the cheapest plausible way through it — and it is the only untested lever that attacks the wall directly rather than hoping a bigger or cleaner model clears it.
 8. **Depth-match the reference ladder.** Run haiku/sonnet/opus at ~132.9k tokens, n=3. Only then is *any* local-vs-reference number a capability gap. Currently the ladder answers a different question (one-shot, 213× shallower) and can only orient.
@@ -413,9 +490,9 @@ bash bench/engine-bench/serve_llamacpp.sh \
 
 **What is missing from the data — the gaps, stated plainly:**
 
-- **No temperature × budget cell** (all sampling at 16384) and **no sampling on the dense model** (all sampling on the MoE) — items 3 and 4.
-- **No MTP-off cell anywhere.** MTP is on in all 14 cells and is entangled with the 35B's entire speed story *and* with the presence_penalty anomaly.
-- **No significance test between sampling cells, between budget cells, or on the judge scores.** The digest only prints paired tests vs `Q4_K_M`.
+- **No temperature × budget cell** (all sampling at 16384) and **no sampling-QUALITY cell on the dense model** (all sampling on the MoE) — items 3 and 4. *(The sampling-SPEED mechanism is now covered on the 27B by the 2026-07-16 probe.)*
+- **No MTP-off cell IN THIS CAMPAIGN.** MTP is on in all 14 cells. It was entangled with the 35B's speed story and the pp anomaly; the 2026-07-16 probe added the MTP-off arm (at ctx 4096) and disentangled both — but at depth an MTP-off arm is still absent here.
+- **~~No significance test between sampling cells~~ — FIXED.** `aggregate.py --baseline` now prints within-model paired tests (2026-07-16). Still absent: significance between **budget** cells beyond the two now surfaced, and on the **judge** scores.
 - **No test of rep-sd differences.** "The MoE is noisier" is monotone across seven pairings and formally untested.
 - **No coding-specific external quant benchmark exists to anchor our null against.** Tier-1 Q4–Q6 comparisons are perplexity/KLD on wikitext, not pass-rates on code.
 - **No external anchor for `UD-Q4_K_XL` at all** — no Unsloth Dynamic accuracy table for Qwen3.6 could be located. Notable, since it is the lowest-scoring cell in the ladder.
@@ -431,7 +508,7 @@ bash bench/engine-bench/serve_llamacpp.sh \
 **Known confounds and limitations, worst first.**
 
 1. **Underpowering — the top limitation.** 5 tasks, rep sd 9.8 → resolution **≳12 pts**. Only 2 of 13 printed comparisons are significant. **The fix is more tasks, not more reps.**
-2. **The sampling axis is baselined against the wrong cell.** The digest's paired tests run against `Q4_K_M` (27B, dense, temp 0.6); the sampling cells are all 35B-A3B. The two SIGNIFICANT results are therefore *cross-model* comparisons. The sampling *ordering* is consistent across TS %, judge and decode speed, but its significance is not established within-model. **Further-tests #3 fixes this with no GPU time.**
+2. ✅ **FIXED 2026-07-16 — was: "the sampling axis is baselined against the wrong cell."** The digest's default paired tests run against `Q4_K_M` (27B, dense) — so the sampling cells' original verdicts were *cross-model*. `aggregate.py` now takes `--baseline`; re-run within-model, the temp-0.3 "significant" result **evaporated** (−7.5, t=−2.60, ns) and only the whole `qwen-gen` preset survives. **The default digest still uses Q4_K_M** (correct for the quant ladder) — read the sampling axis only from a `--baseline a3b-…` run.
 3. **The sampling axis is fully confounded with the model.** All five sampling cells are the MoE. Nothing here establishes temperature behaviour for the dense 27B.
 4. **KV is not uniform (by design).** Q5_K_M and Q6_K at rb4096 run **q8_0** KV because f16 caps them below the needed context (`README` §2). **Mitigated and now bounded:** the `q5-d128-f16-rb4096` cell supplies the direct control (74.3 f16 vs 76.5 q8_0) and the effect sits below the noise floor.
 5. **The reference ladder is not depth-matched.** 213× shallower, one-shot. Both sides are n=3 and the ladder is now complete across all 5 tasks — but depth is the confound, and more reps cannot fix it.

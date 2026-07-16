@@ -261,10 +261,17 @@ def tier_evidence(task, refs):
     return hp, " · ".join(seen)
 
 
-def render_uncertainty(D, configs_path=None):
+def render_uncertainty(D, configs_path=None, baseline=None):
     """Uncertainty + significance — WITHOUT this the reader treats noise as shape. Reports per-cell
-    sd/SE/95% CI, the within-(cell,task) rep noise, and a PAIRED-by-task t-test vs the Q4_K_M baseline
-    (pairing removes task-difficulty variance = the most sensitive test available at this n)."""
+    sd/SE/95% CI, the within-(cell,task) rep noise, and a PAIRED-by-task t-test vs a baseline
+    (pairing removes task-difficulty variance = the most sensitive test available at this n).
+
+    `baseline` picks the paired-test reference cell; it defaults to the quant ladder's Q4_K_M.
+    THAT DEFAULT IS ONLY VALID FOR THE 27B QUANT LADDER. The five sampling cells are all 35B-A3B,
+    so testing them against Q4_K_M silently makes every sampling verdict a CROSS-MODEL comparison
+    (27B dense vs 35B MoE) rather than a statement about the sampler. To read the sampling axis,
+    pass --baseline a3b-d128-f16-rb16384 (the same model at the vendor's coding temperature), or
+    --baseline a3b-d128-f16-rb16384-t10 to isolate presence_penalty from temperature."""
     cfgs = {c["label"]: c for c in jl(configs_path or os.path.join(HERE, "configs.jsonl"))}
     ts = jl(f"{D}/scores_typescript.jsonl")
     if not ts:
@@ -292,7 +299,10 @@ def render_uncertainty(D, configs_path=None):
               f"{len(sc(labels[0], tasks[0]))}-rep mean ≈ **{f(msd/max(len(sc(labels[0], tasks[0])),1)**0.5,1)} pts**. "
               f"A single-task cell-vs-cell gap must exceed ~**{f(2*1.96*msd/max(len(sc(labels[0], tasks[0])),1)**0.5,0)} pts** to beat rep noise alone."]
     # paired-by-task t-test vs baseline
-    base = QUANT_LADDER[0][0]
+    base = baseline or QUANT_LADDER[0][0]
+    if baseline and baseline not in cfgs:
+        sys.exit(f"aggregate: --baseline {baseline!r} is not a cell in configs.jsonl. Known: "
+                 + ", ".join(sorted(cfgs)))
     if base in cfgs:
         L += ["", f"### Paired Δ vs {_LADDER_NAME.get(base, base)} (by task — removes task-difficulty variance)", "",
               "| cell | Δ per task | meanΔ | sd | t | verdict |", "|---|---|--:|--:|--:|---|"]
@@ -472,11 +482,11 @@ def render_reps(D, configs_path=None, calib_files=None):
     return "\n".join(L) + "\n"
 
 
-def build_digest(D, out_path=None, configs_path=None, calib_files=None):
+def build_digest(D, out_path=None, configs_path=None, calib_files=None, baseline=None):
     cells = load_cells(D, configs_path)
     run_task_ids = {r.get("task_id") for r in jl(f"{D}/scores_typescript.jsonl")}
     bands = calib_bands(run_task_ids, calib_files)
-    md = (render_md(cells, bands) + render_uncertainty(D, configs_path)
+    md = (render_md(cells, bands) + render_uncertainty(D, configs_path, baseline)
           + render_fluctuation(D, configs_path)
           + render_reps(D, configs_path, calib_files))
     out_path = out_path or f"{D}/summary.md"
@@ -589,6 +599,13 @@ def main():
                          "file (rows carrying `rep`) to get mean+-sd references instead of n=1 one-shots. "
                          "The legacy files are NOT merged in automatically — list them explicitly if wanted, "
                          "otherwise a (task,model) present in both would silently gain an extra rep.")
+    ap.add_argument("--baseline", default="",
+                    help="cell label to use as the PAIRED-test reference (default: the quant ladder's "
+                         "Q4_K_M, un-d128-f16-rb4096). The default is only valid for the 27B quant "
+                         "ladder: the sampling cells are all 35B-A3B, so against Q4_K_M their verdicts "
+                         "are CROSS-MODEL (27B dense vs 35B MoE), not statements about the sampler. "
+                         "Use a3b-d128-f16-rb16384 to read the sampling axis within-model, or "
+                         "a3b-d128-f16-rb16384-t10 to isolate presence_penalty from temperature.")
     a = ap.parse_args()
     calib_files = [p if os.path.isabs(p) else os.path.join(HERE, p)
                    for p in (s.strip() for s in a.calib_files.split(",")) if p] or None
@@ -599,7 +616,8 @@ def main():
     # summary_by_task.json could only ever be produced by two SEPARATE invocations — which is exactly
     # how they drifted apart (summary_by_task.json 16 min behind a corrected re-grade, 2026-07-15).
     # One invocation now writes both, from the same data, always.
-    outp, cells, _, _ = build_digest(a.dir, a.out or None, calib_files=calib_files)
+    outp, cells, _, _ = build_digest(a.dir, a.out or None, calib_files=calib_files,
+                                     baseline=a.baseline or None)
     print(f"wrote {outp} ({len(cells)} cells) + {outp.replace('.md', '.json')}")
     if a.by_task:
         if a.scores != "scores_typescript.jsonl":
