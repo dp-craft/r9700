@@ -14,7 +14,7 @@ Full how-to for a human: `docs/GUIDE.md`. Standard campaign: `campaigns/2026-07-
 |-----------------|------|-----|
 | THE tuning optimum for one engine (peak bracketed both sides + KV f16/q8_0 ≤5% verdict) | **`sweep.py`** | `bench/model-bench/` |
 | Quick manual knob check (fixed grid, one invocation) | `run.sh` | `bench/model-bench/` |
-| Real-workload cross-engine / thinking / **concurrency** numbers against running servers | `run.sh` (openai_probe) | `bench/engine-bench/` |
+| Real-workload cross-engine / thinking / **concurrency** numbers against running servers | `run.sh` (capture_engine probe) | `bench/engine-bench/` |
 | The **combination matrix** — backend × MTP × KV × depth × parallel streams, server restarts handled, resumable | **`campaign.sh`** | `bench/engine-bench/` |
 | Community-comparable synthetic serving curves | llama-benchy (`bench/dl/benchy-venv`) | `bench/engine-bench/` |
 
@@ -180,11 +180,11 @@ with what THIS run measured (tag it), keep the definition wording as-is.
 | KV `f16` | 16-bit KV-cache entries — the baseline | reference quality & speed; biggest VRAM consumer at long ctx | baseline side of the KV A/B |
 | KV `q8_0` | 8-bit block-quantized KV cache | ~halves KV VRAM (→ more ctx or slots); may cost decode speed | accepted only if pp AND tg lose ≤5% vs f16 at depth 32768 (sweep.py A/B) |
 | MTP | multi-token prediction speculative decoding (`--spec-type draft-mtp`, draft layer embedded in the 35B GGUF) | speeds decode when draft acceptance is high; serving-only (invisible to llama-bench) | campaign.sh on/off axis on live servers |
-| depth / `crN` | code-review workload prompt padded to N tokens (cr8000/cr32000/cr64000) from the tracked corpus | prefill grows ~linearly, decode sags as KV fills; 64K approaches the 32 GB ceiling | openai_probe vs a fresh server, `PREFIX_MODE=unique`, 256-tok decode sample |
+| depth / `crN` | code-review workload prompt padded to N tokens (cr8000/cr32000/cr64000) from the tracked corpus | prefill grows ~linearly, decode sags as KV fills; 64K approaches the 32 GB ceiling | capture_engine probe vs a fresh server, `PREFIX_MODE=unique`, 256-tok decode sample |
 | `thinking` | reasoning fixture via chat API (template applied) | reasoning burns tokens before the first answer token | `ttfa_s` = time to first answer token; null if the think budget ran out |
-| `agentic-cN` | N parallel streams with distinct 8K prompts on `-np 4` slots | per-stream tok/s drops, aggregate usually rises; per-slot ctx = CTX/NP | openai_probe concurrency wave, REPS ≥ 2 |
+| `agentic-cN` | N parallel streams with distinct 8K prompts on `-np 4` slots | per-stream tok/s drops, aggregate usually rises; per-slot ctx = CTX/NP | capture_engine probe concurrency wave, REPS ≥ 2 |
 | `pp` / `tg` | llama-bench prompt processing / text generation tok/s | synthetic upper bound — no prompts, no MTP, no concurrency | llama-bench, ≥ 3 reps, stddev recorded |
-| TTFT p50/p95 | time to first token, median / 95th pct | p95 is the agent-facing latency number under load | per-request timing in openai_probe |
+| TTFT p50/p95 | time to first token, median / 95th pct | p95 is the agent-facing latency number under load | per-request timing in capture_engine |
 | per-stream vs aggregate | one stream's decode rate vs the sum of all streams | the gap quantifies the concurrency payoff | aggregate rows in results.jsonl |
 | `prefix_mode` | `unique` = cold prompt cache, `shared` = warm | shared inflates prefill ~2.4× from request 2 (measured) | probe flag; `unique` is the default for honest numbers |
 | `plateau_within_noise` | difference inside the ±3% run-variance band | a tie — never sold as a win | sweep.py noise gate |

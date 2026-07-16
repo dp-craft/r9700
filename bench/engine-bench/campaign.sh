@@ -67,7 +67,7 @@ echo "campaign → $CAMPAIGN_DIR"
 probe() {  # probe <engine-label> <label> <max_tokens> <concurrency> <reps> <prefix_mode> <api> <files...>
   local engine="$1" label="$2" mt="$3" conc="$4" reps="$5" pm="$6" api="$7"; shift 7
   local pf=(); local f; for f in "$@"; do pf+=(--prompt-file "$f"); done
-  python3 "$HERE/openai_probe.py" --url "http://localhost:$PORT/v1" --model local \
+  python3 "$REPO/bench/lib/capture_engine.py" probe --url "http://localhost:$PORT/v1" --model local \
     "${pf[@]}" --max-tokens "$mt" --concurrency "$conc" --reps "$reps" \
     --prefix-mode "$pm" --api "$api" --engine "$engine" --label "$label" >> "$RESULTS" \
     || echo "  probe FAILED: $engine/$label" | tee -a "$CAMPAIGN_DIR/failures.txt"
