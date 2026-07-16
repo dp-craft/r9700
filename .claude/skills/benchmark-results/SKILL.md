@@ -136,7 +136,7 @@ SVG or hand-write an appendix** — the tools own that (iron rule #6).
 1. **Generate** (quality campaigns): `campaigns/2026-07-12-27b-finetune-quality/make_charts.py --dir out
    --charts charts [--order …] [--calibration …]` → cell-level SVGs + `charts/appendix.md`. Per-task views:
    the campaign's own `make_charts_detailed.py --dir out --charts charts/detailed` → `charts/detailed/`.
-   Throughput runs: `bench/lib/report.py <run_dir>` → `report.html` instead. Wire the call into the
+   Throughput runs: `bench/lib/report.py <run_dir>` → theme-aware SVG charts + `appendix.md` instead. Wire the call into the
    campaign's `run_capture.sh` so charts regenerate with the data — a chart built from a stale
    `summary*.json` is a correctness bug, not a cosmetic one.
 2. **Embed the decision-grade charts INLINE at the finding they support** — a chart belongs next to the

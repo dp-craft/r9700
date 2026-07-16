@@ -134,14 +134,14 @@ above. (Charts are now committed SVGs under `<campaign>/charts/`, embedded in `a
 | Quick VRAM↔ctx what-if | `bench/gen_campaign.py vram-ctx --weights-gib G --kv-kib-per-tok K --budget-mib M` | max ctx |
 | Build a prompt fixture (code/agentic/thinking, N tokens) | `bench/workloads/build_prompt.py --task … --src corpus/… --target-tokens N` | `generated/<name>.txt` (also auto-built by campaign `run.sh`) |
 | Find THE tuning optimum (one engine, bracket + KV ≤5%) | `bench/model-bench/sweep.py` | `sweep-summary.json` |
-| Probe a live server (prefill/decode/ttft/concurrency) | `bench/engine-bench/openai_probe.py` (via `run.sh`) | `results.jsonl` |
+| Probe a live server (prefill/decode/ttft/concurrency) | `bench/lib/capture_engine.py probe` (via `run.sh`) | `results.jsonl` |
 | Launch a parameterized llama-server (BACKEND/MTP/KV/**EXTRA_ARGS**) | `bench/engine-bench/serve_llamacpp.sh` | running server + `/props` |
 | Sample VRAM/GTT/power/thermal | `bench/lib/vram_sampler.py --out CSV` | `gpu_samples.csv` |
-| Run dir → self-contained HTML report | `bench/lib/report.py` | `report.html` |
+| Run/campaign dir → theme-aware SVG charts + appendix.md | `bench/lib/report.py` | `charts/*.svg` + `appendix.md` |
 | Quality capture (per-task replies + tokens/ttfa/flags) | `campaigns/2026-07-12-27b-finetune-quality/capture.py` | `outputs.jsonl` |
 | Grade deterministic tasks (final_match/pyexec/json_schema/constraints) | `…/finetune-quality/graders/score_deterministic.py` | `scores_deterministic.jsonl` |
 | Quality campaign → decision charts (theme-aware SVG + appendix.md) | `campaigns/2026-07-12-27b-finetune-quality/make_charts.py --dir out --charts charts [--order …] [+ out/sweeps.json for connected-parameter line charts]` | `charts/*.svg` + `appendix.md` |
-| Throughput run dir → interactive HTML report (Chart.js) | `bench/lib/report.py <run_dir>` (auto-run by gen_campaign's `run.sh`) | `report.html` |
+| Throughput run/campaign dir → theme-aware SVG charts + appendix.md | `bench/lib/report.py <run_dir>` (auto-run by gen_campaign's `run.sh`) | `charts/*.svg` + `appendix.md` |
 
 If one of these is missing a capability, **extend the tool** (and say so) rather than writing a
 one-off replacement. New reusable capability → propose a skill/tool change, don't fork logic.

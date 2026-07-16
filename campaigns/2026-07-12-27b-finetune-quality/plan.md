@@ -4,6 +4,15 @@
 `analysis.md` (co-located, registered in `docs/INDEX.md`) after Phase C. Scaffolded from `spec.json`
 by `bench/gen_campaign.py` (`kind: quality`) → generated `run.sh`.*
 
+> **⚠ Reproducing the committed data vs. running fresh (2026-07-16 merge note).** The results in
+> `analysis.md`/`out/` were captured by this dir's own `run_capture.sh` → `capture.py` →
+> `make_charts.py`, which **remain here and are the authoritative reproduction path** — they carry the
+> `--min-p`/`--presence-penalty` passthrough, the incomplete-stream guard (Iron Rule 15), and the
+> row-level resume the committed rows depend on. The `spec.json` → `run.sh` → `bench/lib/capture_engine.py`
+> pipeline described below is the **go-forward** path for *new* runs; per the merge review it is **not
+> yet a drop-in reproducer** for the committed rows (capture_engine lacks those three capabilities), so
+> use `run_capture.sh` to reproduce and `run.sh` for fresh work until they are ported.
+
 - **Date:** 2026-07-12 · **Status:** ready to execute
 - **Owner split:** Phase A (downloads + GPU capture + deterministic scoring) is **run manually**;
   Phase B (blind LLM-judge of open-ended tasks, in a Claude session) + Phase C (charts + write-up)
