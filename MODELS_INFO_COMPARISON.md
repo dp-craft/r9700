@@ -12,23 +12,47 @@ pages** (no aggregators/blogs). Compiled 2026-07-20.
 > **1** summary — what is it for, benefits, improvements; **2** configuration notes in detail
 > (parameters, use cases); **3** any other important notes
 
-So the spec is: **(A)** cover all models under `~/models` (11 files / 8 base models); **(B)** a
-link-list **on top**; **(C)** per model exactly **3 sections** — summary+benefits+improvements /
-config **in detail** (params, use cases) / other notes; **(D)** accuracy (it's a reference doc).
+So the spec is: **(A)** cover all models under `~/models`; **(B)** a link-list **on top**;
+**(C)** per model exactly **3 sections** — summary+benefits+improvements / config **in detail**
+(params, use cases) / other notes; **(D)** accuracy (it's a reference doc).
+
+**Note on scope/timing:** the Brian6145 Opus-DeepSeek distill was added to `~/models` **after** the
+first seven docs were written, so it existed for only `_8_ds_opus`. Its absence in the others is
+**not** counted against them, and its presence in `_8` is **not** counted as a merit — every file is
+judged on how well it covers the models that existed when it was written.
 
 ## Final ranking
 
-| Rank | File | List-on-top + completeness + 3-sec | Accuracy | Detail | Look | Grade |
+Judged on merit (structure / accuracy / detail), **not** on Brian6145 coverage:
+
+| Rank | File | List-on-top + 3-sec structure | Accuracy | Detail | Look | Grade |
 |---|---|:--:|:--:|:--:|:--:|:--:|
-| 🥇 | **MODELS_INFO.md** | ✓ full inventory + 3 cross-tables | no errors found | high | A− | **A** |
-| 🥈 | **MODELS_INFO_5_distill_plan.md** | ✓ (4 sections, not 3) | correct SWE 77.2, real numbers | high | A | **A** |
-| 🥉 | **MODELS_INFO_7_hauhau.md** | ✓ list top, all 8, 3-sec | Gemma ctx/license, "beats Opus" wrong | high | A | **B+** |
-| 4 | **MODELS_INFO_4_35q4plan.md** | ✗ no list on top; merges 27B/35B | only 2 real errors (verified) | very high | A | **B+** |
-| 4 | **MODELS_INFO_2.md** | ✓ exact 3-sec, "Recommended for"=use cases | accurate | shallow | A | **B+** |
-| 6 | **MODELS_INFO_3.md** | ✓ 3-sec | 27B="MoE 981M" halluc, scrape residue, format bug | med | B+ | **B−** |
-| 7 | **MODELS_INFO_6_gemma.md** | literal target but no title, GGUF links, gave up on hauhau | thin | fails "in detail" | C+ | **C** |
+| 🥇 | **MODELS_INFO.md** | ✓ full inventory + 3 cross-tables | Gemma license wrong; else clean | high | A− | **A** |
+| 🥇 | **MODELS_INFO_8_ds_opus.md** | ✓ Quick Links top; cleanest 3-sec + config tables | Ornith MTP=No ✓, Qwen 77.2 ✓; Gemma license wrong, self-inconsistent GPQA | high | A | **A** |
+| 🥈 | **MODELS_INFO_5_distill_plan.md** | ✓ (4 sections, not 3) | correct SWE 77.2, real numbers; Gemma license wrong | high | A | **A** |
+| 🥉 | **MODELS_INFO_7_hauhau.md** | ✓ list top, 3-sec | Gemma ctx **and** license, "beats Opus" wrong | high | A | **B+** |
+| 5 | **MODELS_INFO_4_35q4plan.md** | ✗ no list on top; merges 27B/35B | only 2 real errors (verified) | very high | A | **B+** |
+| 5 | **MODELS_INFO_2.md** | ✓ exact 3-sec, "Recommended for"=use cases | accurate | shallow | A | **B+** |
+| 7 | **MODELS_INFO_3.md** | ✓ 3-sec | 27B="MoE 981M" halluc, scrape residue, format bug | med | B+ | **B−** |
+| 8 | **MODELS_INFO_6_gemma.md** | literal target but no title, GGUF links, gave up on hauhau | thin | fails "in detail" | C+ | **C** |
+
+**Common error, not distinguishing:** nearly every file lists Gemma's license as "Apache 2.0" — it's
+actually the **Gemma Terms of Use**. This is a shared miss (MODELS_INFO.md, _5, _7, _8 all have it),
+so it doesn't separate them.
 
 ## Per-file notes
+
+**MODELS_INFO_8_ds_opus.md — A (co-top on merit).** Judged like the rest — setting aside that it
+happens to include the later-added Brian6145 model — it earns the top tier on **structure and
+accuracy**: the cleanest execution of the exact 3-section spec (Summary+Benefits+Improvements /
+Configuration **table** / Notes), detailed, with per-model download counts, and an end comparison
+table that **correctly** marks Ornith MTP = **No** and Qwen 27B SWE-bench = **77.2** — the exact
+points that tripped up _4 and _7. (Its Brian6145 section does match our live setup — temp **0.6** /
+top-p **0.95**, MTP **depth 3**, and the local gguf really carries an nextn/MTP layer, MEASURED via
+`gguf_kv.py` — but that model is not scored for/against any file.) Remaining slips: the shared Gemma
+license miss; an internal inconsistency (§2 cites base GPQA **73.7** while §8 lists Qwen3.6-27B GPQA
+**87.8**, and the official Qwen card says **87.8**); "Dense Transformer" glosses the hybrid
+Gated-DeltaNet attention; the ThinkingCap "Charles University / EuroHPC" attribution looks unsourced.
 
 **MODELS_INFO.md — A (best overall / canonical).** Most accurate and complete. The only one with
 three end-of-doc **cross-tables** (architecture, sampling, license); its *Recommended Sampling
@@ -81,10 +105,13 @@ cannot use MTP.
 
 ## Recommendations
 
-- Keep **MODELS_INFO.md** as the single canonical source (already the sampling source of truth).
-- Consider folding in **_5**'s correct benchmarks + serving tables and **_4**'s Gemma depth, fixing
-  the verified errors (Ornith fake-drafter; Qwen "outperforms"; Gemma license = Gemma, not Apache;
-  Gemma context = 256K).
+- Keep **MODELS_INFO.md** as the single canonical source (already the sampling source of truth) — it
+  just needs the later-added Brian6145 model appended.
+- Good merge base for a rewrite is **`_8_ds_opus`** (cleanest per-model 3-section + config tables) or
+  **MODELS_INFO.md** (has the cross-tables). Whichever is chosen, fold in **_5**'s correct benchmarks
+  + serving tables and **_4**'s Gemma depth, and fix the verified errors: Ornith fake-drafter; Qwen
+  "outperforms"; **Gemma license = Gemma Terms (not Apache 2.0)**; Gemma context = 256K; the _8 GPQA
+  baseline inconsistency (§2 73.7 vs §8 87.8 — official card says **87.8**).
 - Archive/remove **_3** (the "27B = MoE 981M" claim is misleading) and **_6_gemma** (too thin).
 - Naming pattern (`_gemma`, `_hauhau`, `_distill_plan`, `_35q4plan`) suggests each file is a
   different local model's run of the same prompt; if so, the hauhau-35B and distill runs produced
