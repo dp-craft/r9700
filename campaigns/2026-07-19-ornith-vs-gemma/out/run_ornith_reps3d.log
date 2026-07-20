@@ -1,0 +1,152 @@
+resume: ornith-d128-f16-rb4096 — 5/15 already captured, running the rest
+=== ornith-d128-f16-rb4096  (Ornith-1.0-35B (qwen35moe HYBRID, 10 full-attn KV + 30 SSM, 0 nextn). MTP OFF — impossible (no nextn tensors, no drafter). Qwen coding sampler temp 0.6/top_k 20. f16 KV 20 KiB/tok, MEASURED 25748 MiB @ctx 163840, fits clean. decode ~68-77 tok/s @120k depth.: Ornith-1.0-35B-UD-Q4_K_M mtp=0 kv=f16 depth=120k budget=4096) ===
+starting on :8081 (pid 509364) — log: /home/dev/work/dp-craft/amd/bench/.servers/8081.log
+up after 10s — model: Ornith-1.0-35B-UD-Q4_K_M.gguf — build: b9950-961e4b26a
+cmdline: /home/dev/work/dp-craft/amd/bench/llamacpp-vulkan/llama-server -m /home/dev/models/gguf/Ornith-1.0-35B-UD-Q4_K_M.gguf -c 163840 -np 1 -ngl 99 -fa on -ub 2048 -b 4096 -ctk f16 -ctv f16 --host 127.0.0.1 --port 8081 --reasoning-budget 4096
+  VRAM at load: 25235 MiB  (load 11s)
+  [ornith-d128-f16-rb4096] lru-cache rep1: 12288 tok (4095 think/8193 ans) | prefill 1526 decode 68.8 t/s | ttft 87.316s ttfa 146.248s | length
+  [ornith-d128-f16-rb4096] lru-cache rep2: 6417 tok (4095 think/2322 ans) | prefill 895 decode 69.5 t/s | ttft 2.541s ttfa 61.3s | stop
+  [ornith-d128-f16-rb4096] rate-limiter rep1: 5441 tok (3487 think/1954 ans) | prefill 905 decode 69.6 t/s | ttft 2.453s ttfa 52.435s | stop
+  [ornith-d128-f16-rb4096] rate-limiter rep2: 5357 tok (3587 think/1770 ans) | prefill 909 decode 69.6 t/s | ttft 2.444s ttfa 53.913s | stop
+  [ornith-d128-f16-rb4096] async-memo rep1: 5099 tok (4095 think/1004 ans) | prefill 905 decode 69.8 t/s | ttft 2.438s ttfa 61.035s | stop
+  [ornith-d128-f16-rb4096] async-memo rep2: 4744 tok (4095 think/649 ans) | prefill 906 decode 69.3 t/s | ttft 2.429s ttfa 61.443s | stop
+  [ornith-d128-f16-rb4096] expr-eval rep1: 5852 tok (4095 think/1757 ans) | prefill 892 decode 68.8 t/s | ttft 2.453s ttfa 61.824s | stop
+  [ornith-d128-f16-rb4096] expr-eval rep2: 6514 tok (4095 think/2419 ans) | prefill 886 decode 68.8 t/s | ttft 2.465s ttfa 61.99s | stop
+  [ornith-d128-f16-rb4096] pricing-deferred rep1: 6756 tok (4095 think/2661 ans) | prefill 1780 decode 78.5 t/s | ttft 47.593s ttfa 99.484s | stop
+  [ornith-d128-f16-rb4096] pricing-deferred rep2: 3952 tok (1184 think/2768 ans) | prefill 1202 decode 78.6 t/s | ttft 1.87s ttfa 16.983s | stop
+captured 10 rows -> /home/dev/work/dp-craft/amd/campaigns/2026-07-19-ornith-vs-gemma/out/outputs.jsonl (5 already present, skipped)
+stopped port 8081
+skip (ONLY): gemma-d128-q8-rb4096
+
+=== grader self-check (vitest must run) ===
+SELFTEST PASS  (good=1.0 > mediocre=0.519 > bad=0.0; hard_pass g/m/b = True/False/False)
+{
+  "good": {
+    "id": "GOOD",
+    "score": 1.0,
+    "hard_pass": true,
+    "objectives": {
+      "types": 1.0,
+      "lint": 1.0,
+      "tests": 1.0,
+      "bdd": 1.0,
+      "novj": 1.0,
+      "reuse": 1.0,
+      "edge": 1.0
+    },
+    "test_counts": {
+      "own": [
+        2,
+        2
+      ]
+    },
+    "files": [
+      "impl.test.ts",
+      "impl.ts"
+    ],
+    "grader": "fractional-2026-07-15"
+  },
+  "mediocre": {
+    "id": "MEDIOCRE",
+    "score": 0.519,
+    "hard_pass": false,
+    "objectives": {
+      "types": 0.33,
+      "lint": 0.8,
+      "tests": 1.0,
+      "bdd": 1.0,
+      "novj": 1.0,
+      "reuse": 0.0,
+      "edge": 0.0
+    },
+    "test_counts": {
+      "own": [
+        1,
+        1
+      ]
+    },
+    "files": [
+      "impl.test.ts",
+      "impl.ts"
+    ],
+    "grader": "fractional-2026-07-15"
+  },
+  "bad": {
+    "id": "BAD",
+    "score": 0.0,
+    "hard_pass": false,
+    "objectives": {
+      "types": 0.0,
+      "lint": 0.0,
+      "tests": 0.0,
+      "bdd": 0.0,
+      "novj": 0.0,
+      "reuse": 0.0,
+      "edge": 0.0
+    },
+    "test_counts": {
+      "own": [
+        0,
+        0
+      ]
+    },
+    "files": [
+      "impl.test.ts",
+      "impl.ts"
+    ],
+    "grader": "fractional-2026-07-15"
+  }
+}
+
+=== grading (tsc + eslint + vitest, per reply) ===
+graded 10 rows (0 errors/empty), reused 5 already-graded -> /home/dev/work/dp-craft/amd/campaigns/2026-07-19-ornith-vs-gemma/out/scores_typescript.jsonl [15 total]
+  [ornith-d128-f16-rb4096] lru-cache rep1: score=0.401 F
+  [ornith-d128-f16-rb4096] lru-cache rep2: score=0.39 F
+  [ornith-d128-f16-rb4096] rate-limiter rep1: score=0.454 F
+  [ornith-d128-f16-rb4096] rate-limiter rep2: score=0.423 F
+  [ornith-d128-f16-rb4096] async-memo rep1: score=0.864 F
+  [ornith-d128-f16-rb4096] async-memo rep2: score=0.95 F
+  [ornith-d128-f16-rb4096] expr-eval rep1: score=0.639 F
+  [ornith-d128-f16-rb4096] expr-eval rep2: score=0.577 F
+  [ornith-d128-f16-rb4096] pricing-deferred rep1: score=0.592 F
+  [ornith-d128-f16-rb4096] pricing-deferred rep2: score=0.721 F
+
+=== judge SKIPPED (JUDGE_ENGINE=none) — see JUDGE.md ===
+
+=== charts (reused by the benchmark-results skill) ===
+wrote 13 charts + appendix.md -> /home/dev/work/dp-craft/amd/campaigns/2026-07-19-ornith-vs-gemma/charts/
+  quality_vs_cost.svg
+  quality_vs_time.svg
+  scorecard.svg
+  quality_deterministic.svg
+  token_economy.svg
+  throughput.svg
+  latency.svg
+  memory_power.svg
+  capability.svg
+  hard_pass.svg
+  fluctuation.svg
+  rerun_value.svg
+  objective_breakdown.svg
+
+=== aggregate (deterministic digest → out/summary.md) ===
+wrote /home/dev/work/dp-craft/amd/campaigns/2026-07-19-ornith-vs-gemma/out/summary.md (1 cells) + /home/dev/work/dp-craft/amd/campaigns/2026-07-19-ornith-vs-gemma/out/summary.json
+wrote /home/dev/work/dp-craft/amd/campaigns/2026-07-19-ornith-vs-gemma/out/summary_by_task.json (5 tasks) from scores_typescript.jsonl
+
+=== per-task charts (charts/detailed/) ===
+wrote 8 detailed charts + appendix.md -> /home/dev/work/dp-craft/amd/campaigns/2026-07-19-ornith-vs-gemma/charts/detailed/
+  d1_capability_by_task.svg
+  d2_quant_quality.svg
+  d3_quant_cost.svg
+  d4_efficiency_by_task.svg
+  d5_hardpass_by_task.svg
+  d6_model_by_task.svg
+  d7_judge_axes_by_task.svg
+  d8_objective_by_task.svg
+
+Depth run complete.
+  replies:  /home/dev/work/dp-craft/amd/campaigns/2026-07-19-ornith-vs-gemma/out/outputs.jsonl
+  scores:   /home/dev/work/dp-craft/amd/campaigns/2026-07-19-ornith-vs-gemma/out/scores_typescript.jsonl   judge: /home/dev/work/dp-craft/amd/campaigns/2026-07-19-ornith-vs-gemma/out/judge_scores.jsonl
+  VRAM:     /home/dev/work/dp-craft/amd/campaigns/2026-07-19-ornith-vs-gemma/out/vram.jsonl   (gpu samples: /home/dev/work/dp-craft/amd/campaigns/2026-07-19-ornith-vs-gemma/out/gpu_*.csv)
+  charts:   /home/dev/work/dp-craft/amd/campaigns/2026-07-19-ornith-vs-gemma/charts/
+  analysis: /home/dev/work/dp-craft/amd/campaigns/2026-07-19-ornith-vs-gemma/analysis.md   (auto-written; review before committing run data)

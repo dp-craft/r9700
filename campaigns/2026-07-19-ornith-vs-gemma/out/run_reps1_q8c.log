@@ -1,0 +1,15 @@
+skip (complete: ornith-d128-f16-rb4096 — 5/5 replies)
+=== gemma-d128-q8-rb4096  (Gemma-4-31B-it-qat (gemma4 DENSE hybrid, QAT-Q4). MTP OFF. Gemma sampler temp 1.0/top_k 64. KV=q8_0 REQUIRED: f16 spills (32272 MiB + GTT) AND q8_0 KV needs -fa on. ctx 140000 (lowered from 163840): q8_0@163840 hit Vulkan ErrorDeviceLost at ~65k prefill (VRAM OOM that also crashed the GUI) → lower ctx for VRAM headroom. Thinking = <: gemma-4-31B-it-qat-UD-Q4_K_XL mtp=0 kv=q8_0 depth=120k budget=4096) ===
+starting on :8081 (pid 477324) — log: /home/dev/work/dp-craft/amd/bench/.servers/8081.log
+up after 39s — model: gemma-4-31B-it-qat-UD-Q4_K_XL.gguf — build: b9950-961e4b26a
+cmdline: /home/dev/work/dp-craft/amd/bench/llamacpp-vulkan/llama-server -m /home/dev/models/gguf/gemma-4-31B-it-qat-UD-Q4_K_XL.gguf -c 140000 -np 1 -ngl 99 -fa on -ub 2048 -b 4096 -ctk q8_0 -ctv q8_0 --host 127.0.0.1 --port 8081 --reasoning-budget 4096
+  VRAM at load: 25426 MiB  (load 38s)
+  [gemma-d128-q8-rb4096] lru-cache rep0: ERROR HTTP Error 400: Bad Request
+  [gemma-d128-q8-rb4096] rate-limiter rep0: ERROR HTTP Error 400: Bad Request
+  [gemma-d128-q8-rb4096] async-memo rep0: ERROR HTTP Error 400: Bad Request
+  [gemma-d128-q8-rb4096] expr-eval rep0: ERROR HTTP Error 400: Bad Request
+  [gemma-d128-q8-rb4096] pricing-deferred rep0: ERROR incomplete stream: finish_reason=None saw_done=False after 0 content chars — connection cut mid-generation, answer truncated
+captured 5 rows -> /home/dev/work/dp-craft/amd/campaigns/2026-07-19-ornith-vs-gemma/out/outputs.jsonl
+stopped port 8081
+
+=== grader self-check (vitest must run) ===

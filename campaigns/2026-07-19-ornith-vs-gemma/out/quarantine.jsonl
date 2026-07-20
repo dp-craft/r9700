@@ -1,0 +1,19 @@
+{"config": "gemma-d128-q8-rb4096", "task_id": "lru-cache", "rep": 0, "error": "incomplete stream: finish_reason=None saw_done=False after 0 content chars \u2014 connection cut mid-generation, answer truncated"}
+{"config": "gemma-d128-q8-rb4096", "task_id": "lru-cache", "rep": 0, "error": "incomplete stream: finish_reason=None saw_done=False after 0 content chars \u2014 connection cut mid-generation, answer truncated"}
+{"config": "gemma-d128-q8-rb4096", "task_id": "rate-limiter", "rep": 0, "error": "incomplete stream: finish_reason=None saw_done=False after 0 content chars \u2014 connection cut mid-generation, answer truncated"}
+{"config": "gemma-d128-q8-rb4096", "task_id": "async-memo", "rep": 0, "error": "incomplete stream: finish_reason=None saw_done=False after 0 content chars \u2014 connection cut mid-generation, answer truncated"}
+{"config": "gemma-d128-q8-rb4096", "task_id": "lru-cache", "rep": 0, "error": "HTTP Error 400: Bad Request"}
+{"config": "gemma-d128-q8-rb4096", "task_id": "rate-limiter", "rep": 0, "error": "HTTP Error 400: Bad Request"}
+{"config": "gemma-d128-q8-rb4096", "task_id": "async-memo", "rep": 0, "error": "HTTP Error 400: Bad Request"}
+{"config": "gemma-d128-q8-rb4096", "task_id": "expr-eval", "rep": 0, "error": "HTTP Error 400: Bad Request"}
+{"config": "gemma-d128-q8-rb4096", "task_id": "pricing-deferred", "rep": 0, "error": "incomplete stream: finish_reason=None saw_done=False after 0 content chars \u2014 connection cut mid-generation, answer truncated"}
+{"config": "ornith-d128-f16-rb4096", "task_id": "lru-cache", "rep": 1, "error": "incomplete stream: finish_reason=None saw_done=False after 0 content chars \u2014 connection cut mid-generation, answer truncated"}
+{"config": "ornith-d128-f16-rb4096", "task_id": "lru-cache", "rep": 2, "error": "<urlopen error [Errno 111] Connection refused>"}
+{"config": "ornith-d128-f16-rb4096", "task_id": "rate-limiter", "rep": 1, "error": "<urlopen error [Errno 111] Connection refused>"}
+{"config": "ornith-d128-f16-rb4096", "task_id": "rate-limiter", "rep": 2, "error": "<urlopen error [Errno 111] Connection refused>"}
+{"config": "ornith-d128-f16-rb4096", "task_id": "async-memo", "rep": 1, "error": "<urlopen error [Errno 111] Connection refused>"}
+{"config": "ornith-d128-f16-rb4096", "task_id": "async-memo", "rep": 2, "error": "<urlopen error [Errno 111] Connection refused>"}
+{"config": "ornith-d128-f16-rb4096", "task_id": "expr-eval", "rep": 1, "error": "<urlopen error [Errno 111] Connection refused>"}
+{"config": "ornith-d128-f16-rb4096", "task_id": "expr-eval", "rep": 2, "error": "<urlopen error [Errno 111] Connection refused>"}
+{"config": "ornith-d128-f16-rb4096", "task_id": "pricing-deferred", "rep": 1, "error": "<urlopen error [Errno 111] Connection refused>"}
+{"config": "ornith-d128-f16-rb4096", "task_id": "pricing-deferred", "rep": 2, "error": "<urlopen error [Errno 111] Connection refused>"}
