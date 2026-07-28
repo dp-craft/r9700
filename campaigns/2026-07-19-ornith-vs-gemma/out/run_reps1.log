@@ -1,0 +1,15 @@
+resume: ornith-d128-f16-rb4096 — 3/5 already captured, running the rest
+=== ornith-d128-f16-rb4096  (Ornith-1.0-35B (qwen35moe HYBRID, 10 full-attn KV + 30 SSM, 0 nextn). MTP OFF — impossible (no nextn tensors, no drafter). Qwen coding sampler temp 0.6/top_k 20. f16 KV 20 KiB/tok, weights 20.6 GiB -> ~24 GiB @ctx 163840, fits.: Ornith-1.0-35B-UD-Q4_K_M mtp=0 kv=f16 depth=120k budget=4096) ===
+starting on :8081 (pid 423749) — log: /home/dev/work/dp-craft/amd/bench/.servers/8081.log
+up after 63s — model: Ornith-1.0-35B-UD-Q4_K_M.gguf — build: b9950-961e4b26a
+cmdline: /home/dev/work/dp-craft/amd/bench/llamacpp-vulkan/llama-server -m /home/dev/models/gguf/Ornith-1.0-35B-UD-Q4_K_M.gguf -c 163840 -np 1 -ngl 99 -fa on -ub 2048 -b 4096 -ctk f16 -ctv f16 --host 127.0.0.1 --port 8081 --reasoning-budget 4096
+  VRAM at load: 25748 MiB  (load 63s)
+  [ornith-d128-f16-rb4096] expr-eval rep0: 7895 tok (4095 think/3800 ans) | prefill 1525 decode 68.0 t/s | ttft 87.279s ttfa 147.226s | stop
+  [ornith-d128-f16-rb4096] pricing-deferred rep0: 7571 tok (4095 think/3476 ans) | prefill 1886 decode 77.0 t/s | ttft 44.938s ttfa 97.95s | stop
+captured 2 rows -> /home/dev/work/dp-craft/amd/campaigns/2026-07-19-ornith-vs-gemma/out/outputs.jsonl (3 already present, skipped)
+stopped port 8081
+=== gemma-d128-f16-rb4096  (Gemma-4-31B-it-qat (gemma4 DENSE hybrid, sliding-window 1024 + global, QAT-Q4). MTP OFF (280 MB drafter not downloaded). Gemma sampler temp 1.0/top_k 64. VRAM UNGUARDED (gguf_kv can't size gemma4) — WATCH it. Thinking = <: gemma-4-31B-it-qat-UD-Q4_K_XL mtp=0 kv=f16 depth=120k budget=4096) ===
+starting on :8081 (pid 428995) — log: /home/dev/work/dp-craft/amd/bench/.servers/8081.log
+up after 42s — model: gemma-4-31B-it-qat-UD-Q4_K_XL.gguf — build: b9950-961e4b26a
+cmdline: /home/dev/work/dp-craft/amd/bench/llamacpp-vulkan/llama-server -m /home/dev/models/gguf/gemma-4-31B-it-qat-UD-Q4_K_XL.gguf -c 163840 -np 1 -ngl 99 -fa on -ub 2048 -b 4096 -ctk f16 -ctv f16 --host 127.0.0.1 --port 8081 --reasoning-budget 4096
+  VRAM at load: 32272 MiB  (load 41s)

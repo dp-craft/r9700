@@ -1,0 +1,7 @@
+  pricing-deferred: pinned to ~80000 tok (cell depth is ~120000)
+built /home/dev/work/dp-craft/amd/campaigns/2026-07-19-ornith-vs-gemma/out/tasks-120k.jsonl (5/9 tasks @ ~120000 tok; smoke=False)
+=== ornith-d128-f16-rb4096  (Ornith-1.0-35B (qwen35moe HYBRID, 10 full-attn KV + 30 SSM, 0 nextn). MTP OFF — impossible (no nextn tensors, no drafter). Qwen coding sampler temp 0.6/top_k 20. f16 KV 20 KiB/tok, weights 20.6 GiB -> ~24 GiB @ctx 163840, fits.: Ornith-1.0-35B-UD-Q4_K_M mtp=0 kv=f16 depth=120k budget=4096) ===
+starting on :8081 (pid 419843) — log: /home/dev/work/dp-craft/amd/bench/.servers/8081.log
+up after 128s — model: Ornith-1.0-35B-UD-Q4_K_M.gguf — build: b9950-961e4b26a
+cmdline: /home/dev/work/dp-craft/amd/bench/llamacpp-vulkan/llama-server -m /home/dev/models/gguf/Ornith-1.0-35B-UD-Q4_K_M.gguf -c 163840 -np 1 -ngl 99 -fa on -ub 2048 -b 4096 -ctk f16 -ctv f16 --host 127.0.0.1 --port 8081 --reasoning-budget 4096
+  VRAM at load: 25738 MiB  (load 129s)

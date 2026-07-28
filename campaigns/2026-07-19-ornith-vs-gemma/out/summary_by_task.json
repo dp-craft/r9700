@@ -1,0 +1,378 @@
+{
+ "scores_file": "scores_typescript.jsonl",
+ "by_task": {
+  "lru-cache": {
+   "tier": "sonnet",
+   "refs": {
+    "haiku": 81.39999999999999,
+    "sonnet": 95.89999999999999,
+    "opus": 90.9
+   },
+   "cells": {
+    "ornith-d128-f16-rb4096": {
+     "model": "Ornith-1.0-35B-UD-Q4_K_M",
+     "depth": "120k",
+     "kv": "f16",
+     "budget": 4096,
+     "mtp": 0,
+     "n": 3,
+     "ts_pct": 51.63333333333333,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.22,
+      "lint": 0.3333333333333333,
+      "tests": 0.5813692480359147,
+      "edge": 0.3333333333333333,
+      "reuse": 1.0,
+      "bdd": 0.37333333333333335,
+      "novj": 1.0
+     },
+     "judge": null,
+     "judge_mean": null,
+     "notes": [],
+     "think_tok": 3878,
+     "answer_tok": 4670.666666666667,
+     "out_tok": 8548.666666666668,
+     "total_tok": 141344.66666666666,
+     "decode_tps": 68.81978594121495,
+     "gen_s": 124.26227266666668,
+     "ttft_warm_s": 2.541,
+     "cap_hit_pct": 33.33333333333333
+    },
+    "gemma-d128-q8-rb4096": {
+     "model": "gemma-4-31B-it-qat-UD-Q4_K_XL",
+     "depth": "120k",
+     "kv": "q8_0",
+     "budget": 4096,
+     "mtp": 0,
+     "n": 1,
+     "ts_pct": 67.10000000000001,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.0,
+      "lint": 0.0,
+      "tests": 1.0,
+      "edge": 1.0,
+      "reuse": 1.0,
+      "bdd": 0.4,
+      "novj": 1.0
+     },
+     "judge": null,
+     "judge_mean": null,
+     "notes": [],
+     "think_tok": 1961,
+     "answer_tok": 1899,
+     "out_tok": 3860,
+     "total_tok": 146787,
+     "decode_tps": 11.078484527721063,
+     "gen_s": 348.42310699999996,
+     "ttft_warm_s": 772.533,
+     "cap_hit_pct": 0
+    }
+   }
+  },
+  "rate-limiter": {
+   "tier": "sonnet",
+   "refs": {
+    "haiku": 85.7,
+    "sonnet": 100.0,
+    "opus": 97.1
+   },
+   "cells": {
+    "ornith-d128-f16-rb4096": {
+     "model": "Ornith-1.0-35B-UD-Q4_K_M",
+     "depth": "120k",
+     "kv": "f16",
+     "budget": 4096,
+     "mtp": 0,
+     "n": 3,
+     "ts_pct": 39.43333333333333,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.22333333333333336,
+      "lint": 0.26666666666666666,
+      "tests": 0.32967032967032966,
+      "edge": 0.0,
+      "reuse": 1.0,
+      "bdd": 0.5533333333333333,
+      "novj": 1.0
+     },
+     "judge": null,
+     "judge_mean": null,
+     "notes": [],
+     "think_tok": 3225.3333333333335,
+     "answer_tok": 1750,
+     "out_tok": 4975.333333333334,
+     "total_tok": 137722.33333333334,
+     "decode_tps": 69.47432040553593,
+     "gen_s": 71.59106799999999,
+     "ttft_warm_s": 2.35,
+     "cap_hit_pct": 0
+    },
+    "gemma-d128-q8-rb4096": {
+     "model": "gemma-4-31B-it-qat-UD-Q4_K_XL",
+     "depth": "120k",
+     "kv": "q8_0",
+     "budget": 4096,
+     "mtp": 0,
+     "n": 1,
+     "ts_pct": 22.900000000000002,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.0,
+      "lint": 0.0,
+      "tests": 0.0,
+      "edge": 0.0,
+      "reuse": 1.0,
+      "bdd": 0.2,
+      "novj": 1.0
+     },
+     "judge": null,
+     "judge_mean": null,
+     "notes": [],
+     "think_tok": 1048,
+     "answer_tok": 1072,
+     "out_tok": 2120,
+     "total_tok": 144993,
+     "decode_tps": 11.12734286007091,
+     "gen_s": 190.521675,
+     "ttft_warm_s": 20.185,
+     "cap_hit_pct": 0
+    }
+   }
+  },
+  "async-memo": {
+   "tier": "opus",
+   "refs": {
+    "haiku": 76.8,
+    "sonnet": 91.2,
+    "opus": 83.3
+   },
+   "cells": {
+    "ornith-d128-f16-rb4096": {
+     "model": "Ornith-1.0-35B-UD-Q4_K_M",
+     "depth": "120k",
+     "kv": "f16",
+     "budget": 4096,
+     "mtp": 0,
+     "n": 3,
+     "ts_pct": 92.89999999999999,
+     "hard_pct": 33.33333333333333,
+     "objectives": {
+      "types": 0.89,
+      "lint": 0.9333333333333333,
+      "tests": 0.8857142857142857,
+      "edge": 1.0,
+      "bdd": 0.8433333333333334,
+      "novj": 1.0
+     },
+     "judge": null,
+     "judge_mean": null,
+     "notes": [],
+     "think_tok": 3390,
+     "answer_tok": 719,
+     "out_tok": 4109,
+     "total_tok": 136839,
+     "decode_tps": 69.44893206212896,
+     "gen_s": 59.11522133333334,
+     "ttft_warm_s": 2.317,
+     "cap_hit_pct": 0
+    },
+    "gemma-d128-q8-rb4096": {
+     "model": "gemma-4-31B-it-qat-UD-Q4_K_XL",
+     "depth": "120k",
+     "kv": "q8_0",
+     "budget": 4096,
+     "mtp": 0,
+     "n": 1,
+     "ts_pct": 85.7,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.67,
+      "lint": 0.6,
+      "tests": 1.0,
+      "edge": 1.0,
+      "bdd": 0.75,
+      "novj": 1.0
+     },
+     "judge": null,
+     "judge_mean": null,
+     "notes": [],
+     "think_tok": 1418,
+     "answer_tok": 639,
+     "out_tok": 2057,
+     "total_tok": 144929,
+     "decode_tps": 11.18619207338925,
+     "gen_s": 183.88742000000002,
+     "ttft_warm_s": 20.17,
+     "cap_hit_pct": 0
+    }
+   }
+  },
+  "expr-eval": {
+   "tier": "opus",
+   "refs": {
+    "haiku": 61.7,
+    "sonnet": 78.5,
+    "opus": 96.7
+   },
+   "cells": {
+    "ornith-d128-f16-rb4096": {
+     "model": "Ornith-1.0-35B-UD-Q4_K_M",
+     "depth": "120k",
+     "kv": "f16",
+     "budget": 4096,
+     "mtp": 0,
+     "n": 3,
+     "ts_pct": 59.533333333333324,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.0,
+      "lint": 0.0,
+      "tests": 0.9701104613385315,
+      "edge": 1.0,
+      "bdd": 0.2366666666666667,
+      "novj": 1.0
+     },
+     "judge": null,
+     "judge_mean": null,
+     "notes": [],
+     "think_tok": 4095,
+     "answer_tok": 2658.6666666666665,
+     "out_tok": 6753.666666666666,
+     "total_tok": 139468.66666666666,
+     "decode_tps": 68.52298411956271,
+     "gen_s": 98.631863,
+     "ttft_warm_s": 2.453,
+     "cap_hit_pct": 0
+    },
+    "gemma-d128-q8-rb4096": {
+     "model": "gemma-4-31B-it-qat-UD-Q4_K_XL",
+     "depth": "120k",
+     "kv": "q8_0",
+     "budget": 4096,
+     "mtp": 0,
+     "n": 1,
+     "ts_pct": 33.300000000000004,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.0,
+      "lint": 0.0,
+      "tests": 0.0,
+      "edge": 1.0,
+      "bdd": 0.0,
+      "novj": 1.0
+     },
+     "judge": null,
+     "judge_mean": null,
+     "notes": [],
+     "think_tok": 651,
+     "answer_tok": 2048,
+     "out_tok": 2699,
+     "total_tok": 145533,
+     "decode_tps": 11.144414701781244,
+     "gen_s": 242.18409599999998,
+     "ttft_warm_s": 19.55,
+     "cap_hit_pct": 0
+    }
+   }
+  },
+  "pricing-deferred": {
+   "tier": "opus",
+   "refs": {
+    "haiku": 88.7,
+    "sonnet": 96.2,
+    "opus": 97.1
+   },
+   "cells": {
+    "ornith-d128-f16-rb4096": {
+     "model": "Ornith-1.0-35B-UD-Q4_K_M",
+     "depth": "120k",
+     "kv": "f16",
+     "budget": 4096,
+     "mtp": 0,
+     "n": 3,
+     "ts_pct": 67.56666666666666,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.33,
+      "lint": 0.13333333333333333,
+      "tests": 0.8507936507936508,
+      "edge": 0.8333333333333334,
+      "reuse": 1.0,
+      "bdd": 0.48333333333333334,
+      "novj": 1.0
+     },
+     "judge": null,
+     "judge_mean": null,
+     "notes": [],
+     "think_tok": 3124.6666666666665,
+     "answer_tok": 2968.3333333333335,
+     "out_tok": 6093.0,
+     "total_tok": 90518,
+     "decode_tps": 78.03519288810018,
+     "gen_s": 78.22969599999999,
+     "ttft_warm_s": 1.87,
+     "cap_hit_pct": 0
+    },
+    "gemma-d128-q8-rb4096": {
+     "model": "gemma-4-31B-it-qat-UD-Q4_K_XL",
+     "depth": "120k",
+     "kv": "q8_0",
+     "budget": 4096,
+     "mtp": 0,
+     "n": 1,
+     "ts_pct": 74.2,
+     "hard_pct": 0,
+     "objectives": {
+      "types": 0.33,
+      "lint": 0.0,
+      "tests": 1.0,
+      "edge": 1.0,
+      "reuse": 1.0,
+      "bdd": 0.73,
+      "novj": 1.0
+     },
+     "judge": null,
+     "judge_mean": null,
+     "notes": [],
+     "think_tok": 1707,
+     "answer_tok": 2134,
+     "out_tok": 3841,
+     "total_tok": 94794,
+     "decode_tps": 13.705314430670605,
+     "gen_s": 280.256248,
+     "ttft_warm_s": 347.206,
+     "cap_hit_pct": 0
+    }
+   }
+  }
+ },
+ "refs": {
+  "lru-cache": {
+   "haiku": 81.39999999999999,
+   "sonnet": 95.89999999999999,
+   "opus": 90.9
+  },
+  "rate-limiter": {
+   "haiku": 85.7,
+   "sonnet": 100.0,
+   "opus": 97.1
+  },
+  "async-memo": {
+   "haiku": 76.8,
+   "sonnet": 91.2,
+   "opus": 83.3
+  },
+  "expr-eval": {
+   "haiku": 61.7,
+   "sonnet": 78.5,
+   "opus": 96.7
+  },
+  "pricing-deferred": {
+   "haiku": 88.7,
+   "sonnet": 96.2,
+   "opus": 97.1
+  }
+ }
+}

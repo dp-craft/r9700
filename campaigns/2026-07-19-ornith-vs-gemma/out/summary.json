@@ -1,0 +1,67 @@
+{
+ "cells": {
+  "ornith-d128-f16-rb4096": {
+   "model": "Ornith-1.0-35B-UD-Q4_K_M",
+   "depth": "120k",
+   "kv": "f16",
+   "budget": 4096,
+   "n": 15,
+   "n_fail": 0,
+   "ts_pct": 62.21333333333333,
+   "ts_worst": 30.599999999999998,
+   "ts_best": 97.3,
+   "hard_pct": 6.666666666666667,
+   "objectives": {
+    "types": 0.33266666666666667,
+    "lint": 0.3333333333333333,
+    "tests": 0.7235315951105424,
+    "reuse": 1.0,
+    "edge": 0.6333333333333333
+   },
+   "judge": null,
+   "judge_axes": null,
+   "think_tok": 3542.6,
+   "ttfa_s": 75.30006666666667,
+   "ttlt_s": 111.53373333333333,
+   "decode_tps": 70.86024308330855,
+   "runaway_pct": 0,
+   "peak_vram": 25400,
+   "peak_gtt": 815,
+   "avg_power_w": 208.0
+  },
+  "gemma-d128-q8-rb4096": {
+   "model": "gemma-4-31B-it-qat-UD-Q4_K_XL",
+   "depth": "120k",
+   "kv": "q8_0",
+   "budget": 4096,
+   "n": 5,
+   "n_fail": 0,
+   "ts_pct": 56.64,
+   "ts_worst": 22.900000000000002,
+   "ts_best": 85.7,
+   "hard_pct": 0,
+   "objectives": {
+    "types": 0.2,
+    "lint": 0.12,
+    "tests": 0.6,
+    "reuse": 1.0,
+    "edge": 0.8
+   },
+   "judge": null,
+   "judge_axes": null,
+   "think_tok": 1357,
+   "ttfa_s": 351.6486,
+   "ttlt_s": 484.6694,
+   "decode_tps": 11.648349718726614,
+   "runaway_pct": 0,
+   "peak_vram": 27097,
+   "peak_gtt": 90,
+   "avg_power_w": 207.3
+  }
+ },
+ "bands": {
+  "haiku": 80.89333333333333,
+  "sonnet": 90.58,
+  "opus": 94.30666666666667
+ }
+}
