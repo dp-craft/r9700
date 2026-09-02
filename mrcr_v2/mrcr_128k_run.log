@@ -1,0 +1,44 @@
+
+=== /home/dev/mrcr_v2/mrcr_v2/mrcr_v2p1_8needle_in_(65536,131072)_dynamic_fewshot_text_style_fast.csv
+    103 rows, 35 to run (stride 3), effort=medium
+    [1/35] row 0  ctx  130874  score 1.000  551.3s  mean 1.0000   551s elapsed
+    [2/35] row 3  ctx  130874  score 1.000   44.2s  mean 1.0000   595s elapsed
+    [3/35] row 6  ctx  130874  score 0.974   35.7s  mean 0.9913   631s elapsed
+    [4/35] row 9  ctx  130870  score 0.013   35.9s  mean 0.7467   667s elapsed
+    [5/35] row 12  ctx  130870  score 0.028   37.2s  mean 0.6030   704s elapsed
+    [6/35] row 15  ctx  130870  score 0.026   41.9s  mean 0.5068   746s elapsed
+    [7/35] row 18  ctx  130870  score 0.947   37.4s  mean 0.5697   784s elapsed
+    [8/35] row 21  ctx  130870  score 0.991   40.5s  mean 0.6224   824s elapsed
+    [9/35] row 24  ctx  130872  score 1.000   40.0s  mean 0.6643   864s elapsed
+    [10/35] row 27  ctx  130872  score 1.000   30.8s  mean 0.6979   895s elapsed
+    [11/35] row 30  ctx  130872  score 0.037   43.4s  mean 0.6378   938s elapsed
+    [12/35] row 33  ctx  130872  score 0.959   43.9s  mean 0.6646   982s elapsed
+    [13/35] row 36  ctx  130872  score 0.978   48.8s  mean 0.6887  1031s elapsed
+    [14/35] row 39  ctx  130872  score 0.965   36.8s  mean 0.7084  1068s elapsed
+    [15/35] row 42  ctx  130874  score 0.995   38.3s  mean 0.7275  1106s elapsed
+    [16/35] row 45  ctx  130874  score 0.993   64.5s  mean 0.7441  1171s elapsed
+    [17/35] row 48  ctx  130873  score 0.991   44.0s  mean 0.7587  1215s elapsed
+    [18/35] row 51  ctx  130873  score 0.992   38.9s  mean 0.7716  1253s elapsed
+    [19/35] row 54  ctx  130873  score 0.030   43.6s  mean 0.7326  1297s elapsed
+    [20/35] row 57  ctx  130873  score 0.945   40.7s  mean 0.7432  1338s elapsed
+    [21/35] row 60  ctx  130873  score 0.982   41.7s  mean 0.7546  1379s elapsed
+    [22/35] row 63  ctx  130873  score 0.977   37.4s  mean 0.7647  1417s elapsed
+    [23/35] row 66  ctx  130870  score 0.998   29.0s  mean 0.7748  1446s elapsed
+    [24/35] row 69  ctx  130870  score 1.000   42.2s  mean 0.7842  1488s elapsed
+    [25/35] row 72  ctx  130870  score 0.989   45.4s  mean 0.7924  1533s elapsed
+    [26/35] row 75  ctx  130875  score 1.000   31.5s  mean 0.8004  1565s elapsed
+    [27/35] row 78  ctx  130873  score 0.986   41.4s  mean 0.8073  1606s elapsed
+    [28/35] row 81  ctx  130874  score 1.000   36.9s  mean 0.8142  1643s elapsed
+    [29/35] row 84  ctx  130872  score 0.959   36.2s  mean 0.8192  1679s elapsed
+    [30/35] row 87  ctx  130871  score 0.999   27.6s  mean 0.8251  1707s elapsed
+    [31/35] row 90  ctx  130872  score 0.999   65.5s  mean 0.8308  1773s elapsed
+    [32/35] row 93  ctx  130871  score 1.000   36.0s  mean 0.8360  1809s elapsed
+    [33/35] row 96  ctx  130872  score 1.000   38.5s  mean 0.8410  1847s elapsed
+    [34/35] row 99  ctx  130873  score 0.999   41.2s  mean 0.8457  1888s elapsed
+    [35/35] row 102  ctx  130872  score 0.998   39.0s  mean 0.8500  1927s elapsed
+
+bucket                          n  MRCR score
+in_(65536,131072)  n=103       35      0.8500
+TOTAL                          35      0.8500
+
+wall clock 1928s   full results: results_128k_medium.csv

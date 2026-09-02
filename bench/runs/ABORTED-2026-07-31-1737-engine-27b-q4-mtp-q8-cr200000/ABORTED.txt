@@ -1,0 +1,2 @@
+ABORTED by operator request at 2026-07-31 17:44 — prefill was at 59% (114688/~194400 tok, 354.6 s elapsed,
+~7 min remaining). results.jsonl is EMPTY. Per iron rule 15 this is NOT a result; do not aggregate.
