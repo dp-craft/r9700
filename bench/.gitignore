@@ -1,8 +1,8 @@
 # large binaries & transient artifacts — keep scripts + results.jsonl + docs tracked
-llamacpp/
+llamacpp
 *.zip
-llamacpp-vulkan/
-llamacpp-rocm-b9950/
+llamacpp-vulkan
+llamacpp-rocm-b9950
 dl/
 # two-track outputs: keep results.jsonl/llama-bench.json + meta, drop logs & generated prompts
 runs/*/invocations/*.err
