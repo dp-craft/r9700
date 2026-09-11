@@ -43,9 +43,13 @@ default 32768). Guarantees:
 | `CTK`/`CTV` | **`f16`** | KV types. f16 is the baseline; q8_0 must pass the sweep's A/B rule |
 | `FA` | `on` | flash attention (`on|off|auto`) |
 | `REPS` | `3` | repetitions → stddev |
+| `PG` | *(empty)* | request shapes `"P,G P,G"` → one `-pg` test each (prompt + generation, timed together) |
+| `WARMUP` | `1` | `0` = `--no-warmup` (llama-bench's warmup re-runs every test's prompt in full) |
+| `NPL` | *(empty)* | N concurrent sequences → `llama-batched-bench -npl N` from the same `bin/`; single `PP`/`TG`, ctx = N×(PP+TG); `DEPTH`/`REPS`/`PG` unused |
 | `VRAM_SAMPLE` | `1` | sample VRAM/power to `gpu_samples.csv` during the run |
 
-Output → `bench/runs/<stamp>-model-<slug>/` (`llama-bench.json` + `meta.txt` incl. `build_commit`).
+Output → `bench/runs/<stamp>-model-<slug>/` (`llama-bench.json` + `meta.txt` incl. `build_commit`;
+with `NPL`: `batched-bench.json` + `batched-bench.log`, version line in `meta.txt`).
 Vendor handling via `bench/lib/gpu_env.sh` (AMD: HSA override auto; NVIDIA: nvidia-smi meta).
 
 ## What this track CAN'T do (use engine-bench instead)

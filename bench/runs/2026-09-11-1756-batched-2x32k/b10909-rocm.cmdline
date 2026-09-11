@@ -1,0 +1,1 @@
+/home/dev/work/dp-craft/amd/build/b10909-rocm/bin/llama-batched-bench -m /home/dev/models/gguf/unsloth/Qwen3.8-27B-UD-Q4_K_XL.gguf -c 69632 -b 4096 -ub 2048 -ngl 99 -fa on -ctk q8_0 -ctv q8_0 -npp 32768 -ntg 2048 -npl 2

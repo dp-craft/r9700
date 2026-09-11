@@ -41,17 +41,6 @@ takeaway: llama.cpp **b10909** build check on `Qwen3.8-27B-UD-Q4_K_XL.gguf` / KV
 | Very large | 32768 / 2048 | vulkan | 780.1 | 872.4 | +11.8% ▲ better | 27.2 | 28.2 | +3.7% = flat | 117.4 s → 110.2 s (-6.1%) |
 | Very large | 32768 / 2048 | rocm | 696.7 | 952.1 | +36.7% ▲ better | 22.8 | 24.8 | +8.9% ▲ better | 137.0 s → 117.1 s (-14.6%) |
 
-## Size decay — power-law fit (INFERRED, iron rule 16)
-
-Prefill: average prompt rate vs prompt size P. Decode: decode rate vs the depth P it starts at.
-
-| Backend | Build | prefill exponent | prefill R² | decode exponent | decode R² | fit range |
-|---|---|---|---|---|---|---|
-| vulkan | `b10655-4-g6fdd0ac-vulkan` | -0.011 | 0.05 | -0.015 | 0.78 | P = 128–32768 (5 pts) |
-| vulkan | `b10909-vulkan` | +0.003 | 0.00 | -0.012 | 0.79 | P = 128–32768 (5 pts) |
-| rocm | `b10375-rocm` | -0.022 | 0.06 | -0.021 | 0.55 | P = 128–32768 (5 pts) |
-| rocm | `b10909-rocm` | +0.028 | 0.15 | -0.014 | 0.46 | P = 128–32768 (5 pts) |
-
 ## Memory (MEASURED, `bench/lib/vram_sampler.py`)
 
 | Backend | Build | VRAM at arm start (MiB) | peak VRAM (MiB) | peak GTT (MiB) | contended |

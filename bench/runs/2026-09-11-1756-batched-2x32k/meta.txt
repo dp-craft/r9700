@@ -1,0 +1,9 @@
+date=2026-09-11T17:56:36+02:00
+gpu_vendor=amd
+gpu_name=AMD Radeon AI PRO R9700
+gpu_driver=rocm-smi-lib 7.8.0
+vram_total_mib=32624
+hsa_override=12.0.1
+model=/home/dev/models/gguf/unsloth/Qwen3.8-27B-UD-Q4_K_XL.gguf
+knobs: NPP=32768 NTG=2048 NPL=2 CTX=69632 -b 4096 -ub 2048 -ngl 99 -fa on -ctk q8_0 -ctv q8_0
+builds=b10655-4-g6fdd0ac-vulkan b10909-vulkan b10375-rocm b10909-rocm

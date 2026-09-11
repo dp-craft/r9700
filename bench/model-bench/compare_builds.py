@@ -4,11 +4,13 @@
 Skill: llamacpp-build. Reuses model-bench/run.sh (one invocation per arm) + lib/gpu_exclusive.sh.
 
   run --new VER [--backend vulkan|rocm|both] [--prev-vulkan NAME] [--prev-rocm NAME]
-      [--reps 1] [--shapes 128:64,512:256,...] [--model GGUF] [--dry-run]
+      [--reps 1] [--shapes 128:64,512:256,...] [--parallel N] [--model GGUF] [--dry-run]
       Previous defaults to the build/latest-<backend> symlink target. Per backend: previous arm,
       then new arm, each after gpu_exclusive.sh. llama-swap is stopped for the whole run and
       restarted after it (also on failure / Ctrl-C / SIGTERM). Writes
       bench/runs/<stamp>-buildcmp-<VER>/arms.json, then the report (same as `report`).
+      --parallel N (optional, off by default): per build also N concurrent copies of the largest
+      shape via llama-batched-bench (run.sh NPL=N).
   report CMP_DIR
       (Re)generates docs/analysis/<stamp>-llamacpp-<VER>-build-check.md from arms.json + the arm run
       dirs and runs docs/reindex.py. Deterministic: same inputs -> identical report.
@@ -56,6 +58,10 @@ ETA_PP, ETA_TG = 754, 51           # user-stated current Qwen3.8 rates — ETA p
 # sd seen at r=3: ROCm prefill 4.5% (2026-09-11 build check).
 SIG_SIGMA, SIG_PCT = 2.0, 5.0
 IDLE_VRAM_MAX_MIB = 4096           # VRAM held when an arm starts -> another engine resident (rule 14)
+# --parallel: the N streams decode in lockstep; one step costs 1.16-1.27x a single stream's (MEASURED 2026-09-11,
+# 2 x 32k/2k) — ETA only. batched-bench reports no backend, so a --parallel arm must hold this much VRAM above
+# idle or it counts as a CPU fallback (the 27B Q4_K_XL weights alone are ~16 GiB).
+PAR_STEP_COST, PAR_MIN_RESIDENT_MIB = 1.3, 8000
 
 MARK = {"better": "▲ better", "worse": "▼ worse", "flat": "= flat"}
 DEVICE = {"vulkan": "Vulkan", "rocm": "ROCm"}   # --list-devices prefix == llama-bench `backends` value
@@ -101,6 +107,11 @@ def eta_secs(cfg):
              + sum(g for _, g in s) / ETA_TG) * cfg["reps"] + 20)   # + model load
 
 
+def eta_par(cfg):
+    p, g = max(cfg["shapes"], key=sum)
+    return cfg["parallel"] * p / ETA_PP + g * PAR_STEP_COST / ETA_TG + 20
+
+
 # ---------------------------------------------------------------- llama-swap
 def port_pid(port):
     """PID listening on the port, or None — exact, unlike a pgrep pattern that can match itself."""
@@ -139,24 +150,34 @@ def start_swap():
 
 
 # ---------------------------------------------------------------- run
-def run_arm(name, be, cfg, cmp_dir):
+def run_arm(name, be, cfg, cmp_dir, npl=0):
+    """One run.sh invocation: the request shapes (llama-bench), or with npl the concurrent test (batched-bench)."""
     bench = BUILD / name / "bin" / "llama-bench"
-    arm = {"name": name, "backend": be}
+    arm = {"name": name, "backend": be, "kind": "par" if npl else "shapes"}
+    label = f"{name} ×{npl}" if npl else name
     ex = subprocess.run(["bash", str(GPU_EXCL)], capture_output=True, text=True)
     if ex.returncode:
-        die(f"gpu_exclusive.sh refused before arm {name} (GPU not free):\n{ex.stdout}{ex.stderr}")
-    pps = [WARMUP_PP] + sorted({p for p, _ in cfg["shapes"]})
-    env = {**os.environ, "LLAMA_BENCH": str(bench), "MODEL": cfg["model"], "SLUG": f"buildcmp-{name}",
-           "PP": ",".join(map(str, pps)), "TG": "0", "DEPTH": "0",
-           "PG": " ".join(f"{p},{g}" for p, g in [WARMUP_PG] + cfg["shapes"]), "WARMUP": "0",
-           "UB": str(cfg["ub"]), "BATCH": str(cfg["batch"]), "CTK": cfg["kv"], "CTV": cfg["kv"],
-           "REPS": str(cfg["reps"]), "VRAM_SAMPLE": "1"}
+        die(f"gpu_exclusive.sh refused before arm {label} (GPU not free):\n{ex.stdout}{ex.stderr}")
+    env = {**os.environ, "LLAMA_BENCH": str(bench), "MODEL": cfg["model"], "UB": str(cfg["ub"]),
+           "BATCH": str(cfg["batch"]), "CTK": cfg["kv"], "CTV": cfg["kv"], "VRAM_SAMPLE": "1"}
+    if npl:
+        p, g = max(cfg["shapes"], key=sum)
+        # DEPTH/REPS/WARMUP pinned to what batched-bench does (no depth, one run, its own warmup): an inherited
+        # shell value would otherwise land in meta.txt as false provenance
+        env.update(SLUG=f"buildcmp-par{npl}-{name}", PP=str(p), TG=str(g), NPL=str(npl), PG="",
+                   DEPTH="0", REPS="1", WARMUP="1")
+        limit = 3 * eta_par(cfg) + 120
+    else:
+        pps = [WARMUP_PP] + sorted({p for p, _ in cfg["shapes"]})
+        env.update(SLUG=f"buildcmp-{name}", PP=",".join(map(str, pps)), TG="0", DEPTH="0", NPL="",
+                   PG=" ".join(f"{p},{g}" for p, g in [WARMUP_PG] + cfg["shapes"]), WARMUP="0",
+                   REPS=str(cfg["reps"]))
+        limit = 3 * eta_secs(cfg) + 120   # run.sh has no timeout; a hung model load would block forever
     # LD_LIBRARY_PATH outranks RUNPATH: an inherited one would load another build's libllama.
     env.pop("LD_LIBRARY_PATH", None)
-    limit = 3 * eta_secs(cfg) + 120   # run.sh has no timeout; a hung model load would block forever
-    print(f"  arm {name}: running (timeout {limit / 60:.0f} min) …", flush=True)
+    print(f"  arm {label}: running (timeout {limit / 60:.0f} min) …", flush=True)
     t0 = time.time()
-    # own process group, so timeout / Ctrl-C / SIGTERM take llama-bench down too — never an orphan on the GPU
+    # own process group, so timeout / Ctrl-C / SIGTERM take the bench down too — never an orphan on the GPU
     p = subprocess.Popen(["bash", str(RUN_SH)], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                          text=True, start_new_session=True)
     try:
@@ -169,7 +190,7 @@ def run_arm(name, be, cfg, cmp_dir):
     except BaseException:
         os.killpg(p.pid, signal.SIGKILL)
         raise
-    log = cmp_dir / f"arm-{name}.log"
+    log = cmp_dir / f"arm-{name}{f'-par{npl}' if npl else ''}.log"
     log.write_text(out[-20000:] + "\n--- stderr ---\n" + err[-20000:])
     arm["secs"] = round(time.time() - t0, 1)
     m = re.search(r"→ results: (\S+)", out)
@@ -177,7 +198,7 @@ def run_arm(name, be, cfg, cmp_dir):
         arm["run_dir"] = str(pathlib.Path(m.group(1)).relative_to(REPO))
     if rc or not m:
         arm["failed"] = f"run.sh {rc if isinstance(rc, str) else f'exit {rc}'} — see {log.relative_to(REPO)}"
-    print(f"  arm {name}: {'FAILED' if arm.get('failed') else 'ok'} in {arm['secs'] / 60:.1f} min", flush=True)
+    print(f"  arm {label}: {'FAILED' if arm.get('failed') else 'ok'} in {arm['secs'] / 60:.1f} min", flush=True)
     return arm
 
 
@@ -186,8 +207,10 @@ def cmd_run(a):
     for p, g in a.shapes:
         if p <= 0 or g <= 0 or p == WARMUP_PP or (p, g) == WARMUP_PG:
             die(f"bad shape {p}:{g} (both > 0; {WARMUP_PP} is the warmup prompt)")
+    if a.parallel and a.parallel < 2:
+        die("--parallel needs N >= 2")
     cfg = {"model": a.model, "shapes": [list(s) for s in a.shapes], "ub": UB, "batch": BATCH, "kv": KV,
-           "reps": a.reps, "warmup": {"pp": WARMUP_PP, "pg": list(WARMUP_PG)}}
+           "reps": a.reps, "warmup": {"pp": WARMUP_PP, "pg": list(WARMUP_PG)}, "parallel": a.parallel}
     pairs = []
     for be in backends:
         new = arm_name(a.new, be)
@@ -202,8 +225,9 @@ def cmd_run(a):
             print(f"[{be}] skipped: {new} is already latest-{be} — nothing to compare")
             continue
         for n in (prev, new):
-            if not os.access(BUILD / n / "bin" / "llama-bench", os.X_OK):
-                die(f"[{be}] build/{n}/bin/llama-bench missing — build it first ({BUILD_SH} build)")
+            for tool in ["llama-bench"] + (["llama-batched-bench"] if a.parallel else []):
+                if not os.access(BUILD / n / "bin" / tool, os.X_OK):
+                    die(f"[{be}] build/{n}/bin/{tool} missing — build it first ({BUILD_SH} build)")
             if not has_device(n, be):
                 die(f"[{be}] build/{n} exposes no {DEVICE[be]} device — it would silently run on the CPU "
                     "(missing runtime libs?)")
@@ -212,9 +236,11 @@ def cmd_run(a):
         die("nothing to compare")
     if not pathlib.Path(a.model).is_file():
         die(f"model not found: {a.model}")
-    eta = eta_secs({**cfg, "shapes": a.shapes}) * 2 * len(pairs) / 60
-    print(f"plan: {2 * len(pairs)} arms {[p[1:] for p in pairs]} · shapes "
-          f"{', '.join(shape_txt(s) for s in a.shapes)} · r={a.reps} · warmup pass · "
+    run_cfg = {**cfg, "shapes": a.shapes}
+    eta = (eta_secs(run_cfg) + (eta_par(run_cfg) if a.parallel else 0)) * 2 * len(pairs) / 60
+    par_txt = f" · {a.parallel} concurrent × {shape_txt(max(a.shapes, key=sum))}" if a.parallel else ""
+    print(f"plan: {2 * len(pairs)} builds {[p[1:] for p in pairs]} · shapes "
+          f"{', '.join(shape_txt(s) for s in a.shapes)} · r={a.reps} · warmup pass{par_txt} · "
           f"ETA ~{eta:.0f} min (at {ETA_PP}/{ETA_TG} t/s)", flush=True)
     if a.dry_run:
         return
@@ -228,9 +254,10 @@ def cmd_run(a):
     signal.signal(signal.SIGTERM, lambda *_: sys.exit("compare_builds: terminated"))  # -> finally runs
     try:
         for be, prev, new in pairs:
-            for n in (prev, new):
-                doc["arms"].append(run_arm(n, be, {**cfg, "shapes": a.shapes}, cmp_dir))
-                (cmp_dir / "arms.json").write_text(json.dumps(doc, indent=2) + "\n")
+            for npl in [0] + ([a.parallel] if a.parallel else []):
+                for n in (prev, new):
+                    doc["arms"].append(run_arm(n, be, run_cfg, cmp_dir, npl))
+                    (cmp_dir / "arms.json").write_text(json.dumps(doc, indent=2) + "\n")
         report(cmp_dir)
     finally:
         if swap_was_up:
@@ -282,6 +309,25 @@ def load(arm, shapes):
             "version": f'{rows[0]["build_number"]} ({rows[0]["build_commit"]})'}
 
 
+def load_par(arm, npl):
+    """--parallel arm -> totals over the N streams. Same completeness rule as load()."""
+    a = dict(arm)
+    if a.get("failed"):
+        return a
+    rd = REPO / a["run_dir"]
+    try:
+        rows = json.loads((rd / "batched-bench.json").read_text())
+    except (OSError, ValueError) as e:
+        return {**a, "failed": f"unreadable batched-bench.json ({e})"}
+    r = next((r for r in rows if r["pl"] == npl), None)
+    if not r:
+        return {**a, "failed": f"no pl={npl} row in batched-bench.json"}
+    mem = memory(rd / "gpu_samples.csv")
+    if not mem or mem["peak_vram"] - mem["idle"] < PAR_MIN_RESIDENT_MIB:
+        return {**a, "mem": mem, "failed": f"< {PAR_MIN_RESIDENT_MIB} MiB resident in VRAM — CPU fallback?"}
+    return {**a, "pp": (r["speed_pp"], 0.0), "tg": (r["speed_tg"], 0.0), "req": r["t"], "mem": mem}
+
+
 def contended(a):
     return bool(a.get("mem")) and a["mem"]["idle"] > IDLE_VRAM_MAX_MIB
 
@@ -293,40 +339,31 @@ def cell(prev, new):  # (mean, sd) pairs, higher is better -> (Δ%, better|worse
     return pct, ("better" if d > 0 else "worse") if moved else "flat"
 
 
-def fit(points):  # power law: ln(rate) = c + k ln(x) -> (k, R²)
-    pts = [(x, v) for x, v in points if x > 0]
-    if len(pts) < 2:
-        return None
-    xs, ys = [math.log(x) for x, _ in pts], [math.log(v) for _, v in pts]
-    n = len(xs)
-    mx, my = sum(xs) / n, sum(ys) / n
-    sxx = sum((x - mx) ** 2 for x in xs)
-    syy = sum((y - my) ** 2 for y in ys)
-    sxy = sum((x - mx) * (y - my) for x, y in zip(xs, ys))
-    return sxy / sxx, (sxy * sxy / (sxx * syy) if syy else 1.0)
-
-
-def verdict(p, n, shapes):
-    if not n or n.get("failed"):
+def verdict(p, n, shapes, pr=None):  # pr = (prev, new) --parallel arms, or None
+    if not n or n.get("failed") or (pr and pr[1].get("failed")):
         return "FAILED"
-    if not p or p.get("failed"):
+    if not p or p.get("failed") or (pr and pr[0].get("failed")):   # a failed baseline hides nothing silently
         return "NO-BASELINE"
-    if contended(p) or contended(n):
+    if any(contended(x) for x in [p, n, *(pr or ())]):
         return "CONTENDED"
     moves = [cell(p["shape"][s][m], n["shape"][s][m])[1] for s in shapes for m in ("pp", "tg")]
+    if pr:
+        moves += [cell(pr[0][m], pr[1][m])[1] for m in ("pp", "tg")]
     return "REGRESSION" if "worse" in moves else "IMPROVEMENT" if "better" in moves else "NEUTRAL"
 
 
-def recommendation(be, v, p, n):
+def recommendation(be, v, p, n, pr=None):
     nv, pv = ver_of(n["name"], be), ver_of(p["name"], be)
     promote = f"`{BUILD_SH} promote {nv} --backend {be}`"
+    why = n.get("failed") or (pr and pr[1].get("failed") and f"concurrent arm — {pr[1]['failed']}") or "not run"
+    base = p.get("failed") or (pr and pr[0].get("failed") and f"concurrent arm — {pr[0]['failed']}") or "not run"
     return {
         "IMPROVEMENT": f"**Promote** {promote}.",
         "NEUTRAL": f"**Promote** {promote} — no measurable change; newer fixes come for free.",
         "REGRESSION": f"**Hold** — keep `{pv}` as latest-{be}; review the ▼ cells first. Promote anyway: "
                       f"{promote}; roll back later: `{BUILD_SH} promote {pv} --backend {be}`.",
-        "FAILED": f"**Do not promote** — the new build's bench failed: {n.get('failed', 'not run')}.",
-        "NO-BASELINE": f"**Re-run** — the previous build's bench failed ({p.get('failed')}); no comparison.",
+        "FAILED": f"**Do not promote** — the new build's bench failed: {why}.",
+        "NO-BASELINE": f"**Re-run** — the previous build's bench failed ({base}); no comparison.",
         "CONTENDED": f"**Re-run** — VRAM was held by another engine at arm start (> {IDLE_VRAM_MAX_MIB} MiB); "
                      f"numbers invalid: `bench/model-bench/compare_builds.py run --new {nv} --backend {be}`.",
     }[v]
@@ -347,16 +384,24 @@ def report(cmp_dir):
     if "shapes" not in cfg:
         die(f"{cmp_dir.name} is from the pre-shapes depth-sweep version — its report stays as generated")
     shapes, cmp_rel = [tuple(s) for s in cfg["shapes"]], cmp_dir.relative_to(REPO)
-    hl = max(shapes, key=sum)   # headline = the largest request shape
-    arms = [load(x, shapes) for x in doc["arms"]]
-    per_be = {}
-    for x in arms:
-        per_be.setdefault(x["backend"], []).append(x)
-    res = []  # (be, prev_arm, new_arm, verdict)
+    npl = cfg.get("parallel") or 0
+    hl = max(shapes, key=sum)   # headline = the largest request shape (also the --parallel shape)
+    per_be, par_be = {}, {}
+    for x in doc["arms"]:
+        if x.get("kind") == "par":
+            par_be.setdefault(x["backend"], []).append(load_par(x, npl))
+        else:
+            per_be.setdefault(x["backend"], []).append(load(x, shapes))
+    res, par = [], {}  # res: (be, prev_arm, new_arm, verdict); par: be -> (prev, new) --parallel arms
     for be, xs in per_be.items():
         n = xs[1] if len(xs) > 1 else {"name": arm_name(new, be), "failed": "arm not run (interrupted)"}
-        res.append((be, xs[0], n, verdict(xs[0], n, shapes)))
+        if npl:
+            q = par_be.get(be, [])
+            par[be] = (q[0] if q else {"name": xs[0]["name"], "failed": "arm not run (interrupted)"},
+                       q[1] if len(q) > 1 else {"name": n["name"], "failed": "arm not run (interrupted)"})
+        res.append((be, xs[0], n, verdict(xs[0], n, shapes, par.get(be))))
     verdicts = {be: v for be, _, _, v in res}
+    arms = [a for xs in (*per_be.values(), *par_be.values()) for a in xs]
 
     def ok(p, n):
         return not (p.get("failed") or n.get("failed"))
@@ -374,6 +419,7 @@ def report(cmp_dir):
     model = pathlib.Path(cfg["model"]).name
     total = next((a["mem"]["total"] for a in arms if a.get("mem")), 0)
     wu = cfg["warmup"]
+    par_txt = f" · {npl} concurrent × {shape_txt(hl)} (llama-batched-bench)" if npl else ""
 
     L = ["<!-- meta", f"date: {stamp[:10]} {stamp[11:13]}:{stamp[13:15]}",
          f"takeaway: llama.cpp **{new}** build check on `{model}` / KV {cfg['kv']} — {take}.", "-->", "",
@@ -385,23 +431,29 @@ def report(cmp_dir):
          f"HIP {env['hip']} · {env['mesa']} · `HSA_OVERRIDE_GFX_VERSION=12.0.1`",
          f"- **Model:** `{model}` · KV **{cfg['kv']}** · `-ngl 99 -fa on -ub {cfg['ub']} -b {cfg['batch']}` · "
          f"request shapes {', '.join(shape_txt(s) for s in shapes)} · r={cfg['reps']} · warmup pass "
-         f"pp{wu['pp']} + pg{wu['pg'][0]},{wu['pg'][1]} (dropped)",
+         f"pp{wu['pp']} + pg{wu['pg'][0]},{wu['pg'][1]} (dropped){par_txt}",
          "- **Builds:** " + " · ".join(
              f"{be} `{p['name']}` ({p.get('version', '?')}) → `{n['name']}` ({n.get('version', '?')})"
              for be, p, n, _ in res),
          f"- **Data:** `{cmp_rel}/arms.json` → per-arm `bench/runs/<stamp>-model-buildcmp-<build>/` "
-         "(`llama-bench.json`, `meta.txt`, `gpu_samples.csv`)", "",
+         "(`llama-bench.json`, `meta.txt`, `gpu_samples.csv`"
+         + ("; `buildcmp-par<N>-<build>/batched-bench.json`" if npl else "") + ")", "",
          "## Summary", "",
          f"| Backend | Previous | New | Verdict | {wl} request (MEASURED) | Recommendation |", "|---|---|---|---|---|---|"]
     for be, p, n, v in res:
         L.append(f"| {be} | `{p['name']}` | `{n['name']}` | **{v}** | {req_txt(p, n, hl)} | "
-                 f"{recommendation(be, v, p, n)} |")
+                 f"{recommendation(be, v, p, n, par.get(be))} |")
     L += ["", "## Legend", "",
           "- **Prefill t/s** — llama-bench `pp P`: a P-token prompt into an empty context. MEASURED.",
           "- **Decode t/s** — G / (t(`-pg P,G`) − t(`pp P`)): the G tokens generated right after the P-token prompt, "
           "i.e. decode at depth P…P+G. Derived from two MEASURED timings (sd propagated from both when r > 1).",
-          "- **Request** — wall time of llama-bench `-pg P,G`: prompt + generation in one context. MEASURED.",
-          f"- **Δ%** — new vs previous. ▲/▼ only when |Δ%| ≥ {SIG_PCT:.0f} (and, when r > 1, |Δ| > "
+          "- **Request** — wall time of llama-bench `-pg P,G`: prompt + generation in one context. MEASURED."]
+    if npl:
+        L.append(f"- **{npl} concurrent** — llama-batched-bench `-npl {npl}`: {npl} copies of {shape_txt(hl)}; all "
+                 f"prompts prefill first, then the {npl} streams decode in lockstep. t/s are totals over the streams; "
+                 f"request = until all {npl} finish. *{npl} at once vs {npl} in a row* = {npl} × the single-request "
+                 "time ÷ the concurrent time − 1 (throughput gain, derived from two MEASURED times).")
+    L += [f"- **Δ%** — new vs previous. ▲/▼ only when |Δ%| ≥ {SIG_PCT:.0f} (and, when r > 1, |Δ| > "
           f"{SIG_SIGMA:.0f}·√(sd_prev² + sd_new²)); otherwise = flat.",
           "- **Verdict** — REGRESSION: any ▼ prefill/decode cell · IMPROVEMENT: ≥1 ▲, no ▼ · NEUTRAL: all flat · "
           "FAILED / NO-BASELINE / CONTENDED: no valid comparison.", ""]
@@ -423,34 +475,41 @@ def report(cmp_dir):
                           f"{fmt_v(a1['pp'])} | {pp_pct:+.1f}% {MARK[pp_m]} | {fmt_v(a0['tg'])} | "
                           f"{fmt_v(a1['tg'])} | {tg_pct:+.1f}% {MARK[tg_m]} | {req_txt(p, n, s)} |")
     L += detail
-    L += ["", "## Size decay — power-law fit (INFERRED, iron rule 16)", "",
-          "Prefill: average prompt rate vs prompt size P. Decode: decode rate vs the depth P it starts at.", "",
-          "| Backend | Build | prefill exponent | prefill R² | decode exponent | decode R² | fit range |",
-          "|---|---|---|---|---|---|---|"]
-    for be, p, n, _ in res:
-        for a in (p, n):
-            if a.get("failed"):
+    par_detail = []
+    if npl:
+        par_detail = [f"## {npl} concurrent requests (MEASURED, `llama-batched-bench -npl {npl}`)", "",
+                      f"{npl} × {shape_txt(hl)} at once, per build.", "",
+                      "| Backend | Prefill t/s total prev | Prefill t/s total new | Prefill Δ | Decode t/s total prev | "
+                      "Decode t/s total new | Decode Δ | Decode t/s per stream prev → new | Request prev → new | "
+                      f"New: {npl} at once vs {npl} in a row |",
+                      "|---|---|---|---|---|---|---|---|---|---|"]
+        for be, p, n, _ in res:
+            q0, q1 = par[be]
+            if not ok(q0, q1):
+                par_detail.append(f"| {be} | {q0.get('failed') or 'ok'} | {q1.get('failed') or 'ok'} | | | | | | | |")
                 continue
-            fp = fit([(s[0], a["shape"][s]["pp"][0]) for s in shapes])
-            ft = fit([(s[0], a["shape"][s]["tg"][0]) for s in shapes])
-            if not (fp and ft):
-                L.append(f"| {be} | `{a['name']}` | — | — | — | — | < 2 shapes |")
-                continue
-            L.append(f"| {be} | `{a['name']}` | {fp[0]:+.3f} | {fp[1]:.2f} | {ft[0]:+.3f} | {ft[1]:.2f} | "
-                     f"P = {shapes[0][0]}–{shapes[-1][0]} ({len(shapes)} pts) |")
+            pp_pct, pp_m = cell(q0["pp"], q1["pp"])
+            tg_pct, tg_m = cell(q0["tg"], q1["tg"])
+            gain = "n/a" if n.get("failed") else f"{100 * (npl * n['shape'][hl]['req'] / q1['req'] - 1):+.0f}% throughput"
+            par_detail.append(f"| {be} | {q0['pp'][0]:.1f} | {q1['pp'][0]:.1f} | {pp_pct:+.1f}% {MARK[pp_m]} | "
+                              f"{q0['tg'][0]:.1f} | {q1['tg'][0]:.1f} | {tg_pct:+.1f}% {MARK[tg_m]} | "
+                              f"{q0['tg'][0] / npl:.1f} → {q1['tg'][0] / npl:.1f} | "
+                              f"{q0['req']:.1f} s → {q1['req']:.1f} s ({pct_txt(q0['req'], q1['req'])}) | {gain} |")
+        L += [""] + par_detail
     L += ["", "## Memory (MEASURED, `bench/lib/vram_sampler.py`)", "",
           "| Backend | Build | VRAM at arm start (MiB) | peak VRAM (MiB) | peak GTT (MiB) | contended |", "|---|---|---|---|---|---|"]
-    for be, p, n, _ in res:
-        for a in (p, n):
-            m = a.get("mem")
-            if not m:
-                L.append(f"| {be} | `{a['name']}` | — | — | — | no samples |")
-                continue
-            gtt = "—" if m["peak_gtt"] is None else f"{m['peak_gtt']:.0f}"
-            L.append(f"| {be} | `{a['name']}` | {m['idle']:.0f} | {m['peak_vram']:.0f} | {gtt} | "
-                     f"{'**YES**' if contended(a) else 'no'} |")
+    mem_rows = [(be, a, "") for be, p, n, _ in res for a in (p, n)]
+    mem_rows += [(be, a, f" ({npl} concurrent)") for be, q in par.items() for a in q]
+    for be, a, tag in mem_rows:
+        m = a.get("mem")
+        if not m:
+            L.append(f"| {be} | `{a['name']}`{tag} | — | — | — | no samples |")
+            continue
+        gtt = "—" if m["peak_gtt"] is None else f"{m['peak_gtt']:.0f}"
+        L.append(f"| {be} | `{a['name']}`{tag} | {m['idle']:.0f} | {m['peak_vram']:.0f} | {gtt} | "
+                 f"{'**YES**' if contended(a) else 'no'} |")
     L += ["", "## Recommendation", ""]
-    L += [f"- **{be}:** {recommendation(be, v, p, n)}" for be, p, n, v in res]
+    L += [f"- **{be}:** {recommendation(be, v, p, n, par.get(be))}" for be, p, n, v in res]
     L += ["", "## Methodology & caveats", "",
           "- Same session, same model file, same flags; per backend the previous build runs first, then the new one. "
           "llama-swap is stopped for the whole run (restarted after) and `bench/lib/gpu_exclusive.sh` "
@@ -462,8 +521,14 @@ def report(cmp_dir):
           f"- r={cfg['reps']}" + (": no noise estimate. The 5% bar sits above the largest sd seen at r=3 (ROCm prefill "
           "4.5%); still, a single ▼ deserves a re-run with `--reps 3` before acting on it. The smallest prompts take "
           "well under 1 s, so their prefill cells are the noisiest." if cfg["reps"] == 1 else
-          ": sd is a rough noise estimate; the 2σ + 5% rule guards against calling noise a change."),
-          "- Raw llama-bench throughput: no MTP / speculative decoding, no server, no prompt cache. llama-swap's "
+          ": sd is a rough noise estimate; the 2σ + 5% rule guards against calling noise a change.")]
+    if npl:
+        L.append(f"- `--parallel {npl}`: one `run.sh NPL={npl}` → `llama-batched-bench` run per build after its shape "
+                 "arm, n=1, its own warmup (a 16-token decode). No continuous batching: `llama-server -np N` overlaps "
+                 "one stream's prefill with another's decode, so serving numbers differ. batched-bench reports no "
+                 f"backend — the arm fails unless ≥ {PAR_MIN_RESIDENT_MIB} MiB is resident above idle. Its prefill and "
+                 "decode cells count in the verdict; a failed new-build concurrent arm = FAILED.")
+    L += ["- Raw llama-bench throughput: no MTP / speculative decoding, no server, no prompt cache. llama-swap's "
           "served decode (MTP on) is higher — compare builds here, not against serving wall-clock.",
           "- One model (dense 27B, Q4_K_XL) and one KV type: MoE or other quants can move differently.",
           "- Cross-report comparisons are only valid when the GPU/Host line (kernel, HIP, Mesa) is identical.", "",
@@ -472,7 +537,8 @@ def report(cmp_dir):
           f"bench/model-bench/compare_builds.py run --new {new} "
           + (f"--backend {res[0][0]} " if len(res) == 1 else "")
           + " ".join(f"--prev-{be} {p['name']}" for be, p, _, _ in res)
-          + f" --reps {cfg['reps']} --shapes {','.join(f'{p}:{g}' for p, g in shapes)}",
+          + f" --reps {cfg['reps']} --shapes {','.join(f'{p}:{g}' for p, g in shapes)}"
+          + (f" --parallel {npl}" if npl else ""),
           "```", ""]
 
     out = DOCS / f"{stamp}-llamacpp-{new}-build-check.md"
@@ -480,6 +546,8 @@ def report(cmp_dir):
     ri = subprocess.run([sys.executable, str(REPO / "docs/reindex.py")], cwd=REPO, capture_output=True, text=True)
     print("\n" + "\n".join(L[L.index("## Summary") + 2: L.index("## Legend") - 1]))
     print("\n" + "\n".join(detail[2:]))
+    if par_detail:
+        print("\n" + "\n".join(par_detail[4:]))
     print(f"\nreport: {out.relative_to(REPO)}" + ("" if ri.returncode == 0 else f"  (reindex FAILED: {ri.stderr.strip()})"))
     print("VERDICT " + json.dumps(verdicts))
 
@@ -495,6 +563,8 @@ def main():
     r.add_argument("--reps", type=int, default=1)
     r.add_argument("--shapes", default=SHAPES, help="request shapes P:G,P:G (prompt:generated)",
                    type=lambda s: [tuple(int(x) for x in t.split(":")) for t in s.split(",")])
+    r.add_argument("--parallel", type=int, default=0, metavar="N",
+                   help="also run N concurrent copies of the largest shape per build (llama-batched-bench)")
     r.add_argument("--model", default=MODEL)
     r.add_argument("--dry-run", action="store_true", help="print the plan + ETA, run nothing")
     g = sub.add_parser("report", help="regenerate the report from a bench/runs/<stamp>-buildcmp-<VER> dir")
