@@ -54,13 +54,17 @@ bench/                 ← two tracks (see bench/README.md); how-to in docs/GUID
   runs/              ← dated campaign outputs YYYY-MM-DD-HHMM-<slug>/ (results.jsonl/llama-bench.json)
   legacy/            ← ⚠️ FROZEN original harness (harness/ + old *.sh + *_results.jsonl); hardcodes
                        old path /home/dev/work/dippe/amd, does NOT run here; superseded. Reference only.
+build/               ← llama.cpp builds (gitignored): <ver>-src, <ver>-{vulkan,rocm}/bin (+BUILD_INFO), latest-*
+                       symlinks = what llama-swap serves. bench/llamacpp* + llama.cpp-src are compat symlinks
+                       into it. Fetch → build → bench vs previous → promote: /llamacpp-build
 .claude/skills/
   research/               ← reproducible, sourced, hallucination-resistant web research
   benchmark-results/      ← run a benchmark AND document it to a fixed spec (memory column mandatory)
   benchmark-new-campaign/ ← design + scaffold a new campaign (judgement) → gen_campaign.py (emit)
+  llamacpp-build/         ← new llama.cpp: build_llamacpp.sh → compare_builds.py → promote latest-*
 ```
 
-**Never read (gitignored binaries / generated):** `bench/llamacpp*/`, `bench/dl/`,
+**Never read (gitignored binaries / generated):** `bench/llamacpp*/`, `build/`, `bench/dl/`,
 `unsloth_compiled_cache/`, `bench/**/*.log`, `bench/runs/*/*.err`. They are 3 GB of build
 artifacts — reading them wastes tokens and tells you nothing. Structure/results live in the files
 above. (Charts are now committed SVGs under `<campaign>/charts/`, embedded in `appendix.md`.)
@@ -123,7 +127,52 @@ above. (Charts are now committed SVGs under `<campaign>/charts/`, embedded in `a
     verify the kill (port free + VRAM idle) before relaunching. An orphaned `llama-server` silently
     contends for VRAM and manufactures fake findings — 2026-07-15 one caused `invalid token`, 10x-slow
     prefill and a false "Q5 f16 @163840 is unstable" report that nearly reached a published analysis.
-15. **An interrupted run is not a result.** A cut stream, a killed job, a partial file: quarantine it
+    **Gate on free VRAM as a precondition, not just as a post-kill check** — read
+    `FREE_VRAM` and refuse to boot when it is below the engine's working set. A post-kill check only
+    catches what *you* started; the precondition also catches what someone else left behind.
+    **Two shapes this rule did not originally cover, both seen 2026-09-10:**
+    (a) **llama-swap holds a model resident** after your run finishes — it owns the process, so there
+    is no pidfile of yours to kill and the idle timeout may be long or 0. Issue `POST /unload` to its
+    port when you are done with it, and treat "my script exited" as unrelated to "the weights left the
+    card". (b) **An engine with a split process shape** — hipfire runs `bin/daemon` *and*
+    `hipfire serve`; killing only the daemon leaves `serve` holding the port and answering `/health`
+    with a stale model, so every subsequent request 500s. Kill every process in the shape, then
+    confirm the port is free. **Run `bench/lib/gpu_exclusive.sh [required_free_mib]` instead of
+    hand-rolling this** — it unloads llama-swap, kills the whole hipfire shape, waits, and *fails
+    loudly naming the holder* if the floor is not met. Trap it encodes: llama-swap's `/unload` is
+    **GET; POST returns 405**, and `curl -sf … >/dev/null 2>&1` swallows that completely, so a
+    cleanup step can report success and free nothing (2026-09-10, exactly this).
+15. **"No error in the log" is not evidence of a clean run — it depends on the allocator.** An
+    engine that reserves its whole KV window at load (llama.cpp) turns VRAM contention into a *load
+    failure* you cannot miss. An engine with on-demand paging (hipfire's VMM `kv_backend`) has no
+    allocation to fail: under contention it degrades into paging and reports **slowdown only** — no
+    OOM, nothing in `serve.log`, nothing in `dmesg`. On such an engine the *only* contention evidence
+    is residency: `amd-smi process -g 0` showing the daemon holding far less than its known working
+    set. 2026-09-10: a hipfire daemon held 4.4 GB against a ~19.4 GB working set while llama-swap
+    still had ~27 GB resident, and the whole concurrency sweep it produced had to be discarded.
+    Check residency against the expected working set before trusting any hipfire number.
+    **The other silent failure on hipfire is a GPU memory fault**: the worker wedges, `/health`
+    keeps answering `ok` (it never touches the GPU), and the in-flight request hangs until the
+    client's own timeout. 2026-09-10: 2 of 4 DFlash-off boots faulted on their first prompt in
+    `gemm_gate_up_mq4g256v2_wmma_gfx12_bt12`. Every probe runner MUST poll `serve.log` for
+    `Memory Fault` while a request is in flight and abort the request on sight, and a llama-swap row
+    for hipfire MUST NOT rely on `/health` as its liveness check.
+16. **Depth is a variable, not a setting — measure the curve, report the exponent.** A single-point
+    engine comparison is not a result. Prefill rate decays as a power law in conversation depth and
+    **the decay exponents differ enough to reverse the ranking**: measured 2026-09-10 on the 27B,
+    llama.cpp f16 KV −0.294, llama.cpp q8_0 KV −0.499, hipfire 27B −1.324, hipfire 35B −1.657
+    (R² 0.96–0.99, 4 points each). hipfire leads by 2.3× at 18k and loses by ~10× at 160k; **any
+    comparison taken at ≤36k picks the wrong engine.** Take ≥4 depths, fit log-log, quote the
+    exponent and R² beside the rates. A projection beyond the deepest measured point is `INFERRED`
+    (rule 1) and MUST state the fit range — extrapolating a power law 2.2× past its data is an
+    assumption, not a measurement.
+17. **Context capacity ≠ per-request prefill size.** A 160k *window* requirement does not mean 160k
+    token prompts. The real agentic pattern is incremental growth — load 1–20k, prefill, cache, add
+    another 1–20k plus reasoning, repeat until the sum passes 200k — so the honest probe is a
+    multi-turn conversation that grows, with prior turns cached, not a one-shot cold prefill at the
+    target depth. A cold-prefill probe at 160k measures a request shape that never occurs and misses
+    the prefix-reuse behaviour that dominates real cost.
+18. **An interrupted run is not a result.** A cut stream, a killed job, a partial file: quarantine it
     and re-collect. Never let it enter the data as a normal row (2026-07-15: a killed generation was
     graded as a real reply — 0.603 with tests=0.0 — and moved a published cell mean by 1.1 pts).
 
@@ -139,11 +188,14 @@ above. (Charts are now committed SVGs under `<campaign>/charts/`, embedded in `a
 | Probe a live server (prefill/decode/ttft/concurrency) | `bench/lib/capture_engine.py probe` (via `run.sh`) | `results.jsonl` |
 | Launch a parameterized llama-server (BACKEND/MTP/KV/**EXTRA_ARGS**) | `bench/engine-bench/serve_llamacpp.sh` | running server + `/props` |
 | Sample VRAM/GTT/power/thermal | `bench/lib/vram_sampler.py --out CSV` | `gpu_samples.csv` |
+| **Make the GPU exclusive + assert a free-VRAM floor before booting any engine** | `bench/lib/gpu_exclusive.sh [required_free_mib]` | unloads llama-swap (GET), kills the hipfire daemon+serve shape, exits non-zero naming the holder |
 | Run/campaign dir → theme-aware SVG charts + appendix.md | `bench/lib/report.py` | `charts/*.svg` + `appendix.md` |
 | Quality capture (per-task replies + tokens/ttfa/flags) | `campaigns/2026-07-12-27b-finetune-quality/capture.py` | `outputs.jsonl` |
 | Grade deterministic tasks (final_match/pyexec/json_schema/constraints) | `…/finetune-quality/graders/score_deterministic.py` | `scores_deterministic.jsonl` |
 | Quality campaign → decision charts (theme-aware SVG + appendix.md) | `campaigns/2026-07-12-27b-finetune-quality/make_charts.py --dir out --charts charts [--order …] [+ out/sweeps.json for connected-parameter line charts]` | `charts/*.svg` + `appendix.md` |
 | Throughput run/campaign dir → theme-aware SVG charts + appendix.md | `bench/lib/report.py <run_dir>` (auto-run by gen_campaign's `run.sh`) | `charts/*.svg` + `appendix.md` |
+| Fetch + build a llama.cpp tag (vulkan+rocm), promote / roll back `latest-*` | `bench/build_llamacpp.sh build\|promote\|status` (skill **`/llamacpp-build`**) | `build/<ver>-{src,vulkan,rocm}` + `build/latest-*` |
+| New llama.cpp build vs previous (llama-bench request shapes pp128/tg64 … pp32768/tg2048 → verdict) | `bench/model-bench/compare_builds.py run --new <ver>` | `docs/analysis/<stamp>-llamacpp-<ver>-build-check.md` + `VERDICT` line |
 
 If one of these is missing a capability, **extend the tool** (and say so) rather than writing a
 one-off replacement. New reusable capability → propose a skill/tool change, don't fork logic.

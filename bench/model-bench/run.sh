@@ -34,6 +34,8 @@ gpu_setup_env
 : "${CTK:=f16}"               # KV key type   — f16 is the BASELINE; q8_0 must earn its place
 : "${CTV:=f16}"               # KV value type   via an explicit A/B (see sweep.py / GUIDE)
 : "${REPS:=3}"                # repetitions (stddev)
+: "${PG:=}"                   # request shapes "P,G P,G" → one -pg test each (P prompt then G generated, timed together)
+: "${WARMUP:=1}"              # 0 = --no-warmup (llama-bench's warmup re-runs every test's prompt in full)
 : "${VRAM_SAMPLE:=1}"         # 1 = sample VRAM/power to gpu_samples.csv during the run
 
 [ -x "$LLAMA_BENCH" ] || { echo "llama-bench not found/executable: $LLAMA_BENCH" >&2; exit 1; }
@@ -50,8 +52,12 @@ mkdir -p "$OUT"
   gpu_meta
   echo "llama_bench=$LLAMA_BENCH"
   echo "model=$MODEL"
-  echo "knobs: PP=$PP TG=$TG DEPTH=$DEPTH NGL=$NGL FA=$FA UB=$UB BATCH=$BATCH CTK=$CTK CTV=$CTV REPS=$REPS"
+  echo "knobs: PP=$PP TG=$TG DEPTH=$DEPTH NGL=$NGL FA=$FA UB=$UB BATCH=$BATCH CTK=$CTK CTV=$CTV REPS=$REPS PG='$PG' WARMUP=$WARMUP"
 } > "$OUT/meta.txt"
+
+EXTRA=()
+for s in $PG; do EXTRA+=(-pg "$s"); done
+if [ "$WARMUP" = "0" ]; then EXTRA+=(--no-warmup); fi
 
 SAMPLER_PID=""
 if [ "$VRAM_SAMPLE" = "1" ]; then
@@ -65,7 +71,7 @@ set -x
 "$LLAMA_BENCH" -m "$MODEL" \
   -p "$PP" -n "$TG" -d "$DEPTH" -ngl "$NGL" -fa "$FA" \
   -ub "$UB" -b "$BATCH" -ctk "$CTK" -ctv "$CTV" \
-  -r "$REPS" --progress -o json 2> "$OUT/llama-bench.err" | tee "$OUT/llama-bench.json"
+  -r "$REPS" "${EXTRA[@]}" --progress -o json 2> "$OUT/llama-bench.err" | tee "$OUT/llama-bench.json"
 set +x
 
 # llama-bench JSON rows carry build info — surface it into meta.txt (unversioned = noise).

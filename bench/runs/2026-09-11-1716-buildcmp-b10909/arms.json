@@ -1,0 +1,71 @@
+{
+  "stamp": "2026-09-11-1716",
+  "new": "b10909",
+  "config": {
+    "model": "/home/dev/models/gguf/unsloth/Qwen3.8-27B-UD-Q4_K_XL.gguf",
+    "shapes": [
+      [
+        128,
+        64
+      ],
+      [
+        512,
+        256
+      ],
+      [
+        2048,
+        512
+      ],
+      [
+        8192,
+        1024
+      ],
+      [
+        32768,
+        2048
+      ]
+    ],
+    "ub": 2048,
+    "batch": 4096,
+    "kv": "q8_0",
+    "reps": 1,
+    "warmup": {
+      "pp": 1000,
+      "pg": [
+        1000,
+        32
+      ]
+    }
+  },
+  "arms": [
+    {
+      "name": "b10655-4-g6fdd0ac-vulkan",
+      "backend": "vulkan",
+      "secs": 256.5,
+      "run_dir": "bench/runs/2026-09-11-1716-model-buildcmp-b10655-4-g6fdd0ac-vulkan"
+    },
+    {
+      "name": "b10909-vulkan",
+      "backend": "vulkan",
+      "secs": 242.7,
+      "run_dir": "bench/runs/2026-09-11-1720-model-buildcmp-b10909-vulkan"
+    },
+    {
+      "name": "b10375-rocm",
+      "backend": "rocm",
+      "secs": 287.1,
+      "run_dir": "bench/runs/2026-09-11-1724-model-buildcmp-b10375-rocm"
+    },
+    {
+      "name": "b10909-rocm",
+      "backend": "rocm",
+      "secs": 248.9,
+      "run_dir": "bench/runs/2026-09-11-1729-model-buildcmp-b10909-rocm"
+    }
+  ],
+  "env": {
+    "kernel": "7.0.0-31-generic",
+    "hip": "7.15.26333-0000000",
+    "mesa": "Mesa 26.2.2 - kisak-mesa PPA"
+  }
+}

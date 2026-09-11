@@ -1,0 +1,13 @@
+date=2026-09-11T15:40:59+02:00
+host=Linux bipubi 7.0.0-31-generic #31~24.04.1-Ubuntu SMP PREEMPT_DYNAMIC Mon Aug 10 09:38:02 UTC 2 x86_64 x86_64 x86_64 GNU/Linux
+gpu_vendor=amd
+gpu_name=AMD Radeon AI PRO R9700
+gpu_driver=rocm-smi-lib 7.8.0
+vram_total_mib=32624
+hsa_override=12.0.1
+llama_bench=/home/dev/work/dp-craft/amd/build/b10909-vulkan/bin/llama-bench
+model=/home/dev/models/gguf/unsloth/Qwen3.8-27B-UD-Q4_K_XL.gguf
+knobs: PP=2048 TG=128 DEPTH=0,4096,8192,16384,30720 NGL=99 FA=on UB=2048 BATCH=4096 CTK=q8_0 CTV=q8_0 REPS=3
+build_commit=a2878d3
+build_number=10909
+backends=Vulkan
