@@ -1,0 +1,4 @@
+{"kind": "meta", "label": "hipfire-mq4pro-dflash-on", "model": "/home/dev/.hipfire/models/qwen3.8-27b.mq4-pro", "base_url": "http://127.0.0.1:11435/v1", "reps": 3, "note": "hipfire 0.3.0 beta; same as above but speculation.dflash=on with qwen3.8:27b-draft-mq4 (1.21GB) as controller", "extra_body": {}, "started": "2026-09-10T01:49:04"}
+{"kind": "error", "workload": "decode", "phase": "warmup", "error": "HTTPError: HTTP Error 400: Bad Request"}
+{"kind": "error", "workload": "prefill", "phase": "warmup", "error": "HTTPError: HTTP Error 400: Bad Request"}
+{"kind": "error", "workload": "coding", "phase": "warmup", "error": "HTTPError: HTTP Error 400: Bad Request"}

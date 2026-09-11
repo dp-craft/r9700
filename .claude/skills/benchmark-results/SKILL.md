@@ -50,6 +50,34 @@ point (campaign.sh) before they go in a TL;DR.
    rungs that loaded and report the **calculated** max ctx per budget (safe budget + physical VRAM),
    not just the a-priori formula. Physical VRAM on this box = **32624 MiB**.
 
+9. **Readiness gates must assert the positive.** A health endpoint often reports "nothing wrong"
+   before it reports "loaded" — hipfire's `/health` returns `{"model":null,"loading_model":null}`
+   *before a load even starts*, so a gate that waits for `loading_model":null` passes instantly
+   against an idle daemon and every request in the run 500s. Gate on the loaded identity being
+   present (`"model":"<something>","loading_model":null`), never on the absence of a busy flag.
+10. **Depth curve, not a point** (CLAUDE.md rule 16). ≥4 depths, log-log fit, report exponent + R²
+   next to the rates; label any projection past the deepest measured point `INFERRED` with its fit
+   range. Rankings taken at one shallow depth have been measured to invert.
+11. **Grow the conversation, don't cold-prefill** (CLAUDE.md rule 17). For window/context questions
+   the workload is a multi-turn conversation that accumulates with prior turns cached, not a
+   one-shot prompt at the target depth. Report per-turn `ctx`, new-token delta, prefill, decode,
+   wall and VRAM; verify prefix reuse is live by checking that turn 2's wall matches `delta/rate`
+   and not `ctx/rate`.
+12. **KV precision is a depth knob, not only a VRAM knob.** Rule 5's ≤5% A/B must be run *at depth*,
+   because the two precisions decay at different rates, not by a constant offset: measured
+   2026-09-10 on the 27B, f16 KV decays at −0.294 vs q8_0's −0.499, worth +5.6% prefill at 18k but
+   +40% at 73k. q8_0 KV pays dequantisation per attention block against all history, so its penalty
+   scales with the very term that grows. Buying VRAM back with KV quantisation taxes the operation
+   whose cost is already growing — say so when recommending it for a long-context workload.
+13. **Before hand-writing a probe, name the tool that should own it** (CLAUDE.md rule 6). `bench/`
+   has no driver for engines outside llama.cpp/vLLM: `serve_llamacpp.sh`, `capture_engine.py probe`
+   and `gen_campaign.py` do not cover hipfire, so the 2026-09-10 evaluation ran on hand-written
+   scratchpad scripts. That is the rule-6 escape hatch, and it is only legitimate when stated —
+   and it carries a debt: **`bench/` should grow a generic OpenAI-compatible driver** (base-url
+   parameterised, normalising `prompt_per_second`/`predicted_per_second` → `prefill_tok_s`/
+   `decode_tok_s`) plus a **multi-turn growth workload**, so the next engine is a config row rather
+   than a fresh pile of shell.
+
 ## Token policy
 Running is shell work — do it directly. For interpreting large logs or pulling external comparison
 numbers, fan out to **haiku** subagents (return digests only). Never read `bench/llamacpp*/`
@@ -189,3 +217,37 @@ with what THIS run measured (tag it), keep the definition wording as-is.
 | `prefix_mode` | `unique` = cold prompt cache, `shared` = warm | shared inflates prefill ~2.4× from request 2 (measured) | probe flag; `unique` is the default for honest numbers |
 | `plateau_within_noise` | difference inside the ±3% run-variance band | a tie — never sold as a win | sweep.py noise gate |
 | `Q4_K_M` (etc.) | GGUF weight quantization of the model itself | at 32 GB memory-bound long-ctx, Q4 is the optimum, not a compromise | fixed per run; recorded in meta.txt |
+14. **A kernel-route envelope is a threshold — read the dispatcher's eligibility predicates before
+   blaming memory or the model.** hipfire's gfx1201 WMMA prefill attention is default-on only for
+   `ctx ≤ 32768` (`gfx12_query16_default_eligible`); above it dispatch silently takes a ~3× slower
+   kernel, and the resulting curve looked like an allocator or bandwidth problem. One `grep` for the
+   predicate found what four measured depths could only fit a power law to. Measured 2026-09-10:
+   forcing the route lifted 73k prefill 80.5 → 182.5 tok/s. When a curve steepens past a round
+   number, look for the round number in the source first.
+15. **A prefill switch is also a decode switch — re-measure decode after any batched-attention change.**
+   The same dispatcher arm serves ordinary prefill and the speculative-decode *verify* forward
+   (batch 16). Forcing the WMMA prefill route on gfx12 excluded verify from it and dropped DFlash
+   decode 21.9 → 6.7 tok/s at 18k until a second knob (`flash_prefill_min_ctx`) separated the two.
+   A row that reports only the metric the change targeted is not a result.
+16. **Decode rate needs ≥256 generated tokens and a clock/power trace beside it.** 31–41-token answers
+   produced 5.0–14.2 tok/s on one config; 256-token answers on the same engine gave 21.9. And on the
+   R9700 under its 210 W cap the memory clock sits at 400–1000 MHz of 1265 for 60–90 % of samples,
+   which is why identical AR runs spread 16 ↔ 30 tok/s (`05` §24.4, §28.5). Sample `amd-smi metric
+   -g 0 -p -c` at 1 s during the run and print the memory-clock distribution with the decode number;
+   without it two decode figures are not comparable.
+17. **Speculation must be measured on the output shape it will see, with a byte-identical arm first.**
+   hipfire's ladder quotes DFlash at 258 tok/s (τ 13) on a synthetic prompt; on real prose it gave
+   τ 1.7–2.2 and lost to plain AR past 55k. The model-free n-gram draft (exact by construction) gave
+   τ ≈ 10 and 119 → 42 tok/s at 18k → 73k on copy-heavy output and nothing on prose. Report τ and the
+   task per row; a speculation number without both is the synthetic headline again.
+18. **Prefix reuse must be probed with two conversations, not one.** A single growing conversation
+   proves the cache exists; only an A/B/A interleave proves it survives another agent. On hipfire it
+   does not (full reset on divergence, DeltaNet state is irreversible): a 400-character follow-up
+   after a switch cost the full 52 s re-prefill. Any engine intended for multi-agent use gets the
+   interleave probe before the depth curve.
+19. **A trivial warm-up request does not prove a boot is healthy.** hipfire's draft-free 27B faults in
+   `gemm_gate_up_mq4g256v2_wmma_gfx12_bt12` on the **first large** request, not on first touch: across
+   six boots a 15-token warm-up succeeded every time at 258–269 tok/s and two of the six still faulted
+   on the 18k prompt behind it (`05` §28.3). Boot-health probes must run at the workload's real prompt
+   size, and a campaign must report faulted boots as a rate over attempts — 7 of 19 here — not as an
+   anecdote, because the survivors are what the timing tables are otherwise silently sampled from.

@@ -1,0 +1,46 @@
+=== captured 2026-09-10T08:18:09+02:00 ===
+--- kernel / distro ---
+7.0.0-31-generic
+Ubuntu 24.04.5 LTS
+--- amdgpu dkms / firmware ---
+amdgpu-insecure-instinct-udev-rules 31.30.0.0-2337710.24.04
+amdgpu-install 31.30.0.0.31300000-2338789.24.04
+--- rocm version files ---
+/opt/rocm/.info/version: MISSING
+/opt/rocm/.info/version-dev: MISSING
+/opt/rocm/.info/version-libs: MISSING
+--- rocm dirs present ---
+/opt/rocm
+--- hipcc ---
+HIP version: 7.13.99004-3309c6114a
+AMD clang version 23.0.0git (https://github.com/ROCm/llvm-project.git 43215c73116c407735c85a180d174f718798c328+PATCHED:2506c552d8428e2cc1778bef048b20f818e06bb3)
+Target: x86_64-unknown-linux-gnu
+Thread model: posix
+InstalledDir: /opt/rocm/core-7.13/lib/llvm/bin
+--- rocminfo gfx ---
+  Name:                    AMD Ryzen 5 3600 6-Core Processor  
+  Marketing Name:          AMD Ryzen 5 3600 6-Core Processor  
+  Vendor Name:             CPU                                
+  Name:                    gfx1201                            
+  Marketing Name:          AMD Radeon AI PRO R9700            
+  Vendor Name:             AMD                                
+      Name:                    amdgcn-amd-amdhsa--gfx1201         
+      Name:                    amdgcn-amd-amdhsa--gfx12-generic   
+--- apt sources for amd ---
+https://repo.radeon.com/amdgpu/31.30/ubuntu
+https://repo.radeon.com/graphics/26.12/ubuntu
+https://repo.radeon.com/rocmradeon/apt/26.12
+--- apt policy rocm-core ---
+--- hipfire ---
+hipfire 0.3.0 (800ddf7403d8; beta)
+--- mesa / vulkan (llama.cpp baseline path) ---
+libvulkan1:amd64 1.4.313.0~rc1-1lunarg24.04-1
+libvulkan1:i386 1.4.313.0~rc1-1lunarg24.04-1
+mesa-vulkan-drivers:amd64 26.2.2~kisak1~n
+mesa-vulkan-drivers:i386 26.2.2~kisak1~n
+	deviceName         = AMD Radeon AI PRO R9700 (RADV GFX1201)
+	driverName         = radv
+	driverInfo         = Mesa 26.2.2 - kisak-mesa PPA
+	deviceName         = llvmpipe (LLVM 21.1.8, 256 bits)
+	driverName         = llvmpipe
+	driverInfo         = Mesa 26.2.2 - kisak-mesa PPA (LLVM 21.1.8)

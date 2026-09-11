@@ -94,3 +94,35 @@ and does not run here. See `bench/legacy/README.md`. Do not add new work there.
 `llamacpp/`, `llamacpp-vulkan/`, `llamacpp-rocm-b9950/`, `dl/` (multi-GB binaries + benchy venv),
 `.servers/` (runtime pids/logs), `workloads/generated/`, `*.log`, `runs/*/report.html` (legacy), committed `charts/*.svg`
 (regenerate with `lib/report.py`).
+
+## Known gaps — stated debt, not silent workarounds
+
+CLAUDE.md rule 6 requires naming the tool that *should* own a job before hand-writing it. Two gaps
+forced hand-written probes during the 2026-09-10 hipfire evaluation, and both should be closed here
+rather than re-improvised per engine:
+
+1. **No driver for engines outside llama.cpp/vLLM.** `engine-bench/serve_llamacpp.sh`,
+   `lib/capture_engine.py probe` and `gen_campaign.py` cannot launch or probe hipfire, so the whole
+   evaluation ran on scratchpad scripts. **Wanted:** a generic OpenAI-compatible driver, base-URL
+   parameterised, normalising `prompt_per_second`/`predicted_per_second` → `prefill_tok_s`/
+   `decode_tok_s`, so a new engine is a config row instead of a fresh pile of shell.
+2. **No multi-turn growth workload.** Every fixture here is a one-shot prompt of N tokens. Context
+   *capacity* questions need a conversation that accumulates with prior turns cached (CLAUDE.md
+   rule 17) and reports per-turn `ctx` / new-token delta / prefill / decode / wall / VRAM.
+   `workloads/build_prompt.py` builds the turns; nothing drives them as a growing conversation.
+3. **No interleaved-agents workload and no fault watchdog.** Multi-agent use needs an A/B/A probe
+   (two conversations sharing a system prompt, alternating) to expose engines whose prefix cache is
+   one conversation deep — hipfire's is (`05` §28.7). And a hipfire driver must watch `serve.log`
+   for `Memory Fault` during a request, because `/health` stays `ok` on a wedged worker
+   (CLAUDE.md rule 15). Both exist only as 2026-09-10 scratch scripts (`interleave.py`, `ab.sh`).
+4. **No small-step cadence workload.** The agentic tool-call shape — ~5k tokens in, ~1k out, sixteen
+   times, prior turns cached — is a different curve from four 18k turns; it was run once as scratch
+   (`05` §28.9).
+
+Until both exist, a hand-written probe is legitimate **only if it is stated as such in the report**,
+per rule 6.
+
+**Before any engine boots**, run `lib/gpu_exclusive.sh [required_free_mib]` — it unloads llama-swap
+(`/unload` is GET; POST is 405), kills hipfire's `bin/daemon` + `hipfire serve` shape, and fails
+loudly naming the holder if the free-VRAM floor is not met. See CLAUDE.md rules 14-15 for why a
+post-kill check alone is not enough on a paging allocator.
