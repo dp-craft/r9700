@@ -1,0 +1,594 @@
+"""Tests for the THIRD engine backend: `vllm` (stilldeadcode/vllm-radiance in docker).
+
+Written BEFORE the implementation (TDD) and kept as the characterization net for it.
+
+HOW THE SIDE EFFECTS ARE AVOIDED -- read this before adding a test here:
+  * generate.py writes exactly two files: `HERE/config.yaml` and `OPENCODE_CFG`. The autouse
+    `isolate_side_effect_paths` fixture below repoints BOTH into tmp_path for every test in
+    this module, so nothing here can overwrite the deployed config.yaml or the user's real
+    ~/.config/opencode/opencode.json. It also repoints `_MODELS_YAML`, so a test that calls
+    `_load_models()` reads a tmp table rather than the live roster.
+  * The two REGRESSION tests at the top deliberately need the live artefacts. They read them
+    (read-only) and compare them against a run whose outputs went to tmp_path. The live
+    opencode.json is COPIED into tmp_path first, so the run mutates the copy and the original
+    is only ever `read_bytes()`-ed.
+  * `_MODELS_YAML` is NOT redirected for those two tests: the whole point is that the real
+    models.yaml, unchanged, still renders byte-for-byte what is deployed today.
+  * No test in this file touches the GPU, docker, or a server. `vllm_cmd_for()` is a pure
+    string builder and is tested as one.
+"""
+import json
+import pathlib
+
+import pytest
+import yaml
+
+import generate
+
+
+LIVE_CONFIG = pathlib.Path(generate.HERE) / "config.yaml"
+LIVE_OPENCODE = pathlib.Path.home() / ".config/opencode/opencode.json"
+
+
+@pytest.fixture(autouse=True)
+def isolate_side_effect_paths(tmp_path, monkeypatch):
+    """Repoint every module-level path generate.py can write to into tmp_path."""
+    monkeypatch.setattr(generate, "HERE", tmp_path)
+    monkeypatch.setattr(generate, "OPENCODE_CFG", tmp_path / "opencode.json")
+    monkeypatch.setattr(generate, "_MODELS_YAML", tmp_path / "models.yaml")
+    return tmp_path
+
+
+def _write_models_yaml(tmp_path, models):
+    (tmp_path / "models.yaml").write_text(yaml.safe_dump({"models": models}))
+
+
+def _reload_models(tmp_path, monkeypatch, models):
+    """Point _load_models at a tmp table AND install the result as generate.MODELS, which is
+    what main() iterates (it is bound at import time, so patching the yaml alone is not enough).
+    """
+    _write_models_yaml(tmp_path, models)
+    rows = generate._load_models()
+    monkeypatch.setattr(generate, "MODELS", rows)
+    return rows
+
+
+def _run_main(tmp_path, monkeypatch, capsys, seed_opencode):
+    monkeypatch.setattr(generate, "OPENCODE_CFG", tmp_path / "opencode.json")
+    (tmp_path / "opencode.json").write_bytes(seed_opencode)
+    generate.main()
+    capsys.readouterr()
+    return (tmp_path / "config.yaml").read_bytes(), (tmp_path / "opencode.json").read_bytes()
+
+
+# --------------------------------------------------------------------------------------------
+# 1. REGRESSION -- the acceptance criterion: adding vllm changes NOTHING for existing rows
+# --------------------------------------------------------------------------------------------
+def test_regression_config_yaml_is_byte_identical_to_the_deployed_one(
+        tmp_path, monkeypatch, capsys):
+    """The whole generator, driven off the UNCHANGED live models.yaml, must still emit the
+    config.yaml that is deployed right now -- byte for byte.
+
+    This is stronger than tests/golden/config.yaml (which is a snapshot that can go stale):
+    it compares against the artefact llama-swap is actually serving. It also proves the
+    negative that motivated the design -- no new `macros:` line, no new header field, because
+    those are emitted unconditionally and would move these bytes even with zero vllm rows.
+    """
+    if not LIVE_CONFIG.exists():
+        pytest.skip("no deployed config.yaml on this machine")
+    # HERE is tmp_path under the autouse fixture, so the live table must be spelled absolutely.
+    monkeypatch.setattr(generate, "_MODELS_YAML", LIVE_CONFIG.parent / "models.yaml")
+    monkeypatch.setattr(generate, "MODELS", generate._load_models())
+    got, _ = _run_main(tmp_path, monkeypatch, capsys, LIVE_OPENCODE.read_bytes())
+    assert got == LIVE_CONFIG.read_bytes()
+
+
+def test_regression_opencode_models_are_byte_identical_to_the_deployed_ones(
+        tmp_path, monkeypatch, capsys):
+    """Same criterion for the second output file sync_opencode() writes."""
+    if not LIVE_OPENCODE.exists():
+        pytest.skip("no deployed opencode.json on this machine")
+    monkeypatch.setattr(generate, "_MODELS_YAML", LIVE_CONFIG.parent / "models.yaml")
+    monkeypatch.setattr(generate, "MODELS", generate._load_models())
+    _, got = _run_main(tmp_path, monkeypatch, capsys, LIVE_OPENCODE.read_bytes())
+    assert got == LIVE_OPENCODE.read_bytes()
+
+
+def test_deployed_config_mentions_docker_exactly_when_a_vllm_row_is_enabled():
+    """Belt and braces on the two byte tests, phrased as an INVARIANT rather than a snapshot:
+    while the example row in models.yaml stays commented out this asserts the deployed config
+    mentions no container at all, and it keeps holding (rather than turning into a false alarm)
+    on the day someone uncomments the row and regenerates."""
+    if not LIVE_CONFIG.exists():
+        pytest.skip("no deployed config.yaml on this machine")
+    live_rows = yaml.safe_load((LIVE_CONFIG.parent / "models.yaml").read_text())["models"]
+    enabled = any("vllm" in (m.get("backends") or []) for m in live_rows)
+    assert ("docker run" in LIVE_CONFIG.read_text()) is enabled
+
+
+# --------------------------------------------------------------------------------------------
+# 2. the example row -- the one a user uncomments in models.yaml
+# --------------------------------------------------------------------------------------------
+# MEASURED best config on this box (radiance 0.9.3 + R4D attention + MTP-8): decode 58.6 tok/s on
+# real 8k agentic code vs 45.8 for llama.cpp+MTP. Boot 230-310 s, covered by healthCheckTimeout.
+VLLM_ROW = {
+    "id": "qwen38-27b-int4",
+    "vllm_model": "/home/dev/models/vllm/Qwen3.8-27B-INT4",
+    "ctx": 36864,
+    "kv": "f16",
+    "mtp": 8,
+    "family": "QWEN38",
+    "backends": ["vllm"],
+    "np": 4,
+}
+VLLM_FID = "qwen38-27b-int4-ctx36k-mtp-vllm"
+VLLM_CONTAINER = f"llama-swap-{VLLM_FID}"
+
+
+def _row(**over):
+    return dict(VLLM_ROW, **over)
+
+
+# --------------------------------------------------------------------------------------------
+# 3. id shaping
+# --------------------------------------------------------------------------------------------
+def test_backend_tag_has_a_vllm_entry():
+    """An unmapped backend silently produces an id indistinguishable from the vulkan one --
+    the comment above BACKEND_TAG says so, and this pins it."""
+    assert generate.BACKEND_TAG.get("vllm")
+
+
+def test_backend_tags_stay_unique():
+    tags = [t for t in generate.BACKEND_TAG.values() if t]
+    assert len(tags) == len(set(tags))
+
+
+def test_full_id_carries_the_vllm_tag():
+    assert generate.full_id("qwen38-27b-int4", 36864, "f16", 8, "vllm") == VLLM_FID
+
+
+def test_full_id_vllm_differs_from_the_vulkan_id_of_the_same_row():
+    args = ("qwen38-27b-int4", 36864, "f16", 8)
+    assert generate.full_id(*args, "vllm") != generate.full_id(*args, "vulkan")
+
+
+# --------------------------------------------------------------------------------------------
+# 4. _load_models validation -- mirrors the hipfire defensive posture
+# --------------------------------------------------------------------------------------------
+def test_load_models_accepts_the_example_row(tmp_path):
+    _write_models_yaml(tmp_path, [_row()])
+    (row,) = generate._load_models()
+    assert row[0] == "qwen38-27b-int4"
+    assert row[1] == "/home/dev/models/vllm/Qwen3.8-27B-INT4", (
+        "the model dir occupies the same tuple slot as a gguf path / hipfire tag")
+    assert row[6] == ["vllm"]
+
+
+def test_load_models_requires_vllm_model_on_a_vllm_row(tmp_path):
+    bad = _row()
+    del bad["vllm_model"]
+    _write_models_yaml(tmp_path, [bad])
+    with pytest.raises(ValueError, match="needs `vllm_model`"):
+        generate._load_models()
+
+
+def test_load_models_requires_an_absolute_vllm_model_path(tmp_path):
+    """A relative `-v src:/model` source is read by docker as a named VOLUME, not a bind mount,
+    so the container would boot against an empty directory instead of failing."""
+    _write_models_yaml(tmp_path, [_row(vllm_model="models/vllm/Qwen3.8-27B-INT4")])
+    with pytest.raises(ValueError, match="absolute"):
+        generate._load_models()
+
+
+def test_load_models_rejects_vllm_sharing_a_row_with_another_backend(tmp_path):
+    _write_models_yaml(tmp_path, [_row(backends=["vulkan", "vllm"])])
+    with pytest.raises(ValueError, match="cannot share a row"):
+        generate._load_models()
+
+
+def test_load_models_rejects_a_row_that_is_both_hipfire_and_vllm(tmp_path):
+    _write_models_yaml(tmp_path, [_row(backends=["hipfire", "vllm"], hipfire_tag="t")])
+    with pytest.raises(ValueError, match="cannot share a row"):
+        generate._load_models()
+
+
+def test_load_models_rejects_vllm_keys_on_a_non_vllm_row(tmp_path):
+    plain = {"id": "m1", "path": "vendor/m1.gguf", "ctx": 4096, "kv": "f16",
+             "family": "QWEN27", "backends": ["vulkan"],
+             "vllm_model": "/home/dev/models/vllm/X"}
+    _write_models_yaml(tmp_path, [plain])
+    with pytest.raises(ValueError, match="non-vllm row"):
+        generate._load_models()
+
+
+def test_load_models_rejects_hipfire_keys_on_a_vllm_row(tmp_path):
+    """Already covered by the pre-existing hipfire guard; pinned here so a future edit to the
+    if/elif chain cannot open a hole."""
+    _write_models_yaml(tmp_path, [_row(hipfire_tag="ornith-1.5:35b-a3b-mq4r")])
+    with pytest.raises(ValueError, match="non-hipfire row"):
+        generate._load_models()
+
+
+@pytest.mark.parametrize("key, value", [
+    ("path", "unsloth/Qwen3.8-27B-UD-Q4_K_XL.gguf"),
+    ("templates", ["froggeric"]),
+    ("kv_unified", True),
+    ("draft", {"path": "d.gguf", "type": "dflash"}),
+    ("spec_p_min", 0.4),
+    ("alias", "qwen38"),
+    ("chat_template_kwargs", {"reasoning_effort": "medium"}),
+])
+def test_load_models_rejects_llamacpp_only_keys_on_a_vllm_row(tmp_path, key, value):
+    """A vllm row carrying one of these has no argv to put it in, so it would be dropped in
+    silence. `path` is in the list for a sharper reason: it shares the tuple slot with
+    `vllm_model`, so a stray gguf path would be bind-mounted as the model directory."""
+    _write_models_yaml(tmp_path, [_row(**{key: value})])
+    with pytest.raises(ValueError) as exc:
+        generate._load_models()
+    assert key in str(exc.value)
+
+
+def test_every_forbidden_key_is_actually_llamacpp_only():
+    """Guard against the list growing a key the vllm path DOES express (np, mtp, ctx, kv)."""
+    expressible = {"np", "mtp", "ctx", "kv", "id", "family", "backends", "vllm_model"}
+    assert not (set(generate.VLLM_FORBIDDEN_KEYS) & expressible)
+
+
+def test_load_models_rejects_a_per_row_vllm_env(tmp_path):
+    """DELIBERATE non-feature -- see VLLM_ENV in generate.py. The container env is the MEASURED
+    recipe; a per-row override would let a row deviate from it with no record in the id."""
+    _write_models_yaml(tmp_path, [_row(vllm_env={"RADIANCE_FAST_DRAFT": "0"})])
+    with pytest.raises(ValueError, match="VLLM_ENV"):
+        generate._load_models()
+
+
+def test_load_models_rejects_boolean_mtp_on_a_vllm_row(tmp_path):
+    """`mtp: true` means 'use the engine default depth' on llama.cpp. vLLM's
+    --speculative-config has no such fallback: num_speculative_tokens is mandatory."""
+    _write_models_yaml(tmp_path, [_row(mtp=True)])
+    with pytest.raises(ValueError, match="INTEGER"):
+        generate._load_models()
+
+
+def test_load_models_accepts_an_integer_mtp_on_a_vllm_row(tmp_path):
+    _write_models_yaml(tmp_path, [_row(mtp=8)])
+    (row,) = generate._load_models()
+    assert row[4] == 8
+
+
+def test_load_models_accepts_mtp_off_on_a_vllm_row(tmp_path):
+    _write_models_yaml(tmp_path, [_row(mtp=False)])
+    (row,) = generate._load_models()
+    assert row[4] is False
+
+
+def test_load_models_still_requires_family_on_a_vllm_row(tmp_path):
+    """PINS THE CHOICE (see the vllm branch comment in _load_models): `family` stays REQUIRED
+    and the sampler is simply not emitted, exactly as on a hipfire row. vLLM honours sampling
+    from the request body, so the recipe has nowhere to go on the command line -- but keeping
+    the key means zero change to the existing family validation, and the row still records
+    which model line it serves."""
+    bad = _row()
+    del bad["family"]
+    _write_models_yaml(tmp_path, [bad])
+    with pytest.raises(KeyError):
+        generate._load_models()
+
+
+def test_load_models_rejects_an_unknown_family_on_a_vllm_row(tmp_path):
+    _write_models_yaml(tmp_path, [_row(family="NOPE")])
+    with pytest.raises(ValueError, match="Unknown family"):
+        generate._load_models()
+
+
+def test_load_models_vllm_row_keeps_the_15_field_tuple_shape(tmp_path):
+    """No new tuple slot was added, which is why no existing caller or test had to change."""
+    _write_models_yaml(tmp_path, [_row()])
+    (row,) = generate._load_models()
+    assert len(row) == 15
+
+
+def test_load_models_vllm_rows_may_differ_in_ctx(tmp_path):
+    """Unlike hipfire (one global memory.max_seq), --max-model-len is per container."""
+    _write_models_yaml(tmp_path, [_row(id="a", ctx=36864), _row(id="b", ctx=65536)])
+    assert sorted(r[2] for r in generate._load_models()) == [36864, 65536]
+
+
+# --------------------------------------------------------------------------------------------
+# 5. vllm_cmd_for -- the pure string builder
+# --------------------------------------------------------------------------------------------
+SPEC = ('{"method":"mtp","num_speculative_tokens":8,"attention_backend":"R4D",'
+        '"disable_padded_drafter_batch":true}')
+
+EXPECTED_LINES = [
+    f"docker run --rm --name {VLLM_CONTAINER}",
+    "--device /dev/kfd --device /dev/dri",
+    "--group-add 992 --group-add 44",
+    "--shm-size 4g --cap-add SYS_PTRACE --security-opt seccomp=unconfined",
+    "-p 127.0.0.1:${PORT}:8000",
+    "-v /home/dev/models/vllm/Qwen3.8-27B-INT4:/model:ro",
+    "-v /home/dev/work/dp-craft/amd/bench/dl/radiance-cache:/cache",
+    "-e VLLM_ROCM_USE_AITER=1",
+    "-e VLLM_ROCM_USE_AITER_UNIFIED_ATTENTION=1",
+    "-e VLLM_ROCM_USE_AITER_MHA=0",
+    "-e VLLM_ROCM_USE_AITER_MLA=0",
+    "-e VLLM_ROCM_USE_AITER_MOE=0",
+    "-e VLLM_ROCM_USE_AITER_LINEAR=0",
+    "-e VLLM_ROCM_USE_AITER_FP8BMM=0",
+    "-e VLLM_ROCM_USE_AITER_FP4BMM=0",
+    "-e VLLM_ROCM_USE_AITER_RMSNORM=0",
+    "-e VLLM_CACHE_ROOT=/cache/vllm",
+    "-e TORCHINDUCTOR_CACHE_DIR=/cache/inductor",
+    "-e TRITON_CACHE_DIR=/cache/triton",
+    "-e AITER_ROOT_DIR=/cache/aiter",
+    "-e TRITON_CACHE_AUTOTUNING=1",
+    "-e RADIANCE_FAST_DRAFT=1",
+    "-e RADIANCE_DRAFT_TAU=0.28",
+    "-e RADIANCE_SKINNY_GEMM=all",
+    "stilldeadcode/vllm-radiance:0.9.3",
+    "/model --served-model-name qwen38-27b-int4",
+    "--host 0.0.0.0 --port 8000",
+    "--language-model-only --max-model-len 36864",
+    "--max-num-batched-tokens 16384",
+    "--max-num-seqs 4 --gpu-memory-utilization 0.90",
+    "--attention-backend R4D --enable-prefix-caching --mamba-cache-mode align",
+    "--enable-force-include-usage --enable-prompt-tokens-details --enable-per-request-metrics",
+    f"--speculative-config '{SPEC}'",
+    "--no-async-scheduling",
+]
+
+
+def _cmd(**over):
+    kw = dict(fid=VLLM_FID, served="qwen38-27b-int4",
+              model_dir="/home/dev/models/vllm/Qwen3.8-27B-INT4",
+              ctx=36864, mtp=8, slots=4)
+    kw.update(over)
+    return generate.vllm_cmd_for(**kw)
+
+
+def _lines(cmd):
+    return [ln.strip() for ln in cmd.split("\n")]
+
+
+def test_vllm_cmd_for_matches_the_measured_invocation():
+    assert _lines(_cmd()) == EXPECTED_LINES
+
+
+def test_vllm_cmd_for_joins_lines_with_the_six_space_continuation():
+    """Same YAML block-scalar continuation the llama.cpp and hipfire builders use."""
+    assert "\n      " in _cmd()
+    assert "\n" not in _cmd().replace("\n      ", "")
+
+
+def test_vllm_cmd_for_is_a_single_foreground_executable_invocation():
+    """llama-swap tokenizes `cmd` shell-style but does NOT run it through a shell, so a `;`,
+    `&&` or `|` would be passed to docker as a literal argument, not interpreted."""
+    cmd = _cmd()
+    for meta in (";", "&&", "||", "|", ">", "<", "$(", "`"):
+        assert meta not in cmd, f"{meta!r} needs a shell, and there is none"
+    assert cmd.startswith("docker run ")
+
+
+def test_vllm_cmd_for_never_detaches():
+    """`-d` would make docker return immediately: llama-swap would consider the row dead while
+    the container kept the GPU. Same reason the hipfire row has no `-d`."""
+    assert " -d " not in f" {_cmd()} "
+    assert "--detach" not in _cmd()
+
+
+def test_vllm_cmd_for_never_uses_the_llamacpp_macros():
+    cmd = _cmd()
+    for macro in ("${common}", "${vulkan}", "${rocm}", "${hipfire}"):
+        assert macro not in cmd
+
+
+def test_vllm_cmd_for_port_reaches_the_host_side_of_the_mapping():
+    """${PORT} is llama-swap's per-row host port; the container always listens on 8000."""
+    assert "-p 127.0.0.1:${PORT}:8000" in _cmd()
+    assert _cmd().count("${PORT}") == 1
+    assert "--port 8000" in _cmd()
+
+
+def test_vllm_cmd_for_ctx_drives_max_model_len():
+    assert "--max-model-len 65536" in _cmd(ctx=65536)
+    assert "--max-model-len 36864" not in _cmd(ctx=65536)
+
+
+def test_vllm_cmd_for_slots_drive_max_num_seqs():
+    assert "--max-num-seqs 1 " in _cmd(slots=1)
+
+
+def test_vllm_cmd_for_speculative_config_is_single_quoted_compact_json():
+    """Single quotes are load-bearing for exactly the reason --chat-template-kwargs documents:
+    llama-swap's shell-style tokenizer eats bare quotes and vLLM then cannot parse the value."""
+    line = [ln for ln in _lines(_cmd()) if ln.startswith("--speculative-config")][0]
+    payload = line.split(" ", 1)[1]
+    assert payload.startswith("'") and payload.endswith("'")
+    assert " " not in payload, "compact separators keep the value one token"
+    assert json.loads(payload[1:-1]) == {
+        "method": "mtp", "num_speculative_tokens": 8,
+        "attention_backend": "R4D", "disable_padded_drafter_batch": True}
+
+
+def test_vllm_cmd_for_mtp_depth_reaches_num_speculative_tokens():
+    line = [ln for ln in _lines(_cmd(mtp=4)) if ln.startswith("--speculative-config")][0]
+    assert json.loads(line.split(" ", 1)[1][1:-1])["num_speculative_tokens"] == 4
+
+
+def test_vllm_cmd_for_mtp_off_omits_the_speculative_config_entirely():
+    assert "--speculative-config" not in _cmd(mtp=False)
+    assert _lines(_cmd(mtp=False))[-1] == "--no-async-scheduling"
+
+
+def test_vllm_cmd_for_model_dir_is_mounted_read_only():
+    assert "-v /srv/m:/model:ro" in _cmd(model_dir="/srv/m")
+
+
+def test_vllm_container_name_is_derived_from_the_row_id():
+    assert generate.vllm_container(VLLM_FID) == VLLM_CONTAINER
+    assert generate.vllm_container("a") != generate.vllm_container("b")
+
+
+def test_vllm_container_name_is_docker_safe():
+    name = generate.vllm_container(VLLM_FID)
+    assert name[0].isalnum()
+    assert all(ch.isalnum() or ch in "_.-" for ch in name)
+
+
+# --------------------------------------------------------------------------------------------
+# 6. main() -- the emitted config.yaml block
+# --------------------------------------------------------------------------------------------
+SEED_CFG = {
+    "provider": {"llama-swap": {"npm": "@ai-sdk/openai-compatible", "models": {}}},
+}
+
+
+@pytest.fixture
+def only_vllm(tmp_path, monkeypatch, capsys):
+    """Run main() over a table that holds nothing but the example vllm row."""
+    def _run(rows=None):
+        _reload_models(tmp_path, monkeypatch, rows or [_row()])
+        monkeypatch.setattr(generate, "RERANKERS", [])
+        monkeypatch.setattr(generate, "EMBEDDERS", [])
+        cfg, oc = _run_main(tmp_path, monkeypatch, capsys,
+                            (json.dumps(SEED_CFG, indent=2) + "\n").encode())
+        return cfg.decode(), json.loads(oc)["provider"]["llama-swap"]["models"]
+    return _run
+
+
+def test_main_emits_the_expected_vllm_block(only_vllm):
+    text, _ = only_vllm()
+    block = "\n".join([
+        f'  "{VLLM_FID}":',
+        f'    name: "{VLLM_FID}  [vllm, ctx=36864, kv=f16, mtp=8, np=4, '
+        f'image=stilldeadcode/vllm-radiance:0.9.3]"',
+        "    cmd: |",
+        "      " + generate.vllm_cmd_for(
+            fid=VLLM_FID, served="qwen38-27b-int4",
+            model_dir="/home/dev/models/vllm/Qwen3.8-27B-INT4",
+            ctx=36864, mtp=8, slots=4),
+        f"    cmdStop: docker rm -f {VLLM_CONTAINER}",
+        "    useModelName: qwen38-27b-int4",
+    ])
+    assert block in text
+
+
+def test_main_emits_cmdstop_that_force_removes_the_container(only_vllm):
+    """Without it a lingering container keeps ~28.7 GB of VRAM and the next row cannot load;
+    `-f` also clears a container left behind by a crashed boot, which would otherwise make
+    --name collide forever."""
+    text, _ = only_vllm()
+    assert f"    cmdStop: docker rm -f {VLLM_CONTAINER}" in text
+
+
+def test_main_emits_usemodelname_equal_to_the_served_model_name(only_vllm):
+    """llama-swap forwards the body verbatim with `model` set to its own row id, and vLLM 404s
+    on an unknown model name -- same failure hipfire has."""
+    text, _ = only_vllm()
+    assert "    useModelName: qwen38-27b-int4" in text
+    assert "--served-model-name qwen38-27b-int4" in text
+
+
+def test_main_vllm_row_joins_inference_group(only_vllm):
+    """32 GB cannot hold radiance (~28.7 GB) and a llama.cpp 27B (~29.4 GB) at once, so the row
+    must be swappable against every other chat model."""
+    text, _ = only_vllm()
+    group = text.split('"inference-group":')[1]
+    assert f'      - "{VLLM_FID}"' in group
+
+
+def test_main_vllm_row_gets_no_llamacpp_env_block(only_vllm):
+    """GGML_VK_ALLOW_GRAPHICS_QUEUE / HSA_OVERRIDE_GFX_VERSION are llama.cpp knobs, and an
+    llama-swap `env:` sets the DOCKER CLIENT's environment, which the container never sees."""
+    text, _ = only_vllm()
+    assert "GGML_VK_ALLOW_GRAPHICS_QUEUE" not in text
+    assert "HSA_OVERRIDE_GFX_VERSION" not in text
+    assert "\n    env:" not in text
+
+
+def test_main_vllm_row_advertises_ctx_and_no_variants_to_opencode(only_vllm):
+    _, models = only_vllm()
+    assert list(models) == [VLLM_FID]
+    assert models[VLLM_FID]["limit"]["context"] == 36864
+    assert "variants" not in models[VLLM_FID]
+
+
+def test_main_two_vllm_rows_get_distinct_containers_and_ports(only_vllm):
+    text, _ = only_vllm([_row(id="a", ctx=36864), _row(id="b", ctx=65536)])
+    names = [ln.split("--name ")[1] for ln in text.splitlines() if "--name " in ln]
+    assert len(names) == 2 and len(set(names)) == 2
+
+
+def test_main_emits_no_extra_macro_for_vllm(only_vllm):
+    """The docker argv is built inline instead of behind a `${vllm}` macro ON PURPOSE: the
+    macros block is emitted unconditionally, so a new macro line would change config.yaml even
+    on a box with zero vllm rows -- and that is exactly what the regression tests forbid."""
+    text, _ = only_vllm()
+    macros = text.split("macros:")[1].split("models:")[0]
+    assert "docker" not in macros
+
+
+# --------------------------------------------------------------------------------------------
+# kv on a vllm row -> --kv-cache-dtype (VLLM_KV_DTYPES)
+# --------------------------------------------------------------------------------------------
+def test_vllm_f16_row_emits_no_kv_cache_dtype_flag():
+    """f16 is vLLM's `auto`; the measured invocation carries no flag, and must not start to."""
+    assert "--kv-cache-dtype" not in _cmd()
+    assert "--kv-cache-dtype" not in _cmd(kv="f16")
+
+
+def test_vllm_fp8_row_emits_the_kv_cache_dtype_flag_once():
+    lines = _lines(_cmd(kv="fp8"))
+    assert lines.count("--kv-cache-dtype fp8") == 1
+    # It is a vLLM server argument, so it must sit AFTER the image, never among docker's flags.
+    assert lines.index("--kv-cache-dtype fp8") > lines.index("stilldeadcode/vllm-radiance:0.9.3")
+
+
+def test_full_id_tags_fp8_so_it_cannot_collide_with_the_f16_row():
+    f16 = generate.full_id("qwen38-27b-int4", 200000, "f16", 0, "vllm")
+    fp8 = generate.full_id("qwen38-27b-int4", 200000, "fp8", 0, "vllm")
+    assert "kvfp8" in fp8 and "kvfp8" not in f16 and f16 != fp8
+
+
+def test_load_models_refuses_q8_0_on_a_vllm_row(tmp_path):
+    """The bug this guards: `kv: q8_0` on a vllm row renamed the id 'kvq8' while the engine
+    silently ran auto KV -- vLLM has no q8_0 type."""
+    _write_models_yaml(tmp_path, [_row(kv="q8_0")])
+    with pytest.raises(ValueError, match="not a vLLM KV cache type"):
+        generate._load_models()
+
+
+def test_load_models_accepts_fp8_on_a_vllm_row(tmp_path):
+    _write_models_yaml(tmp_path, [_row(kv="fp8")])
+    (row,) = generate._load_models()
+    assert row[3] == "fp8"
+
+
+def test_load_models_refuses_fp8_on_a_llamacpp_row(tmp_path):
+    plain = {"id": "some-gguf", "path": "x/y.gguf", "ctx": 8192, "kv": "fp8",
+             "family": VLLM_ROW["family"], "backends": ["vulkan"]}
+    _write_models_yaml(tmp_path, [plain])
+    with pytest.raises(ValueError, match="vLLM-only"):
+        generate._load_models()
+
+
+def test_main_passes_the_row_kv_through_to_the_vllm_command(tmp_path, monkeypatch, capsys):
+    """End to end: models.yaml `kv: fp8` must reach the emitted docker line, not just the id."""
+    _reload_models(tmp_path, monkeypatch, [_row(kv="fp8")])
+    generate.main()
+    text = (tmp_path / "config.yaml").read_text()
+    fid = generate.full_id("qwen38-27b-int4", VLLM_ROW["ctx"], "fp8", VLLM_ROW["mtp"], "vllm")
+    assert f'"{fid}":' in text
+    assert "--kv-cache-dtype fp8" in text
+
+
+def test_vllm_usage_and_metrics_flags_are_on_every_row_variant():
+    """Emitted unconditionally: kv and mtp must not be able to drop them."""
+    flags = ("--enable-force-include-usage", "--enable-prompt-tokens-details",
+             "--enable-per-request-metrics")
+    for kw in ({}, {"kv": "fp8"}, {"mtp": 0}, {"kv": "fp8", "mtp": 0, "slots": 1}):
+        cmd = _cmd(**kw)
+        for f in flags:
+            assert cmd.count(f) == 1, (kw, f)
+        # server args, not docker args
+        assert cmd.index(f) > cmd.index("stilldeadcode/vllm-radiance:0.9.3")

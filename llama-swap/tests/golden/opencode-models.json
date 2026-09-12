@@ -1,0 +1,822 @@
+{
+  "muse-glimmer-30b-q5kl-f16-ctx128k-dflash": {
+    "limit": {
+      "context": 131072,
+      "output": 32768
+    },
+    "name": "muse-glimmer-30b-q5kl-f16-ctx128k-dflash",
+    "variants": {
+      "high": {
+        "chat_template_kwargs": {
+          "reasoning_strength": "high"
+        }
+      },
+      "low": {
+        "chat_template_kwargs": {
+          "reasoning_strength": "low"
+        }
+      },
+      "medium": {
+        "chat_template_kwargs": {
+          "reasoning_strength": "medium"
+        }
+      },
+      "xhigh": {
+        "chat_template_kwargs": {
+          "reasoning_strength": "xhigh"
+        }
+      }
+    }
+  },
+  "muse-glimmer-30b-q5kl-f16-ctx128k-dflash-rocm": {
+    "limit": {
+      "context": 131072,
+      "output": 32768
+    },
+    "name": "muse-glimmer-30b-q5kl-f16-ctx128k-dflash-rocm",
+    "variants": {
+      "high": {
+        "chat_template_kwargs": {
+          "reasoning_strength": "high"
+        }
+      },
+      "low": {
+        "chat_template_kwargs": {
+          "reasoning_strength": "low"
+        }
+      },
+      "medium": {
+        "chat_template_kwargs": {
+          "reasoning_strength": "medium"
+        }
+      },
+      "xhigh": {
+        "chat_template_kwargs": {
+          "reasoning_strength": "xhigh"
+        }
+      }
+    }
+  },
+  "ornith35b-a3b-hipfire-ctx200000-kvq8-hf": {
+    "limit": {
+      "context": 200000,
+      "output": 32768
+    },
+    "name": "ornith35b-a3b-hipfire-ctx200000-kvq8-hf"
+  },
+  "qwen27b-q4km-q8-ctx200000-kvq8-mtp-frog-coding": {
+    "limit": {
+      "context": 200000,
+      "output": 32768
+    },
+    "name": "qwen27b-q4km-q8-ctx200000-kvq8-mtp-frog-coding",
+    "variants": {
+      "high": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "high"
+        },
+        "reasoning_budget_tokens": 8192
+      },
+      "low": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "low"
+        },
+        "reasoning_budget_tokens": 2048
+      },
+      "medium": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "medium"
+        },
+        "reasoning_budget_tokens": 4096
+      },
+      "none": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "none"
+        }
+      },
+      "xhigh": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "xhigh"
+        },
+        "reasoning_budget_tokens": 32768
+      },
+      "xhigh-no-preserve": {
+        "chat_template_kwargs": {
+          "preserve_thinking": false,
+          "reasoning_effort": "xhigh"
+        },
+        "reasoning_budget_tokens": 32768
+      }
+    }
+  },
+  "qwen27b-q4km-q8-ctx200000-kvq8-mtp-frog-planning": {
+    "limit": {
+      "context": 200000,
+      "output": 32768
+    },
+    "name": "qwen27b-q4km-q8-ctx200000-kvq8-mtp-frog-planning",
+    "variants": {
+      "high": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "high"
+        },
+        "reasoning_budget_tokens": 8192
+      },
+      "low": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "low"
+        },
+        "reasoning_budget_tokens": 2048
+      },
+      "medium": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "medium"
+        },
+        "reasoning_budget_tokens": 4096
+      },
+      "none": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "none"
+        }
+      },
+      "xhigh": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "xhigh"
+        },
+        "reasoning_budget_tokens": 32768
+      },
+      "xhigh-no-preserve": {
+        "chat_template_kwargs": {
+          "preserve_thinking": false,
+          "reasoning_effort": "xhigh"
+        },
+        "reasoning_budget_tokens": 32768
+      }
+    }
+  },
+  "qwen35-4b-q4km-ctx128k": {
+    "limit": {
+      "context": 131072,
+      "output": 32768
+    },
+    "name": "qwen35-4b-q4km-ctx128k"
+  },
+  "qwen35-4b-q8-ctx128k": {
+    "limit": {
+      "context": 131072,
+      "output": 32768
+    },
+    "name": "qwen35-4b-q8-ctx128k"
+  },
+  "qwen35-9b-q4km-ctx128k": {
+    "limit": {
+      "context": 131072,
+      "output": 32768
+    },
+    "name": "qwen35-9b-q4km-ctx128k"
+  },
+  "qwen35b-a3b-q5km-ctx150000-mtp-frog-coding": {
+    "limit": {
+      "context": 150000,
+      "output": 32768
+    },
+    "name": "qwen35b-a3b-q5km-ctx150000-mtp-frog-coding",
+    "variants": {
+      "high": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "high"
+        },
+        "reasoning_budget_tokens": 8192
+      },
+      "low": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "low"
+        },
+        "reasoning_budget_tokens": 2048
+      },
+      "medium": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "medium"
+        },
+        "reasoning_budget_tokens": 4096
+      },
+      "none": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "none"
+        }
+      },
+      "xhigh": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "xhigh"
+        },
+        "reasoning_budget_tokens": 32768
+      },
+      "xhigh-no-preserve": {
+        "chat_template_kwargs": {
+          "preserve_thinking": false,
+          "reasoning_effort": "xhigh"
+        },
+        "reasoning_budget_tokens": 32768
+      }
+    }
+  },
+  "qwen35b-a3b-q5km-ctx150000-mtp-frog-planning": {
+    "limit": {
+      "context": 150000,
+      "output": 32768
+    },
+    "name": "qwen35b-a3b-q5km-ctx150000-mtp-frog-planning",
+    "variants": {
+      "high": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "high"
+        },
+        "reasoning_budget_tokens": 8192
+      },
+      "low": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "low"
+        },
+        "reasoning_budget_tokens": 2048
+      },
+      "medium": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "medium"
+        },
+        "reasoning_budget_tokens": 4096
+      },
+      "none": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "none"
+        }
+      },
+      "xhigh": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "xhigh"
+        },
+        "reasoning_budget_tokens": 32768
+      },
+      "xhigh-no-preserve": {
+        "chat_template_kwargs": {
+          "preserve_thinking": false,
+          "reasoning_effort": "xhigh"
+        },
+        "reasoning_budget_tokens": 32768
+      }
+    }
+  },
+  "qwen35b-a3b-q5km-ctx150000-mtp-rocm-frog": {
+    "limit": {
+      "context": 150000,
+      "output": 32768
+    },
+    "name": "qwen35b-a3b-q5km-ctx150000-mtp-rocm-frog",
+    "variants": {
+      "high": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "high"
+        },
+        "reasoning_budget_tokens": 8192
+      },
+      "low": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "low"
+        },
+        "reasoning_budget_tokens": 2048
+      },
+      "medium": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "medium"
+        },
+        "reasoning_budget_tokens": 4096
+      },
+      "none": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "none"
+        }
+      },
+      "xhigh": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "xhigh"
+        },
+        "reasoning_budget_tokens": 32768
+      },
+      "xhigh-no-preserve": {
+        "chat_template_kwargs": {
+          "preserve_thinking": false,
+          "reasoning_effort": "xhigh"
+        },
+        "reasoning_budget_tokens": 32768
+      }
+    }
+  },
+  "qwen35b-a3b-q5km-ctx150000-mtp-rocm-sharp": {
+    "limit": {
+      "context": 150000,
+      "output": 32768
+    },
+    "name": "qwen35b-a3b-q5km-ctx150000-mtp-rocm-sharp",
+    "variants": {
+      "high": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "high"
+        },
+        "reasoning_budget_tokens": 8192
+      },
+      "low": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "low"
+        },
+        "reasoning_budget_tokens": 2048
+      },
+      "medium": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "medium"
+        },
+        "reasoning_budget_tokens": 4096
+      },
+      "none": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "none"
+        }
+      },
+      "xhigh": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "xhigh"
+        },
+        "reasoning_budget_tokens": 32768
+      },
+      "xhigh-no-preserve": {
+        "chat_template_kwargs": {
+          "preserve_thinking": false,
+          "reasoning_effort": "xhigh"
+        },
+        "reasoning_budget_tokens": 32768
+      }
+    }
+  },
+  "qwen35b-a3b-q5km-ctx150000-mtp-sharp-coding": {
+    "limit": {
+      "context": 150000,
+      "output": 32768
+    },
+    "name": "qwen35b-a3b-q5km-ctx150000-mtp-sharp-coding",
+    "variants": {
+      "high": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "high"
+        },
+        "reasoning_budget_tokens": 8192
+      },
+      "low": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "low"
+        },
+        "reasoning_budget_tokens": 2048
+      },
+      "medium": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "medium"
+        },
+        "reasoning_budget_tokens": 4096
+      },
+      "none": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "none"
+        }
+      },
+      "xhigh": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "xhigh"
+        },
+        "reasoning_budget_tokens": 32768
+      },
+      "xhigh-no-preserve": {
+        "chat_template_kwargs": {
+          "preserve_thinking": false,
+          "reasoning_effort": "xhigh"
+        },
+        "reasoning_budget_tokens": 32768
+      }
+    }
+  },
+  "qwen35b-a3b-q5km-ctx150000-mtp-sharp-planning": {
+    "limit": {
+      "context": 150000,
+      "output": 32768
+    },
+    "name": "qwen35b-a3b-q5km-ctx150000-mtp-sharp-planning",
+    "variants": {
+      "high": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "high"
+        },
+        "reasoning_budget_tokens": 8192
+      },
+      "low": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "low"
+        },
+        "reasoning_budget_tokens": 2048
+      },
+      "medium": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "medium"
+        },
+        "reasoning_budget_tokens": 4096
+      },
+      "none": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "none"
+        }
+      },
+      "xhigh": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "xhigh"
+        },
+        "reasoning_budget_tokens": 32768
+      },
+      "xhigh-no-preserve": {
+        "chat_template_kwargs": {
+          "preserve_thinking": false,
+          "reasoning_effort": "xhigh"
+        },
+        "reasoning_budget_tokens": 32768
+      }
+    }
+  },
+  "qwen38-27b-int4-ctx130000-mtp-vllm": {
+    "limit": {
+      "context": 130000,
+      "output": 32768
+    },
+    "name": "qwen38-27b-int4-ctx130000-mtp-vllm"
+  },
+  "qwen38-27b-int4-ctx160000-kvfp8-vllm": {
+    "limit": {
+      "context": 160000,
+      "output": 32768
+    },
+    "name": "qwen38-27b-int4-ctx160000-kvfp8-vllm"
+  },
+  "qwen38-27b-q4kxl-f16-mtp-ctx150000-mtp-frog-coding": {
+    "limit": {
+      "context": 150000,
+      "output": 32768
+    },
+    "name": "qwen38-27b-q4kxl-f16-mtp-ctx150000-mtp-frog-coding",
+    "variants": {
+      "high": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "high"
+        },
+        "reasoning_budget_tokens": 8192
+      },
+      "low": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "low"
+        },
+        "reasoning_budget_tokens": 2048
+      },
+      "medium": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "medium"
+        },
+        "reasoning_budget_tokens": 4096
+      },
+      "none": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "none"
+        }
+      },
+      "xhigh": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "xhigh"
+        },
+        "reasoning_budget_tokens": 32768
+      },
+      "xhigh-no-preserve": {
+        "chat_template_kwargs": {
+          "preserve_thinking": false,
+          "reasoning_effort": "xhigh"
+        },
+        "reasoning_budget_tokens": 32768
+      }
+    }
+  },
+  "qwen38-27b-q4kxl-f16-mtp-ctx150000-mtp-frog-planning": {
+    "limit": {
+      "context": 150000,
+      "output": 32768
+    },
+    "name": "qwen38-27b-q4kxl-f16-mtp-ctx150000-mtp-frog-planning",
+    "variants": {
+      "high": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "high"
+        },
+        "reasoning_budget_tokens": 8192
+      },
+      "low": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "low"
+        },
+        "reasoning_budget_tokens": 2048
+      },
+      "medium": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "medium"
+        },
+        "reasoning_budget_tokens": 4096
+      },
+      "none": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "none"
+        }
+      },
+      "xhigh": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "xhigh"
+        },
+        "reasoning_budget_tokens": 32768
+      },
+      "xhigh-no-preserve": {
+        "chat_template_kwargs": {
+          "preserve_thinking": false,
+          "reasoning_effort": "xhigh"
+        },
+        "reasoning_budget_tokens": 32768
+      }
+    }
+  },
+  "qwen38-27b-q4kxl-f16-mtp-ctx150000-mtp-sharp-coding": {
+    "limit": {
+      "context": 150000,
+      "output": 32768
+    },
+    "name": "qwen38-27b-q4kxl-f16-mtp-ctx150000-mtp-sharp-coding",
+    "variants": {
+      "high": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "high"
+        },
+        "reasoning_budget_tokens": 8192
+      },
+      "low": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "low"
+        },
+        "reasoning_budget_tokens": 2048
+      },
+      "medium": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "medium"
+        },
+        "reasoning_budget_tokens": 4096
+      },
+      "none": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "none"
+        }
+      },
+      "xhigh": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "xhigh"
+        },
+        "reasoning_budget_tokens": 32768
+      },
+      "xhigh-no-preserve": {
+        "chat_template_kwargs": {
+          "preserve_thinking": false,
+          "reasoning_effort": "xhigh"
+        },
+        "reasoning_budget_tokens": 32768
+      }
+    }
+  },
+  "qwen38-27b-q4kxl-f16-mtp-ctx150000-mtp-sharp-planning": {
+    "limit": {
+      "context": 150000,
+      "output": 32768
+    },
+    "name": "qwen38-27b-q4kxl-f16-mtp-ctx150000-mtp-sharp-planning",
+    "variants": {
+      "high": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "high"
+        },
+        "reasoning_budget_tokens": 8192
+      },
+      "low": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "low"
+        },
+        "reasoning_budget_tokens": 2048
+      },
+      "medium": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "medium"
+        },
+        "reasoning_budget_tokens": 4096
+      },
+      "none": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "none"
+        }
+      },
+      "xhigh": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "xhigh"
+        },
+        "reasoning_budget_tokens": 32768
+      },
+      "xhigh-no-preserve": {
+        "chat_template_kwargs": {
+          "preserve_thinking": false,
+          "reasoning_effort": "xhigh"
+        },
+        "reasoning_budget_tokens": 32768
+      }
+    }
+  },
+  "qwen38-27b-q4kxl-q8-mtp-ctx200000-kvq8-mtp-frog-coding": {
+    "limit": {
+      "context": 200000,
+      "output": 32768
+    },
+    "name": "qwen38-27b-q4kxl-q8-mtp-ctx200000-kvq8-mtp-frog-coding",
+    "variants": {
+      "high": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "high"
+        },
+        "reasoning_budget_tokens": 8192
+      },
+      "low": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "low"
+        },
+        "reasoning_budget_tokens": 2048
+      },
+      "medium": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "medium"
+        },
+        "reasoning_budget_tokens": 4096
+      },
+      "none": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "none"
+        }
+      },
+      "xhigh": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "xhigh"
+        },
+        "reasoning_budget_tokens": 32768
+      },
+      "xhigh-no-preserve": {
+        "chat_template_kwargs": {
+          "preserve_thinking": false,
+          "reasoning_effort": "xhigh"
+        },
+        "reasoning_budget_tokens": 32768
+      }
+    }
+  },
+  "qwen38-27b-q4kxl-q8-mtp-ctx200000-kvq8-mtp-frog-planning": {
+    "limit": {
+      "context": 200000,
+      "output": 32768
+    },
+    "name": "qwen38-27b-q4kxl-q8-mtp-ctx200000-kvq8-mtp-frog-planning",
+    "variants": {
+      "high": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "high"
+        },
+        "reasoning_budget_tokens": 8192
+      },
+      "low": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "low"
+        },
+        "reasoning_budget_tokens": 2048
+      },
+      "medium": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "medium"
+        },
+        "reasoning_budget_tokens": 4096
+      },
+      "none": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "none"
+        }
+      },
+      "xhigh": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "xhigh"
+        },
+        "reasoning_budget_tokens": 32768
+      },
+      "xhigh-no-preserve": {
+        "chat_template_kwargs": {
+          "preserve_thinking": false,
+          "reasoning_effort": "xhigh"
+        },
+        "reasoning_budget_tokens": 32768
+      }
+    }
+  },
+  "qwen38-27b-q4kxl-q8-mtp-ctx200000-kvq8-mtp-sharp-coding": {
+    "limit": {
+      "context": 200000,
+      "output": 32768
+    },
+    "name": "qwen38-27b-q4kxl-q8-mtp-ctx200000-kvq8-mtp-sharp-coding",
+    "variants": {
+      "high": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "high"
+        },
+        "reasoning_budget_tokens": 8192
+      },
+      "low": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "low"
+        },
+        "reasoning_budget_tokens": 2048
+      },
+      "medium": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "medium"
+        },
+        "reasoning_budget_tokens": 4096
+      },
+      "none": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "none"
+        }
+      },
+      "xhigh": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "xhigh"
+        },
+        "reasoning_budget_tokens": 32768
+      },
+      "xhigh-no-preserve": {
+        "chat_template_kwargs": {
+          "preserve_thinking": false,
+          "reasoning_effort": "xhigh"
+        },
+        "reasoning_budget_tokens": 32768
+      }
+    }
+  },
+  "qwen38-27b-q4kxl-q8-mtp-ctx200000-kvq8-mtp-sharp-planning": {
+    "limit": {
+      "context": 200000,
+      "output": 32768
+    },
+    "name": "qwen38-27b-q4kxl-q8-mtp-ctx200000-kvq8-mtp-sharp-planning",
+    "variants": {
+      "high": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "high"
+        },
+        "reasoning_budget_tokens": 8192
+      },
+      "low": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "low"
+        },
+        "reasoning_budget_tokens": 2048
+      },
+      "medium": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "medium"
+        },
+        "reasoning_budget_tokens": 4096
+      },
+      "none": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "none"
+        }
+      },
+      "xhigh": {
+        "chat_template_kwargs": {
+          "reasoning_effort": "xhigh"
+        },
+        "reasoning_budget_tokens": 32768
+      },
+      "xhigh-no-preserve": {
+        "chat_template_kwargs": {
+          "preserve_thinking": false,
+          "reasoning_effort": "xhigh"
+        },
+        "reasoning_budget_tokens": 32768
+      }
+    }
+  }
+}
