@@ -1,0 +1,17 @@
+run: vLLM window boot matrix (boot-log only; aborted at the KV pool line, before graph capture)
+started: 2026-09-12 18:44 | reruns 19:23-19:38
+gpu: AMD Radeon AI PRO R9700 (RDNA4 gfx1201) 32624 MiB | HSA_OVERRIDE_GFX_VERSION=12.0.1
+host: Ryzen 5 3600, 31 GB RAM | kernel 7.0.0-31-generic | ROCm 10.0.0 host | Mesa 26.2.2
+vllm image: stilldeadcode/vllm-radiance:0.9.3 @ sha256:45694209177a55a1ab3ba6702fe6e978b1b66a6e66ae3fc066f8d579f7bc4c25
+            (vLLM 0.27.1, torch 2.11.0+rocm7.14; image ENV reports RADIANCE_VERSION=0.6.2)
+vllm model: RedHatAI/Qwen3.8-27B-INT4 @ bf08f3db (compressed-tensors W4A16 g128) -> /home/dev/models/vllm/Qwen3.8-27B-INT4
+vllm fixed args: --language-model-only --max-num-batched-tokens 16384 --gpu-memory-utilization 0.90
+                 --attention-backend R4D --enable-prefix-caching --mamba-cache-mode align --no-async-scheduling
+                 MTP: --speculative-config {method:mtp, num_speculative_tokens:S, attention_backend:R4D, disable_padded_drafter_batch:true}
+vllm env: VLLM_ROCM_USE_AITER=1 VLLM_ROCM_USE_AITER_UNIFIED_ATTENTION=1 (all other AITER sub-flags 0)
+          RADIANCE_FAST_DRAFT=1 RADIANCE_DRAFT_TAU=0.28 RADIANCE_SKINNY_GEMM=all
+varied per arm: --max-model-len, S (MTP), --max-num-seqs, --kv-cache-dtype (see arm dir names)
+gate: bench/lib/gpu_exclusive.sh 29000 before every arm
+scripts: scripts/bootmatrix.sh (original 8 arms), scripts/bootarm.sh (fixed single-arm reruns)
+quarantine: quarantine/ (w1, c3, c4 originals — contended; see CAVEAT.txt)
+analysis: docs/analysis/2026-09-12-1535-vllm-window-budgets-and-rocm-knobs.md §2c

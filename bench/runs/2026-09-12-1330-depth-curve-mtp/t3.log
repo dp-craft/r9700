@@ -1,0 +1,26 @@
+===== T3 depth curve  2026-09-12 12:57:41 =====
+depths: 8000 12000 20000 32000   reps: 3   max_tokens: 256   prefix-mode: unique   api: chat
+
+##### ARM A: llama.cpp Vulkan + MTP (llama-swap: qwen38-27b-q4kxl-q8-mtp-ctx200000-kvq8-mtp-sharp-coding)  12:57:41
+  warmup1 http=000 0.000151s
+  warmup2 http=000 0.000128s
+  props http=000
+DEPTH 8000 rc=2 prompt_tok=None prefill=None decode=None aggregate=None ttft_p50=None ttft_p95=None n_ok=None n_err=None | load_vram_used_mib=454 peak_vram_used_mib=454 peak_gtt_used_mib=52 avg_power_w=10.5 peak_power_w=11.0 peak_temp_c=31.0 avg_sclk_mhz=0.0 peak_sclk_mhz=0.0 avg_mclk_mhz=96.0 peak_mclk_mhz=96.0 avg_gpu_busy_pct=0.0 peak_gpu_busy_pct=0.0 samples=2
+DEPTH 12000 rc=2 prompt_tok=None prefill=None decode=None aggregate=None ttft_p50=None ttft_p95=None n_ok=None n_err=None | load_vram_used_mib=454 peak_vram_used_mib=454 peak_gtt_used_mib=52 avg_power_w=11.5 peak_power_w=13.0 peak_temp_c=31.0 avg_sclk_mhz=20.5 peak_sclk_mhz=41.0 avg_mclk_mhz=96.0 peak_mclk_mhz=96.0 avg_gpu_busy_pct=1.5 peak_gpu_busy_pct=3.0 samples=2
+DEPTH 20000 rc=2 prompt_tok=None prefill=None decode=None aggregate=None ttft_p50=None ttft_p95=None n_ok=None n_err=None | load_vram_used_mib=454 peak_vram_used_mib=454 peak_gtt_used_mib=52 avg_power_w=10.0 peak_power_w=10.0 peak_temp_c=32.0 avg_sclk_mhz=0.0 peak_sclk_mhz=0.0 avg_mclk_mhz=96.0 peak_mclk_mhz=96.0 avg_gpu_busy_pct=0.0 peak_gpu_busy_pct=0.0 samples=2
+DEPTH 32000 rc=2 prompt_tok=None prefill=None decode=None aggregate=None ttft_p50=None ttft_p95=None n_ok=None n_err=None | load_vram_used_mib=454 peak_vram_used_mib=454 peak_gtt_used_mib=52 avg_power_w=16.0 peak_power_w=21.0 peak_temp_c=31.0 avg_sclk_mhz=250.0 peak_sclk_mhz=500.0 avg_mclk_mhz=96.0 peak_mclk_mhz=96.0 avg_gpu_busy_pct=14.0 peak_gpu_busy_pct=28.0 samples=2
+  unloading llama-swap (GET, POST returns 405 -- iron rule 14)
+  unload http=000
+  unload FAILED
+
+##### ARM B: vllm-radiance 0.9.3 R4D + MTP8  12:58:07
+GPU exclusive: 32170 MiB free (used 454 MiB), floor 29000 MiB.
+  boot: ok=1 after 357s
+  warmup1 http=200 1.253257s
+  warmup2 http=200 1.582126s
+DEPTH 8000 rc=0 prompt_tok=8183 prefill=1168.6 decode=37.81 aggregate=18.55 ttft_p50=7.0034 ttft_p95=7.3031 n_ok=3 n_err=0 | load_vram_used_mib=25103 peak_vram_used_mib=26362 peak_gtt_used_mib=60 avg_power_w=187.6 peak_power_w=257.0 peak_temp_c=57.0 avg_sclk_mhz=2182.6 peak_sclk_mhz=2917.0 avg_mclk_mhz=1164.2 peak_mclk_mhz=1258.0 avg_gpu_busy_pct=87.7 peak_gpu_busy_pct=100.0 samples=40
+DEPTH 12000 rc=0 prompt_tok=12096 prefill=813.7 decode=40.32 aggregate=12.06 ttft_p50=14.8653 ttft_p95=15.3627 n_ok=3 n_err=0 | load_vram_used_mib=26362 peak_vram_used_mib=28008 peak_gtt_used_mib=60 avg_power_w=201.6 peak_power_w=282.0 peak_temp_c=64.0 avg_sclk_mhz=2466.1 peak_sclk_mhz=2906.0 avg_mclk_mhz=1219.3 peak_mclk_mhz=1258.0 avg_gpu_busy_pct=96.0 peak_gpu_busy_pct=100.0 samples=60
+DEPTH 20000 rc=0 prompt_tok=20122 prefill=812.0 decode=36.11 aggregate=8.01 ttft_p50=24.7776 ttft_p95=24.8528 n_ok=3 n_err=0 | load_vram_used_mib=28008 peak_vram_used_mib=28994 peak_gtt_used_mib=62 avg_power_w=206.5 peak_power_w=276.0 peak_temp_c=70.0 avg_sclk_mhz=2429.0 peak_sclk_mhz=2892.0 avg_mclk_mhz=1224.4 peak_mclk_mhz=1258.0 avg_gpu_busy_pct=97.1 peak_gpu_busy_pct=100.0 samples=89
+DEPTH 32000 rc=0 prompt_tok=32317 prefill=736.8 decode=43.79 aggregate=5.15 ttft_p50=43.8568 ttft_p95=43.8677 n_ok=3 n_err=0 | load_vram_used_mib=28994 peak_vram_used_mib=28994 peak_gtt_used_mib=62 avg_power_w=206.7 peak_power_w=276.0 peak_temp_c=72.0 avg_sclk_mhz=2454.9 peak_sclk_mhz=2882.0 avg_mclk_mhz=1221.4 peak_mclk_mhz=1258.0 avg_gpu_busy_pct=98.0 peak_gpu_busy_pct=100.0 samples=137
+
+===== T3 done 13:10:16 =====

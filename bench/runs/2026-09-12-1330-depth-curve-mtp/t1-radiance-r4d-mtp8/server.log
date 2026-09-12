@@ -1,0 +1,355 @@
+
+[1;38;5;39m┌─[ RADIANCE · GPU TOPOLOGY & BANDWIDTH (rocm-bandwidth-test) ]──[0m
+........
+          RocmBandwidthTest Version: 2.6.0
+
+          Launch Command is: rocm-bandwidth-test (rocm_bandwidth -a + rocm_bandwidth -A)
+
+
+          Device: 0,  AMD Ryzen 5 3600 6-Core Processor
+          Device: 1,  AMD Radeon AI PRO R9700,  GPU-6df66d6fefd86d2c,  09:0.0
+
+          Inter-Device Access
+
+          D/D       0         1         
+
+          0         1         1         
+
+          1         1         1         
+
+
+          Inter-Device Numa Distance
+
+          D/D       0         1         
+
+          0         0         20        
+
+          1         20        0         
+
+
+          Unidirectional copy peak bandwidth GB/s
+
+          D/D       0           1           
+
+          0         N/A         14.168      
+
+          1         14.062      354.172     
+
+
+          Bidirectional copy peak bandwidth GB/s
+
+          D/D       0           1           
+
+          0         N/A         25.334      
+
+          1         25.334      N/A         
+[1;38;5;39m└─[ end bandwidth report ]──────────────────────────────[0m
+[38;5;39;1m[0m
+[38;5;39;1m██████╗  █████╗ ██████╗ ██╗ █████╗ ███╗   ██╗ ██████╗███████╗[0m
+[38;5;39;1m██╔══██╗██╔══██╗██╔══██╗██║██╔══██╗████╗  ██║██╔════╝██╔════╝[0m
+[38;5;39;1m██████╔╝███████║██║  ██║██║███████║██╔██╗ ██║██║     █████╗[0m
+[38;5;39;1m██╔══██╗██╔══██║██║  ██║██║██╔══██║██║╚██╗██║██║     ██╔══╝[0m
+[38;5;39;1m██║  ██║██║  ██║██████╔╝██║██║  ██║██║ ╚████║╚██████╗███████╗[0m
+[38;5;39;1m╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝ ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝ ╚═════╝╚══════╝[0m
+[2m  vLLM inference server · AMD Radeon AI PRO R9700 · gfx1201 / RDNA4[0m
+[2m  radiance [0m[38;5;39mv0.9.3[0m
+
+[38;5;39;1m───[ GPUs ]──────────────────────────────────────────────────────[0m
+  detected : [32;1m1[0m GPU(s)[2m  (HIP_VISIBLE_DEVICES=unset)[0m
+  [0] AMD Radeon AI PRO R9700    gfx1201    31.9 GiB   [32;1m✓ gfx1201[0m
+  arch check : [32;1mPASS[0m [2m(1/1 gfx1201)[0m
+
+[38;5;39;1m───[ RADIANCE optimizations ]────────────────────────────────────[0m
+  [2mfeature toggles (set to 0 to disable):[0m
+    [32;1mON [0m RADIANCE_USE_R4D           [2mhand-written gfx1201 kernels: attention, gated delta net, vision, all-reduce, skinny GEMM[0m
+    [32;1mON [0m RADIANCE_USE_R4D_AR        [2mP2P one-shot all-reduce for TP=2, byte-identical to RCCL[0m
+    [32;1mON [0m RADIANCE_USE_R4D_AR_QUANT  [2mcompressed all-reduce payload for large messages: rotated 6-bit (on; not RCCL-identical)[0m
+    [32;1mON [0m RADIANCE_PRESHUFFLE        [2mpreshuffled AITER FP8 blockscale GEMM[0m
+    [32;1mON [0m RADIANCE_FUSE_RMS_QUANT    [2mfold group-FP8 quant into the RMSNorm epilogue[0m
+    [32;1mON [0m RADIANCE_DYNAMIC_DRAFT     [2mper-request MTP draft-depth controller (needs speculative mtp)[0m
+    [32;1mON [0m RADIANCE_FAST_DRAFT        [2m2-bit MTP draft head behind an exact rerank (opt-in; needs speculative mtp)[0m
+
+  [2mdynamic drafting (RADIANCE_DYNAMIC_DRAFT):[0m
+        [2mper-slot confidence gate: draft while cum. confidence >= TAU, take a free-win[0m
+        [2mn-gram, else verify; batch schedule caps serial MTP forwards at concurrency.[0m
+        [2m·[0m RADIANCE_DRAFT_SCHEDULE = [38;5;39m1:8,2:7,4:6,8:5,16:4[0m  [2mbatch-size MTP-forward ceiling (bs:max_depth, carry-forward)[0m
+        [2m·[0m RADIANCE_DRAFT_TAU = [38;5;39m0.28[0m  [2mconfidence-product stop threshold[0m
+
+  [2mNUMA binding (RADIANCE_NUMA_BIND / --numa-bind):[0m
+        [2moff (set =auto or pass --numa-bind to pin to the GPU-local node)[0m
+
+  [2mstartup:[0m
+        [2m·[0m RADIANCE_RUN_BWTEST = [38;5;39m1[0m  [2mGPU topology + bandwidth sweep at startup (on; backgrounded, ~1 s; set 0 to skip)[0m
+        [2m·[0m RADIANCE_BANNER_PLAIN = [38;5;39m0[0m  [2mdisable ANSI color (also NO_COLOR)[0m
+
+  [2mbaked-in (always on; correctness + GEMM path):[0m
+    [32;1m•[0m block-FP8 GEMM dispatcher; preshuffle / AITER split-K / generic + tuned fp8-configs
+    [32;1m•[0m tuned fused-MoE Triton configs for fine-grained MoE (Qwen3.6-35B-A3B E=256,N=256; ~-12% TTFT prefill)
+    [32;1m•[0m bf16 / auto KV cache attention fit + tune (fits the RDNA4 64 KiB LDS at head_size 256)
+    [32;1m•[0m amdsmi gfx1201 GPU enumeration fix (device_count / platform detect)
+    [32;1m•[0m AITER enablement for gfx12x (upstream gates it to MI3xx / CDNA)
+    [32;1m•[0m native sampler fallback (AITER top-k/top-p kernel absent on RDNA4)
+    [32;1m•[0m MTP drafter unpad fix (enables disable_padded_drafter_batch single-stream path)
+    [32;1m•[0m tool-parser streaming vs non-streaming consistency (vLLM #47137)
+    [32;1m•[0m from_json Jinja filter for tool-calling chat templates
+
+  [2mAITER routing (VLLM_ROCM_USE_AITER*):[0m
+    [32;1mAITER=1[0m  [32;1mAITER_UATTN=1[0m  [2mAITER_MHA=0[0m  [2mAITER_MLA=0[0m  [2mAITER_MOE=0[0m  [2mAITER_LINEAR=0[0m  [2mAITER_RMSNORM=0[0m  [2mAITER_FP8BMM=0[0m
+
+[38;5;39;1m───[ component versions ]────────────────────────────────────────[0m
+    radiance      [38;5;39m0.9.3[0m
+    vllm          [38;5;39m0.27.1[0m
+    torch         [38;5;39m2.11.0+rocm7.14[0m
+    torchvision   [38;5;39m0.24.1+d801a34[0m
+    triton        [38;5;39m3.6.0[0m
+    aiter         [38;5;39m0.1.17[0m
+    transformers  [38;5;39m5.14.1[0m
+    amdsmi        [38;5;39m26.5.0+2b22ab01[0m
+    hip           [38;5;39m7.14.60850[0m
+    rocm          [38;5;39m7.14.0[0m
+    python        [38;5;39m3.12.3[0m
+
+  [2mGPU topology + bandwidth sweep runs in the background; report follows below.[0m
+[38;5;39;1m──────────────────────────────────────────────────────────────[0m
+
+[radiance.gemm] skinny GEMM kernel ENABLED for M in [6,64]: 48x5120, 96x5120, 256x2048, 256x5120, 1280x5120
+[aiter] [pid=1 pname=MainProcess] start build [module_aiter_core] under /opt/vllm/lib/python3.12/site-packages/aiter/jit/build/module_aiter_core
+[aiter] Current hipcc not support: -mllvm -amdgpu-coerce-illegal-types=1, skip it.
+[aiter] [pid=1 pname=MainProcess] [32mfinish build [module_aiter_core], cost 23.6s [0m
+[aiter] import [module_aiter_core] under /opt/vllm/lib/python3.12/site-packages/aiter/jit/module_aiter_core.so
+[radiance.w4] 4-bit drafter hook installed
+[radiance.w4] bf16 drafter hook installed
+[radiance] preshuffle weight-shuffle-at-load hook installed
+[radiance] attn tuned-config override installed on 2 module aliases
+[radiance] fast-reduce hook armed (RADIANCE_USE_R4D_AR=1, all_reduce wrap)
+[radiance.draft] RADIANCE_DYNAMIC_DRAFT=ON  controller=policy  tau=0.28  schedule=1:8,2:7,4:6,8:5,16:4  (GPU-resident capture + n-gram matcher; per-slot confidence gate short-circuits the forward loop)
+[radiance.gdn] gdn_chunk_scan ENABLED (head_k 128, head_v 128, chunk 64; replaces wy + delta_h + chunk_o)
+[radiance] int2 draft head armed (RADIANCE_FAST_DRAFT)
+[radiance.vit] head_dim-72 attention installed
+[radiance.vit] Gemma4 vision attention installed (head_dim 72)
+(APIServer pid=1) INFO 09-12 11:23:29 [api_utils.py:345] 
+(APIServer pid=1) INFO 09-12 11:23:29 [api_utils.py:345]        █     █     █▄   ▄█
+(APIServer pid=1) INFO 09-12 11:23:29 [api_utils.py:345]  ▄▄ ▄█ █     █     █ ▀▄▀ █  version 0.27.1
+(APIServer pid=1) INFO 09-12 11:23:29 [api_utils.py:345]   █▄█▀ █     █     █     █  model   /model
+(APIServer pid=1) INFO 09-12 11:23:29 [api_utils.py:345]    ▀▀  ▀▀▀▀▀ ▀▀▀▀▀ ▀     ▀
+(APIServer pid=1) INFO 09-12 11:23:29 [api_utils.py:345] 
+(APIServer pid=1) INFO 09-12 11:23:29 [api_utils.py:273] non-default args: {'model_tag': '/model', 'host': '0.0.0.0', 'model': '/model', 'max_model_len': 36864, 'served_model_name': ['qwen38-27b-int4'], 'attention_backend': 'R4D', 'gpu_memory_utilization': 0.9, 'enable_prefix_caching': True, 'mamba_cache_mode': 'align', 'language_model_only': True, 'max_num_batched_tokens': 16384, 'max_num_seqs': 4, 'async_scheduling': False, 'speculative_config': {'method': 'mtp', 'num_speculative_tokens': 8, 'attention_backend': 'R4D', 'disable_padded_drafter_batch': True}}
+(APIServer pid=1) INFO 09-12 11:23:29 [model.py:645] Resolved architecture: Qwen3_5ForConditionalGeneration
+(APIServer pid=1) INFO 09-12 11:23:29 [model.py:1883] Using max model len 36864
+(APIServer pid=1) INFO 09-12 11:23:31 [registry.py:134] All limits of multimodal modalities supported by the model are set to 0, running in text-only mode.
+(APIServer pid=1) INFO 09-12 11:23:31 [model.py:842] Disabled mm_prefix attention mode because multimodal inputs are configuration-disabled. Attention backends without mm_prefix support may now be selected.
+(APIServer pid=1) INFO 09-12 11:23:32 [model.py:645] Resolved architecture: Qwen3_5MTP
+(APIServer pid=1) INFO 09-12 11:23:32 [model.py:1883] Using max model len 262144
+(APIServer pid=1) WARNING 09-12 11:23:32 [registry.py:117] Model /model is treated as multimodal but has no registered multimodal processor; running in text-only mode.
+(APIServer pid=1) WARNING 09-12 11:23:32 [speculative.py:912] Enabling num_speculative_tokens > 1 will run multiple times of forward on same MTP layer,which may result in lower acceptance rate
+(APIServer pid=1) INFO 09-12 11:23:32 [speculative.py:1157] Overriding draft model max model len from 262144 to 36864
+(APIServer pid=1) INFO 09-12 11:23:32 [scheduler.py:242] Chunked prefill is enabled with max_num_batched_tokens=16384.
+(APIServer pid=1) INFO 09-12 11:23:32 [config.py:638] Warning: Prefix caching in Mamba cache 'align' mode is currently enabled. Its support for Mamba layers is experimental. Please report any issues you may observe.
+(APIServer pid=1) INFO 09-12 11:23:32 [kernel.py:306] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'])
+(APIServer pid=1) INFO 09-12 11:23:32 [compilation.py:329] Enabled custom fusions: mla_dual_rms_norm
+[radiance.gemm] skinny GEMM kernel ENABLED for M in [6,64]: 48x5120, 96x5120, 256x2048, 256x5120, 1280x5120
+(EngineCore pid=397) [aiter] import [module_aiter_core] under /opt/vllm/lib/python3.12/site-packages/aiter/jit/module_aiter_core.so
+(EngineCore pid=397) [radiance.w4] 4-bit drafter hook installed
+(EngineCore pid=397) [radiance.w4] bf16 drafter hook installed
+(EngineCore pid=397) [radiance] preshuffle weight-shuffle-at-load hook installed
+(EngineCore pid=397) [radiance] attn tuned-config override installed on 2 module aliases
+(EngineCore pid=397) [radiance] fast-reduce hook armed (RADIANCE_USE_R4D_AR=1, all_reduce wrap)
+(EngineCore pid=397) [radiance.draft] RADIANCE_DYNAMIC_DRAFT=ON  controller=policy  tau=0.28  schedule=1:8,2:7,4:6,8:5,16:4  (GPU-resident capture + n-gram matcher; per-slot confidence gate short-circuits the forward loop)
+(EngineCore pid=397) [radiance.gdn] gdn_chunk_scan ENABLED (head_k 128, head_v 128, chunk 64; replaces wy + delta_h + chunk_o)
+(EngineCore pid=397) [radiance] int2 draft head armed (RADIANCE_FAST_DRAFT)
+(EngineCore pid=397) [radiance.vit] head_dim-72 attention installed
+(EngineCore pid=397) [radiance.vit] Gemma4 vision attention installed (head_dim 72)
+(EngineCore pid=397) INFO 09-12 11:23:54 [core.py:121] Initializing a V1 LLM engine (v0.27.1) with config: model='/model', speculative_config=SpeculativeConfig(method='mtp', model='/model', num_spec_tokens=8), tokenizer='/model', skip_tokenizer_init=False, tokenizer_mode=auto, revision=None, tokenizer_revision=None, trust_remote_code=False, dtype=torch.bfloat16, max_seq_len=36864, download_dir=None, load_format=auto, tensor_parallel_size=1, pipeline_parallel_size=1, data_parallel_size=1, decode_context_parallel_size=1, dcp_comm_backend=ag_rs, disable_custom_all_reduce=True, quantization=compressed-tensors, quantization_config=None, enforce_eager=False, enable_return_routed_experts=False, kv_cache_dtype=auto, device_config=cuda, structured_outputs_config=StructuredOutputsConfig(backend='auto', disable_any_whitespace=False, disable_additional_properties=False, reasoning_parser='', reasoning_parser_plugin='', enable_in_reasoning=False), observability_config=ObservabilityConfig(show_hidden_metrics_for_version=None, otlp_traces_endpoint=None, collect_detailed_traces=None, kv_cache_metrics=False, kv_cache_metrics_sample=0.01, cudagraph_metrics=False, enable_layerwise_nvtx_tracing=False, enable_mfu_metrics=False, enable_mm_processor_stats=False, enable_logging_iteration_details=False, jit_monitor_mode='warn', jit_monitor_verbose=False), seed=0, served_model_name=qwen38-27b-int4, enable_prefix_caching=True, enable_chunked_prefill=True, pooler_config=None, compilation_config={'mode': <CompilationMode.VLLM_COMPILE: 3>, 'debug_dump_path': None, 'cache_dir': '', 'compile_cache_save_format': 'binary', 'backend': 'inductor', 'custom_ops': ['+sparse_attn_indexer', 'none'], 'ir_enable_torch_wrap': True, 'splitting_ops': ['vllm::unified_attention_with_output', 'vllm::unified_mla_attention_with_output', 'vllm::mamba_mixer2', 'vllm::mamba_mixer', 'vllm::short_conv', 'vllm::linear_attention', 'vllm::qwen_gdn_attention_core', 'vllm::gdn_attention_core_xpu', 'vllm::olmo_hybrid_gdn_full_forward', 'vllm::sparse_attn_indexer', 'vllm::rocm_aiter_sparse_attn_indexer', 'vllm::deepseek_v4_attention', 'vllm::hpc_rope_norm_forward', 'vllm::unified_kv_cache_update', 'vllm::unified_mla_kv_cache_update'], 'compile_mm_encoder': False, 'cudagraph_mm_encoder': False, 'encoder_cudagraph_token_budgets': [], 'encoder_cudagraph_max_vision_items_per_batch': 0, 'encoder_cudagraph_max_frames_per_batch': None, 'compile_sizes': [], 'compile_ranges_endpoints': [16384], 'inductor_compile_config': {'enable_auto_functionalized_v2': False, 'size_asserts': False, 'alignment_asserts': False, 'scalar_asserts': False, 'combo_kernels': True, 'benchmark_combo_kernel': True}, 'inductor_passes': {}, 'cudagraph_mode': <CUDAGraphMode.FULL_AND_PIECEWISE: (2, 1)>, 'cudagraph_num_of_warmups': 1, 'cudagraph_capture_sizes': [1, 2, 4, 8, 16, 24, 32, 40, 48, 56, 64, 72], 'cudagraph_copy_inputs': False, 'cudagraph_specialize_lora': True, 'use_inductor_graph_partition': False, 'pass_config': {'fuse_norm_quant': False, 'fuse_act_quant': False, 'fuse_attn_quant': False, 'enable_sp': False, 'fuse_gemm_comms': False, 'fuse_allreduce_rms': False, 'enable_qk_norm_rope_fusion': False, 'fuse_rope_kvcache_cat_mla': False, 'fuse_act_padding': False, 'fuse_mla_dual_rms_norm': True, 'fuse_rope_kvcache': False, 'fuse_qk_norm_rope_kvcache': False}, 'max_cudagraph_capture_size': 72, 'dynamic_shapes_config': {'type': <DynamicShapesType.BACKED: 'backed'>, 'evaluate_guards': False, 'assume_32_bit_indexing': False}, 'local_cache_dir': None, 'fast_moe_cold_start': False, 'static_all_moe_layers': []}, kernel_config=KernelConfig(ir_op_priority=IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native']), enable_flashinfer_autotune=True, enable_cutedsl_warmup=True, enable_jit_warmup=True, enable_bf16x3_router_gemm=False, moe_backend='auto', linear_backend='auto')
+(EngineCore pid=397) INFO 09-12 11:23:55 [registry.py:134] All limits of multimodal modalities supported by the model are set to 0, running in text-only mode.
+(EngineCore pid=397) INFO 09-12 11:23:55 [parallel_state.py:1640] world_size=1 rank=0 local_rank=0 distributed_init_method=tcp://172.17.0.2:36929 backend=nccl
+(EngineCore pid=397) INFO 09-12 11:23:55 [parallel_state.py:1977] rank 0 in world size 1 is assigned as DP rank 0, PP rank 0, PCP rank 0, TP rank 0, EP rank N/A, EPLB rank N/A
+(EngineCore pid=397) WARNING 09-12 11:23:57 [__init__.py:205] min_p and logit_bias parameters won't work with speculative decoding.
+(EngineCore pid=397) INFO 09-12 11:23:57 [gpu_model_runner.py:5322] Starting to load model /model...
+(EngineCore pid=397) INFO 09-12 11:23:57 [rocm.py:437] Set FLASH_ATTENTION_TRITON_AMD_ENABLE=TRUE to enable Flash Attention Triton backend on RDNA.
+(EngineCore pid=397) INFO 09-12 11:23:57 [rocm.py:723] Using Torch SDPA backend for ViT model.
+(EngineCore pid=397) WARNING 09-12 11:23:57 [activation.py:856] [ROCm] PyTorch's native GELU with tanh approximation is unstable. Falling back to GELU(approximate='none').
+(EngineCore pid=397) INFO 09-12 11:23:57 [mm_encoder_attention.py:375] Using AttentionBackendEnum.TORCH_SDPA for MMEncoderAttention.
+(EngineCore pid=397) INFO 09-12 11:23:58 [compressed_tensors_wNa16.py:137] Using RDNAHybridW4A16LinearKernel for CompressedTensorsWNA16
+(EngineCore pid=397) INFO 09-12 11:23:58 [qwen_gdn_linear_attn.py:155] Using Triton/FLA GDN prefill kernel (requested=auto, head_k_dim=128).
+(EngineCore pid=397) INFO 09-12 11:23:58 [rocm.py:610] Using R4D backend (selected via --attention-backend).
+(EngineCore pid=397) INFO 09-12 11:23:58 [selector.py:202] Using HND KV cache layout for R4D backend.
+(EngineCore pid=397) WARNING 09-12 11:23:58 [compilation.py:1347] Op 'sparse_attn_indexer' not present in model, enabling with '+sparse_attn_indexer' has no effect
+(EngineCore pid=397) INFO 09-12 11:23:58 [weight_utils.py:867] Filesystem type for checkpoints: EXT4. Checkpoint size: 18.12 GiB. Available RAM: 19.20 GiB.
+(EngineCore pid=397) INFO 09-12 11:23:58 [weight_utils.py:897] Auto-prefetch is disabled because the filesystem (EXT4) is not a recognized network FS (NFS/Lustre) and the checkpoint size (18.12 GiB) exceeds 90% of available RAM (19.20 GiB).
+(EngineCore pid=397) Loading safetensors checkpoint shards:   0% Completed | 0/2 [00:00<?, ?it/s]
+(EngineCore pid=397) Loading safetensors checkpoint shards:  50% Completed | 1/2 [00:59<00:59, 59.27s/it]
+(EngineCore pid=397) Loading safetensors checkpoint shards: 100% Completed | 2/2 [00:59<00:00, 29.65s/it]
+(EngineCore pid=397) 
+(EngineCore pid=397) INFO 09-12 11:24:59 [default_loader.py:430] Loading weights took 61.07 seconds
+(EngineCore pid=397) INFO 09-12 11:25:06 [gpu_model_runner.py:5346] Loading drafter model...
+(EngineCore pid=397) INFO 09-12 11:25:06 [kernel.py:306] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'])
+(EngineCore pid=397) INFO 09-12 11:25:06 [compilation.py:329] Enabled custom fusions: mla_dual_rms_norm
+(EngineCore pid=397) INFO 09-12 11:25:06 [weight_utils.py:867] Filesystem type for checkpoints: EXT4. Checkpoint size: 18.12 GiB. Available RAM: 21.59 GiB.
+(EngineCore pid=397) INFO 09-12 11:25:06 [weight_utils.py:890] Auto-prefetch is disabled because the filesystem (EXT4) is not a recognized network FS (NFS/Lustre). If you want to force prefetching, start vLLM with --safetensors-load-strategy=prefetch.
+(EngineCore pid=397) Loading safetensors checkpoint shards:   0% Completed | 0/2 [00:00<?, ?it/s]
+(EngineCore pid=397) Loading safetensors checkpoint shards:  50% Completed | 1/2 [00:09<00:09,  9.73s/it]
+(EngineCore pid=397) Loading safetensors checkpoint shards: 100% Completed | 2/2 [00:11<00:00,  5.26s/it]
+(EngineCore pid=397) Loading safetensors checkpoint shards: 100% Completed | 2/2 [00:11<00:00,  5.93s/it]
+(EngineCore pid=397) 
+(EngineCore pid=397) [radiance] INT2_DRAFT_HEAD: draft head (248320, 5120) bf16 -> int2 g128 asym (0.33 GiB/rank), 8 cand/block, rerank top-32 exact
+(EngineCore pid=397) INFO 09-12 11:25:18 [default_loader.py:430] Loading weights took 12.29 seconds
+(EngineCore pid=397) INFO 09-12 11:25:18 [llm_base_proposer.py:1480] Detected MTP model. Sharing target model embedding weights with the draft model.
+(EngineCore pid=397) INFO 09-12 11:25:18 [llm_base_proposer.py:1560] Detected MTP model. Sharing target model lm_head weights with the draft model.
+(EngineCore pid=397) INFO 09-12 11:25:24 [gpu_model_runner.py:5419] Model loading took 17.8 GiB memory and 81.107373 seconds
+(EngineCore pid=397) INFO 09-12 11:25:24 [interface.py:911] Setting attention block size to 1648 tokens to ensure that attention page size is >= mamba page size.
+(EngineCore pid=397) INFO 09-12 11:25:24 [interface.py:935] Padding mamba page size by 0.12% to ensure that mamba page size and attention page size are exactly equal.
+(EngineCore pid=397) INFO 09-12 11:25:28 [backends.py:1094] Using cache directory: /cache/vllm/torch_compile_cache/db3c3c8e3c/rank_0_0/backbone for vLLM's torch.compile
+(EngineCore pid=397) INFO 09-12 11:25:28 [backends.py:1155] Dynamo bytecode transform time: 4.07 s
+(EngineCore pid=397) INFO 09-12 11:25:36 [backends.py:292] Directly load the compiled graph(s) for compile range (1, 16384) from the cache, took 7.429 s
+(EngineCore pid=397) INFO 09-12 11:25:36 [decorators.py:311] Directly load AOT compilation from path /cache/vllm/torch_compile_cache/torch_aot_compile/38a7127a20e5d4b094e54fe282cd4d7aab4e1289fb03324e8ef7bf9e8c730e35/rank_0_0/model
+(EngineCore pid=397) INFO 09-12 11:25:36 [monitor.py:53] torch.compile took 12.10 s in total
+(EngineCore pid=397) INFO 09-12 11:25:59 [monitor.py:81] Initial profiling/warmup run took 23.01 s
+(EngineCore pid=397) INFO 09-12 11:25:59 [backends.py:1094] Using cache directory: /cache/vllm/torch_compile_cache/db3c3c8e3c/rank_0_0/eagle_head for vLLM's torch.compile
+(EngineCore pid=397) INFO 09-12 11:25:59 [backends.py:1155] Dynamo bytecode transform time: 0.11 s
+(EngineCore pid=397) INFO 09-12 11:25:59 [backends.py:292] Directly load the compiled graph(s) for compile range (1, 16384) from the cache, took 0.374 s
+(EngineCore pid=397) INFO 09-12 11:25:59 [decorators.py:311] Directly load AOT compilation from path /cache/vllm/torch_compile_cache/torch_aot_compile/f6c00b0abeb1e56f8da55c9d0f680d7d61c0551186d55e447b56214eac28c80b/rank_0_0/model
+(EngineCore pid=397) INFO 09-12 11:25:59 [monitor.py:53] torch.compile took 0.54 s in total
+(EngineCore pid=397) INFO 09-12 11:25:59 [monitor.py:81] Initial profiling/warmup run took 0.00 s
+(EngineCore pid=397) WARNING 09-12 11:26:01 [kv_cache_utils.py:1261] Add 3 padding layers, may waste at most 6.25% KV cache memory
+(EngineCore pid=397) [radiance] R4D attention: 24 q heads / 4 kv heads, head_dim 256, block 16, attn_prefill_h256_gqa6_fp8kv + attn_decode_h256_gqa6_fp8kv, 7.6 MiB split-KV scratch
+(EngineCore pid=397) [radiance] R4D attention: 24 q heads / 4 kv heads, head_dim 256, block 16, attn_prefill_h256_gqa6_fp8kv + attn_decode_h256_gqa6_fp8kv, 7.6 MiB split-KV scratch
+(EngineCore pid=397) INFO 09-12 11:26:01 [gpu_model_runner.py:6695] Profiling CUDA graph memory: PIECEWISE=8 (largest=72), FULL=4 (largest=36)
+(EngineCore pid=397) [radiance.gemm] claimed N=96 K=5120 M=63  WV=1 SK=8 MB=1
+(EngineCore pid=397) [radiance.gemm] claimed N=96 K=5120 M=36  WV=1 SK=8 MB=1
+(EngineCore pid=397) [radiance.gdn] all-R4D prefill path live
+(EngineCore pid=397) [radiance.gdn] all-R4D decode path live
+(EngineCore pid=397) [radiance.gemm] claimed N=96 K=5120 M=27  WV=1 SK=8 MB=1
+(EngineCore pid=397) INFO 09-12 11:26:03 [gpu_model_runner.py:6820] Estimated CUDA graph memory: 1.23 GiB total
+(EngineCore pid=397) INFO 09-12 11:26:03 [gpu_worker.py:563] Available KV cache memory: 5.04 GiB
+(EngineCore pid=397) INFO 09-12 11:26:03 [gpu_worker.py:578] CUDA graph memory profiling is enabled (default since v0.21.0). The current --gpu-memory-utilization=0.9000 is equivalent to --gpu-memory-utilization=0.8613 without CUDA graph memory profiling. To maintain the same effective KV cache size as before, increase --gpu-memory-utilization to 0.9387. To disable, set VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=0.
+(EngineCore pid=397) WARNING 09-12 11:26:03 [kv_cache_utils.py:1261] Add 3 padding layers, may waste at most 6.25% KV cache memory
+(EngineCore pid=397) INFO 09-12 11:26:03 [kv_cache_utils.py:2235] GPU KV cache size: 65,381 tokens
+(EngineCore pid=397) INFO 09-12 11:26:03 [kv_cache_utils.py:2236] Maximum concurrency for 36,864 tokens per request: 1.77x
+(EngineCore pid=397) [radiance] R4D attention: 24 q heads / 4 kv heads, head_dim 256, block 16, attn_prefill_h256_gqa6_fp8kv + attn_decode_h256_gqa6_fp8kv, 7.6 MiB split-KV scratch
+(EngineCore pid=397) [radiance] R4D attention: 24 q heads / 4 kv heads, head_dim 256, block 16, attn_prefill_h256_gqa6_fp8kv + attn_decode_h256_gqa6_fp8kv, 7.6 MiB split-KV scratch
+(EngineCore pid=397) INFO 09-12 11:26:03 [qwen_triton_warmup.py:270] Warming up Qwen Triton kernels for model_type=qwen3_5_text.
+(EngineCore pid=397) INFO 09-12 11:26:04 [ll_bf16.py:30] cuteDSL (CUTLASS Python) not available, ll_bf16_gemm disabled
+(EngineCore pid=397) INFO 09-12 11:26:04 [gpu_model_runner.py:6881] Rank 0: Torch profiler disabled for CUDA graph capture
+(EngineCore pid=397) Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):   0%|          | 0/8 [00:00<?, ?it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  12%|█▎        | 1/8 [00:00<00:01,  4.92it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  25%|██▌       | 2/8 [00:00<00:01,  5.94it/s][radiance.gemm] claimed N=96 K=5120 M=54  WV=1 SK=8 MB=1
+(EngineCore pid=397) Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  38%|███▊      | 3/8 [00:00<00:00,  6.38it/s][radiance.gemm] claimed N=96 K=5120 M=45  WV=1 SK=8 MB=1
+(EngineCore pid=397) Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  50%|█████     | 4/8 [00:00<00:00,  6.62it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  62%|██████▎   | 5/8 [00:00<00:00,  6.78it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  75%|███████▌  | 6/8 [00:00<00:00,  6.18it/s][radiance.gemm] claimed N=96 K=5120 M=18  WV=1 SK=8 MB=1
+(EngineCore pid=397) Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  88%|████████▊ | 7/8 [00:01<00:00,  5.88it/s][radiance.gemm] claimed N=96 K=5120 M=9  WV=1 SK=8 MB=1
+(EngineCore pid=397) Capturing CUDA graphs (mixed prefill-decode, PIECEWISE): 100%|██████████| 8/8 [00:01<00:00,  6.30it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE): 100%|██████████| 8/8 [00:01<00:00,  6.23it/s]
+(EngineCore pid=397) Capturing CUDA graphs (decode, FULL):   0%|          | 0/4 [00:00<?, ?it/s]Capturing CUDA graphs (decode, FULL):  25%|██▌       | 1/4 [00:00<00:00,  6.58it/s]Capturing CUDA graphs (decode, FULL):  50%|█████     | 2/4 [00:00<00:00,  5.63it/s]Capturing CUDA graphs (decode, FULL):  75%|███████▌  | 3/4 [00:00<00:00,  5.44it/s]Capturing CUDA graphs (decode, FULL): 100%|██████████| 4/4 [00:00<00:00,  5.94it/s]Capturing CUDA graphs (decode, FULL): 100%|██████████| 4/4 [00:00<00:00,  5.85it/s]
+(EngineCore pid=397) INFO 09-12 11:26:06 [gpu_model_runner.py:6927] Graph capturing finished in 3 secs, took 1.16 GiB
+(EngineCore pid=397) INFO 09-12 11:26:06 [gpu_worker.py:726] CUDA graph pool memory: 1.16 GiB (actual), 1.23 GiB (estimated), difference: 0.07 GiB (6.0%).
+(EngineCore pid=397) INFO 09-12 11:26:06 [gpu_worker.py:789] Free memory on device (31.78/31.86 GiB) on startup. Desired GPU memory utilization is (0.9, 28.67 GiB). Actual usage is 19.96 GiB for consumed memory (weights + non-torch), 3.67 GiB for peak activation, and 1.16 GiB for CUDAGraph memory. Replace gpu_memory_utilization config with `--kv-cache-memory=4005140890` (3.73 GiB) to fit into requested memory, or `--kv-cache-memory=7340032000` (6.84 GiB) to fully utilize gpu memory. Current kv cache memory in use is 5.04 GiB.
+(EngineCore pid=397) INFO 09-12 11:26:07 [jit_monitor.py:79] Kernel JIT monitor activated; monitored JIT compilations during inference will use mode=warn.
+(EngineCore pid=397) [radiance] R4D kernel selection: libr4d 0.5.0, 19 kernels built, 15 of 15 queries resolved
+(EngineCore pid=397) [radiance]   gemm_nt               M=64 K=5120 dtype=bf16
+(EngineCore pid=397) [radiance]                         -> gemm_bf16_nt_m64
+(EngineCore pid=397) [radiance]   gemm_nt               M=64 K=5120 N=5120 dtype=w4a16
+(EngineCore pid=397) [radiance]                         -> gemm_w4a16_nt_m64
+(EngineCore pid=397) [radiance]   gemm_nt               M=64 K=5120 N=5120 dtype=w4a8
+(EngineCore pid=397) [radiance]                         -> gemm_w4a8_nt_m64
+(EngineCore pid=397) [radiance]   quant_act             K=5120 dtype=bf16
+(EngineCore pid=397) [radiance]                         -> quant_act_i8
+(EngineCore pid=397) [radiance]   gdn_chunk_scan        head_k=128 head_v=128 chunk=64
+(EngineCore pid=397) [radiance]                         -> gdn_chunk_scan_k128_v128_c64_bf16
+(EngineCore pid=397) [radiance]   gdn_conv_prep         conv_width=4 head_k=128 head_v=128 chunk=64
+(EngineCore pid=397) [radiance]                         -> gdn_conv_prep_w4_h128_bf16
+(EngineCore pid=397) [radiance]   gdn_conv_update       conv_width=4 head_k=128 head_v=128
+(EngineCore pid=397) [radiance]                         -> gdn_conv_update_w4_h128_bf16
+(EngineCore pid=397) [radiance]   gdn_kkt_solve         head_k=128 chunk=64
+(EngineCore pid=397) [radiance]                         -> gdn_kkt_solve_k128_c64_bf16
+(EngineCore pid=397) [radiance]   gdn_recurrent_update  head_k=128 head_v=128
+(EngineCore pid=397) [radiance]                         -> gdn_recurrent_update_k128_v128_bf16_fp32state
+(EngineCore pid=397) [radiance]   gdn_gated_rmsnorm     channels=128
+(EngineCore pid=397) [radiance]                         -> gdn_gated_rmsnorm_h128_bf16
+(EngineCore pid=397) [radiance]   attn_vit              head_dim=72 gqa=1 causal=0 q_dtype=bf16 kv_dtype=bf16
+(EngineCore pid=397) [radiance]                         -> attn_vit_h72_bf16
+(EngineCore pid=397) [radiance]   attn_prefill_paged    kv_dtype=fp8_e4m3 head_dim=256 gqa=6 block_size=16 causal=1 q_dtype=bf16
+(EngineCore pid=397) [radiance]                         -> attn_prefill_h256_gqa6_fp8kv  (asked 18x)
+(EngineCore pid=397) [radiance]   attn_prefill_paged    kv_dtype=bf16 head_dim=256 gqa=6 block_size=16 causal=1 q_dtype=bf16
+(EngineCore pid=397) [radiance]                         -> attn_prefill_h256_gqa6_bf16kv
+(EngineCore pid=397) [radiance]   attn_decode_paged     kv_dtype=fp8_e4m3 q_len=1 head_dim=256 gqa=6 block_size=16 causal=1 q_dtype=bf16
+(EngineCore pid=397) [radiance]                         -> attn_decode_h256_gqa6_fp8kv
+(EngineCore pid=397) [radiance]   attn_decode_paged     kv_dtype=bf16 q_len=1 head_dim=256 gqa=6 block_size=16 causal=1 q_dtype=bf16
+(EngineCore pid=397) [radiance]                         -> attn_decode_h256_gqa6_bf16kv
+(EngineCore pid=397) INFO 09-12 11:26:07 [core.py:348] init engine (profile, create kv cache, warmup model) took 43.42 s (compilation: 12.63 s)
+(EngineCore pid=397) INFO 09-12 11:26:07 [kernel.py:306] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'])
+(APIServer pid=1) INFO 09-12 11:26:07 [api_server.py:678] Supported tasks: ['generate']
+(APIServer pid=1) INFO 09-12 11:26:17 [hf.py:540] Detected the chat template content format to be 'openai'. You can set `--chat-template-content-format` to override this.
+(APIServer pid=1) WARNING 09-12 11:26:17 [model.py:1637] Default vLLM sampling parameters have been overridden by the model's `generation_config.json`: `{'temperature': 1.0, 'top_k': 20, 'top_p': 0.95}`. If this is not intended, please relaunch vLLM instance with `--generation-config vllm`.
+(APIServer pid=1) INFO 09-12 11:26:17 [api_server.py:682] Starting vLLM server on http://0.0.0.0:8000
+(APIServer pid=1) INFO 09-12 11:26:17 [launcher.py:37] Available routes are:
+(APIServer pid=1) INFO 09-12 11:26:17 [launcher.py:46] Route: /openapi.json, Methods: GET, HEAD
+(APIServer pid=1) INFO 09-12 11:26:17 [launcher.py:46] Route: /docs, Methods: GET, HEAD
+(APIServer pid=1) INFO 09-12 11:26:17 [launcher.py:46] Route: /docs/oauth2-redirect, Methods: GET, HEAD
+(APIServer pid=1) INFO 09-12 11:26:17 [launcher.py:46] Route: /redoc, Methods: GET, HEAD
+(APIServer pid=1) INFO 09-12 11:26:17 [launcher.py:46] Route: /load, Methods: GET
+(APIServer pid=1) INFO 09-12 11:26:17 [launcher.py:46] Route: /version, Methods: GET
+(APIServer pid=1) INFO 09-12 11:26:17 [launcher.py:46] Route: /health, Methods: GET
+(APIServer pid=1) INFO 09-12 11:26:17 [launcher.py:46] Route: /metrics, Methods: GET
+(APIServer pid=1) INFO 09-12 11:26:17 [launcher.py:46] Route: /tokenize, Methods: POST
+(APIServer pid=1) INFO 09-12 11:26:17 [launcher.py:46] Route: /detokenize, Methods: POST
+(APIServer pid=1) INFO 09-12 11:26:17 [launcher.py:46] Route: /v1/models, Methods: GET
+(APIServer pid=1) INFO 09-12 11:26:17 [launcher.py:46] Route: /ping, Methods: GET
+(APIServer pid=1) INFO 09-12 11:26:17 [launcher.py:46] Route: /ping, Methods: POST
+(APIServer pid=1) INFO 09-12 11:26:17 [launcher.py:46] Route: /invocations, Methods: POST
+(APIServer pid=1) INFO 09-12 11:26:17 [launcher.py:46] Route: /v1/chat/completions, Methods: POST
+(APIServer pid=1) INFO 09-12 11:26:17 [launcher.py:46] Route: /v1/chat/completions/batch, Methods: POST
+(APIServer pid=1) INFO 09-12 11:26:17 [launcher.py:46] Route: /v1/responses, Methods: POST
+(APIServer pid=1) INFO 09-12 11:26:17 [launcher.py:46] Route: /v1/responses/{response_id}, Methods: GET
+(APIServer pid=1) INFO 09-12 11:26:17 [launcher.py:46] Route: /v1/responses/{response_id}/cancel, Methods: POST
+(APIServer pid=1) INFO 09-12 11:26:17 [launcher.py:46] Route: /v1/completions, Methods: POST
+(APIServer pid=1) INFO 09-12 11:26:17 [launcher.py:46] Route: /v1/messages, Methods: POST
+(APIServer pid=1) INFO 09-12 11:26:17 [launcher.py:46] Route: /v1/messages/count_tokens, Methods: POST
+(APIServer pid=1) INFO 09-12 11:26:17 [launcher.py:46] Route: /generative_scoring, Methods: POST
+(APIServer pid=1) INFO 09-12 11:26:17 [launcher.py:46] Route: /scale_elastic_ep, Methods: POST
+(APIServer pid=1) INFO 09-12 11:26:17 [launcher.py:46] Route: /is_scaling_elastic_ep, Methods: POST
+(APIServer pid=1) INFO 09-12 11:26:17 [launcher.py:46] Route: /v1/chat/completions/render, Methods: POST
+(APIServer pid=1) INFO 09-12 11:26:17 [launcher.py:46] Route: /v1/completions/render, Methods: POST
+(APIServer pid=1) INFO 09-12 11:26:17 [launcher.py:46] Route: /v1/chat/completions/derender, Methods: POST
+(APIServer pid=1) INFO 09-12 11:26:17 [launcher.py:46] Route: /v1/completions/derender, Methods: POST
+(APIServer pid=1) INFO 09-12 11:26:17 [launcher.py:46] Route: /inference/v1/generate, Methods: POST
+(APIServer pid=1) INFO 09-12 11:26:17 [launcher.py:99] API server: waiting for HTTP server to start
+(APIServer pid=1) INFO:     Started server process [1]
+(APIServer pid=1) INFO:     Waiting for application startup.
+(APIServer pid=1) INFO:     Application startup complete.
+(APIServer pid=1) INFO 09-12 11:26:17 [launcher.py:105] API server: HTTP server started
+(APIServer pid=1) INFO:     172.17.0.1:45502 - "GET /health HTTP/1.1" 200 OK
+(EngineCore pid=397) WARNING 09-12 11:26:21 [jit_monitor.py:135] Triton kernel JIT compilation during inference: precopy_mamba_align_fused_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.
+(EngineCore pid=397) WARNING 09-12 11:26:21 [jit_monitor.py:135] Triton kernel JIT compilation during inference: postprocess_mamba_fused_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.
+(EngineCore pid=397) WARNING 09-12 11:26:21 [jit_monitor.py:135] Triton kernel JIT compilation during inference: _match_scan. This causes a latency spike; consider extending warmup to cover this shape/config.
+(EngineCore pid=397) WARNING 09-12 11:26:21 [jit_monitor.py:135] Triton kernel JIT compilation during inference: _match_gather. This causes a latency spike; consider extending warmup to cover this shape/config.
+(EngineCore pid=397) WARNING 09-12 11:26:21 [jit_monitor.py:135] Triton kernel JIT compilation during inference: _draft_head_int2. This causes a latency spike; consider extending warmup to cover this shape/config.
+(EngineCore pid=397) WARNING 09-12 11:26:21 [jit_monitor.py:135] Triton kernel JIT compilation during inference: _rerank_exact. This causes a latency spike; consider extending warmup to cover this shape/config.
+(EngineCore pid=397) WARNING 09-12 11:26:21 [jit_monitor.py:135] Triton kernel JIT compilation during inference: _cap_s1. This causes a latency spike; consider extending warmup to cover this shape/config.
+(EngineCore pid=397) WARNING 09-12 11:26:21 [jit_monitor.py:135] Triton kernel JIT compilation during inference: _cap_s2_local. This causes a latency spike; consider extending warmup to cover this shape/config.
+(EngineCore pid=397) WARNING 09-12 11:26:21 [jit_monitor.py:135] Triton kernel JIT compilation during inference: eagle_step_slot_mapping_metadata_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.
+(EngineCore pid=397) WARNING 09-12 11:26:21 [jit_monitor.py:135] Triton kernel JIT compilation during inference: expand_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.
+(EngineCore pid=397) WARNING 09-12 11:26:21 [jit_monitor.py:135] Triton kernel JIT compilation during inference: _topk_topp_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.
+(APIServer pid=1) INFO:     172.17.0.1:45514 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+(APIServer pid=1) INFO:     172.17.0.1:45516 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+(APIServer pid=1) INFO:     172.17.0.1:45520 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+(APIServer pid=1) INFO 09-12 11:26:27 [loggers.py:310] Engine 000: Avg prompt throughput: 5.8 tokens/s, Avg generation throughput: 2.9 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%
+(APIServer pid=1) INFO 09-12 11:26:27 [metrics.py:120] SpecDecoding metrics: Mean acceptance length: 3.19, Accepted throughput: 2.29 tokens/s, Drafted throughput: 6.53 tokens/s, Accepted: 46 tokens, Drafted: 131 tokens, Per-position acceptance rate: 0.619, 0.429, 0.238, 0.190, 0.190, 0.190, 0.190, 0.143, Avg Draft acceptance rate: 35.1%
+(APIServer pid=1) INFO 09-12 11:26:37 [loggers.py:310] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%
+(EngineCore pid=397) WARNING 09-12 11:27:07 [jit_monitor.py:135] Triton kernel JIT compilation during inference: _triton_w4a16_skinny_fmt_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.
+(APIServer pid=1) INFO:     172.17.0.1:34576 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+(APIServer pid=1) INFO 09-12 11:27:17 [loggers.py:310] Engine 000: Avg prompt throughput: 3231.4 tokens/s, Avg generation throughput: 25.6 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%
+(APIServer pid=1) INFO 09-12 11:27:17 [metrics.py:120] SpecDecoding metrics: Mean acceptance length: 3.79, Accepted throughput: 3.80 tokens/s, Drafted throughput: 7.78 tokens/s, Accepted: 190 tokens, Drafted: 389 tokens, Per-position acceptance rate: 0.721, 0.500, 0.471, 0.368, 0.279, 0.235, 0.132, 0.088, Avg Draft acceptance rate: 48.8%
+(APIServer pid=1) INFO:     172.17.0.1:58804 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+(APIServer pid=1) INFO 09-12 11:27:27 [loggers.py:310] Engine 000: Avg prompt throughput: 530.0 tokens/s, Avg generation throughput: 32.2 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 50.5%, Prefix cache hit rate: 61.1%
+(APIServer pid=1) INFO 09-12 11:27:27 [metrics.py:120] SpecDecoding metrics: Mean acceptance length: 3.92, Accepted throughput: 24.20 tokens/s, Drafted throughput: 45.49 tokens/s, Accepted: 242 tokens, Drafted: 455 tokens, Per-position acceptance rate: 0.843, 0.602, 0.446, 0.361, 0.241, 0.181, 0.133, 0.108, Avg Draft acceptance rate: 53.2%
+(APIServer pid=1) INFO:     172.17.0.1:43468 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+(APIServer pid=1) INFO 09-12 11:27:37 [loggers.py:310] Engine 000: Avg prompt throughput: 264.8 tokens/s, Avg generation throughput: 23.4 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 50.5%, Prefix cache hit rate: 68.8%
+(APIServer pid=1) INFO 09-12 11:27:37 [metrics.py:120] SpecDecoding metrics: Mean acceptance length: 2.53, Accepted throughput: 14.10 tokens/s, Drafted throughput: 31.20 tokens/s, Accepted: 141 tokens, Drafted: 312 tokens, Per-position acceptance rate: 0.641, 0.391, 0.250, 0.109, 0.076, 0.033, 0.022, 0.011, Avg Draft acceptance rate: 45.2%
+(APIServer pid=1) INFO:     172.17.0.1:39730 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+(APIServer pid=1) INFO 09-12 11:27:47 [loggers.py:310] Engine 000: Avg prompt throughput: 264.9 tokens/s, Avg generation throughput: 27.7 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 50.5%, Prefix cache hit rate: 73.4%
+(APIServer pid=1) INFO 09-12 11:27:47 [metrics.py:120] SpecDecoding metrics: Mean acceptance length: 3.10, Accepted throughput: 18.70 tokens/s, Drafted throughput: 39.00 tokens/s, Accepted: 187 tokens, Drafted: 390 tokens, Per-position acceptance rate: 0.787, 0.472, 0.315, 0.213, 0.135, 0.101, 0.056, 0.022, Avg Draft acceptance rate: 47.9%
+(APIServer pid=1) INFO:     172.17.0.1:55402 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+(APIServer pid=1) INFO 09-12 11:27:57 [loggers.py:310] Engine 000: Avg prompt throughput: 264.8 tokens/s, Avg generation throughput: 32.6 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 50.5%, Prefix cache hit rate: 76.5%
+(APIServer pid=1) INFO 09-12 11:27:57 [metrics.py:120] SpecDecoding metrics: Mean acceptance length: 3.70, Accepted throughput: 24.00 tokens/s, Drafted throughput: 47.10 tokens/s, Accepted: 240 tokens, Drafted: 471 tokens, Per-position acceptance rate: 0.809, 0.528, 0.393, 0.303, 0.247, 0.180, 0.135, 0.101, Avg Draft acceptance rate: 51.0%
+(APIServer pid=1) INFO:     172.17.0.1:44816 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+(APIServer pid=1) INFO 09-12 11:28:07 [loggers.py:310] Engine 000: Avg prompt throughput: 265.2 tokens/s, Avg generation throughput: 29.1 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 50.5%, Prefix cache hit rate: 78.6%
+(APIServer pid=1) INFO 09-12 11:28:07 [metrics.py:120] SpecDecoding metrics: Mean acceptance length: 3.24, Accepted throughput: 20.20 tokens/s, Drafted throughput: 38.10 tokens/s, Accepted: 202 tokens, Drafted: 381 tokens, Per-position acceptance rate: 0.778, 0.544, 0.333, 0.189, 0.122, 0.111, 0.100, 0.067, Avg Draft acceptance rate: 53.0%
+(APIServer pid=1) INFO:     172.17.0.1:44826 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+(APIServer pid=1) INFO 09-12 11:28:17 [loggers.py:310] Engine 000: Avg prompt throughput: 264.8 tokens/s, Avg generation throughput: 29.4 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 50.5%, Prefix cache hit rate: 80.3%
+(APIServer pid=1) INFO 09-12 11:28:17 [metrics.py:120] SpecDecoding metrics: Mean acceptance length: 3.31, Accepted throughput: 20.60 tokens/s, Drafted throughput: 39.70 tokens/s, Accepted: 206 tokens, Drafted: 397 tokens, Per-position acceptance rate: 0.719, 0.461, 0.360, 0.270, 0.169, 0.135, 0.124, 0.079, Avg Draft acceptance rate: 51.9%

@@ -1,0 +1,1 @@
+pp32768/tg2048 run INTERRUPTED 2026-09-11 ~21:10 by operator decision (rule 18): ROCM_ATTN fallback decode kernel grid (1,4) -> 2.8 tok/s at 32k depth (engine-log gauge), ~40 min remaining; not a result.

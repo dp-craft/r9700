@@ -1,0 +1,5 @@
+starting on :8000 (pid/pgid 310004, MTP=1) — log: /home/dev/work/dp-craft/amd/bench/.servers/8000.log
+up after 371s — model: qwen38-27b-int4 — VRAM 26059/32624 MiB
+linear kernel(s) selected:
+  (EngineCore pid=310335) INFO 09-12 09:16:23 [compressed_tensors_wNa16.py:137] Using RDNAHybridW4A16LinearKernel for CompressedTensorsWNA16
+cmdline: VLLM_ROCM_USE_AITER=0 HSA_OVERRIDE_GFX_VERSION=12.0.1 LD_LIBRARY_PATH=/home/dev/work/dp-craft/amd/bench/dl/vllm-venv/mpi-libs /home/dev/work/dp-craft/amd/bench/dl/vllm-venv/bin/vllm serve /home/dev/models/vllm/Qwen3.8-27B-INT4 --served-model-name qwen38-27b-int4 --host 127.0.0.1 --port 8000 --language-model-only --max-model-len 36864 --max-num-batched-tokens 16384 --max-num-seqs 4 --gpu-memory-utilization 0.90 --mamba-backend triton --no-enable-prefix-caching --speculative-config {"method":"mtp","num_speculative_tokens":3} --attention-backend TRITON_ATTN

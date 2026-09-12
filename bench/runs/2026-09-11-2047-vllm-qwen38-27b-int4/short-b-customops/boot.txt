@@ -1,0 +1,17 @@
+starting on :8000 (pid/pgid 317398, MTP=0) — log: /home/dev/work/dp-craft/amd/bench/.servers/8000.log
+server DIED during startup — last log lines:
+(APIServer pid=317398)            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=317398)   File "/home/dev/work/dp-craft/amd/bench/dl/vllm-venv/lib/python3.12/site-packages/vllm/tracing/otel.py", line 178, in sync_wrapper
+(APIServer pid=317398)     return func(*args, **kwargs)
+(APIServer pid=317398)            ^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=317398)   File "/home/dev/work/dp-craft/amd/bench/dl/vllm-venv/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 991, in __init__
+(APIServer pid=317398)     super().__init__(
+(APIServer pid=317398)   File "/home/dev/work/dp-craft/amd/bench/dl/vllm-venv/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 609, in __init__
+(APIServer pid=317398)     with launch_core_engines(
+(APIServer pid=317398)   File "/usr/lib/python3.12/contextlib.py", line 144, in __exit__
+(APIServer pid=317398)     next(self.gen)
+(APIServer pid=317398)   File "/home/dev/work/dp-craft/amd/bench/dl/vllm-venv/lib/python3.12/site-packages/vllm/v1/engine/utils.py", line 1240, in launch_core_engines
+(APIServer pid=317398)     wait_for_engine_startup(
+(APIServer pid=317398)   File "/home/dev/work/dp-craft/amd/bench/dl/vllm-venv/lib/python3.12/site-packages/vllm/v1/engine/utils.py", line 1320, in wait_for_engine_startup
+(APIServer pid=317398)     raise RuntimeError(
+(APIServer pid=317398) RuntimeError: Engine core initialization failed. See root cause above. Failed core proc(s): {'EngineCore': 1}

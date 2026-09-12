@@ -1,0 +1,110 @@
+===== vLLM window boot-matrix  2026-09-12 18:44:35 =====
+image=stilldeadcode/vllm-radiance:0.9.3 model=/home/dev/models/vllm/Qwen3.8-27B-INT4 floor=29000MiB
+
+########## w1-ctx112k-mtp3 — shipped row as generated  (18:44:35)
+   ctx=114688 mtp=3 np=4 kv=auto extra=''
+   verdict=REFUSED after 268s
+arm=w1-ctx112k-mtp3 ctx=114688 mtp=3 np=4 kv=auto verdict=REFUSED secs=268
+   Available KV cache memory: 4.35 GiB
+   Model loading took 17.8 GiB
+   Setting attention block size to 1600 tokens
+   ! larger than the available KV cache memory (4.35 GiB). Based on the available memory, the estimated ma
+
+########## w2-ctx112k-mtp3-fp8 — fp8 KV as the window enabler  (18:49:14)
+   ctx=114688 mtp=3 np=4 kv=fp8 extra=''
+   verdict=POOL-SIZED after 222s
+arm=w2-ctx112k-mtp3-fp8 ctx=114688 mtp=3 np=4 kv=fp8 verdict=POOL-SIZED secs=222
+   Available KV cache memory: 5.5 GiB
+   GPU KV cache size: 138,416 tokens
+   Maximum concurrency for 114,688 tokens per request: 1.21x
+   Model loading took 17.8 GiB
+   Setting attention block size to 1600 tokens
+
+########## w3-ctx112k-mtp0 — is MTP the blocker?  (18:53:06)
+   ctx=114688 mtp=0 np=4 kv=auto extra=''
+   verdict=POOL-SIZED after 282s
+arm=w3-ctx112k-mtp0 ctx=114688 mtp=0 np=4 kv=auto verdict=POOL-SIZED secs=282
+   Available KV cache memory: 7.13 GiB
+   GPU KV cache size: 213,606 tokens
+   Maximum concurrency for 114,688 tokens per request: 1.86x
+   Model loading took 16.68 GiB
+   Setting attention block size to 1568 tokens
+
+########## w4-ctx112k-mtp3-np1 — is max-num-seqs the lever?  (18:58:00)
+   ctx=114688 mtp=3 np=1 kv=auto extra=''
+   verdict=POOL-SIZED after 279s
+arm=w4-ctx112k-mtp3-np1 ctx=114688 mtp=3 np=1 kv=auto verdict=POOL-SIZED secs=279
+   Available KV cache memory: 4.76 GiB
+   GPU KV cache size: 119,961 tokens
+   Maximum concurrency for 114,688 tokens per request: 1.05x
+   Model loading took 17.8 GiB
+   Setting attention block size to 1600 tokens
+
+########## c1-ctx36k-mtp8 — re-measure shipped baseline (spread)  (19:02:49)
+   ctx=36864 mtp=8 np=4 kv=auto extra=''
+   verdict=POOL-SIZED after 303s
+arm=c1-ctx36k-mtp8 ctx=36864 mtp=8 np=4 kv=auto verdict=POOL-SIZED secs=303
+   Available KV cache memory: 5.04 GiB
+   GPU KV cache size: 65,381 tokens
+   Maximum concurrency for 36,864 tokens per request: 1.77x
+   Model loading took 17.8 GiB
+   Setting attention block size to 1648 tokens
+
+########## c2-ctx36k-mtp3 — MTP-3 pool at the known window  (19:08:02)
+   ctx=36864 mtp=3 np=4 kv=auto extra=''
+   verdict=POOL-SIZED after 310s
+arm=c2-ctx36k-mtp3 ctx=36864 mtp=3 np=4 kv=auto verdict=POOL-SIZED secs=310
+   Available KV cache memory: 4.33 GiB
+   GPU KV cache size: 78,454 tokens
+   Maximum concurrency for 36,864 tokens per request: 2.13x
+   Model loading took 17.8 GiB
+   Setting attention block size to 1600 tokens
+
+########## c3-ctx36k-mtp0 — MTP-0, prefix caching ON (confound)  (19:13:24)
+   ctx=36864 mtp=0 np=4 kv=auto extra=''
+   verdict=EXITED after 206s
+arm=c3-ctx36k-mtp0 ctx=36864 mtp=0 np=4 kv=auto verdict=EXITED secs=206
+
+########## c4-ctx36k-mtp8-fp8 — fp8 KV delta at a fixed window  (19:17:00)
+   ctx=36864 mtp=8 np=4 kv=fp8 extra=''
+   verdict=EXITED after 310s
+arm=c4-ctx36k-mtp8-fp8 ctx=36864 mtp=8 np=4 kv=fp8 verdict=EXITED secs=310
+
+===== done 19:22:29 — summary: bench/runs/2026-09-12-1844-vllm-window-bootmatrix/summary.txt =====
+arm=w1-ctx112k-mtp3 ctx=114688 mtp=3 np=4 kv=auto verdict=REFUSED secs=268
+   Available KV cache memory: 4.35 GiB
+   Model loading took 17.8 GiB
+   Setting attention block size to 1600 tokens
+   ! larger than the available KV cache memory (4.35 GiB). Based on the available memory, the estimated ma
+arm=w2-ctx112k-mtp3-fp8 ctx=114688 mtp=3 np=4 kv=fp8 verdict=POOL-SIZED secs=222
+   Available KV cache memory: 5.5 GiB
+   GPU KV cache size: 138,416 tokens
+   Maximum concurrency for 114,688 tokens per request: 1.21x
+   Model loading took 17.8 GiB
+   Setting attention block size to 1600 tokens
+arm=w3-ctx112k-mtp0 ctx=114688 mtp=0 np=4 kv=auto verdict=POOL-SIZED secs=282
+   Available KV cache memory: 7.13 GiB
+   GPU KV cache size: 213,606 tokens
+   Maximum concurrency for 114,688 tokens per request: 1.86x
+   Model loading took 16.68 GiB
+   Setting attention block size to 1568 tokens
+arm=w4-ctx112k-mtp3-np1 ctx=114688 mtp=3 np=1 kv=auto verdict=POOL-SIZED secs=279
+   Available KV cache memory: 4.76 GiB
+   GPU KV cache size: 119,961 tokens
+   Maximum concurrency for 114,688 tokens per request: 1.05x
+   Model loading took 17.8 GiB
+   Setting attention block size to 1600 tokens
+arm=c1-ctx36k-mtp8 ctx=36864 mtp=8 np=4 kv=auto verdict=POOL-SIZED secs=303
+   Available KV cache memory: 5.04 GiB
+   GPU KV cache size: 65,381 tokens
+   Maximum concurrency for 36,864 tokens per request: 1.77x
+   Model loading took 17.8 GiB
+   Setting attention block size to 1648 tokens
+arm=c2-ctx36k-mtp3 ctx=36864 mtp=3 np=4 kv=auto verdict=POOL-SIZED secs=310
+   Available KV cache memory: 4.33 GiB
+   GPU KV cache size: 78,454 tokens
+   Maximum concurrency for 36,864 tokens per request: 2.13x
+   Model loading took 17.8 GiB
+   Setting attention block size to 1600 tokens
+arm=c3-ctx36k-mtp0 ctx=36864 mtp=0 np=4 kv=auto verdict=EXITED secs=206
+arm=c4-ctx36k-mtp8-fp8 ctx=36864 mtp=8 np=4 kv=fp8 verdict=EXITED secs=310

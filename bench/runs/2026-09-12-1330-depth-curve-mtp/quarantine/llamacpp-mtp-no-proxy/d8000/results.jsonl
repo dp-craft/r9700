@@ -1,0 +1,4 @@
+{"kind": "request", "label": "cr8000", "engine": "llamacpp-vulkan-mtp", "rep": 0, "stream": 0, "concurrency": 1, "prefix_mode": "unique", "error": "<urlopen error [Errno 111] Connection refused>"}
+{"kind": "request", "label": "cr8000", "engine": "llamacpp-vulkan-mtp", "rep": 1, "stream": 0, "concurrency": 1, "prefix_mode": "unique", "error": "<urlopen error [Errno 111] Connection refused>"}
+{"kind": "request", "label": "cr8000", "engine": "llamacpp-vulkan-mtp", "rep": 2, "stream": 0, "concurrency": 1, "prefix_mode": "unique", "error": "<urlopen error [Errno 111] Connection refused>"}
+{"kind": "aggregate", "label": "cr8000", "engine": "llamacpp-vulkan-mtp", "error": "all requests failed"}

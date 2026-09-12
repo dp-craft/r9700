@@ -1,0 +1,2 @@
+arm: TRITON_ATTN + cudagraph_mode=NONE (eager dispatch, no HIP graph replay)
+hypothesis: the ~19.5us per-kernel floor is tied to full-CUDA-graph decode steps; same kernels ran 1.2-2.5us in the eager prefill step

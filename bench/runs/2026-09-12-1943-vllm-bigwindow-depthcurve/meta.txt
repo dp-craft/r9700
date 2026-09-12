@@ -1,0 +1,21 @@
+run: big-window depth curve, llama.cpp 200k row vs vLLM/radiance 114688 row
+started: 2026-09-12 19:43 | done 20:22
+gpu: AMD Radeon AI PRO R9700 (RDNA4 gfx1201) 32624 MiB | HSA_OVERRIDE_GFX_VERSION=12.0.1
+host: Ryzen 5 3600, 31 GB RAM | kernel 7.0.0-31-generic | ROCm 10.0.0 host | Mesa 26.2.2
+vllm image: stilldeadcode/vllm-radiance:0.9.3 @ sha256:45694209177a55a1ab3ba6702fe6e978b1b66a6e66ae3fc066f8d579f7bc4c25
+            (vLLM 0.27.1, torch 2.11.0+rocm7.14; image ENV reports RADIANCE_VERSION=0.6.2)
+vllm model: RedHatAI/Qwen3.8-27B-INT4 @ bf08f3db (compressed-tensors W4A16 g128) -> /home/dev/models/vllm/Qwen3.8-27B-INT4
+vllm fixed args: --language-model-only --max-num-batched-tokens 16384 --gpu-memory-utilization 0.90
+                 --attention-backend R4D --enable-prefix-caching --mamba-cache-mode align --no-async-scheduling
+                 MTP: --speculative-config {method:mtp, num_speculative_tokens:S, attention_backend:R4D, disable_padded_drafter_batch:true}
+vllm env: VLLM_ROCM_USE_AITER=1 VLLM_ROCM_USE_AITER_UNIFIED_ATTENTION=1 (all other AITER sub-flags 0)
+          RADIANCE_FAST_DRAFT=1 RADIANCE_DRAFT_TAU=0.28 RADIANCE_SKINNY_GEMM=all
+ARM A: llama.cpp b10909-vulkan (commit a2878d3), llama-swap row qwen38-27b-q4kxl-q8-mtp-ctx200000-kvq8-mtp-sharp-planning
+       Qwen3.8-27B-UD-Q4_K_XL.gguf (17559178144 bytes) -c 200000 -ctk q8_0 -ctv q8_0 -np 1 --kv-unified -ngl 99
+       -fa on -ub 2048 -b 4096 --jinja --spec-type draft-mtp, sharp chat template
+ARM B: vLLM --max-model-len 114688, MTP S=3, --max-num-seqs 4, kv auto (booted directly as container radiance-depthcurve)
+probe: bench/lib/capture_engine.py probe --prefix-mode unique --api chat --max-tokens 256 --temperature 0.2 --reps 3 --warmup 1
+fixtures: bench/workloads/generated/codereview-{8000,20000,40000,100000}.txt
+memory: <arm>/gpu_samples.csv (bench/lib/vram_sampler.py)
+scripts: scripts/depthcurve_bigwindow.sh (printer/fit key names fixed AFTER the run), scripts/summarize_depth.py
+analysis: docs/analysis/2026-09-12-1535-vllm-window-budgets-and-rocm-knobs.md §2d

@@ -1,0 +1,19 @@
+QUARANTINED (iron rule 18) — not results. Re-collected as <arm>-rerun in the parent dir.
+
+w1-ctx112k-mtp3      REFUSED, "Available KV cache memory: 4.35 GiB", estimated max model len 108800.
+                     CONTAMINATED: a llama-server started in ANOTHER session held VRAM during the arm
+                     (user-reported). Clean re-collection w1-ctx112k-mtp3-rerun: 5.50 GiB, pool 138,416,
+                     BOOTS. The REFUSED verdict was never real.
+c3-ctx36k-mtp0       verdict=EXITED after 206s. Same contention (user-reported OOM).
+c4-ctx36k-mtp8-fp8   verdict=EXITED after 310s. Same contention.
+                     BOTH LOST THEIR DIAGNOSTICS to a script bug: bootmatrix.sh used `docker run --rm`, so
+                     the exited container was removed and the follow-up `docker logs` overwrote server.log
+                     with "No such container". Fixed in scripts/bootarm.sh (no --rm; never overwrite a good
+                     log with a failed capture).
+
+gpu_exclusive.sh passed before every one of these arms (>=29000 MiB free). It proves the card is free
+BEFORE boot; it cannot prove it STAYS free while llama-swap reloads on demand for another client.
+
+SUSPECT, NOT QUARANTINED (kept in place, flagged in the analysis, re-collection pending):
+w4-ctx112k-mtp3-np1  4.76 GiB and c2-ctx36k-mtp3 4.33 GiB — same depressed-availability signature as
+                     w1, no direct evidence of contention. Do not cite either without re-collecting.

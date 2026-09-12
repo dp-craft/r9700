@@ -1,0 +1,35 @@
+===== T1 shared-body / divergent-tail @32k  2026-09-12 13:19:18 =====
+
+##### ARM A: llama.cpp Vulkan + MTP  13:19:18
+  warmup http=200 62.356968s
+  warmup http=200 0.997462s
+   #    regime   ptok   ttft_s   prefill  decode
+   1      COLD  32426   38.167     853.5   48.96
+   2   partial  32425    3.335     625.6   46.55
+   3   partial  32429    3.364     621.6   51.19
+   4   partial  32425    3.323     626.8   55.07
+   5  full-hit  32426    3.369     618.4   48.90
+   6  full-hit  32425    3.334     624.9   46.33
+   7  full-hit  32429    3.376     618.2   52.82
+   8  full-hit  32425    3.348     622.4   57.24
+  mem: load_vram_used_mib=27096 peak_vram_used_mib=27373 peak_gtt_used_mib=1925 avg_power_w=187.8 peak_power_w=281.0 peak_temp_c=65.0 avg_sclk_mhz=2125.4 peak_sclk_mhz=2912.0 avg_mclk_mhz=1137.9 peak_mclk_mhz=1258.0 avg_gpu_busy_pct=83.9 peak_gpu_busy_pct=100.0 samples=95
+  unload http=200
+
+##### ARM B: vllm-radiance R4D + MTP8  13:22:18
+llama-swap /unload -> HTTP 200
+GPU exclusive: 32170 MiB free (used 454 MiB), floor 29000 MiB.
+  boot ok=1 after 242s
+  warmup http=200 1.060441s
+  warmup http=200 1.351809s
+   #    regime   ptok   ttft_s   prefill  decode
+   1      COLD  32313   44.312     729.2   47.78
+   2   partial  32312    2.760   11706.0   44.32
+   3   partial  32316    2.406   13429.2   33.20
+   4   partial  32312    2.413   13391.9   35.16
+   5  full-hit  32313    2.414   13382.9   48.26
+   6  full-hit  32312    2.426   13317.4   36.85
+   7  full-hit  32316    2.434   13274.4   42.30
+   8  full-hit  32312    2.437   13258.6   34.52
+  mem: load_vram_used_mib=26314 peak_vram_used_mib=30148 peak_gtt_used_mib=60 avg_power_w=204.5 peak_power_w=273.0 peak_temp_c=67.0 avg_sclk_mhz=2438.8 peak_sclk_mhz=3006.0 avg_mclk_mhz=1190.5 peak_mclk_mhz=1258.0 avg_gpu_busy_pct=95.2 peak_gpu_busy_pct=100.0 samples=105
+
+===== T1 done 13:28:21 =====

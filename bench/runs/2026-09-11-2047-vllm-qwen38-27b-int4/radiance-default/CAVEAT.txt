@@ -1,0 +1,6 @@
+R1 (prefill 1381.0 / decode 9.93) ran MISCONFIGURED per the image README:
+  - VLLM_ROCM_USE_AITER=1 / VLLM_ROCM_USE_AITER_UNIFIED_ATTENTION=1 not set (tuned attention path off)
+  - --language-model-only omitted -> vision tower loaded
+  - no persistent Triton/inductor cache -> cold, partly un-autotuned kernels
+  - no --attention-backend, no MTP
+Keep for reference only; superseded by radiance-r4d / radiance-r4d-mtp.

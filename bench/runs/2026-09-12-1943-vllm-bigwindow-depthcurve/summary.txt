@@ -1,0 +1,20 @@
+
+### llamacpp-200k   (n=12 requests)
+  depth    ptok   prefill    ±sd   decode    ±sd   ttft_s  total_s   gen   n
+   8000    8297     890.0   62.6    67.40   0.45    11.67    15.47   256   3
+  20000   20236     882.4   10.8    57.43   4.57    23.96    28.42   256   3
+  40000   40137     804.8    2.9    49.48   3.29    51.56    56.73   256   3
+ 100000   98105     636.6    0.7    35.43   1.06   158.60   165.81   256   3
+   fit prefill : exponent -0.136  R2 0.826
+   fit decode  : exponent -0.257  R2 0.965
+   fit total_s : exponent +0.964  R2 0.983
+
+### radiance-ctx114688-mtp3-kvauto   (n=12 requests)
+  depth    ptok   prefill    ±sd   decode    ±sd   ttft_s  total_s   gen   n
+   8000    8182    1242.2   46.9    42.11   0.53     6.59    12.65   256   3
+  20000   20123     807.4    0.5    43.43   3.38    24.92    30.82   256   3
+  40000   40023     768.0    0.3    50.56   2.05    52.12    57.17   256   3
+ 100000   97991     661.8    1.7    44.32   4.20   148.07   153.86   256   3
+   fit prefill : exponent -0.241  R2 0.877
+   fit decode  : exponent +0.035  R2 0.208
+   fit total_s : exponent +0.999  R2 0.998

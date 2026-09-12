@@ -1,0 +1,2 @@
+arm: TRITON_ATTN + FULL_AND_PIECEWISE graphs (default) + HIP_FORCE_DEV_KERNARG=1
+context: cudagraph NONE was WORSE (tg 13.23 vs 16.17) -> dispatch floor is real; test whether kernarg placement reduces it

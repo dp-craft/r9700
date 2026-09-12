@@ -1,0 +1,28 @@
+===== llama-swap load times (minimal prompt: "hi", max_tokens 1, streamed)  2026-09-12 13:46:19 =====
+idle before: vram=26404 MiB  containers=[llama-swap-qwen38-27b-int4-ctx36k-mtp-vllm ]
+
+--- A. vLLM (radiance) from IDLE ---
+  idle: vram=512 MiB
+  vLLM  cold (from idle)             http=200  TTF=    0.00 s  total= 235.45 s  vram=26332 MiB
+  vLLM  warm                         http=200  TTF=    0.05 s  total=   0.17 s  vram=26332 MiB
+  container: llama-swap-qwen38-27b-int4-ctx36k-mtp-vllm
+
+--- B. llama.cpp from IDLE ---
+  idle: vram=514 MiB  containers=[]
+  llama.cpp cold (from idle)         http=200  TTF=    0.00 s  total=  40.20 s  vram=27159 MiB
+  llama.cpp warm                     http=200  TTF=    0.04 s  total=   0.23 s  vram=27159 MiB
+
+--- C. direct swap llama.cpp -> vLLM (stop other + start) ---
+  vLLM  cold (swap from llama.cpp)   http=200  TTF=    0.00 s  total= 246.91 s  vram=26332 MiB
+  containers=[llama-swap-qwen38-27b-int4-ctx36k-mtp-vllm ]
+
+--- D. direct swap vLLM -> llama.cpp ---
+  llama.cpp cold (swap from vLLM)    http=200  TTF=    0.00 s  total=  40.77 s  vram=27156 MiB
+  containers=[]  vram=27156 MiB
+
+--- summary ---
+  engine         cold TTF   warm TTFT   load time   swap-in TTF
+  vLLM              0.00s       0.05s      -0.05s         0.00s
+  llama.cpp         0.00s       0.04s      -0.04s         0.00s
+  ratio vLLM/llama.cpp load: 1.2x
+===== done 13:56:22 =====

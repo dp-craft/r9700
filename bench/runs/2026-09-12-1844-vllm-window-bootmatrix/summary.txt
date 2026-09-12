@@ -1,0 +1,64 @@
+arm=w1-ctx112k-mtp3 ctx=114688 mtp=3 np=4 kv=auto verdict=REFUSED secs=268
+   Available KV cache memory: 4.35 GiB
+   Model loading took 17.8 GiB
+   Setting attention block size to 1600 tokens
+   ! larger than the available KV cache memory (4.35 GiB). Based on the available memory, the estimated ma
+arm=w2-ctx112k-mtp3-fp8 ctx=114688 mtp=3 np=4 kv=fp8 verdict=POOL-SIZED secs=222
+   Available KV cache memory: 5.5 GiB
+   GPU KV cache size: 138,416 tokens
+   Maximum concurrency for 114,688 tokens per request: 1.21x
+   Model loading took 17.8 GiB
+   Setting attention block size to 1600 tokens
+arm=w3-ctx112k-mtp0 ctx=114688 mtp=0 np=4 kv=auto verdict=POOL-SIZED secs=282
+   Available KV cache memory: 7.13 GiB
+   GPU KV cache size: 213,606 tokens
+   Maximum concurrency for 114,688 tokens per request: 1.86x
+   Model loading took 16.68 GiB
+   Setting attention block size to 1568 tokens
+arm=w4-ctx112k-mtp3-np1 ctx=114688 mtp=3 np=1 kv=auto verdict=POOL-SIZED secs=279
+   Available KV cache memory: 4.76 GiB
+   GPU KV cache size: 119,961 tokens
+   Maximum concurrency for 114,688 tokens per request: 1.05x
+   Model loading took 17.8 GiB
+   Setting attention block size to 1600 tokens
+arm=c1-ctx36k-mtp8 ctx=36864 mtp=8 np=4 kv=auto verdict=POOL-SIZED secs=303
+   Available KV cache memory: 5.04 GiB
+   GPU KV cache size: 65,381 tokens
+   Maximum concurrency for 36,864 tokens per request: 1.77x
+   Model loading took 17.8 GiB
+   Setting attention block size to 1648 tokens
+arm=c2-ctx36k-mtp3 ctx=36864 mtp=3 np=4 kv=auto verdict=POOL-SIZED secs=310
+   Available KV cache memory: 4.33 GiB
+   GPU KV cache size: 78,454 tokens
+   Maximum concurrency for 36,864 tokens per request: 2.13x
+   Model loading took 17.8 GiB
+   Setting attention block size to 1600 tokens
+arm=c3-ctx36k-mtp0 ctx=36864 mtp=0 np=4 kv=auto verdict=EXITED secs=206
+arm=c4-ctx36k-mtp8-fp8 ctx=36864 mtp=8 np=4 kv=fp8 verdict=EXITED secs=310
+arm=c3-ctx36k-mtp0-rerun ctx=36864 mtp=0 np=4 kv=auto verdict=POOL-SIZED
+   Available KV cache memory: 7.22 GiB
+   GPU KV cache size: 184,320 tokens
+   Maximum concurrency for 36,864 tokens per request: 5.00x
+   Model loading took 16.68 GiB
+   Setting attention block size to 1568 tokens
+arm=c3-ctx36k-mtp0-rerun ctx=36864 mtp=0 np=4 kv=auto verdict=POOL-SIZED
+   Available KV cache memory: 5.04 GiB
+   GPU KV cache size: 65,381 tokens
+   Maximum concurrency for 36,864 tokens per request: 1.77x
+   Model loading took 17.8 GiB
+   Setting attention block size to 1648 tokens
+arm=c3-ctx36k-mtp0-rerun ctx=114688 mtp=0 np=4 kv=auto verdict=POOL-SIZED
+   Available KV cache memory: 5.5 GiB
+   GPU KV cache size: 138,416 tokens
+   Maximum concurrency for 114,688 tokens per request: 1.21x
+   Model loading took 17.8 GiB
+   Setting attention block size to 1600 tokens
+
+===== ERRATA (added 2026-09-12 after the run) =====
+The three "arm=c3-ctx36k-mtp0-rerun" lines above are MISLABELLED (bootarm.sh hardcoded the label;
+fixed in scripts/bootarm.sh). Correct mapping, verified from each arm dir's own server.log
+(max_model_len / num_speculative_tokens / kv_cache_dtype):
+  1st rerun block (7.22 GiB, 184,320 tok, 1568)  = c3-ctx36k-mtp0-rerun     ctx=36864  mtp=0 kv=auto
+  2nd rerun block (5.04 GiB,  65,381 tok, 1648)  = c4-ctx36k-mtp8-fp8-rerun ctx=36864  mtp=8 kv=fp8
+  3rd rerun block (5.50 GiB, 138,416 tok, 1600)  = w1-ctx112k-mtp3-rerun    ctx=114688 mtp=3 kv=auto
+The original w1 / c3 / c4 rows above are QUARANTINED — see quarantine/CAVEAT.txt.

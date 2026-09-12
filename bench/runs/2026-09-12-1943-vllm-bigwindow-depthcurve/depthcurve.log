@@ -1,0 +1,26 @@
+===== big-window depth curve  2026-09-12 19:43:24 =====
+vllm: ctx=114688 mtp=3 np=4 kv=auto | depths=8000 20000 40000 100000 reps=3 max_tokens=256
+
+##### ARM A: llama.cpp qwen38-27b-q4kxl-q8-mtp-ctx200000-kvq8-mtp-sharp-planning  19:43:24
+  DEPTH   8000 ptok=None prefill=None decode=None ttft_p50=None n_ok=3 n_err=0
+  DEPTH  20000 ptok=None prefill=None decode=None ttft_p50=None n_ok=3 n_err=0
+  DEPTH  40000 ptok=None prefill=None decode=None ttft_p50=None n_ok=3 n_err=0
+  DEPTH 100000 ptok=None prefill=None decode=None ttft_p50=None n_ok=3 n_err=0
+
+##### ARM B: radiance ctx=114688 mtp=3 np=4 kv=auto  20:01:31
+  Available KV cache memory: 5.5 GiB
+  GPU KV cache size: 138,416 tokens
+  Maximum concurrency for 114,688 tokens per request: 1.21x
+  boot ok after 260s
+  DEPTH   8000 ptok=None prefill=None decode=None ttft_p50=None n_ok=3 n_err=0
+  DEPTH  20000 ptok=None prefill=None decode=None ttft_p50=None n_ok=3 n_err=0
+  DEPTH  40000 ptok=None prefill=None decode=None ttft_p50=None n_ok=3 n_err=0
+  DEPTH 100000 ptok=None prefill=None decode=None ttft_p50=None n_ok=3 n_err=0
+  -- draft acceptance --
+  Mean acceptance length: 3.97
+  Mean acceptance length: 2.71
+  Mean acceptance length: 2.96
+llamacpp-200k: <3 usable points, no fit
+radiance-ctx114688-mtp3-kvauto: <3 usable points, no fit
+skip bench/runs/2026-09-12-1943-vllm-bigwindow-depthcurve: no outputs.jsonl / results.jsonl / sweep-summary.json
+===== done 20:22:31 — bench/runs/2026-09-12-1943-vllm-bigwindow-depthcurve =====

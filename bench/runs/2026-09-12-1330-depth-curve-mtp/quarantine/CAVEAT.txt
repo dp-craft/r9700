@@ -1,0 +1,16 @@
+QUARANTINED (iron rule 18) — not a result.
+
+Arm A (llama.cpp + MTP via llama-swap) produced 4 rows of rc=2 / n_ok=None. Cause: the llama-swap
+proxy on :9292 was NOT RUNNING when the arm executed. Every request failed at connect
+(curl http=000 in 0.00015 s) and the vram_sampler recorded 454 MiB / 0% busy — i.e. an idle GPU,
+which is the positive proof no work ran.
+
+The proxy was alive at 12:5x (ss showed llama-swap pid 373895 on :9292) and gone by 12:57:41. It has
+no systemd unit; it is started manually via ~/llama_swap_start.sh. Nothing in this session killed it
+(the only GPU-touching step, gpu_exclusive.sh, ran AFTER this arm had already failed).
+
+MY BUG, and the reason the arm burned 26 s instead of aborting: t3_run.sh's warmup() printed
+http=000 and carried on. A readiness gate must assert the POSITIVE (benchmark-results rule 9);
+mine asserted nothing. Fixed in t3_armA.sh, which exits non-zero unless warmup returns HTTP 200.
+
+Re-collect with t3_armA.sh once the proxy is up.

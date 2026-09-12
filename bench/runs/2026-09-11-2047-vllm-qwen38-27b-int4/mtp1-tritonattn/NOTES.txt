@@ -1,0 +1,2 @@
+arm: MTP=1 (num_speculative_tokens=3) + TRITON_ATTN, default cudagraph mode, no profiler
+prediction (source-based): MTP verify has query_len>1, which disables the 3D split-KV attention path (max_seqlen_q>1) -> expect little/no gain at 32k depth

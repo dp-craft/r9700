@@ -1,0 +1,4 @@
+===== vLLM via llama-swap  2026-09-12 13:42:57 =====
+start: vram=514 MiB  containers=[]
+
+--- 1. cold boot through the proxy (first request blocks on the health gate) ---

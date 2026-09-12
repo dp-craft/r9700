@@ -1,0 +1,12 @@
+##### ARM A rerun: llama.cpp Vulkan + MTP (qwen38-27b-q4kxl-q8-mtp-ctx200000-kvq8-mtp-sharp-coding)  2026-09-12 13:10:45
+  proxy OK
+  warm-up OK (model loaded)
+  warm-up 2 http=200 1.008671s
+  props http=200
+DEPTH 8000 rc=0 prompt_tok=8295 prefill=905.6157074260487 decode=56.46834982209148 aggregate=18.36 ttft_p50=9.5745 ttft_p95=9.6172 n_ok=3 n_err=0 | load_vram_used_mib=27097 peak_vram_used_mib=27280 peak_gtt_used_mib=1879 avg_power_w=187.6 peak_power_w=284.0 peak_temp_c=63.0 avg_sclk_mhz=2240.7 peak_sclk_mhz=2914.0 avg_mclk_mhz=1112.8 peak_mclk_mhz=1258.0 avg_gpu_busy_pct=84.9 peak_gpu_busy_pct=100.0 samples=40
+DEPTH 12000 rc=0 prompt_tok=12211 prefill=889.3136151369366 decode=54.58106358158799 aggregate=13.56 ttft_p50=14.2971 ttft_p95=14.5734 n_ok=3 n_err=0 | load_vram_used_mib=27280 peak_vram_used_mib=27295 peak_gtt_used_mib=1886 avg_power_w=191.5 peak_power_w=272.0 peak_temp_c=67.0 avg_sclk_mhz=2043.5 peak_sclk_mhz=2758.0 avg_mclk_mhz=1145.4 peak_mclk_mhz=1258.0 avg_gpu_busy_pct=87.6 peak_gpu_busy_pct=100.0 samples=53
+DEPTH 20000 rc=0 prompt_tok=20235 prefill=864.1598027718786 decode=49.16017077664973 aggregate=8.7 ttft_p50=24.2806 ttft_p95=24.3831 n_ok=3 n_err=0 | load_vram_used_mib=27295 peak_vram_used_mib=27327 peak_gtt_used_mib=1902 avg_power_w=188.7 peak_power_w=255.0 peak_temp_c=68.0 avg_sclk_mhz=2134.0 peak_sclk_mhz=3084.0 avg_mclk_mhz=1159.0 peak_mclk_mhz=1258.0 avg_gpu_busy_pct=88.1 peak_gpu_busy_pct=100.0 samples=82
+DEPTH 32000 rc=0 prompt_tok=32428 prefill=819.4049014143482 decode=48.29282039161501 aggregate=5.56 ttft_p50=41.002 ttft_p95=41.0075 n_ok=3 n_err=0 | load_vram_used_mib=27327 peak_vram_used_mib=27374 peak_gtt_used_mib=1926 avg_power_w=196.9 peak_power_w=278.0 peak_temp_c=69.0 avg_sclk_mhz=2168.0 peak_sclk_mhz=2785.0 avg_mclk_mhz=1172.4 peak_mclk_mhz=1258.0 avg_gpu_busy_pct=93.6 peak_gpu_busy_pct=100.0 samples=127
+  unloading (GET; POST returns 405 — iron rule 14)
+  unload http=200
+##### arm A done 13:17:15

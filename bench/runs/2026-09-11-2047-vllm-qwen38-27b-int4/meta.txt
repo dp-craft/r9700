@@ -1,0 +1,10 @@
+run: bench/runs/2026-09-11-2047-vllm-qwen38-27b-int4  (vLLM spike — design docs/brainstorm/vllm-qwen38-r9700/vllm-qwen38-r9700.md)
+date: 2026-09-11T20:47:24+02:00
+host: 7.0.0-31-generic | AMDSMI Tool: 27.0.0+6b0e43f3 | AMDSMI Library version: 27.0.0 | ROCm version: 10.0.0 | amdgpu version: N/A | ionic version: N/A | hipconfig 7.15.26333-0000000
+gpu: AMD Radeon AI PRO R9700             gfx1201
+packages: amdsmi=26.2.2+c2d9476115 compressed-tensors=0.17.0 torch=2.12.0+git6bbd260 transformers=5.17.0 triton=3.7.1+gitf0b55c07 vllm=0.29.0+rocm723 
+mpi-libs: libevent-pthreads-2.1-7t64_2.1.12-stable-9ubuntu2.1_amd64.deb libhwloc15_2.10.0-1build1_amd64.deb libopenmpi3t64_4.1.6-7ubuntu2_amd64.deb 
+model: RedHatAI/Qwen3.8-27B-INT4 @ bf08f3dbd9a324e53956920aad378a1f1b6dd24a → ~/models/vllm/Qwen3.8-27B-INT4
+llama-benchy: llama-benchy 0.4.0
+launcher: start_vllm.sh (exact cmdline copied per arm into <arm>/cmdline.txt)
+baseline (indicative): docs/analysis/2026-09-11-1716-llamacpp-b10909-build-check.md
