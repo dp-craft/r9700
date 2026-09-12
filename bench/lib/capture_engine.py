@@ -172,6 +172,19 @@ def run_probe(a):
             return f"[stream-id {uuid.uuid4().hex[:12]} — unique per-request prefix]\n\n" + base
         if a.prefix_mode == "shared":
             return prompts[0]
+        if a.prefix_mode == "tail":
+            # SHARED BODY + DIVERGENT TAIL — the realistic agentic cache pattern, and the one the
+            # other three modes cannot express. `unique` prepends its marker at the FRONT, which
+            # moves token 0 and therefore defeats prefix caching completely; `shared` reuses the
+            # prompt byte-for-byte, which is a 100% hit and measures the cache's upper bound rather
+            # than its working behaviour. Real agents re-read the same repo and ask a DIFFERENT
+            # question about it, so only the last few hundred tokens differ.
+            # Always built on prompts[0] so every request shares one prefix regardless of how many
+            # --prompt-file were given. Falls back to a uuid line when no --tail is supplied, which
+            # still diverges the tail (partial hit) rather than matching exactly.
+            tails = a.tail or [f"[query-id {{}} — unique per-request tail]"]
+            t = tails[i % len(tails)]
+            return prompts[0] + "\n\n" + (t.format(uuid.uuid4().hex[:12]) if "{}" in t else t)
         return base
 
     def one(prompt, max_tokens):
@@ -322,7 +335,14 @@ def main():
     p.add_argument("--concurrency", type=int, default=1)
     p.add_argument("--reps", type=int, default=1, help="repeat the whole wave N times")
     p.add_argument("--warmup", type=int, default=1, help="untimed warm-up requests before measuring")
-    p.add_argument("--prefix-mode", choices=["none", "unique", "shared"], default="none")
+    p.add_argument("--prefix-mode", choices=["none", "unique", "shared", "tail"], default="none",
+                   help="none=verbatim, unique=uuid PREFIX (cold, defeats the cache), "
+                        "shared=byte-identical (100%% hit), tail=shared body + divergent tail "
+                        "(partial hit — the realistic agentic pattern)")
+    p.add_argument("--tail", action="append",
+                   help="prefix-mode=tail only: a tail appended to the shared body, cycled per "
+                        "request. Repeatable. A literal {} in the value is replaced by a random "
+                        "hex id. Omitted => one uuid-only tail.")
     p.add_argument("--api", choices=["completions", "chat"], default="completions")
     p.add_argument("--timeout", type=float, default=1200.0)
     p.set_defaults(func=run_probe)
