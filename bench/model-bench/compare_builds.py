@@ -39,7 +39,7 @@ RUNS = REPO / "bench/runs"
 DOCS = REPO / "docs/analysis"
 RUN_SH = REPO / "bench/model-bench/run.sh"
 GPU_EXCL = REPO / "bench/lib/gpu_exclusive.sh"
-BUILD_SH = "bench/build_llamacpp.sh"
+BUILD_SH = "llamacpp/build_llamacpp.sh"
 SWAP_DIR = pathlib.Path.home() / ".config/llama-swap"
 SWAP_PORT = 9292
 
@@ -79,11 +79,62 @@ def sh(cmd):
 
 
 def arm_name(ver, be):
+    """Return the *canonical* arm label (e.g. b10969-vulkan).  Does NOT include SDK suffixes."""
     return ver if ver.endswith(f"-{be}") else f"{ver}-{be}"
 
 
 def ver_of(name, be):
-    return name[: -len(f"-{be}")] if name.endswith(f"-{be}") else name
+    """Strip backend (and optional SDK suffix) to recover the bare version tag.
+
+    Handles:  b10969-vulkan,  b10969-vulkan-1.4.357.1,  /abs/path/b10969-vulkan-1.4.357.1
+    Returns:  b10969
+    """
+    base = pathlib.Path(name).name  # strip any directory prefix (absolute symlink residue)
+    # Pattern: <ver>-<backend>[-<sdk_suffix>]
+    # Find "-<backend>" in the basename and extract everything before it
+    sep = f"-{be}"
+    idx = base.find(sep)
+    if idx >= 0:
+        base = base[:idx]
+    return base
+
+
+def resolve_build(name, be):
+    """Resolve the actual build directory name, locating SDK-versioned Vulkan builds.
+
+    Given an arm label like "b10969-vulkan", glob for b10969-vulkan* and return the first
+    matching directory name.  Falls back to the original name if nothing matches (ROCm,
+    or a plain dir).  Returns the *basename* (not an absolute path) so it works with
+    the BUILD/ concatenation used throughout the script.
+    """
+    # Normalize: strip directory prefix if this came from an absolute symlink
+    base = pathlib.Path(name).name
+
+    # If the dir already exists as-is, use it (ROCm, or a Vulkan build without SDK suffix)
+    if (BUILD / base / "bin" / "llama-server").is_file():
+        return base
+
+    # Try globbing for SDK-suffixed variants (Vulkan: b10969-vulkan-1.4.357.1, b10969-vulkan-system)
+    pattern = f"{base}-*"
+    matches = sorted(BUILD.glob(pattern))
+    for m in matches:
+        if m.is_dir() and (m / "bin" / "llama-server").is_file():
+            return m.name
+    # Return original — caller will produce a meaningful error
+    return name
+
+
+def resolve_latest(be):
+    """Read the latest-<backend> symlink and return the *basename* of its target.
+
+    Handles both relative and absolute symlinks by resolving through readlink + Path.name.
+    Returns the basename so `resolve_build()` can locate the actual (possibly SDK-suffixed) dir.
+    """
+    link = BUILD / f"latest-{be}"
+    if not link.is_symlink():
+        return None
+    target = os.readlink(link)
+    return pathlib.Path(target).name
 
 
 def kfmt(n):
@@ -97,7 +148,8 @@ def shape_txt(s):
 def has_device(name, be):
     """Silent-CPU-fallback guard: release assets load GPU backends dynamically and DROP one whose runtime
     libs are missing (2026-09-11: b9950-rocm ran a 27B on the CPU, no error anywhere)."""
-    out = sh(f"'{BUILD / name / 'bin' / 'llama-server'}' --list-devices 2>&1")
+    actual = resolve_build(name, be)
+    out = sh(f"'{BUILD / actual / 'bin' / 'llama-server'}' --list-devices 2>&1")
     return re.search(rf"^\s*{DEVICE[be]}\d+:", out, re.M) is not None
 
 
@@ -213,25 +265,29 @@ def cmd_run(a):
            "reps": a.reps, "warmup": {"pp": WARMUP_PP, "pg": list(WARMUP_PG)}, "parallel": a.parallel}
     pairs = []
     for be in backends:
-        new = arm_name(a.new, be)
-        prev = getattr(a, f"prev_{be}")
-        if not prev:
-            link = BUILD / f"latest-{be}"
-            if not link.is_symlink():
+        new_label = arm_name(a.new, be)
+        prev_label = getattr(a, f"prev_{be}")
+        if not prev_label:
+            latest_base = resolve_latest(be)
+            if latest_base is None:
                 die(f"no previous build for {be}: build/latest-{be} unset — pass --prev-{be}")
-            prev = os.readlink(link)
-        prev = arm_name(prev, be)
-        if prev == new:
-            print(f"[{be}] skipped: {new} is already latest-{be} — nothing to compare")
+            prev_label = latest_base
+        # Compare version tags (strip backend + SDK suffix) for the "already latest" check
+        prev_ver = ver_of(prev_label, be)
+        if prev_ver == a.new:
+            print(f"[{be}] skipped: {a.new} is already latest-{be} — nothing to compare")
             continue
-        for n in (prev, new):
+        # Resolve to actual build directory names (may be SDK-suffixed for Vulkan)
+        new_actual = resolve_build(new_label, be)
+        prev_actual = resolve_build(prev_label, be)
+        for n in (prev_actual, new_actual):
             for tool in ["llama-bench"] + (["llama-batched-bench"] if a.parallel else []):
                 if not os.access(BUILD / n / "bin" / tool, os.X_OK):
                     die(f"[{be}] build/{n}/bin/{tool} missing — build it first ({BUILD_SH} build)")
             if not has_device(n, be):
                 die(f"[{be}] build/{n} exposes no {DEVICE[be]} device — it would silently run on the CPU "
                     "(missing runtime libs?)")
-        pairs.append((be, prev, new))
+        pairs.append((be, prev_actual, new_actual))
     if not pairs:
         die("nothing to compare")
     if not pathlib.Path(a.model).is_file():
