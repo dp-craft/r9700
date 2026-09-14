@@ -202,8 +202,49 @@ def start_swap():
 
 
 # ---------------------------------------------------------------- run
+def warmup_shaders(name, cfg, _cmp_dir):
+    """Run all shapes through llama-bench once to warm the Mesa RADV shader cache, then discard results.
+
+    Different Vulkan SDK versions produce different SPIR-V shaders (glslc v2023.8 vs v2026.3) so
+    the cache from a previous build's arm does NOT cover the new build. A cold cache adds ~5 min
+    of shader compilation overhead to the first arm, making cross-build comparisons invalid.
+    """
+    bench = BUILD / name / "bin" / "llama-bench"
+    label = f"{name} (warmup)"
+    ex = subprocess.run(["bash", str(GPU_EXCL)], capture_output=True, text=True)
+    if ex.returncode:
+        die(f"gpu_exclusive.sh refused before shader warmup {label} (GPU not free):\n{ex.stdout}{ex.stderr}")
+    env = {**os.environ, "LLAMA_BENCH": str(bench), "MODEL": cfg["model"], "UB": str(cfg["ub"]),
+           "BATCH": str(cfg["batch"]), "CTK": cfg["kv"], "CTV": cfg["kv"], "VRAM_SAMPLE": "0"}
+    pps = sorted({p for p, _ in cfg["shapes"]})
+    env.update(SLUG=f"warmup-{name}", PP=",".join(map(str, pps)), TG="0", DEPTH="0", NPL="",
+               PG=" ".join(f"{p},{g}" for p, g in cfg["shapes"]), WARMUP="0", REPS="1")
+    env.pop("LD_LIBRARY_PATH", None)
+    print(f"  warmup {label}: running …", flush=True)
+    t0 = time.time()
+    p = subprocess.Popen(["bash", str(RUN_SH)], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                         text=True, start_new_session=True)
+    try:
+        p.communicate(timeout=600)
+    except subprocess.TimeoutExpired:
+        os.killpg(p.pid, signal.SIGKILL)
+        p.communicate()
+        print(f"  warmup {label}: timed out after 10 min (discarded)", flush=True)
+    except BaseException:
+        os.killpg(p.pid, signal.SIGKILL)
+        raise
+    print(f"  warmup {label}: done in {time.time() - t0:.0f} s (discarded)", flush=True)
+
+
 def run_arm(name, be, cfg, cmp_dir, npl=0):
-    """One run.sh invocation: the request shapes (llama-bench), or with npl the concurrent test (batched-bench)."""
+    """One run.sh invocation: the request shapes (llama-bench), or with npl the concurrent test (batched-bench).
+
+    Shader warmup: if this is the first Vulkan arm with a b10969 SDK-suffixed build (new glslc produces
+    different SPIR-V not covered by previous build's cache), run warmup_shaders() first."""
+    # Shader warmup for b10969-vulkan builds: different SDK = different SPIR-V = cold cache
+    if be == "vulkan" and "b10969" in name and npl == 0:
+        warmup_shaders(name, cfg, cmp_dir)
+
     bench = BUILD / name / "bin" / "llama-bench"
     arm = {"name": name, "backend": be, "kind": "par" if npl else "shapes"}
     label = f"{name} ×{npl}" if npl else name
