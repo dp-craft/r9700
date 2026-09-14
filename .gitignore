@@ -1,10 +1,12 @@
-# compat symlinks into build/ (no trailing slash: a symlink is not a directory to git)
+# compat symlinks into builds/ (bench/ → ../build/ symlink → llamacpp/builds/)
 bench/llamacpp-vulkan-b10375
 bench/llamacpp-b10375
 bench/llamacpp-vulkan-6fdd0ac
 llama.cpp-src
-# llama.cpp builds: <ver>-src, <ver>-{vulkan,rocm}, latest-* — bench/build_llamacpp.sh
-build/
+# llama.cpp builds: symlink `build/` → llamacpp/builds/
+# (build/ itself is a symlink — git tracks symlink target, not contents)
+llamacpp/vulkansdk/
+llamacpp/builds/
 # IDE state + local skill backups
 .idea/
 .claude/skills/tmp/

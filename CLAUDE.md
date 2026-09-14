@@ -54,14 +54,17 @@ bench/                 ← two tracks (see bench/README.md); how-to in docs/GUID
   runs/              ← dated campaign outputs YYYY-MM-DD-HHMM-<slug>/ (results.jsonl/llama-bench.json)
   legacy/            ← ⚠️ FROZEN original harness (harness/ + old *.sh + *_results.jsonl); hardcodes
                        old path /home/dev/work/dippe/amd, does NOT run here; superseded. Reference only.
-build/               ← llama.cpp builds (gitignored): <ver>-src, <ver>-{vulkan,rocm}/bin (+BUILD_INFO), latest-*
-                       symlinks = what llama-swap serves. bench/llamacpp* + llama.cpp-src are compat symlinks
-                       into it. Fetch → build → bench vs previous → promote: /llamacpp-build
+build/               ← backward-compat symlink → llamacpp/builds/
+llamacpp/            ← llama.cpp build pipeline: build_llamacpp.sh, setup_vulkan.sh (Vulkan SDK)
+                       builds/ (gitignored): <ver>-src, <ver>-{vulkan,rocm}/bin (+BUILD_INFO), latest-*
+                       symlinks = what llama-swap serves. vulkansdk/ (gitignored): SDK downloads + installs
+                       Fetch → build → bench vs previous → promote: /llamacpp-build
 .claude/skills/
   research/               ← reproducible, sourced, hallucination-resistant web research
   benchmark-results/      ← run a benchmark AND document it to a fixed spec (memory column mandatory)
   benchmark-new-campaign/ ← design + scaffold a new campaign (judgement) → gen_campaign.py (emit)
-  llamacpp-build/         ← new llama.cpp: build_llamacpp.sh → compare_builds.py → promote latest-*
+  llamacpp-build/         ← new llama.cpp: llamacpp/build_llamacpp.sh → compare_builds.py → promote latest-*
+                       Vulkan SDK: llamacpp/setup_vulkan.sh (download, verify, update)
 ```
 
 **Never read (gitignored binaries / generated):** `bench/llamacpp*/`, `build/`, `bench/dl/`,
@@ -194,7 +197,7 @@ above. (Charts are now committed SVGs under `<campaign>/charts/`, embedded in `a
 | Grade deterministic tasks (final_match/pyexec/json_schema/constraints) | `…/finetune-quality/graders/score_deterministic.py` | `scores_deterministic.jsonl` |
 | Quality campaign → decision charts (theme-aware SVG + appendix.md) | `campaigns/2026-07-12-27b-finetune-quality/make_charts.py --dir out --charts charts [--order …] [+ out/sweeps.json for connected-parameter line charts]` | `charts/*.svg` + `appendix.md` |
 | Throughput run/campaign dir → theme-aware SVG charts + appendix.md | `bench/lib/report.py <run_dir>` (auto-run by gen_campaign's `run.sh`) | `charts/*.svg` + `appendix.md` |
-| Fetch + build a llama.cpp tag (vulkan+rocm), promote / roll back `latest-*` | `bench/build_llamacpp.sh build\|promote\|status` (skill **`/llamacpp-build`**) | `build/<ver>-{src,vulkan,rocm}` + `build/latest-*` |
+| Fetch + build a llama.cpp tag (vulkan+rocm), promote / roll back `latest-*` | `llamacpp/build_llamacpp.sh build\|promote\|status` (skill **`/llamacpp-build`**) | `llamacpp/builds/<ver>-{src,vulkan,rocm}` + `llamacpp/builds/latest-*` + Vulkan SDK (`llamacpp/setup_vulkan.sh`) |
 | New llama.cpp build vs previous (llama-bench request shapes pp128/tg64 … pp32768/tg2048 → verdict; optional `--parallel 2` = 2 concurrent 32k requests via llama-batched-bench) | `bench/model-bench/compare_builds.py run --new <ver> [--parallel 2]` | `docs/analysis/<stamp>-llamacpp-<ver>-build-check.md` + `VERDICT` line |
 
 If one of these is missing a capability, **extend the tool** (and say so) rather than writing a

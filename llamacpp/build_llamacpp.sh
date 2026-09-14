@@ -1,24 +1,27 @@
 #!/usr/bin/env bash
-# build_llamacpp.sh — fetch, build and promote llama.cpp under $REPO/build/ (skill: llamacpp-build).
+# build_llamacpp.sh — fetch, build and promote llama.cpp (skill: llamacpp-build).
 #
-#   build/<ver>-src          shallow checkout of upstream tag <ver> (bNNNNN)
-#   build/<ver>-<backend>    CMake binary dir, backend = vulkan|rocm: bin/ + BUILD_INFO
-#   build/latest-<backend>   symlink → the promoted <ver>-<backend>; llama-swap serves
-#                            build/latest-<backend>/bin/llama-server (generate.py VULKAN_BIN/ROCM_BIN)
+#   builds/<ver>-src          shallow checkout of upstream tag <ver> (bNNNNN)
+#   builds/<ver>-<backend>    CMake binary dir, backend = vulkan|rocm: bin/ + BUILD_INFO
+#   builds/latest-<backend>   symlink → the promoted <ver>-<backend>; llama-swap serves
+#                             builds/latest-<backend>/bin/llama-server (generate.py VULKAN_BIN/ROCM_BIN)
+#   (setup_vulkan.sh manages the self-contained Vulkan SDK under llamacpp/vulkansdk/)
 #
 # Usage:
-#   build_llamacpp.sh status                        latest-* targets, newest upstream tag, builds, disk
+#   build_llamacpp.sh status                        latest-* targets, newest upstream tag, builds, disk, SDK
 #   build_llamacpp.sh latest-tag                    newest upstream bNNNNN
 #   build_llamacpp.sh build [--tag VER] [--backend vulkan|rocm|both] [--jobs N]
 #                                                   default: newest tag, both backends. VER may also name
-#                                                   an existing non-tag build/<VER>-src (b10655-4-g6fdd0ac).
+#                                                   an existing non-tag builds/<VER>-src (b10655-4-g6fdd0ac).
 #                                                   Re-run resumes: src reused, CMake incremental, an
 #                                                   already verified build is skipped.
 #   build_llamacpp.sh promote VER [--backend ...]   latest-<backend> → <VER>-<backend> (also = rollback)
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BUILD="$REPO/build"
+BUILD="$REPO/llamacpp/builds"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SDK_SETUP="$SCRIPT_DIR/setup_vulkan.sh"
 UPSTREAM="https://github.com/ggml-org/llama.cpp.git"
 GPU_TARGET=gfx1201      # R9700 — CLAUDE.md fixpoint
 MIN_FREE_GB=5           # src ~0.1 GB + a build tree ~1-2 GB; the root fs runs ~90% full
@@ -34,6 +37,7 @@ export CC="$CC_BIN" CXX="$CXX_BIN"
 declare -A MB_PER_JOB=([vulkan]=1500 [rocm]=3000)
 
 die() { echo "build_llamacpp: $*" >&2; exit 1; }
+ok()  { echo "build_llamacpp: $*"; }
 
 latest_tag() {
   git ls-remote --tags --refs "$UPSTREAM" | awk -F/ '{print $3}' | grep -E '^b[0-9]+$' | sort -V | tail -1
@@ -83,16 +87,27 @@ fetch_src() {  # VER → ensures build/VER-src
 }
 
 build_one() {  # VER BACKEND JOBS
-  local ver=$1 be=$2 jobs=$3 src="$BUILD/$1-src" out="$BUILD/$1-$2" sha num t0
+  local ver=$1 be=$2 jobs=$3 sdk_ver="${SDK_VER:-}" src="$BUILD/$1-src" sha num t0
+  # Append SDK version to Vulkan build dir for traceability (rule 2)
+  local be_label=$2
+  if [ "$be" = "vulkan" ] && [ -n "$sdk_ver" ]; then
+    be_label="${2}-${sdk_ver}"
+  fi
+  local out="$BUILD/$1-${be_label}"
   local -a flags cenv=()
   sha=$(git -C "$src" rev-parse --short=7 HEAD)
   if [[ $ver =~ ^b([0-9]+) ]]; then num=${BASH_REMATCH[1]}; else num=0; fi
   if verify "$out" "$sha" "$num" "$be" 2>/dev/null; then
-    echo "[$be] $ver already built and verified: $out"; return 0
+    echo "[$be] $ver already built and verified: $out (SDK: $sdk_ver)"; return 0
   fi
   case $be in
-    vulkan) command -v glslc >/dev/null || die "[vulkan] glslc missing (Vulkan SDK)"
-            flags=(-DGGML_VULKAN=ON) ;;
+    vulkan)
+            command -v glslc >/dev/null || die "[vulkan] glslc missing (run: $SDK_SETUP update)"
+            flags=(-DGGML_VULKAN=ON)
+            if [ -n "${VULKAN_SDK:-}" ]; then
+                flags+=(-DVULKAN_SDK="$VULKAN_SDK" -DCMAKE_PREFIX_PATH="$VULKAN_SDK")
+            fi
+            ;;
     rocm)   command -v hipconfig >/dev/null || die "[rocm] hipconfig missing (ROCm)"
             # BUILD_RPATH on every target: RUNPATH is not transitive, so libggml-hip.so needs the ROCm
             # lib dir itself — ROCm is not in ld.so.cache and llama-swap sets no LD_LIBRARY_PATH (2026-09-11)
@@ -116,7 +131,14 @@ build_one() {  # VER BACKEND JOBS
   { echo "date=$(date -Iseconds)"; echo "ver=$ver"; echo "commit=$sha"; echo "backend=$be"
     echo "build_secs=$((SECONDS - t0))"; echo "jobs=$jobs"
     echo "cmake_flags=${flags[*]}"; echo "cxx=$("$CXX_BIN" --version | head -1)"
-    case $be in vulkan) echo "glslc=$(glslc --version | head -1)" ;; rocm) echo "hip=$(hipconfig --version)" ;; esac
+    case $be in
+        vulkan)
+            echo "glslc=$(glslc --version | head -1)"
+            echo "vulkan_sdk=${SDK_VER:-system}"
+            [ "${SDK_VER:-system}" != "system" ] && echo "vulkan_sdk_path=$REPO/llamacpp/vulkansdk/$SDK_VER"
+            ;;
+        rocm) echo "hip=$(hipconfig --version)" ;;
+    esac
     echo "version=$(version_line "$out")"
   } >"$out/BUILD_INFO"
   echo "[$be] OK in $(( (SECONDS - t0) / 60 )) min: $(version_line "$out")"
@@ -128,6 +150,35 @@ cmd_build() {
     --tag) tag=$2; shift 2 ;; --backend) be=$2; shift 2 ;; --jobs) jobs=$2; shift 2 ;;
     *) die "unknown build arg: $1" ;; esac; done
   list=$(parse_backend "$be")
+
+  # Init Vulkan SDK if building Vulkan backend
+  if echo "$list" | grep -q "vulkan"; then
+    # Ensure glslc is available: local SDK first, then system fallback
+    if [ -L "$REPO/llamacpp/vulkansdk/latest" ]; then
+      local sdk="$(readlink -f "$REPO/llamacpp/vulkansdk/latest")"
+      local glslc_path
+      glslc_path=$(find "$sdk" -name glslc -type f -executable 2>/dev/null | head -1)
+      if [ -n "$glslc_path" ]; then
+        export VULKAN_SDK="$sdk"
+        export PATH="$(dirname "$glslc_path"):$PATH"
+        SDK_VER=$(basename "$sdk")
+        ok "Vulkan SDK: $SDK_VER ($sdk)"
+      else
+        ok "SDK directory exists but glslc not found in $sdk"
+      fi
+    fi
+
+    # System fallback
+    if [ -z "${VULKAN_SDK:-}" ]; then
+      if command -v glslc >/dev/null 2>&1; then
+        SDK_VER="system"
+        ok "Vulkan SDK: system (glslc: $(glslc --version 2>&1 | head -1))"
+      else
+        die "glslc not found. Install with: $SDK_SETUP update"
+      fi
+    fi
+  fi
+
   [ -x "$CC_BIN" ] && [ -x "$CXX_BIN" ] || die "compiler missing: $CC_BIN / $CXX_BIN (override CC_BIN/CXX_BIN)"
   [ -n "$tag" ] || tag=$(latest_tag) || die "could not resolve the newest upstream tag (offline?)"
   mkdir -p "$BUILD"
@@ -139,18 +190,36 @@ cmd_build() {
 }
 
 cmd_promote() {
-  local ver=${1:-} be=both list b prev
+  local ver=${1:-} be=both list b prev target_dir
   [ -n "$ver" ] || die "usage: promote VER [--backend vulkan|rocm|both]"; shift
   while [ $# -gt 0 ]; do case $1 in --backend) be=$2; shift 2 ;; *) die "unknown promote arg: $1" ;; esac; done
   list=$(parse_backend "$be")
   for b in $list; do   # validate every target before flipping any link
-    [ -x "$BUILD/$ver-$b/bin/llama-server" ] || die "not built: build/$ver-$b"
+    # For Vulkan, find SDK-versioned dir; for ROCm, use standard name
+    if [ "$b" = "vulkan" ]; then
+      # Find the Vulkan build dir (may have SDK version suffix)
+      local candidates
+      candidates=$(ls -1d "$BUILD"/$ver-vulkan* 2>/dev/null | head -1)
+      [ -n "$candidates" ] && [ -x "$candidates/bin/llama-server" ] || die "not built: no $ver-vulkan* in builds/"
+      target_dir=$(basename "$candidates")
+    else
+      target_dir="$ver-$b"
+      [ -x "$BUILD/$target_dir/bin/llama-server" ] || die "not built: build/$ver-$b"
+    fi
     [ -e "$BUILD/latest-$b" ] && [ ! -L "$BUILD/latest-$b" ] && die "build/latest-$b is not a symlink"
   done
   for b in $list; do
+    # Re-resolve target_dir
+    if [ "$b" = "vulkan" ]; then
+      local candidates
+      candidates=$(ls -1d "$BUILD"/$ver-vulkan* 2>/dev/null | head -1)
+      target_dir=$(basename "$candidates")
+    else
+      target_dir="$ver-$b"
+    fi
     prev=$(readlink "$BUILD/latest-$b" 2>/dev/null || echo "<none>")
-    ln -sfn "$ver-$b" "$BUILD/latest-$b"
-    echo "[$b] latest-$b: $prev → $ver-$b  ($(version_line "$BUILD/latest-$b"))"
+    ln -sfn "$target_dir" "$BUILD/latest-$b"
+    echo "[$b] latest-$b: $prev → $target_dir  ($(version_line "$BUILD/latest-$b"))"
   done
   echo "llama-swap serves it from the next model load; a running model keeps the old binary until unloaded (curl -s http://127.0.0.1:9292/unload)."
 }
@@ -165,6 +234,7 @@ cmd_status() {
   done
   echo "builds in $BUILD:"; ls -1 "$BUILD" 2>/dev/null | grep -v '^latest-' | sed 's/^/  /' || true
   echo "disk free: $(df -h --output=avail "$BUILD" | tail -1 | tr -d ' ')"
+  echo "Vulkan SDK: $($SDK_SETUP check 2>&1 || echo 'missing')"
 }
 
 case "${1:-}" in
