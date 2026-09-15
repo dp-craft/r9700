@@ -1,0 +1,29 @@
+ggml_cuda_init: found 1 ROCm devices (Total VRAM: 32624 MiB):
+  Device 0: AMD Radeon AI PRO R9700, gfx1201 (0x1201), VMM: no, Wave Size: 32, VRAM: 32624 MiB
+llama-bench: benchmark 1/11: starting
+llama-bench: benchmark 1/11: prompt run 1/1
+llama-bench: benchmark 2/11: starting
+llama-bench: benchmark 2/11: prompt run 1/1
+llama-bench: benchmark 3/11: starting
+llama-bench: benchmark 3/11: prompt run 1/1
+llama-bench: benchmark 4/11: starting
+llama-bench: benchmark 4/11: prompt run 1/1
+llama-bench: benchmark 5/11: starting
+llama-bench: benchmark 5/11: prompt run 1/1
+llama-bench: benchmark 6/11: starting
+llama-bench: benchmark 6/11: prompt run 1/1
+llama-bench: benchmark 7/11: starting
+llama-bench: benchmark 7/11: prompt run 1/1
+llama-bench: benchmark 7/11: generation run 1/1
+llama-bench: benchmark 8/11: starting
+llama-bench: benchmark 8/11: prompt run 1/1
+llama-bench: benchmark 8/11: generation run 1/1
+llama-bench: benchmark 9/11: starting
+llama-bench: benchmark 9/11: prompt run 1/1
+llama-bench: benchmark 9/11: generation run 1/1
+llama-bench: benchmark 10/11: starting
+llama-bench: benchmark 10/11: prompt run 1/1
+llama-bench: benchmark 10/11: generation run 1/1
+llama-bench: benchmark 11/11: starting
+llama-bench: benchmark 11/11: prompt run 1/1
+llama-bench: benchmark 11/11: generation run 1/1

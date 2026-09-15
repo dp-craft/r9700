@@ -1,0 +1,3 @@
++ /home/dev/work/dp-craft/amd/llamacpp/builds/b790cf51aa-stew675-rocm/bin/llama-bench -m /home/dev/models/gguf/unsloth/Qwen3.8-27B-UD-Q4_K_XL.gguf -p 1000,128,512,2048,8192,32768 -n 0 -d 0 -ngl 99 -fa on -ub 2048 -b 4096 -ctk q8_0 -ctv q8_0 -r 1 -pg 128,64 -pg 512,256 -pg 2048,512 -pg 8192,1024 -pg 32768,2048 --no-warmup --progress -o json
++ tee /home/dev/work/dp-craft/amd/bench/runs/2026-09-15-1046-model-buildcmp-stew675-rocm/llama-bench.json
++ set +x

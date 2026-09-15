@@ -1,0 +1,5 @@
+date=2026-09-15T10:35:16+02:00
+model=/home/dev/models/gguf/unsloth/Qwen3.8-27B-UD-Q4_K_XL.gguf
+knobs: UB=2048 BATCH=4096 CTK=q8_0 CTV=q8_0 FA=on NGL=99 REPS=1
+run_arms: stock-rocm stew675-vulkan stew675-rocm
+done_arms: stock-vulkan
