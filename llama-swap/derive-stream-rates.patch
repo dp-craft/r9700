@@ -1,0 +1,260 @@
+diff --git a/internal/server/metrics.go b/internal/server/metrics.go
+index 21c16b6..5f05782 100644
+--- a/internal/server/metrics.go
++++ b/internal/server/metrics.go
+@@ -220,6 +220,7 @@ func (mp *metricsMonitor) record(modelID string, r *http.Request, recorder *resp
+ 			tm.Tokens = parsed.Tokens
+ 			tm.DurationMs = parsed.DurationMs
+ 		}
++		deriveStreamRates(&tm, r.URL.Path, recorder)
+ 	} else if gjson.ValidBytes(body) {
+ 		parsed := gjson.ParseBytes(body)
+ 		usage := parsed.Get("usage")
+@@ -498,8 +499,14 @@ func buildMetrics(modelID string, start time.Time, inputTokens, outputTokens, ca
+ 	if timings.Exists() {
+ 		inputTokens = timings.Get("prompt_n").Int()
+ 		outputTokens = timings.Get("predicted_n").Int()
+-		promptPerSecond = timings.Get("prompt_per_second").Float()
+-		tokensPerSecond = timings.Get("predicted_per_second").Float()
++		// A missing sub-field must stay unset (-1) rather than read as 0, so a
++		// partial timings object reports "unknown" instead of a zero rate.
++		if v := timings.Get("prompt_per_second"); v.Exists() {
++			promptPerSecond = v.Float()
++		}
++		if v := timings.Get("predicted_per_second"); v.Exists() {
++			tokensPerSecond = v.Float()
++		}
+ 		timingsDurationMs := int(timings.Get("prompt_ms").Float() + timings.Get("predicted_ms").Float())
+ 		if timingsDurationMs > durationMs {
+ 			durationMs = timingsDurationMs
+@@ -551,6 +558,39 @@ func buildMetrics(modelID string, start time.Time, inputTokens, outputTokens, ca
+ 	}
+ }
+ 
++// deriveStreamRates fills prefill/decode rates the backend did not report, from
++// the token arrival times observed while proxying the stream. llama.cpp's
++// Anthropic /v1/messages endpoint sends token counts but no timings object, so
++// without this those requests record "unknown" rates. The values are
++// approximations (the prefill window includes queueing and model load; the
++// decode span runs first-to-last token), like the browser-measured stats in
++// the chat view. Rates the backend did report are never overridden.
++func deriveStreamRates(tm *ActivityLogEntry, path string, recorder *responseBodyCopier) {
++	first, last := recorder.FirstTokenAt(), recorder.LastTokenAt()
++	if first.IsZero() {
++		return
++	}
++	// Anthropic usage input_tokens already exclude cached tokens; OpenAI
++	// prompt_tokens include them.
++	anthropic := strings.HasSuffix(path, "/v1/messages")
++	if tm.Tokens.PromptPerSecond < 0 {
++		ttft := first.Sub(recorder.StartTime())
++		newTokens := tm.Tokens.InputTokens
++		if !anthropic && tm.Tokens.CachedTokens >= 0 {
++			newTokens -= tm.Tokens.CachedTokens
++		}
++		if ttft > 0 && newTokens > 0 {
++			tm.Tokens.PromptPerSecond = float64(newTokens) / ttft.Seconds()
++		}
++	}
++	if tm.Tokens.TokensPerSecond < 0 {
++		gen := last.Sub(first)
++		if gen > 0 && tm.Tokens.OutputTokens > 1 {
++			tm.Tokens.TokensPerSecond = float64(tm.Tokens.OutputTokens-1) / gen.Seconds()
++		}
++	}
++}
++
+ // decompressBody decompresses the body based on the Content-Encoding header.
+ func decompressBody(body []byte, encoding string) ([]byte, error) {
+ 	switch strings.ToLower(strings.TrimSpace(encoding)) {
+@@ -597,6 +637,14 @@ type responseBodyCopier struct {
+ 	status      int
+ 	wroteHeader bool
+ 	start       time.Time
++
++	// Token-arrival tracking for streamed responses, used by
++	// deriveStreamRates on backends that report counts but no timings.
++	sseChecked   bool
++	sseTracking  bool
++	sseLineBuf   []byte
++	firstTokenAt time.Time
++	lastTokenAt  time.Time
+ }
+ 
+ func newBodyCopier(w http.ResponseWriter) *responseBodyCopier {
+@@ -620,9 +668,71 @@ func (w *responseBodyCopier) Write(b []byte) (int, error) {
+ 	if w.status == http.StatusSwitchingProtocols {
+ 		return w.ResponseWriter.Write(b)
+ 	}
++	w.trackSSETokens(b)
+ 	return w.tee.Write(b)
+ }
+ 
++// trackSSETokens notes when the first and last streamed token lines arrive, for
++// backends that report token counts but no rates (llama.cpp's Anthropic
++// /v1/messages). Lines are reassembled across Write calls; only the partial
++// tail is retained.
++func (w *responseBodyCopier) trackSSETokens(b []byte) {
++	if !w.sseChecked {
++		w.sseChecked = true
++		w.sseTracking = strings.Contains(w.Header().Get("Content-Type"), "text/event-stream")
++	}
++	if !w.sseTracking {
++		return
++	}
++	w.sseLineBuf = append(w.sseLineBuf, b...)
++	for {
++		i := bytes.IndexByte(w.sseLineBuf, '\n')
++		if i < 0 {
++			break
++		}
++		line := w.sseLineBuf[:i]
++		w.sseLineBuf = w.sseLineBuf[i+1:]
++		if sseLineCarriesToken(line) {
++			now := time.Now()
++			if w.firstTokenAt.IsZero() {
++				w.firstTokenAt = now
++			}
++			w.lastTokenAt = now
++		}
++	}
++}
++
++// sseLineCarriesToken reports whether one SSE line carries a generated token:
++// an Anthropic content_block_delta with non-empty thinking/text/tool input, or
++// an OpenAI chunk with a non-empty content/reasoning delta.
++func sseLineCarriesToken(line []byte) bool {
++	line = bytes.TrimSpace(line)
++	if !bytes.HasPrefix(line, []byte("data:")) {
++		return false
++	}
++	data := bytes.TrimSpace(line[len("data:"):])
++	if len(data) == 0 || bytes.Equal(data, []byte("[DONE]")) || !bytes.Contains(data, []byte("delta")) {
++		return false
++	}
++	parsed := gjson.ParseBytes(data)
++	if dt := parsed.Get("delta.type").String(); dt != "" {
++		switch dt {
++		case "thinking_delta", "text_delta":
++			return parsed.Get("delta.thinking").String() != "" || parsed.Get("delta.text").String() != ""
++		case "input_json_delta":
++			return parsed.Get("delta.partial_json").String() != ""
++		}
++		return false
++	}
++	for _, c := range parsed.Get("choices").Array() {
++		d := c.Get("delta")
++		if d.Get("content").String() != "" || d.Get("reasoning_content").String() != "" {
++			return true
++		}
++	}
++	return false
++}
++
+ func (w *responseBodyCopier) WriteHeader(statusCode int) {
+ 	if w.wroteHeader {
+ 		return
+@@ -670,3 +780,5 @@ func (w *responseBodyCopier) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+ 
+ func (w *responseBodyCopier) Status() int          { return w.status }
+ func (w *responseBodyCopier) StartTime() time.Time { return w.start }
++func (w *responseBodyCopier) FirstTokenAt() time.Time { return w.firstTokenAt }
++func (w *responseBodyCopier) LastTokenAt() time.Time  { return w.lastTokenAt }
+diff --git a/internal/server/metrics_test.go b/internal/server/metrics_test.go
+index 5dabd67..ce70a25 100644
+--- a/internal/server/metrics_test.go
++++ b/internal/server/metrics_test.go
+@@ -240,6 +240,93 @@ func TestServer_ProcessStreamingResponse_NoData(t *testing.T) {
+ 	}
+ }
+ 
++func TestServer_SSELineCarriesToken(t *testing.T) {
++	tests := []struct {
++		name string
++		line string
++		want bool
++	}{
++		{"anthropic thinking delta", `data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"hmm"}}`, true},
++		{"anthropic empty thinking delta", `data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":""}}`, false},
++		{"anthropic text delta", `data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"hi"}}`, true},
++		{"anthropic tool input delta", `data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\"a\":"}}`, true},
++		{"anthropic signature delta", `data: {"type":"content_block_delta","index":0,"delta":{"type":"signature_delta","signature":""}}`, false},
++		{"anthropic message start", `data: {"type":"message_start","message":{"usage":{"input_tokens":4}}}`, false},
++		{"openai content delta", `data: {"choices":[{"index":0,"delta":{"content":"hi"}}]}`, true},
++		{"openai reasoning delta", `data: {"choices":[{"index":0,"delta":{"reasoning_content":"hmm"}}]}`, true},
++		{"openai role only", `data: {"choices":[{"index":0,"delta":{"role":"assistant"}}]}`, false},
++		{"done", "data: [DONE]", false},
++		{"event line", "event: content_block_delta", false},
++	}
++	for _, test := range tests {
++		t.Run(test.name, func(t *testing.T) {
++			if got := sseLineCarriesToken([]byte(test.line)); got != test.want {
++				t.Fatalf("sseLineCarriesToken() = %v, want %v", got, test.want)
++			}
++		})
++	}
++}
++
++// A timings object without rate fields must leave the rates unset (-1), not 0.
++func TestServer_ParseMetrics_TimingsMissingRates(t *testing.T) {
++	body := `{"timings":{"prompt_n":20,"predicted_n":50}}`
++	parsed := gjson.Parse(body)
++	entry, err := parseMetrics("m", time.Now(), parsed.Get("usage"), parsed.Get("timings"), parsed.Get("metrics"))
++	if err != nil {
++		t.Fatalf("parseMetrics: %v", err)
++	}
++	if entry.Tokens.PromptPerSecond != -1 || entry.Tokens.TokensPerSecond != -1 {
++		t.Fatalf("rates = %+v, want -1/-1", entry.Tokens)
++	}
++}
++
++func TestServer_DeriveStreamRates_Anthropic(t *testing.T) {
++	start := time.Now().Add(-10 * time.Second)
++	rec := &responseBodyCopier{start: start, firstTokenAt: start.Add(2 * time.Second), lastTokenAt: start.Add(9 * time.Second)}
++	// Anthropic input_tokens exclude cached tokens (589 new of 61920 total).
++	tm := ActivityLogEntry{Tokens: TokenMetrics{InputTokens: 589, OutputTokens: 400, CachedTokens: 61331, PromptPerSecond: -1, TokensPerSecond: -1}}
++	deriveStreamRates(&tm, "/v1/messages", rec)
++	if got, want := tm.Tokens.PromptPerSecond, 589/2.0; math.Abs(got-want) > 1e-9 {
++		t.Errorf("PromptPerSecond = %v, want %v", got, want)
++	}
++	if got, want := tm.Tokens.TokensPerSecond, 399/7.0; math.Abs(got-want) > 1e-9 {
++		t.Errorf("TokensPerSecond = %v, want %v", got, want)
++	}
++}
++
++func TestServer_DeriveStreamRates_OpenAI(t *testing.T) {
++	start := time.Now().Add(-10 * time.Second)
++	rec := &responseBodyCopier{start: start, firstTokenAt: start.Add(2 * time.Second), lastTokenAt: start.Add(6 * time.Second)}
++	// OpenAI prompt_tokens include cached tokens (40 of 100).
++	tm := ActivityLogEntry{Tokens: TokenMetrics{InputTokens: 100, OutputTokens: 50, CachedTokens: 40, PromptPerSecond: -1, TokensPerSecond: -1}}
++	deriveStreamRates(&tm, "/v1/chat/completions", rec)
++	if got, want := tm.Tokens.PromptPerSecond, 60/2.0; math.Abs(got-want) > 1e-9 {
++		t.Errorf("PromptPerSecond = %v, want %v", got, want)
++	}
++	if got, want := tm.Tokens.TokensPerSecond, 49/4.0; math.Abs(got-want) > 1e-9 {
++		t.Errorf("TokensPerSecond = %v, want %v", got, want)
++	}
++}
++
++// No observed token lines means nothing to derive from: rates stay unset and
++// backend-reported rates are never overridden.
++func TestServer_DeriveStreamRates_NoClockAndNoOverride(t *testing.T) {
++	rec := &responseBodyCopier{start: time.Now()}
++	tm := ActivityLogEntry{Tokens: TokenMetrics{InputTokens: 10, OutputTokens: 5, PromptPerSecond: -1, TokensPerSecond: -1}}
++	deriveStreamRates(&tm, "/v1/messages", rec)
++	if tm.Tokens.PromptPerSecond != -1 || tm.Tokens.TokensPerSecond != -1 {
++		t.Fatalf("rates = %+v, want unchanged -1/-1", tm.Tokens)
++	}
++
++	start := time.Now().Add(-5 * time.Second)
++	rec2 := &responseBodyCopier{start: start, firstTokenAt: start.Add(time.Second), lastTokenAt: start.Add(4 * time.Second)}
++	tm2 := ActivityLogEntry{Tokens: TokenMetrics{InputTokens: 10, OutputTokens: 5, PromptPerSecond: 42, TokensPerSecond: 17}}
++	deriveStreamRates(&tm2, "/v1/messages", rec2)
++	if tm2.Tokens.PromptPerSecond != 42 || tm2.Tokens.TokensPerSecond != 17 {
++		t.Fatalf("rates = %+v, want reported values kept", tm2.Tokens)
++	}
++}
++
+ func TestMetricsMonitor_RecordMetadata(t *testing.T) {
+ 	mm := newTestMetricsMonitor(t, nil, 10, 0)
+ 	r := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"usage":{}}`))

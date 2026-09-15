@@ -10,3 +10,5 @@ llamacpp/builds/
 # IDE state + local skill backups
 .idea/
 .claude/skills/tmp/
+llama-swap/llama-swap/
+/llama-swap/.go-toolchain/

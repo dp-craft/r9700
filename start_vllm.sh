@@ -16,7 +16,8 @@ set -euo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 : "${VENV:=$REPO/bench/dl/vllm-venv}"
-: "${MODEL:=$HOME/models/vllm/Qwen3.8-27B-INT4}"
+: "${MODEL:=$HOME/models/vllm/amd/Qwen3.8-27B-Quark-AWQ-MXFP4}"
+#: "${MODEL:=$HOME/models/vllm/Qwen3.8-27B-INT4}"
 : "${NAME:=qwen38-27b-int4}"
 : "${PORT:=8000}"
 : "${MTP:=0}"
