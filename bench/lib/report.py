@@ -21,7 +21,7 @@ color-independent data table is emitted, so nothing depends on color alone.
     python3 report.py RUN_DIR [RUN_DIR ...]          # writes <dir>/charts/*.svg + <dir>/appendix.md
     python3 report.py CAMPAIGN_DIR --charts DIR --appendix FILE
 """
-import argparse, json, math, os, statistics as st
+import argparse, json, math, os, re, statistics as st
 from collections import defaultdict, OrderedDict
 
 # validated categorical slots (light / dark) — dataviz references/palette.md
@@ -441,14 +441,30 @@ def render_throughput(d):
     S = slot_map(engines)
     files = OrderedDict()
 
-    cr = [r for r in ag if isinstance(r.get("label"), str) and r["label"][:2] == "cr" and r["label"][2:].isdigit()]
-    depths = sorted({int(r["label"][2:]) for r in cr})
+    # depth labels: "cr8192" (code-review fixture) or "<engine>-d8192" (campaign depth rows)
+    def depth_of(r):
+        lab = r.get("label")
+        if not isinstance(lab, str):
+            return None
+        m = re.fullmatch(r"cr(\d+)|.+[-_](?:cr|d)(\d+)", lab)
+        return int(m.group(1) or m.group(2)) if m else None
+
+    cr = [r for r in ag if depth_of(r) is not None]
+    depths = sorted(d for d in {depth_of(r) for r in cr} if d is not None)
     if len(depths) >= 2:
         xl = [f"{x//1000}K" for x in depths]
         for fn, ti, field, yl in [
                 ("depth_prefill.svg", "Prefill tok/s vs context depth (p50)", "prefill_tok_s_p50", "prefill tok/s"),
                 ("depth_decode.svg", "Decode tok/s vs context depth (p50, per stream)", "decode_tok_s_per_stream_p50", "decode tok/s")]:
-            series = [(e, [({int(r["label"][2:]): r.get(field) for r in cr if r.get("engine") == e}).get(x) for x in depths], S[e]) for e in engines]
+            # per (engine, depth): last non-null value wins — a quarantined row (null field,
+            # e.g. server crash mid-rep) can never overwrite a clean re-collection
+            series = []
+            for e in engines:
+                dm = {}
+                for r in cr:
+                    if r.get("engine") == e and r.get(field) is not None:
+                        dm[depth_of(r)] = r.get(field)
+                series.append((e, [dm.get(x) for x in depths], S[e]))
             files[fn] = lines(ti, xl, series, yl, "prompt depth (tokens)")
 
     agn = [r for r in ag if isinstance(r.get("label"), str) and r["label"].startswith("agentic-c")]

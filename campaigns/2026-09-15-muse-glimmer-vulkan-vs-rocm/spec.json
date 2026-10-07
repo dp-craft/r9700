@@ -1,0 +1,279 @@
+{
+  "slug": "muse-glimmer-vulkan-vs-rocm",
+  "date": "2026-09-15",
+  "title": "Muse-Glimmer-30B + DFlash drafter — Vulkan vs ROCm through llama-swap, prefill/decode curve by depth",
+  "serving": {
+    "layer": "llama-swap :9292 (swap-on-demand; backends started manually by the operator)",
+    "note": "gen_campaign.py cannot emit this lifecycle (its run.sh hardcodes serve_llamacpp.sh); driver is the hand-written exception per iron rule 6 — user chose manual starts. Recommended follow-up: teach gen_campaign.py a `source: llama-swap` server mode."
+  },
+  "build_design": {
+    "kind": "2x2 factorial: {vulkan, rocm} x {b10969 upstream 391fac1, stew675 fork v16-r4}",
+    "history": "Original decision (2026-09-15): matched stew675 pair. First vulkan pass ran b10969-vulkan-system anyway (latest-vulkan symlink was never repointed; config still uses the ${vulkan} macro) — kept and tagged 'as-deployed'. User then chose to complete the factorial: +rocm-b10969 and +vulkan-stew675 arms. Yields both matched pairs (b10969 vk-vs-rocm, stew675 vk-vs-rocm) plus the per-backend build effect.",
+    "arms": {
+      "vulkan": {
+        "build": "b10969-vulkan-system",
+        "status": "measured 2026-09-15 (as-deployed)"
+      },
+      "rocm": {
+        "build": "b790cf51aa-stew675-rocm",
+        "status": "measured 2026-09-15 (as-deployed)"
+      },
+      "rocm-b10969": {
+        "build": "b10969-rocm",
+        "status": "pending — flip latest-rocm to b10969-rocm, reload -dflash-rocm"
+      },
+      "vulkan-stew675": {
+        "build": "b790cf51aa-stew675-vulkan-1.4.357.1",
+        "status": "pending — flip latest-vulkan to the stew675 Vulkan build, reload -dflash"
+      }
+    },
+    "reason": "llama-swap's ${vulkan}/${rocm} macros resolve to build/latest-* symlinks that were promoted independently: latest-vulkan=b10969-vulkan-system (upstream 391fac1) vs latest-rocm=b790cf51aa-stew675-rocm (fork v16-r4 b862fc3). As-deployed would confound version with backend (iron rule 2).",
+    "provenance": "run.sh resolves each loaded server's binary from GET /running (readlink -f) and records it per pass in meta.txt; warns if the resolved path is not the arm's expected build. Rows in results.jsonl carry the arm label, so every number is attributable to a build (rule 2)."
+  },
+  "model": "/home/dev/models/gguf/unsloth/Muse-Glimmer-30B-UD-Q5_K_L.gguf",
+  "draft_model": "/home/dev/models/gguf/unsloth/dflash-kquant.gguf",
+  "spec_decoding": {
+    "type": "draft-dflash",
+    "n_max": 15,
+    "p_min": 0.4,
+    "note": "n_max 15 is a LOCAL choice (one below the 16-token diffusion block), not vendor — models.yaml; p_min 0.4 IS measured (2026-08 sweep). Identical on both arms → backend is the only variable."
+  },
+  "servers": [
+    {
+      "name": "muse-vulkan",
+      "llama_swap_model": "muse-glimmer-30b-q5kl-f16-ctx128k-dflash",
+      "binary": "build/latest-vulkan/bin/llama-server (resolved at load; the measured pass ran b10969-vulkan-system — see build_design)",
+      "env": [
+        "GGML_VK_ALLOW_GRAPHICS_QUEUE=1"
+      ],
+      "probes": [
+        {
+          "slug": "muse-vulkan-d8192",
+          "prompts": [
+            "codereview-8192.txt"
+          ],
+          "max_tokens": 512,
+          "api": "chat",
+          "prefix_mode": "unique",
+          "reps": 2,
+          "warmup": 1
+        },
+        {
+          "slug": "muse-vulkan-d32768",
+          "prompts": [
+            "codereview-32768.txt"
+          ],
+          "max_tokens": 512,
+          "api": "chat",
+          "prefix_mode": "unique",
+          "reps": 2,
+          "warmup": 1
+        },
+        {
+          "slug": "muse-vulkan-d65536",
+          "prompts": [
+            "codereview-65536.txt"
+          ],
+          "max_tokens": 512,
+          "api": "chat",
+          "prefix_mode": "unique",
+          "reps": 2,
+          "warmup": 1
+        },
+        {
+          "slug": "muse-vulkan-d98304",
+          "prompts": [
+            "codereview-98304.txt"
+          ],
+          "max_tokens": 512,
+          "api": "chat",
+          "prefix_mode": "unique",
+          "reps": 2,
+          "warmup": 1
+        }
+      ]
+    },
+    {
+      "name": "muse-rocm",
+      "llama_swap_model": "muse-glimmer-30b-q5kl-f16-ctx128k-dflash-rocm",
+      "binary": "build/latest-rocm/bin/llama-server",
+      "env": [
+        "HSA_OVERRIDE_GFX_VERSION=12.0.1"
+      ],
+      "probes": [
+        {
+          "slug": "muse-rocm-d8192",
+          "prompts": [
+            "codereview-8192.txt"
+          ],
+          "max_tokens": 512,
+          "api": "chat",
+          "prefix_mode": "unique",
+          "reps": 2,
+          "warmup": 1
+        },
+        {
+          "slug": "muse-rocm-d32768",
+          "prompts": [
+            "codereview-32768.txt"
+          ],
+          "max_tokens": 512,
+          "api": "chat",
+          "prefix_mode": "unique",
+          "reps": 2,
+          "warmup": 1
+        },
+        {
+          "slug": "muse-rocm-d65536",
+          "prompts": [
+            "codereview-65536.txt"
+          ],
+          "max_tokens": 512,
+          "api": "chat",
+          "prefix_mode": "unique",
+          "reps": 2,
+          "warmup": 1
+        },
+        {
+          "slug": "muse-rocm-d98304",
+          "prompts": [
+            "codereview-98304.txt"
+          ],
+          "max_tokens": 512,
+          "api": "chat",
+          "prefix_mode": "unique",
+          "reps": 2,
+          "warmup": 1
+        }
+      ]
+    },
+    {
+      "name": "muse-rocm-b10969",
+      "llama_swap_model": "muse-glimmer-30b-q5kl-f16-ctx128k-dflash-rocm",
+      "binary": "build/latest-rocm/bin/llama-server (operator flips latest-rocm -> b10969-rocm for this arm)",
+      "env": [
+        "HSA_OVERRIDE_GFX_VERSION=12.0.1"
+      ],
+      "probes": [
+        {
+          "slug": "muse-rocm-b10969-d8192",
+          "prompts": [
+            "codereview-8192.txt"
+          ],
+          "max_tokens": 512,
+          "api": "chat",
+          "prefix_mode": "unique",
+          "reps": 2,
+          "warmup": 1
+        },
+        {
+          "slug": "muse-rocm-b10969-d32768",
+          "prompts": [
+            "codereview-32768.txt"
+          ],
+          "max_tokens": 512,
+          "api": "chat",
+          "prefix_mode": "unique",
+          "reps": 2,
+          "warmup": 1
+        },
+        {
+          "slug": "muse-rocm-b10969-d65536",
+          "prompts": [
+            "codereview-65536.txt"
+          ],
+          "max_tokens": 512,
+          "api": "chat",
+          "prefix_mode": "unique",
+          "reps": 2,
+          "warmup": 1
+        },
+        {
+          "slug": "muse-rocm-b10969-d98304",
+          "prompts": [
+            "codereview-98304.txt"
+          ],
+          "max_tokens": 512,
+          "api": "chat",
+          "prefix_mode": "unique",
+          "reps": 2,
+          "warmup": 1
+        }
+      ]
+    },
+    {
+      "name": "muse-vulkan-stew675",
+      "llama_swap_model": "muse-glimmer-30b-q5kl-f16-ctx128k-dflash",
+      "binary": "build/latest-vulkan/bin/llama-server (operator flips latest-vulkan -> b790cf51aa-stew675-vulkan-1.4.357.1 for this arm)",
+      "env": [
+        "GGML_VK_ALLOW_GRAPHICS_QUEUE=1"
+      ],
+      "probes": [
+        {
+          "slug": "muse-vulkan-stew675-d8192",
+          "prompts": [
+            "codereview-8192.txt"
+          ],
+          "max_tokens": 512,
+          "api": "chat",
+          "prefix_mode": "unique",
+          "reps": 2,
+          "warmup": 1
+        },
+        {
+          "slug": "muse-vulkan-stew675-d32768",
+          "prompts": [
+            "codereview-32768.txt"
+          ],
+          "max_tokens": 512,
+          "api": "chat",
+          "prefix_mode": "unique",
+          "reps": 2,
+          "warmup": 1
+        },
+        {
+          "slug": "muse-vulkan-stew675-d65536",
+          "prompts": [
+            "codereview-65536.txt"
+          ],
+          "max_tokens": 512,
+          "api": "chat",
+          "prefix_mode": "unique",
+          "reps": 2,
+          "warmup": 1
+        },
+        {
+          "slug": "muse-vulkan-stew675-d98304",
+          "prompts": [
+            "codereview-98304.txt"
+          ],
+          "max_tokens": 512,
+          "api": "chat",
+          "prefix_mode": "unique",
+          "reps": 2,
+          "warmup": 1
+        }
+      ]
+    }
+  ],
+  "tuning": {
+    "ub": 2048,
+    "b": 4096,
+    "fa": "on",
+    "ctx": 131072,
+    "kv": "f16",
+    "np": 1,
+    "kv_unified": true
+  },
+  "vram": {
+    "weights_gib": 19.93,
+    "kv_kib_per_tok": {
+      "f16": 52,
+      "q8_0": 28
+    },
+    "budget_mib": 32400,
+    "overhead_mib": 2000,
+    "note": "weights_gib INCLUDES the 1.52 GiB drafter (18.41 + 1.52). KV geometry MEASURED via bench/gguf_kv.py: arch muse-glimmer, 52 attn layers, 52 KiB/tok f16. Predicted full-ctx ≈ 29,064 MiB < 32,400 budget."
+  },
+  "notes": "Depths 8/32/64/96K per iron rule 16 (>=4 points for a log-log prefill-decay fit per backend; ctx is PINNED at 131072 = trained depth, so 98304 + 512 output leaves ~32k headroom). prefix_mode=unique = cold prefill per rep (uuid prefix defeats the cache) — this measures the backend compute shape, NOT the incremental agentic cache-reuse pattern (rule 17); that is a documented out-of-scope follow-up. Untimed warmup=1 matters for Vulkan (first prefill compiles shaders). Vendor reference: Muse-Glimmer card CLAIMS 74.9 -> 233.4 tok/s (3.1x) with the DFlash drafter on an RTX 5090 — different GPU, provenance CLAIMED."
+}

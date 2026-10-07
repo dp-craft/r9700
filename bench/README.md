@@ -58,6 +58,30 @@ against any llama.cpp build you point it at (ROCm, Vulkan, CUDA, Metal…).
   second request — measured), chat template where raw completions would silently EOS, failures
   kept in the table instead of averaged away.
 
+## Results so far — headline table
+
+Every number below is **MEASURED** on the R9700 (32 GB, gfx1201): either quoted from a report's
+summary (its `results.jsonl` rows) or read directly from the run dir's aggregate row (label cited).
+Per-run detail: [`runs/INDEX.md`](runs/INDEX.md) · full write-ups: `docs/INDEX.md`. Newest first.
+
+| Date | Campaign (run dir) | Model · stack | Headline result | Report |
+|------|--------------------|---------------|-----------------|--------|
+| 2026-09-15 | [muse-glimmer vulkan-vs-rocm](runs/2026-09-15-muse-glimmer-vulkan-vs-rocm/) | Muse-Glimmer-30B Q5_K_L + dflash drafter · stew675, ctx128k f16, MTP-dflash | 4-depth curve 8k→98k: prefill 941→842 tok/s (rocm) / 865→740 (vulkan); decode 33.3→31.1 / 37.6→36.4 t/s; rocm2 re-run 899→786 pf / 28.8→26.9 dec (2301/2305 clean; 2205 pass had no token counts) | [analysis](../campaigns/2026-09-15-muse-glimmer-vulkan-vs-rocm/analysis.md) |
+| 2026-09-15 | [stew675 vs stock buildcmp](../campaigns/2026-09-15-stew675-buildcmp/) | Qwen3.8-27B Q4_K_XL · llama-bench pp128→pp32768 | stew675 patch: **+14–20 % prefill on ROCm**, decode flat, Vulkan prefill flat/slightly worse | [analysis](../campaigns/2026-09-15-stew675-buildcmp/analysis.md) |
+| 2026-09-14 | [b10969 build check](runs/2026-09-14-2345-buildcmp-b10969/) | Qwen3.8-27B Q4_K_XL · Vulkan, q8_0 KV | **NEUTRAL** vs b10909 (32k-in/2k-out request −0.1 %) | [build check](../docs/analysis/2026-09-14-2345-llamacpp-b10969-build-check.md) |
+| 2026-09-12 | [vLLM/radiance vs llama.cpp](runs/2026-09-12-1330-depth-curve-mtp/) | Qwen3.8-27B-INT4 · vllm-radiance R4D+MTP8 vs llama.cpp MTP | 4-depth curve: **llama.cpp+MTP wins decode at every depth by 9–33 %**; radiance's only win = prefill/TTFT at 8k; radiance decode does not decay with depth | [radiance eval](../docs/analysis/2026-09-12-1055-vllm-radiance-r9700-evaluation.md) · [window budgets](../docs/analysis/2026-09-12-1535-vllm-window-budgets-and-rocm-knobs.md) |
+| 2026-09-11 | [vLLM stock 0.29.0 + INT4](runs/2026-09-11-2047-vllm-qwen38-27b-int4/) | RedHatAI/Qwen3.8-27B-INT4 · stock vLLM ROCm | default attention backend collapses decode (**2.8 tok/s @32k**); `TRITON_ATTN` → **14.1 tok/s** but prefill 222 tok/s — still loses to llama.cpp b10909 (28.2 tok/s / 872 tok/s) | [vllm-int4](../docs/analysis/2026-09-11-2047-vllm-qwen38-27b-int4.md) |
+| 2026-09-11 | [forum tuning ideas](runs/2026-09-11-1950-benchy-ideas-27b/) | Qwen3.8-27B Q4_K_XL · Vulkan b10909, MTP-3 | **none beats the served MTP config**: n-max5 −11/−20 %, ngram −11 %, adaptive MTP −15/−5 %, `rm_kq=1` +0.4 % tie; q8_0 KV ties f16 ≤18k, saves 4.8 GB | [benchy-ideas](../docs/analysis/2026-09-11-1950-benchy-ideas-27b.md) |
+| 2026-09-11 | [b10909 build check](runs/2026-09-11-1716-buildcmp-b10909/) | Qwen3.8-27B Q4_K_XL · vs b10655 (Vulkan) / b10375 (ROCm) | **IMPROVEMENT both backends**: 32k-in/2k-out −6.1 % Vulkan, −14.6 % ROCm | [1537](../docs/analysis/2026-09-11-1537-llamacpp-b10909-build-check.md) · [1716](../docs/analysis/2026-09-11-1716-llamacpp-b10909-build-check.md) |
+| 2026-07-31 | [27B Q4 MTP q8_0 depth ladder](runs/2026-07-31-1727-engine-27b-q4-mtp-q8-cr64000/) | JackRong & unsloth Qwen3.6-27B Q4 MTP · Vulkan, q8_0 KV | 64k: pf 478/557 tok/s, dec 31.0/44.9 t/s (JackRong/unsloth); 128k: pf 310–383, dec 26.1–31.1; TTFT 136/112 s @64k (aggregate rows, labels `27b-q4-mtp-q8-*` / `unsloth-*`) | none yet |
+| 2026-07-16 | [MTP sampler tax](runs/2026-07-16-0927-mtp-sampler-probe/) | 27B-MTP + 35B-A3B · penalty samplers × MTP | any penalty sampler = **fixed ~2 ms/tok host tax** (depth-invariant to 132.9k); draft acceptance unchanged (`pp=0.01` sha1-identical reply, −30 % decode) | [sampler-tax](../docs/analysis/2026-07-16-0927-mtp-sampler-tax.md) |
+| 2026-07-13 | [serving-substrate matrix](runs/2026-07-13-0734-engine-pf-cr8000/) | Qwen3.6-27B · Vulkan vs HIP, KV f16/q8, MTP on/off | real prefill at depth 666–831 tok/s (not 75); **cache reuse: 32k TTFT 42.7→3.1 s (13.7×)**; MTP 2.0× decode; q8_0 rejected (−12/−19 % pf); frozen substrate = Vulkan·f16·MTP | [substrate](../campaigns/2026-07-12-27b-serving-substrate/analysis.md) |
+| 2026-07-12 | [maxctx ladder](runs/2026-07-12-27b-maxctx-f16/) | Qwen3.6-27B Q4_K_S · Vulkan, f16 vs q8_0 KV, ctx 48k→120k | hybrid arch → **200k f16 loads in 31 s @29.0 GiB** (old 64k/120k "ceiling" was the highest tested, not the cap); @40k pf ~742 f16 / 635 q8_0, decode flat 28.5 | [maxctx](../campaigns/2026-07-12-27b-maxctx-f16/analysis.md) |
+| 2026-07-11 | [deep-context 35B matrix](runs/2026-07-11-2200-deep-context/) | Qwen3.6-35B-A3B · Vulkan, MTP×KV×depth×np, 8k→200k | prefill 3077→1254 tok/s, decode 104→61 (8k→200k); MTP a **net loss** for deep-prefill/short-decode; **q8_0 KV −40 % prefill** at depth → keep f16; np2→np4 doubles TTFT ~0 gain | [deep-context](../docs/analysis/2026-07-11-2200-deep-context-35b.md) |
+| 2026-07-11 | [35B adaptive sweeps](runs/2026-07-11-1833-sweep-35b-rocm/) | Qwen3.6-35B-A3B · `sweep.py`, ROCm vs Vulkan | optima `-ub 4096` ROCm / `-ub 2048` Vulkan (interior peaks), `-fa on` +6–9 % pf; q8_0 rejected both (ROCm −7.5 % dec, Vulkan −29.7 % pf); Vulkan decode +53 % | [sweep](../docs/analysis/2026-07-11-1833-sweep-35b-rocm-vs-vulkan.md) |
+| 2026-07-11 | [35B serving combo](runs/2026-07-11-1844-campaign-combo35b/) | Qwen3.6-35B-A3B · backend×MTP×KV×depth×conc | **Vulkan+MTP+f16 ≈140 decode** single-stream; MTP +30–40 % but −8…−15 % at c4 → off for parallel; 4 agents fit 32 GB (~48 tok/s/stream) | [combo](../docs/analysis/2026-07-11-1844-campaign-combo35b.md) |
+| 2026-07-11 | [harness smokes](runs/2026-07-11-1734-model-smoke-v2/) | 27B/35B · both tracks | pipeline validation runs (sweep micro, mini campaign, engine run.sh) — no published findings | none |
+
 ## Layout
 
 | Dir | Track | Tool | Answers |

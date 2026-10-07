@@ -195,8 +195,11 @@ cmd_promote() {
   while [ $# -gt 0 ]; do case $1 in --backend) be=$2; shift 2 ;; *) die "unknown promote arg: $1" ;; esac; done
   list=$(parse_backend "$be")
   for b in $list; do   # validate every target before flipping any link
+    # Exact dir name wins (suffixed builds, e.g. b790cf51aa-stew675-rocm-10.1)
+    if [ -x "$BUILD/$ver/bin/llama-server" ]; then
+      target_dir="$ver"
     # For Vulkan, find SDK-versioned dir; for ROCm, use standard name
-    if [ "$b" = "vulkan" ]; then
+    elif [ "$b" = "vulkan" ]; then
       # Find the Vulkan build dir (may have SDK version suffix)
       local candidates
       candidates=$(ls -1d "$BUILD"/$ver-vulkan* 2>/dev/null | head -1)
@@ -209,8 +212,10 @@ cmd_promote() {
     [ -e "$BUILD/latest-$b" ] && [ ! -L "$BUILD/latest-$b" ] && die "build/latest-$b is not a symlink"
   done
   for b in $list; do
-    # Re-resolve target_dir
-    if [ "$b" = "vulkan" ]; then
+    # Re-resolve target_dir (exact dir name wins, as in the validation pass)
+    if [ -x "$BUILD/$ver/bin/llama-server" ]; then
+      target_dir="$ver"
+    elif [ "$b" = "vulkan" ]; then
       local candidates
       candidates=$(ls -1d "$BUILD"/$ver-vulkan* 2>/dev/null | head -1)
       target_dir=$(basename "$candidates")

@@ -28,6 +28,7 @@ Empty → newest upstream tag, both backends. `bNNNNN` → that tag. `--backend`
    - `--parallel 2` (optional): per build also 2 × pp32768+tg2048 at once via `llama-batched-bench` (`run.sh NPL=2`) — total prefill/decode t/s, per-stream decode, request time, throughput vs 2 in a row. Its cells count in the verdict.
    - Duration (MEASURED, b10909, both backends): 4 shape arms 4.0–4.8 min each, 17.2 min total; `--parallel 2` adds 3.0–3.9 min per build (one-off, 2026-09-11) → ≈ 32 min. The printed ETA (754/51 t/s) runs ~20% low: llama-bench decode has no MTP (~28 t/s).
    - Refused up front (`exposes no … device` = silent CPU fallback, or `gpu_exclusive.sh refused`) → show the message, stop; nothing was measured.
+   - Build options, details, and other contextual settings
 5. **Promote per verdict** (table below) — `llamacpp/build_llamacpp.sh promote bNNNNN --backend B`.
 6. **Present** — in this order, tables verbatim from the tool's stdout:
    1. Summary table.

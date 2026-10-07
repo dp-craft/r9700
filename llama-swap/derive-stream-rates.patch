@@ -1,5 +1,5 @@
 diff --git a/internal/server/metrics.go b/internal/server/metrics.go
-index 21c16b6..5f05782 100644
+index 21c16b6..547a19e 100644
 --- a/internal/server/metrics.go
 +++ b/internal/server/metrics.go
 @@ -220,6 +220,7 @@ func (mp *metricsMonitor) record(modelID string, r *http.Request, recorder *resp
@@ -154,10 +154,14 @@ index 21c16b6..5f05782 100644
  func (w *responseBodyCopier) WriteHeader(statusCode int) {
  	if w.wroteHeader {
  		return
-@@ -670,3 +780,5 @@ func (w *responseBodyCopier) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+@@ -668,5 +778,7 @@ func (w *responseBodyCopier) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+ 	return nil, nil, fmt.Errorf("underlying ResponseWriter does not support hijacking")
+ }
  
- func (w *responseBodyCopier) Status() int          { return w.status }
- func (w *responseBodyCopier) StartTime() time.Time { return w.start }
+-func (w *responseBodyCopier) Status() int          { return w.status }
+-func (w *responseBodyCopier) StartTime() time.Time { return w.start }
++func (w *responseBodyCopier) Status() int             { return w.status }
++func (w *responseBodyCopier) StartTime() time.Time    { return w.start }
 +func (w *responseBodyCopier) FirstTokenAt() time.Time { return w.firstTokenAt }
 +func (w *responseBodyCopier) LastTokenAt() time.Time  { return w.lastTokenAt }
 diff --git a/internal/server/metrics_test.go b/internal/server/metrics_test.go

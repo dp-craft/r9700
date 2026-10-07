@@ -4,7 +4,7 @@
 # Patch set: https://github.com/stew675/llama-cpp-rdna-boosts
 #   16 blocks covering: adaptive MTP, chunked GDN prefill, BF16 KV, WMMA flash-attn,
 #   fused MoE, k-quant VDR boosts, hybrid all-reduce, qwen4exp, attention-memory wins.
-# Applied on top of llama.cpp at fork point 790cf51aa.
+# Applied on top of llama.cpp at fork point a55e952b8 (= upstream tag b11376).
 #
 # Layout (aligned with build_llamacpp.sh conventions):
 #   builds/<ver>-src                     stock source (build_llamacpp.sh)
@@ -21,8 +21,9 @@
 #
 # Usage:
 #   build_stew675_patched.sh status                                    latest-stew675-* targets, patches version, builds
-#   build_stew675_patched.sh build [--backend vulkan|rocm|both] [--jobs N] [--src PATH]
+#   build_stew675_patched.sh build [--backend vulkan|rocm|both] [--jobs N] [--src PATH] [--out-suffix S]
 #                                                          --src PATH  reuse an existing llama.cpp checkout
+#                                                          --out-suffix S  same source, different toolchain → <slug>-S-<backend>
 #                                                                      (fetches fork SHA, applies patches in-place).
 #                                                          default: both backends, clones fresh.
 #                                                          Re-run resumes: src reused, CMake incremental,
@@ -45,14 +46,17 @@ SDK_SETUP="$SCRIPT_DIR/setup_vulkan.sh"
 UPSTREAM="https://github.com/ggml-org/llama.cpp.git"
 BOOSTS_REPO="https://github.com/stew675/llama-cpp-rdna-boosts"
 
-# Fork point — pinned from release.json on main. Change when the set re-bases.
-FORK_SHA="790cf51aa"
+# Fork point — pinned from release.json on main ("base"). Change when the set re-bases.
+# 2026-10-07: r4@790cf51aa → r23@a55e952b8 (upstream tag b11376).
+FORK_SHA="a55e952b8"
 # Tag format for builds/ dir (human-readable anchor, matches bNNNN convention)
 FORK_TAG="b${FORK_SHA}"
 
 GPU_TARGET=gfx1201      # R9700 — CLAUDE.md fixpoint
 MIN_FREE_GB=5           # src ~0.1 GB + patches ~0.5 MB + a build tree ~1-2 GB
 SRC_DIR=""              # --src: reuse an existing llama.cpp checkout (empty = clone fresh)
+OUT_SUFFIX=""           # --out-suffix S: same source, different toolchain → builds/<slug>-S-<backend>
+                        # (e.g. a ROCm 10.1 rebuild of the fork while the 10.0 build stays the baseline)
 
 # Compilers pinned (same as build_llamacpp.sh)
 CC_BIN=${CC_BIN:-/usr/bin/gcc}
@@ -121,6 +125,14 @@ except: print('unknown')
 " 2>/dev/null || echo "unknown"
 }
 
+applied_patch_version() {  # what was ACTUALLY applied to the src (sidecar written at apply time)
+    local src v
+    src=$(get_src_path)
+    v=$(grep '^version=' "$src/.stew675-patch-info" 2>/dev/null | cut -d= -f2)
+    [ -n "$v" ] && { echo "$v"; return 0; }
+    resolve_patch_version   # pre-sidecar builds: live query — may NOT match what is applied
+}
+
 ###############################################################################
 # Source fetch & patch apply
 ###############################################################################
@@ -138,11 +150,15 @@ get_build_slug() {
     # Derive the build output slug, aligned with build_llamacpp.sh <ver>-<backend> pattern.
     # Fresh clone: <ver>-stew675-{backend}
     # --src PATH:  <src-basename>-stew675-{backend}
+    # --out-suffix S appends -S (same source, different toolchain — keeps the baseline dir intact)
+    local slug
     if [ -n "$SRC_DIR" ]; then
-        echo "$(basename "$SRC_DIR" | tr '/' '_' | sed 's/[^a-zA-Z0-9._-]//g')-stew675"
+        slug="$(basename "$SRC_DIR" | tr '/' '_' | sed 's/[^a-zA-Z0-9._-]//g')-stew675"
     else
-        echo "${FORK_TAG}-stew675"
+        slug="${FORK_TAG}-stew675"
     fi
+    [ -n "$OUT_SUFFIX" ] && slug="${slug}-${OUT_SUFFIX}"
+    echo "$slug"
 }
 
 fetch_and_patch() {  # → ensures the src dir is checked out at fork SHA AND patched
@@ -198,6 +214,23 @@ fetch_and_patch() {  # → ensures the src dir is checked out at fork SHA AND pa
     curl -sL --fail -o "$patch_tmp" "$patch_url" \
         || { rm -f "$patch_tmp"; die "Failed to download patch from $patch_url"; }
 
+    # Verify the downloaded patch against release.json's declared sha256 (iron rule 2: provenance).
+    local expected_sha actual_sha
+    expected_sha=$(resolve_patch_sha)
+    if [ -n "$expected_sha" ]; then
+        actual_sha=$(sha256sum "$patch_tmp" | awk '{print $1}')
+        [ "$actual_sha" = "$expected_sha" ] \
+            || { rm -f "$patch_tmp"; die "patch sha256 mismatch: got $actual_sha, release.json declares $expected_sha"; }
+        ok "Patch sha256 verified against release.json: ${actual_sha:0:12}…"
+    else
+        ok "WARN: no expected sha256 from release.json (offline?) — skipping verification"
+    fi
+
+    # Capture the version at download time, so BUILD_INFO records what was applied even if
+    # main moves on while we compile (this fork releases every few hours).
+    local applied_ver
+    applied_ver=$(resolve_patch_version)
+
     # Note: the main-branch patch is a unified diff (not git-am format-patch).
     # We verify via the tip commit SHA after applying, not via the patch file hash.
 
@@ -229,10 +262,11 @@ fetch_and_patch() {  # → ensures the src dir is checked out at fork SHA AND pa
 
         # git apply stages changes but does not commit — commit them
         git add -A
-        git commit -q -m "stew675 rdna-boosts: 16 patches (v16-790cf51aa) applied"
+        git commit -q -m "stew675 rdna-boosts: 16 patches (base ${FORK_SHA}) applied"
 
         rm -f "$patch_tmp"
         touch "$patch_marker"
+        { echo "version=$applied_ver"; echo "sha256=${actual_sha:-}"; } > "$src/.stew675-patch-info"
 
         local tip
         tip=$(git rev-parse --short=7 HEAD)
@@ -353,7 +387,8 @@ build_one() {  # BACKEND JOBS
 
     { echo "date=$(date -Iseconds)"
       echo "fork=$FORK_SHA"; echo "commit=$sha"; echo "backend=$be"
-      echo "patch_version=$(resolve_patch_version)"
+      echo "patch_version=$(applied_patch_version)"
+      grep '^sha256=' "$src/.stew675-patch-info" 2>/dev/null | sed 's/^/patch_sha256=/' || true
       echo "build_secs=$((SECONDS - t0))"; echo "jobs=$jobs"
       echo "cmake_flags=${flags[*]}"; echo "cxx=$("$CXX_BIN" --version | head -1)"
       case $be in
@@ -393,6 +428,7 @@ cmd_build() {
     while [ $# -gt 0 ]; do case $1 in
         --backend) be=$2; shift 2 ;; --jobs) jobs=$2; shift 2 ;;
         --src) SRC_DIR=$(readlink -f "$2"); shift 2 ;;
+        --out-suffix) OUT_SUFFIX=$2; shift 2 ;;
         *) die "unknown build arg: $1" ;; esac; done
     list=$(parse_backend "$be")
 
@@ -431,11 +467,11 @@ cmd_build() {
     local patch_ver src_path
     patch_ver=$(resolve_patch_version)
     src_path=$(get_src_path)
-    ok "Patch version: $patch_ver (fork: $FORK_SHA, src: $src_path)"
+    ok "main declares patch: $patch_ver (fork: $FORK_SHA, src: $src_path)"
 
     fetch_and_patch
     for b in $list; do build_one "$b" "${jobs:-$(auto_jobs "$b")}"; done
-    ok "DONE [$list] — patch: $patch_ver, fork: $FORK_SHA"
+    ok "DONE [$list] — applied patch: $(applied_patch_version), fork: $FORK_SHA"
     local slug
     slug=$(get_build_slug)
     ok "Next: test with ./llamacpp/builds/${slug}-${list%% *}-${SDK_VER:-}/bin/llama-server"

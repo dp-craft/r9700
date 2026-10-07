@@ -6,6 +6,26 @@
 #   ./llama_swap_start.sh restart
 set -euo pipefail
 
+
+# Force HIP to recognize the R9700 architecture properly
+export HSA_OVERRIDE_GFX_VERSION=12.0.1
+
+# Optimize memory allocation performance
+export MALLOC_THROTTLE=0
+export GLIBC_TUNABLES=glibc.malloc.tcache_max=1048576
+export GGML_HIPBLAS=ON
+export HSA_DISABLE_CACHE=1
+
+# 1. KIKAPCSOLJUK a CPU aktív várakozását (Spin-Lock) a ROCm-ban
+export HSA_ENABLE_INTERRUPT=1
+
+# 2. Optimalizáljuk a szálkezelést Ubuntu alatt
+#export OMP_NUM_THREADS=1           # Szálütközés elkerülése
+#export GOTO_NUM_THREADS=1
+#export OPENBLAS_NUM_THREADS=1
+export HSA_POLL_TIMEOUT=1    # Csökkentjük az időt, amíg a CPU pörögve vár
+
+
 BIN="$HOME/.local/bin/llama-swap"
 CONFIG="$HOME/.config/llama-swap/config.yaml"
 PORT=9292

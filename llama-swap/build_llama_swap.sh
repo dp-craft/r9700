@@ -11,7 +11,7 @@
 #      /v1/messages), so the activity table shows real rates instead of
 #      "unknown".
 #   3. go vet + go test -short ./... (the project's own gate, minus staticcheck).
-#   4. Build the web UI if missing (npm install + vite build into
+#   4. Build the web UI if missing or stale (npm ci + vite build into
 #      internal/server/ui_dist) and compile the linux-amd64 binary with
 #      -tags embed_ui, same ldflags as the Makefile's linux-amd64 target.
 #   5. Back up the current ~/.local/bin/llama-swap and install the new one.
@@ -73,9 +73,16 @@ log "go test -short ./..."
 "$GO_CMD" test -short ./...
 
 # --- 4. UI + binary build ----------------------------------------------------
-if [ ! -f internal/server/ui_dist/index.html ]; then
-    log "Building web UI (npm install + vite build)"
-    (cd ui && npm install && npm run build)
+# Rebuild the UI if missing, or if any UI source is newer than the last build —
+# otherwise pulling an upstream update would embed a stale frontend.
+ui_stale() {
+    [ ! -f internal/server/ui_dist/index.html ] && return 0
+    find ui -path ui/node_modules -prune -o -type f -newer internal/server/ui_dist/index.html -print -quit | grep -q .
+}
+if ui_stale; then
+    log "Building web UI (npm ci + vite build)"
+    # npm ci installs strictly from package-lock.json and never modifies it.
+    (cd ui && npm ci && npm run build)
 fi
 
 GIT_HASH="$(git rev-parse --short HEAD)"

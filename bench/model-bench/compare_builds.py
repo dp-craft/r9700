@@ -79,8 +79,12 @@ def sh(cmd):
 
 
 def arm_name(ver, be):
-    """Return the *canonical* arm label (e.g. b10969-vulkan).  Does NOT include SDK suffixes."""
-    return ver if ver.endswith(f"-{be}") else f"{ver}-{be}"
+    """Return the *canonical* arm label (e.g. b10969-vulkan).
+
+    An input that already contains "-<backend>" is treated as a complete arm label and passed
+    through verbatim — needed for same-source A/B runs against SDK-suffixed Vulkan dirs
+    (b10969-vulkan-1.4.357.1) or runtime-suffixed ROCm dirs (…-rocm-10.1)."""
+    return ver if f"-{be}" in ver else f"{ver}-{be}"
 
 
 def ver_of(name, be):
