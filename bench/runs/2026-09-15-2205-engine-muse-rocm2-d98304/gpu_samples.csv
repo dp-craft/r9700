@@ -1,0 +1,6 @@
+unix_ts,vram_used_mib,vram_total_mib,gtt_used_mib,power_w,temp_c,sclk_mhz,mclk_mhz,gpu_busy_pct
+1789502750.6,829,32624,77,17.0,50.0,41.0,96.0,3.0
+1789502751.7,857,32624,72,11.0,50.0,0.0,96.0,0.0
+1789502752.8,855,32624,64,11.0,50.0,0.0,96.0,0.0
+1789502753.9,859,32624,76,11.0,50.0,0.0,96.0,0.0
+# load_vram_used_mib=829 peak_vram_used_mib=859 peak_gtt_used_mib=77 avg_power_w=12.5 peak_power_w=17.0 peak_temp_c=50.0 avg_sclk_mhz=10.2 peak_sclk_mhz=41.0 avg_mclk_mhz=96.0 peak_mclk_mhz=96.0 avg_gpu_busy_pct=0.8 peak_gpu_busy_pct=3.0 samples=4

@@ -1,0 +1,35 @@
+[
+[New LWP 65595]
+[New LWP 65594]
+
+This GDB supports auto-downloading debuginfo from the following URLs:
+  <https://debuginfod.ubuntu.com>
+Enable debuginfod for this session? (y or [n]) [answered N; input not from terminal]
+Debuginfod has been disabled.
+To make this setting permanent, add 'set debuginfod enabled off' to .gdbinit.
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+0x00007bcfef510913 in __GI___wait4 (pid=65612, stat_loc=0x0, options=0, usage=0x0) at ../sysdeps/unix/sysv/linux/wait4.c:30
+#0  0x00007bcfef510913 in __GI___wait4 (pid=65612, stat_loc=0x0, options=0, usage=0x0) at ../sysdeps/unix/sysv/linux/wait4.c:30
+30	in ../sysdeps/unix/sysv/linux/wait4.c
+#1  0x00007bcfef744903 in ggml_print_backtrace () from /home/dev/work/dp-craft/amd/llamacpp/builds/b790cf51aa-stew675-10.1-rocm/bin/libggml-base.so.0
+#2  0x00007bcfef744aab in ggml_abort () from /home/dev/work/dp-craft/amd/llamacpp/builds/b790cf51aa-stew675-10.1-rocm/bin/libggml-base.so.0
+#3  0x00007bcfeda78572 in ggml_cuda_error(char const*, char const*, char const*, int, char const*) () from /home/dev/work/dp-craft/amd/llamacpp/builds/b790cf51aa-stew675-10.1-rocm/bin/libggml-hip.so.0
+#4  0x00007bcfeda7f64e in ggml_backend_cuda_synchronize(ggml_backend*) () from /home/dev/work/dp-craft/amd/llamacpp/builds/b790cf51aa-stew675-10.1-rocm/bin/libggml-hip.so.0
+#5  0x00007bcfef760e1e in ggml_backend_sched_synchronize () from /home/dev/work/dp-craft/amd/llamacpp/builds/b790cf51aa-stew675-10.1-rocm/bin/libggml-base.so.0
+#6  0x00007bcfeebf8149 in llama_context::synchronize() () from /home/dev/work/dp-craft/amd/llamacpp/builds/b790cf51aa-stew675-10.1-rocm/bin/libllama.so.0
+#7  0x00007bcfefb4f155 in test_prompt(llama_context*, int, int, int) () from /home/dev/work/dp-craft/amd/llamacpp/builds/b790cf51aa-stew675-10.1-rocm/bin/libllama-bench-impl.so
+#8  0x00007bcfefb5e4f9 in llama_bench(int, char**) () from /home/dev/work/dp-craft/amd/llamacpp/builds/b790cf51aa-stew675-10.1-rocm/bin/libllama-bench-impl.so
+#9  0x00007bcfef42a1ca in __libc_start_call_main (main=main@entry=0x5f6aad90e270 <main>, argc=argc@entry=35, argv=argv@entry=0x7ffce056b0e8) at ../sysdeps/nptl/libc_start_call_main.h:58
+#10 0x00007bcfef42a28b in __libc_start_main_impl (main=0x5f6aad90e270 <main>, argc=35, argv=0x7ffce056b0e8, init=<optimized out>, fini=<optimized out>, rtld_fini=<optimized out>, stack_end=0x7ffce056b0d8) at ../csu/libc-start.c:360
+#11 0x00005f6aad90e2a5 in _start ()
+[Inferior 1 (process 65591) detached]
+
+--- stderr ---
++ tee /home/dev/work/dp-craft/amd/bench/runs/2026-10-07-1221-model-buildcmp-b790cf51aa-stew675-10.1-rocm/llama-bench.json
++ /home/dev/work/dp-craft/amd/build/b790cf51aa-stew675-10.1-rocm/bin/llama-bench -m /home/dev/models/gguf/unsloth/Qwen3.8-27B-UD-Q4_K_XL.gguf -p 1000,128,512,2048 -n 0 -d 0 -ngl 99 -fa on -ub 2048 -b 4096 -ctk q8_0 -ctv q8_0 -r 2 -pg 1000,32 -pg 128,64 -pg 512,256 -pg 2048,512 --no-warmup --progress -o json
+/home/dev/work/dp-craft/amd/bench/model-bench/run.sh: line 117: 65591 Aborted                 (core dumped) "$LLAMA_BENCH" -m "$MODEL" -p "$PP" -n "$TG" -d "$DEPTH" -ngl "$NGL" -fa "$FA" -ub "$UB" -b "$BATCH" -ctk "$CTK" -ctv "$CTV" -r "$REPS" "${EXTRA[@]}" --progress -o json 2> "$OUT/llama-bench.err"
+     65592 Done                    | tee "$OUT/llama-bench.json"
++ cleanup
++ '[' -n 65590 ']'
++ kill 65590

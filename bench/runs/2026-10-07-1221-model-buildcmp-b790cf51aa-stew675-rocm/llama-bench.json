@@ -1,0 +1,26 @@
+[
+[New LWP 65512]
+[New LWP 65511]
+
+This GDB supports auto-downloading debuginfo from the following URLs:
+  <https://debuginfod.ubuntu.com>
+Enable debuginfod for this session? (y or [n]) [answered N; input not from terminal]
+Debuginfod has been disabled.
+To make this setting permanent, add 'set debuginfod enabled off' to .gdbinit.
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+0x000071c27d310913 in __GI___wait4 (pid=65527, stat_loc=0x0, options=0, usage=0x0) at ../sysdeps/unix/sysv/linux/wait4.c:30
+#0  0x000071c27d310913 in __GI___wait4 (pid=65527, stat_loc=0x0, options=0, usage=0x0) at ../sysdeps/unix/sysv/linux/wait4.c:30
+30	in ../sysdeps/unix/sysv/linux/wait4.c
+#1  0x000071c27d544903 in ggml_print_backtrace () from /home/dev/work/dp-craft/amd/llamacpp/builds/b790cf51aa-stew675-rocm/bin/libggml-base.so.0
+#2  0x000071c27d544aab in ggml_abort () from /home/dev/work/dp-craft/amd/llamacpp/builds/b790cf51aa-stew675-rocm/bin/libggml-base.so.0
+#3  0x000071c27b9bde72 in ggml_cuda_error(char const*, char const*, char const*, int, char const*) () from /home/dev/work/dp-craft/amd/llamacpp/builds/b790cf51aa-stew675-rocm/bin/libggml-hip.so.0
+#4  0x000071c27b9c4f3e in ggml_backend_cuda_synchronize(ggml_backend*) () from /home/dev/work/dp-craft/amd/llamacpp/builds/b790cf51aa-stew675-rocm/bin/libggml-hip.so.0
+#5  0x000071c27d560e1e in ggml_backend_sched_synchronize () from /home/dev/work/dp-craft/amd/llamacpp/builds/b790cf51aa-stew675-rocm/bin/libggml-base.so.0
+#6  0x000071c27c9f8149 in llama_context::synchronize() () from /home/dev/work/dp-craft/amd/llamacpp/builds/b790cf51aa-stew675-rocm/bin/libllama.so.0
+#7  0x000071c27d9c1155 in test_prompt(llama_context*, int, int, int) () from /home/dev/work/dp-craft/amd/llamacpp/builds/b790cf51aa-stew675-rocm/bin/libllama-bench-impl.so
+#8  0x000071c27d9d04f9 in llama_bench(int, char**) () from /home/dev/work/dp-craft/amd/llamacpp/builds/b790cf51aa-stew675-rocm/bin/libllama-bench-impl.so
+#9  0x000071c27d22a1ca in __libc_start_call_main (main=main@entry=0x63f4a1ce2270 <main>, argc=argc@entry=35, argv=argv@entry=0x7ffe251876d8) at ../sysdeps/nptl/libc_start_call_main.h:58
+#10 0x000071c27d22a28b in __libc_start_main_impl (main=0x63f4a1ce2270 <main>, argc=35, argv=0x7ffe251876d8, init=<optimized out>, fini=<optimized out>, rtld_fini=<optimized out>, stack_end=0x7ffe251876c8) at ../csu/libc-start.c:360
+#11 0x000063f4a1ce22a5 in _start ()
+[Inferior 1 (process 65508) detached]

@@ -1,0 +1,12 @@
+date=2026-09-15T20:16:06+02:00
+campaign=muse-glimmer-vulkan-vs-rocm (served via llama-swap :9292, backends started manually by operator)
+model=/home/dev/models/gguf/unsloth/Muse-Glimmer-30B-UD-Q5_K_L.gguf + /home/dev/models/gguf/unsloth/dflash-kquant.gguf (drafter)
+builds=matched stew675 (vulkan arm pinned in the llama-swap config by operator; actual per-pass binary recorded in server_binary lines below)
+tuning=ub2048 b4096 faon ctx131072 kv=f16 np1 kv_unified spec=draft-dflash n_max15 p_min0.4 temp1.0 top_p0.95 top_k64
+vram_predicted_mib=29064 (weights 19.93 GiB incl drafter + 131072 x 52 KiB/tok f16 + 2000 overhead)
+backend=rocm model_id=muse-glimmer-30b-q5kl-f16-ctx128k-dflash-rocm server_binary=/home/dev/work/dp-craft/amd/build/latest-rocm/bin/llama-server started=2026-09-15T20:33:06+02:00
+backend=vulkan model_id=muse-glimmer-30b-q5kl-f16-ctx128k-dflash server_binary=/home/dev/work/dp-craft/amd/build/latest-vulkan/bin/llama-server started=2026-09-15T20:47:42+02:00
+backend=rocm model_id=muse-glimmer-30b-q5kl-f16-ctx128k-dflash-rocm server_binary=/home/dev/work/dp-craft/amd/build/latest-rocm/bin/llama-server resolved=/home/dev/work/dp-craft/amd/llamacpp/builds/ROCM-lemonade/bin/llama-server started=2026-09-15T22:01:17+02:00
+backend=rocm2 model_id=muse-glimmer-30b-q5kl-f16-ctx128k-dflash-rocm server_binary=/home/dev/work/dp-craft/amd/build/latest-rocm/bin/llama-server resolved=/home/dev/work/dp-craft/amd/llamacpp/builds/ROCM-lemonade/bin/llama-server started=2026-09-15T22:02:49+02:00
+backend=rocm2 model_id=muse-glimmer-30b-q5kl-f16-ctx128k-dflash-rocm server_binary=/home/dev/work/dp-craft/amd/build/latest-rocm/bin/llama-server resolved=/home/dev/work/dp-craft/amd/llamacpp/builds/ROCM-lemonade/bin/llama-server started=2026-09-15T22:08:59+02:00
+backend=rocm2 model_id=muse-glimmer-30b-q5kl-f16-ctx128k-dflash-rocm server_binary=/home/dev/work/dp-craft/amd/build/latest-rocm/bin/llama-server resolved=/home/dev/work/dp-craft/amd/llamacpp/builds/ROCM-lemonade/bin/llama-server started=2026-09-15T23:01:44+02:00

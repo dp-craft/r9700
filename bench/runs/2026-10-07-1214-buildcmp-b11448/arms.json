@@ -1,0 +1,54 @@
+{
+  "stamp": "2026-10-07-1214",
+  "new": "b11448",
+  "config": {
+    "model": "/home/dev/models/gguf/unsloth/Qwen3.8-27B-UD-Q4_K_XL.gguf",
+    "shapes": [
+      [
+        128,
+        64
+      ],
+      [
+        512,
+        256
+      ],
+      [
+        2048,
+        512
+      ]
+    ],
+    "ub": 2048,
+    "batch": 4096,
+    "kv": "q8_0",
+    "reps": 2,
+    "warmup": {
+      "pp": 1000,
+      "pg": [
+        1000,
+        32
+      ]
+    },
+    "parallel": 0
+  },
+  "arms": [
+    {
+      "name": "b10969-vulkan-1.4.363.0",
+      "backend": "vulkan",
+      "kind": "shapes",
+      "secs": 78.7,
+      "run_dir": "bench/runs/2026-10-07-1215-model-buildcmp-b10969-vulkan-1.4.363.0"
+    },
+    {
+      "name": "b11448-vulkan-1.4.363.0",
+      "backend": "vulkan",
+      "kind": "shapes",
+      "secs": 79.0,
+      "run_dir": "bench/runs/2026-10-07-1216-model-buildcmp-b11448-vulkan-1.4.363.0"
+    }
+  ],
+  "env": {
+    "kernel": "7.0.0-38-generic",
+    "hip": "7.16.26385-0000000",
+    "mesa": "Mesa 26.2.4 - kisak-mesa PPA"
+  }
+}

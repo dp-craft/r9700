@@ -1,0 +1,12 @@
+ggml_cuda_init: found 1 ROCm devices (Total VRAM: 32624 MiB):
+  Device 0: AMD Radeon AI PRO R9700, gfx1201 (0x1201), VMM: no, Wave Size: 32, VRAM: 32624 MiB
+llama-bench: benchmark 1/8: starting
+llama-bench: benchmark 1/8: prompt run 1/2
+Warning: Queue error - HSA_STATUS_ERROR_MEMORY_FAULT
+VGPU(0x63f4d1f82710) hang analysis:
+SWq=0x71c26e916000, HWq=0x71c22c200000, id=2, priority=1, Dispatch Header = 0xd02 (type=2, barrier=1, acquire=2, release=1), setup=3, grid=[1280, 64, 1], workgroup=[32, 8, 1], private_seg_size=0, group_seg_size=57856, kernel_obj=0x71c224343640, kernarg_address=0x71bfddebf200, completion_signal=0x0, rptr=1778, wptr=2426
+:0:rocdevice.cpp            :3905: 17228777780 us:  Memory Fault Error [host: bipubi, GPU index: 0, faulting addr: 0x71af9a07c000, kernel: void mul_mat_q<(ggml_type)23, 128, false, false>(char const*, int const*, int const*, int const*, float*, float*, float const*, HIP_vector_type<unsigned int, 3u>, int, int, int, int, int, HIP_vector_type<unsigned int, 3u>, HIP_vector_type<unsigned int, 3u>, int, int, int, HIP_vector_type<unsigned int, 3u>, HIP_vector_type<unsigned int, 3u>, int, int, int, HIP_vector_type<unsigned int, 3u>, char const*, ggml_glu_op, float)]
+/home/dev/work/dp-craft/amd/llamacpp/builds/b790cf51aa-stew675-src/ggml/src/ggml-cuda/ggml-cuda.cu:115: ROCm error
+warning: 30	../sysdeps/unix/sysv/linux/wait4.c: No such file or directory
+warning: 58	../sysdeps/nptl/libc_start_call_main.h: No such file or directory
+warning: 360	../csu/libc-start.c: No such file or directory
