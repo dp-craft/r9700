@@ -426,18 +426,36 @@ def render_quality(d):
 
 
 # ============================================================ render: throughput
+def loglog_fit(xs, ys):
+    """Power-law fit y = a·x^k on positive pairs (iron rule 16). Returns (k, R², n) or None if < 3."""
+    pts = [(math.log(x), math.log(y)) for x, y in zip(xs, ys) if x and y and x > 0 and y > 0]
+    if len(pts) < 3:
+        return None
+    mx, my = mean([p[0] for p in pts]), mean([p[1] for p in pts])
+    sxx = sum((x - mx) ** 2 for x, _ in pts)
+    if sxx == 0:
+        return None
+    k = sum((x - mx) * (y - my) for x, y in pts) / sxx
+    ss_tot = sum((y - my) ** 2 for _, y in pts)
+    ss_res = sum((y - (my + k * (x - mx))) ** 2 for x, y in pts)
+    return round(k, 3), (round(1 - ss_res / ss_tot, 3) if ss_tot else 1.0), len(pts)
+
+
 def render_throughput(d):
     rows = load_jsonl(_find(d, "results.jsonl"))
     ag = [r for r in rows if r.get("kind") == "aggregate" and "error" not in r]
-    if not ag:
-        return {}, ["_No aggregate rows to chart._"]
+    turns = [r for r in rows if r.get("kind") == "turn" and not r.get("error")]
+    bad_turns = [r for r in rows if r.get("kind") == "turn" and r.get("error")]
+    power = [r for r in rows if r.get("kind") == "power"]
+    if not ag and not turns:
+        return {}, ["_No aggregate or conversation rows to chart._"]
     gpu = {r.get("label"): r for r in rows if r.get("kind") == "gpu"}
     for a in ag:                                              # merge gpu memory onto matching labels
         g = gpu.get(a.get("label"))
         if g:
             for k in ("vram_used_mib_at_load", "peak_vram_mib", "peak_gtt_mib", "avg_power_w"):
                 a.setdefault(k, g.get(k))
-    engines = list(OrderedDict((r.get("engine"), 1) for r in ag))
+    engines = list(OrderedDict((r.get("engine"), 1) for r in ag + turns))
     S = slot_map(engines)
     files = OrderedDict()
 
@@ -502,23 +520,102 @@ def render_throughput(d):
             ("Avg power (W)", "", "{:.0f}", [(e, a.get("avg_power_w"), S[e]) for e, a in mem]),
         ])
 
+    # --- growing conversation (iron rule 17): per-turn means across reps, x = turn (mean context) ---
+    fits = []
+    if turns:
+        tix = sorted({r["turn"] for r in turns})
+        ctx_of = {t: mean([r.get("context_tokens") for r in turns if r["turn"] == t and r.get("context_tokens")]) for t in tix}
+        xl = [f"t{t} {ctx_of[t] / 1000:.0f}K" if ctx_of[t] else f"t{t}" for t in tix]
+        for fn, ti, field, yl, z in [
+                ("conv_prefill_new.svg", "Conversation — prefill of NEW tokens per turn (prior turns cached)", "prefill_new_tok_s", "new tok/s", True),
+                ("conv_decode.svg", "Conversation — decode tok/s per turn", "decode_tok_s", "decode tok/s", True),
+                ("conv_ttft.svg", "Conversation — time to first token per turn (lower = better)", "ttft_s", "seconds", False)]:
+            series = [(e, [mean([r.get(field) for r in turns if r.get("engine") == e and r["turn"] == t
+                                 and r.get(field) is not None]) for t in tix], S[e]) for e in engines]
+            files[fn] = lines(ti, xl, series, yl, "turn (mean context depth)", ymin0=z)
+        for e in engines:
+            et = [r for r in turns if r.get("engine") == e]
+            for field in ("decode_tok_s", "prefill_new_tok_s"):
+                f_ = loglog_fit([r.get("context_tokens") for r in et], [r.get(field) for r in et])
+                if f_:
+                    fits.append((e, "conversation", field, *f_,
+                                 min(r.get("context_tokens") or 0 for r in et), max(r.get("context_tokens") or 0 for r in et)))
+    # one fit per (engine, probe series): the label minus its depth suffix (deep-mtp0-cr8000 ->
+    # deep-mtp0), so configs sharing an engine name (MTP on/off, KV types) are never fitted together
+    series_of = lambda r: re.sub(r"[-_](?:cr|d)\d+$", "", r["label"])
+    for key in OrderedDict(((r.get("engine"), series_of(r)), 1) for r in cr):
+        ea = [r for r in cr if (r.get("engine"), series_of(r)) == key]
+        for field in ("prefill_tok_s_p50", "decode_tok_s_per_stream_p50"):
+            f_ = loglog_fit([r.get("prompt_tokens") or depth_of(r) for r in ea], [r.get(field) for r in ea])
+            if f_:
+                fits.append((key[0], f"cold `{key[1]}`", field, *f_,
+                             min(depth_of(r) for r in ea), max(depth_of(r) for r in ea)))
+
+    if power:
+        files["power_phase.svg"] = small_multiples("GPU power by phase (avg W, per probe)", [
+            ("Prefill avg (W)", "", "{:.0f}", [(p_["label"], p_.get("prefill_w_avg"), 0) for p_ in power]),
+            ("Decode avg (W)", "", "{:.0f}", [(p_["label"], p_.get("decode_w_avg"), 1) for p_ in power]),
+        ])
+
     # --- appendix ---
     ftxt = os.path.join(d, "failures.txt")
     fail_lines = [l.strip() for l in open(ftxt, encoding="utf-8")] if os.path.exists(ftxt) else []
     fail_lines = [l for l in fail_lines if l]
     ap = []
     errrows = [r for r in ag if r.get("n_err")]
-    if fail_lines or errrows:
-        items = fail_lines + [f"n_err={r['n_err']} in {r.get('engine')}/{r.get('label')}" for r in errrows]
+    if fail_lines or errrows or bad_turns:
+        items = fail_lines + [f"n_err={r['n_err']} in {r.get('engine')}/{r.get('label')}" for r in errrows] \
+            + [f"interrupted turn {r.get('turn')} rep {r.get('rep')} in {r.get('label')}: {r.get('error')}" for r in bad_turns]
         ap.append(f"> ⚠️ **{len(items)} failure(s)** (excluded from charts): " + "; ".join(map(esc, items)) + "\n")
     order = [("depth_prefill.svg", "Prefill vs depth"), ("depth_decode.svg", "Decode vs depth"),
              ("conc_aggregate.svg", "Aggregate tok/s vs concurrency"),
              ("conc_perstream.svg", "Per-stream decode vs concurrency"),
              ("conc_ttft.svg", "TTFT p95 vs concurrency"), ("thinking.svg", "Thinking latency"),
-             ("memory.svg", "Memory & power")]
+             ("memory.svg", "Memory & power"),
+             ("conv_prefill_new.svg", "Conversation: prefill of new tokens"),
+             ("conv_decode.svg", "Conversation: decode per turn"),
+             ("conv_ttft.svg", "Conversation: TTFT per turn"),
+             ("power_phase.svg", "Power by phase")]
     for fn, ti in order:
         if files.get(fn):
             ap.append(f"\n**{ti}**\n\n![{ti}](charts/{fn})\n")
+    flagged = [p_ for p_ in power if p_.get("flag")]
+    if flagged:
+        ap.append("> ⚠️ **Low GPU power — config suspect:** " + "; ".join(
+            f"{esc(p_['label'])}: {esc(p_['flag'])}" for p_ in flagged) + "\n")
+    if fits:
+        ap.append("\n### Depth fits (log-log, y = a·depth^k — iron rule 16; valid only inside the fit range)\n")
+        ap.append("| engine | shape | metric | exponent k | R² | n | fit range (tokens) |")
+        ap.append("|--------|-------|--------|-----------:|---:|--:|--------------------|")
+        for e, shape, field, k, r2, n, lo, hi in fits:
+            ap.append(f"| {e} | {shape} | {field} | {k:+.3f} | {r2:.3f} | {n} | {lo}–{hi} |")
+    spec = [r for r in rows if r.get("kind") == "spec"]
+    if spec:
+        ap.append("\n### Speculative decoding acceptance (MEASURED: vLLM counters diffed per probe, warm-ups included)\n")
+        ap.append("| label | drafts | drafted tok | accepted tok | acceptance | mean accept len τ | accepted per draft position |")
+        ap.append("|-------|-------:|------------:|-------------:|-----------:|------------------:|-----------------------------|")
+        for r in spec:
+            acc = "—" if r.get("acceptance_rate") is None else f"{r['acceptance_rate']:.1%}"
+            tau = "—" if r.get("mean_accept_len") is None else f"{r['mean_accept_len']:.2f}"
+            ap.append(f"| {r['label']} | {r.get('drafts')} | {r.get('draft_tokens')} | {r.get('accepted_tokens')} | {acc} | {tau} | "
+                      f"{', '.join(str(x) for x in r.get('accepted_per_pos') or [])} |")
+    if power:
+        ap.append("\n### Power by phase (MEASURED: gpu_samples.csv joined with request phase times)\n")
+        ap.append("| label | prefill avg W | prefill peak W | n | decode avg W | decode peak W | n | flag |")
+        ap.append("|-------|--------------:|---------------:|--:|-------------:|--------------:|--:|------|")
+        g_ = lambda x: "—" if x is None else f"{x:.0f}"
+        for p_ in power:
+            ap.append(f"| {p_['label']} | {g_(p_.get('prefill_w_avg'))} | {g_(p_.get('prefill_w_peak'))} | {p_.get('prefill_n')} | "
+                      f"{g_(p_.get('decode_w_avg'))} | {g_(p_.get('decode_w_peak'))} | {p_.get('decode_n')} | {p_.get('flag') or ''} |")
+    if turns:
+        ap.append("\n### Conversation turns\n")
+        ap.append("| engine | label | rep | turn | context tok | cached | new | prefill new tok/s | decode tok/s | ttft s | gen | finish |")
+        ap.append("|--------|-------|----:|-----:|------------:|-------:|----:|------------------:|-------------:|-------:|----:|--------|")
+        h_ = lambda x, dd=1: "—" if x is None else (f"{x:.{dd}f}" if isinstance(x, float) else str(x))
+        for r in turns:
+            ap.append(f"| {r.get('engine')} | {r.get('label')} | {r.get('rep')} | {r.get('turn')} | {h_(r.get('context_tokens'))} | "
+                      f"{h_(r.get('cached_tokens'))} | {h_(r.get('new_tokens'))} | {h_(r.get('prefill_new_tok_s'), 0)} | "
+                      f"{h_(r.get('decode_tok_s'))} | {h_(r.get('ttft_s'), 2)} | {h_(r.get('gen_tokens'))} | {r.get('finish')} |")
     ap.append("\n### Aggregate rows\n")
     ap.append("| engine | label | conc | prompt tok | prefill p50 | decode p50 | agg tok/s | ttft p50 | ttft p95 | peak VRAM | peak GTT | err |")
     ap.append("|--------|-------|-----:|-----------:|------------:|-----------:|----------:|---------:|---------:|----------:|---------:|----:|")

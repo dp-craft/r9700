@@ -7,6 +7,14 @@
       Emits one {kind:"request"} line per request + one {kind:"aggregate"} per run. Prefix modes
       (unique/shared/none) model agentic cache behaviour. This is what engine-bench/run.sh drives.
 
+  conversation  (growing multi-turn agentic pattern — CLAUDE.md iron rule 17)
+      Turn 0 = --start-tokens of a source file; each later turn appends the reply + --step-tokens
+      more, prior turns cached, until --max-depth. One {kind:"turn"} line per turn (context, cached,
+      NEW tokens, prefill_new_tok_s, decode, ttft, wall-clock phase times) + a conversation_summary.
+      --turn-prompt FILE appends a task to every later turn (blocks split on a `---` line, cycled;
+      with --step-tokens 0 the task IS the turn). kv_usage_peak = vLLM's kv_cache_usage_perc polled
+      from /metrics during the turn (null on engines without it).
+
   tasks  (quality / token-economy — was the finetune campaign's capture.py)
       A task suite (tasks.jsonl) sent one task at a time (optionally --reps for self-consistency),
       saving the FULL response + a think/answer token split + health flags for grading. Emits one
@@ -48,6 +56,11 @@ def count_tokens(v1_base, text):
     base = v1_base[:-3] if v1_base.rstrip("/").endswith("/v1") else v1_base
     try:
         return len(_post_json(base.rstrip("/") + "/tokenize", {"content": text}).get("tokens", []))
+    except Exception:
+        pass
+    try:   # vLLM's /tokenize takes {"prompt"} and answers {"count", "tokens"}
+        r = _post_json(base.rstrip("/") + "/tokenize", {"prompt": text})
+        return r.get("count") or len(r.get("tokens", []))
     except Exception:
         return round(len(text.split()) * 1.33)
 
@@ -96,7 +109,7 @@ def stream(v1_base, api, payload, timeout=1200.0):
                 for ch in obj.get("choices", []):
                     d = ch.get("delta") or {}
                     pc = ch.get("text") or d.get("content") or ""      # completions .text | chat .content
-                    pr = d.get("reasoning_content") or ""
+                    pr = d.get("reasoning_content") or d.get("reasoning") or ""   # vLLM >= ~0.29 streams `reasoning`
                     now = time.perf_counter() - t0
                     if pr:
                         saw_reasoning = True
@@ -163,6 +176,14 @@ def _request_metrics(s):
             "ttfa_s": round(s["ttfa"], 3) if s["ttfa"] is not None else None}
 
 
+def _wall(w_start, s):
+    """Unix-time phase boundaries of one request (prefill = start→first token, decode = first token
+    →end), so phase_power.py can join them against gpu_samples.csv. Not `t_`-prefixed: probe rows
+    drop t_* keys (perf_counter values, meaningless outside this process)."""
+    return {"wall_start": round(w_start, 3), "wall_first_token": round(w_start + s["ttft"], 3),
+            "wall_end": round(w_start + s["total_s"], 3)}
+
+
 def run_probe(a):
     prompts = [open(f, encoding="utf-8", errors="replace").read() for f in a.prompt_file]
 
@@ -191,12 +212,14 @@ def run_probe(a):
         payload = {"model": a.model, "max_tokens": max_tokens, "temperature": a.temperature,
                    "_prompt": prompt}
         t_start = time.perf_counter()
+        w_start = time.time()
         s = stream(a.url, a.api, payload, a.timeout)
         if "error" in s:
             return {"error": s["error"], "t_start": t_start}
         m = _request_metrics(s)
         m["t_start"] = t_start
         m["t_end"] = t_start + s["total_s"]
+        m.update(_wall(w_start, s))
         return m
 
     for w in range(a.warmup):
@@ -249,6 +272,106 @@ def run_probe(a):
         "tok_count_source": all_reqs[0].get("tok_count_source"),
     }
     print(json.dumps(agg))
+
+
+# ------------------------------------------------------------------ mode: conversation
+def _kv_poller(v1_base, stop, out, interval=0.5):
+    """Collect vLLM's vllm:kv_cache_usage_perc (0..1) until `stop` is set. The gauge counts blocks
+    held by running requests, so it must be read DURING the request, not after it. Gives up on the
+    first failed fetch or a missing gauge (e.g. llama.cpp) — `out` then stays empty."""
+    base = v1_base.rstrip("/")
+    base = base[:-3] if base.endswith("/v1") else base
+    while not stop.is_set():
+        try:
+            text = urllib.request.urlopen(base + "/metrics", timeout=5).read().decode()
+        except Exception:
+            return
+        vals = [float(l.rsplit(" ", 1)[1]) for l in text.splitlines()
+                if l.startswith("vllm:kv_cache_usage_perc")]
+        if not vals:
+            return
+        out.append(max(vals))
+        stop.wait(interval)
+
+
+def run_conversation(a):
+    """GROWING multi-turn chat (CLAUDE.md iron rule 17): turn 0 sends --start-tokens of the source
+    file, every later turn appends the model's reply + the next --step-tokens chunk, until the next
+    turn would pass --max-depth. Prior turns stay cached server-side, so each turn measures the cost
+    an agent actually pays: prefill of the NEW tokens only (prompt_tokens - cached_tokens), plus
+    decode at the grown depth. Each rep is a fresh conversation (unique id in turn 0, so a rep never
+    hits the previous rep's cache). An errored turn ends its conversation and is recorded with
+    `error` (iron rule 18: an interrupted turn is never a normal row)."""
+    src = open(a.prompt_file[0], encoding="utf-8", errors="replace").read()
+    sample = src[:200000]
+    cpt = len(sample) / max(1, count_tokens(a.url, sample))           # chars per token
+    kwargs = json.loads(a.chat_template_kwargs) if a.chat_template_kwargs else None
+    tasks = ([b.strip() for b in re.split(r"(?m)^---\s*$", open(a.turn_prompt, encoding="utf-8").read())
+              if b.strip()] if a.turn_prompt else [])
+    task_tok = int(max(map(len, tasks)) / cpt) + 64 if tasks else 0   # + chat-template margin
+    n_err, summaries = 0, []
+    for rep in range(a.reps):
+        cid = uuid.uuid4().hex[:12]
+        msgs, pos, turn, last = [], 0, 0, None
+        while True:
+            n = int((a.start_tokens if turn == 0 else a.step_tokens) * cpt)
+            if pos + n > len(src):
+                break                                                   # source exhausted
+            if turn == 0:
+                content = f"[conversation-id {cid}]\n\n" + src[pos:pos + n]
+            elif tasks:
+                chunk = src[pos:pos + n]
+                content = (chunk + "\n\n" if chunk else "") + tasks[(turn - 1) % len(tasks)]
+            else:
+                content = (f"Part {turn + 1} of the material follows. Continue the review with it.\n\n"
+                           + src[pos:pos + n])
+            msgs.append({"role": "user", "content": content})
+            pos += n
+            payload = {"model": a.model, "max_tokens": a.max_tokens, "temperature": a.temperature,
+                       "messages": list(msgs)}
+            if kwargs:
+                payload["chat_template_kwargs"] = kwargs
+            kv_stop, kv_vals = threading.Event(), []
+            kv_t = threading.Thread(target=_kv_poller, args=(a.url, kv_stop, kv_vals), daemon=True)
+            kv_t.start()
+            w_start = time.time()
+            s = stream(a.url, "chat", payload, a.timeout)
+            kv_stop.set(); kv_t.join(timeout=10)
+            row = {"kind": "turn", "label": a.label, "engine": a.engine, "rep": rep, "turn": turn,
+                   "conversation_id": cid}
+            if "error" not in s and not s.get("finish"):   # cut stream: tokens arrived, no finish_reason
+                s = {"error": "stream ended without finish_reason (interrupted)", "total_s": s["total_s"]}
+            if "error" in s:
+                row.update(error=s["error"], total_s=round(s.get("total_s", 0), 3))
+                print(json.dumps(row)); n_err += 1
+                break
+            m = _request_metrics(s)
+            cached = (s["usage"].get("prompt_tokens_details") or {}).get("cached_tokens")
+            ctx = m["prompt_tokens"]
+            new = ctx - cached if (ctx is not None and cached is not None) else None
+            m.pop("prefill_tok_s")         # full-prompt/ttft would count cached tokens as prefilled
+            row.update(m)
+            row.update(_wall(w_start, s))
+            row.update(context_tokens=ctx, cached_tokens=cached, new_tokens=new,
+                       prefill_new_tok_s=round(new / m["ttft_s"], 1) if new and m["ttft_s"] else None,
+                       finish=s["finish"],
+                       kv_usage_peak=round(max(kv_vals), 4) if kv_vals else None)
+            print(json.dumps(row), flush=True)
+            msgs.append({"role": "assistant", "content": s["content"] or s["reasoning"]})
+            last = row
+            turn += 1
+            if (ctx or 0) + m["gen_tokens"] + a.step_tokens + task_tok + a.max_tokens > a.max_depth:
+                break
+        summaries.append({"rep": rep, "turns": turn,
+                          "final_context_tokens": last["context_tokens"] if last else None})
+    print(json.dumps({"kind": "conversation_summary", "label": a.label, "engine": a.engine,
+                      "model": a.model, "url": a.url, "prompt_files": a.prompt_file,
+                      "start_tokens": a.start_tokens, "step_tokens": a.step_tokens,
+                      "max_depth": a.max_depth, "max_tokens": a.max_tokens, "reps": a.reps,
+                      "chat_template_kwargs": kwargs, "turn_prompt": a.turn_prompt or None,
+                      "conversations": summaries, "n_err": n_err}))
+    if n_err == a.reps:
+        sys.exit(2)
 
 
 # ------------------------------------------------------------------ mode: tasks
@@ -346,6 +469,25 @@ def main():
     p.add_argument("--api", choices=["completions", "chat"], default="completions")
     p.add_argument("--timeout", type=float, default=1200.0)
     p.set_defaults(func=run_probe)
+
+    c = sub.add_parser("conversation", help="growing multi-turn chat, prior turns cached (JSONL to stdout)")
+    c.add_argument("--url", required=True, help="base URL incl. /v1")
+    c.add_argument("--model", default="local")
+    c.add_argument("--prompt-file", action="append", required=True,
+                   help="source text the turns are cut from (first file used); must hold >= max-depth tokens")
+    c.add_argument("--start-tokens", type=int, default=10000, help="size of turn 0")
+    c.add_argument("--step-tokens", type=int, default=15000, help="new material added per later turn")
+    c.add_argument("--max-depth", type=int, required=True, help="stop before context would exceed this")
+    c.add_argument("--max-tokens", type=int, default=256)
+    c.add_argument("--temperature", type=float, default=0.2)
+    c.add_argument("--chat-template-kwargs", default="", help='JSON, e.g. \'{"reasoning_effort":"low"}\'')
+    c.add_argument("--turn-prompt", default="",
+                   help="task file appended to every later turn (blocks split on a '---' line, cycled)")
+    c.add_argument("--reps", type=int, default=1, help="independent conversations")
+    c.add_argument("--engine", default="unknown")
+    c.add_argument("--label", default="run")
+    c.add_argument("--timeout", type=float, default=1200.0)
+    c.set_defaults(func=run_conversation)
 
     t = sub.add_parser("tasks", help="quality task-suite capture (full telemetry to --out JSONL)")
     t.add_argument("--url", required=True, help="base URL incl. /v1")

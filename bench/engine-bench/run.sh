@@ -14,6 +14,7 @@
 #
 # Env knobs: PROMPT_FILE (required for probe; space-separated list = per-stream variants)
 #            SLUG MAX_TOKENS CONCURRENCY REPS WARMUP PREFIX_MODE (none|unique|shared)
+#            MODE=conversation (+ START_TOKENS STEP_TOKENS MAX_DEPTH CHAT_KWARGS [TURN_PROMPT]): growing multi-turn chat
 #            USE_BENCHY BENCHY_ARGS
 #            SAMPLE_VRAM=1  → log GPU VRAM+GTT+power across the probe (gpu_samples.csv) and fold a
 #                            `gpu` row into results.jsonl. NOTE: the sampler spans the whole engine
@@ -55,6 +56,7 @@ mkdir -p "$OUT"
   echo "date=$(date -Iseconds)"
   echo "workload=${PROMPT_FILE:-benchy-synthetic}"
   echo "max_tokens=$MAX_TOKENS concurrency=$CONCURRENCY reps=$REPS warmup=$WARMUP prefix_mode=$PREFIX_MODE"
+  [ "${MODE:-probe}" = conversation ] && echo "mode=conversation start_tokens=${START_TOKENS:-10000} step_tokens=${STEP_TOKENS:-15000} max_depth=${MAX_DEPTH:-} chat_kwargs=${CHAT_KWARGS:-}${TURN_PROMPT:+ turn_prompt=$TURN_PROMPT}"
 } > "$OUT/meta.txt"
 if [ "$USE_BENCHY" != "1" ]; then
   for f in $PROMPT_FILE; do cp "$f" "$OUT/"; done
@@ -77,6 +79,7 @@ fi
 stop_sampler () { [ -n "$SAMPLER_PID" ] && kill "$SAMPLER_PID" 2>/dev/null && wait "$SAMPLER_PID" 2>/dev/null || true; SAMPLER_PID=""; }
 trap stop_sampler EXIT
 
+PROBE_FAILED=0   # nonzero exit at the end, so a caller never marks an all-failed probe as done
 for e in "${ENGINES[@]}"; do
   IFS='|' read -r name url model <<<"$e"
   echo "== $name ($url) =="
@@ -93,10 +96,24 @@ for e in "${ENGINES[@]}"; do
       > "$OUT/benchy_${name}.txt" 2>&1 || echo "  benchy failed for $name (see $OUT/benchy_${name}.txt)"
   else
     PF_ARGS=(); for f in $PROMPT_FILE; do PF_ARGS+=(--prompt-file "$f"); done
+    # speculative-decoding acceptance for THIS probe (vLLM counters; no-op for engines without them)
+    python3 "$REPO/bench/lib/spec_metrics.py" snap "$url" > "$OUT/.spec_before_${name}.json" 2>/dev/null || echo '{}' > "$OUT/.spec_before_${name}.json"
+    spec_row () { python3 "$REPO/bench/lib/spec_metrics.py" diff "$OUT/.spec_before_${name}.json" "$url" "$SLUG" "$name" \
+                    >> "$OUT/results.jsonl" 2>/dev/null || true; rm -f "$OUT/.spec_before_${name}.json"; }
+    if [ "${MODE:-probe}" = conversation ]; then
+      python3 "$REPO/bench/lib/capture_engine.py" conversation --url "$url" --model "$model" "${PF_ARGS[@]}" \
+        --start-tokens "${START_TOKENS:-10000}" --step-tokens "${STEP_TOKENS:-15000}" \
+        --max-depth "${MAX_DEPTH:?MODE=conversation needs MAX_DEPTH}" --max-tokens "$MAX_TOKENS" \
+        --reps "$REPS" --chat-template-kwargs "${CHAT_KWARGS:-}" ${TURN_PROMPT:+--turn-prompt "$TURN_PROMPT"} \
+        --engine "$name" --label "$SLUG" >> "$OUT/results.jsonl" || { echo "  conversation failed for $name"; PROBE_FAILED=1; }
+      spec_row
+      continue
+    fi
     python3 "$REPO/bench/lib/capture_engine.py" probe --url "$url" --model "$model" "${PF_ARGS[@]}" \
       --max-tokens "$MAX_TOKENS" --concurrency "$CONCURRENCY" --reps "$REPS" \
       --warmup "$WARMUP" --prefix-mode "$PREFIX_MODE" --api "$API" \
-      --engine "$name" --label "$SLUG" >> "$OUT/results.jsonl" || echo "  probe failed for $name"
+      --engine "$name" --label "$SLUG" >> "$OUT/results.jsonl" || { echo "  probe failed for $name"; PROBE_FAILED=1; }
+    spec_row
   fi
 done
 
@@ -118,6 +135,13 @@ if last:
         "peak_gtt_mib": int(float(g["peak_gtt_used_mib"])) if "peak_gtt_used_mib" in g else None,
         "avg_power_w": float(g["avg_power_w"]) if "avg_power_w" in g else None}))
 PY
+  # per-phase power (prefill vs decode) from the requests' wall-clock phase boundaries
+  python3 "$REPO/bench/lib/phase_power.py" "$OUT" > "$OUT/.power.jsonl" 2>/dev/null \
+    && cat "$OUT/.power.jsonl" >> "$OUT/results.jsonl"; rm -f "$OUT/.power.jsonl"
+  python3 -c "import json
+for l in open('$OUT/results.jsonl'):
+    d=json.loads(l)
+    if d.get('kind')=='power': print(f\"power {d['label']}: prefill avg {d['prefill_w_avg']} W (n={d['prefill_n']}) decode avg {d['decode_w_avg']} W (n={d['decode_n']}) {d.get('flag') or ''}\")" || true
 fi
 
 echo "→ results: $OUT"
@@ -129,3 +153,4 @@ for l in open('$OUT/results.jsonl'):
     print(f\"{d.get('engine'):16} c={d.get('concurrency')} ttft_p50={d.get('ttft_s_p50')}s \"
           f\"prefill_p50={d.get('prefill_tok_s_p50')} dec/stream_p50={d.get('decode_tok_s_per_stream_p50')} \"
           f\"AGG={d.get('aggregate_tok_s')} tok/s err={d.get('n_err')}\")"; }
+[ "$PROBE_FAILED" = 0 ] || { echo "→ at least one probe FAILED (rows kept in $OUT/results.jsonl)" >&2; exit 1; }

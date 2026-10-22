@@ -33,8 +33,11 @@ Spec schema (JSON)
   "title": "Deep-context campaign",   # optional (README H1)
   "notes": ["free-text lines emitted as # NOTE: comments at the top of run.sh"],  # optional
 
-  "model": "/abs/path/model.gguf",    # required
-  "backend": "vulkan",                # rocm|vulkan  (engine URL/port wiring)
+  "model": "/abs/path/model.gguf",    # required (vllm: the checkpoint, informational — the profile mounts it)
+  "engine": "llamacpp",               # llamacpp (default) | vllm
+  "profile": "sly-radiance/qwen38-mxfp4",  # vllm only: bench/engine-bench/vllm/profiles/<engine>/<model>
+  "served_model": "qwen38-27b-mxfp4", # vllm only: the --served-model-name requests must use
+  "backend": "vulkan",                # llamacpp only: rocm|vulkan  (engine URL/port wiring)
   "port": 8081,                       # server port (must match backend's engine URL)
   "tuning": {"ub": 2048, "b": 4096, "fa": "on"},
   "vram": {                           # OPTIONAL but recommended: enables the pre-flight guard
@@ -53,9 +56,20 @@ Spec schema (JSON)
   ]
 }
 Probe defaults: max_tokens 256, api "completions", concurrency 1, reps 2, prefix_mode "unique".
+Optional probe "warmup": N untimed warm-ups (default: engine-bench/run.sh's 1). Each warm-up is a full
+prefill of the probe's own fixture, so set 0 on deep probes once the server is warm.
+Conversation probe (iron rule 17 — growing multi-turn chat, prior turns cached):
+  {"slug": "conv", "mode": "conversation", "prompts": ["codereview-150000.txt"], "start_tokens": 10000,
+   "step_tokens": 15000, "max_depth": 145000, "max_tokens": 256, "reps": 2,
+   "chat_template_kwargs": {"reasoning_effort": "low"}}      # max_depth defaults to the server ctx
+  Optional "turn_prompt": "<file in bench/workloads/tasks/>" appends that task to every later turn
+  ('---'-separated blocks are cycled); with "step_tokens": 0 the task IS the turn (fill-then-think).
+vllm servers: `ctx` → MAXLEN, `np` → MAXSEQS, `kv` → KV_DTYPE (e.g. fp8|auto), `mtp` must be 0 (the
+speculative config lives in the profile). No VRAM prediction: vLLM reserves
+--gpu-memory-utilization at boot, and serve_vllm.sh's watchdog guards the load-time peak.
 Each probe SLUG must be unique in the campaign (the driver globs its run dir by that slug).
 """
-import sys, os, json, argparse, datetime, stat
+import sys, os, re, json, argparse, datetime, stat
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BACKEND_PORT = {"rocm": 8080, "vulkan": 8081}
@@ -70,7 +84,7 @@ def predict_vram_mib(spec, srv):
     Returns int MiB, or -1 if it cannot be computed (no `vram` block, or the server's KV type is
     absent from kv_kib_per_tok) — the guard then can't act on that server."""
     v = spec.get("vram")
-    if not v or "weights_gib" not in v or "kv_kib_per_tok" not in v:
+    if spec.get("engine") == "vllm" or not v or "weights_gib" not in v or "kv_kib_per_tok" not in v:
         return -1
     kk = v["kv_kib_per_tok"]
     if isinstance(kk, dict):
@@ -95,6 +109,11 @@ def emit_runsh(spec):
     tune = spec.get("tuning", {})
     ub, b, fa = tune.get("ub", 2048), tune.get("b", 4096), tune.get("fa", "on")
     engine_name = f"llamacpp-{backend}" if backend in BACKEND_PORT else backend
+    vllm = spec.get("engine") == "vllm"
+    if vllm:
+        port = spec.get("port") or 8000
+        engine_name = "vllm-" + spec["profile"].replace("/", "-")
+    served = spec["served_model"] if vllm else "local"
     v = spec.get("vram") or {}
     default_budget = int(v.get("budget_mib", 32400))   # < physical VRAM (32624 MiB) → VRAM-only
 
@@ -119,7 +138,7 @@ def emit_runsh(spec):
     ad('EB="$ROOT/bench/engine-bench"')
     ad('GEN="$ROOT/bench/workloads/generated"')
     ad(f'export MODEL={sh_quote(spec["model"])}')
-    ad(f'export ENGINES_LIST="{engine_name}|http://localhost:{port}/v1|local"')
+    ad(f'export ENGINES_LIST="{engine_name}|http://localhost:{port}/v1|{served}"')
     ad("# --- run-time knobs (override on the command line) ---")
     ad(f'VRAM_BUDGET_MIB="${{VRAM_BUDGET_MIB:-{default_budget}}}"  # guard: skip servers predicted above this')
     ad('ONLY="${ONLY:-}"                 # comma-separated slug globs; empty = all probes')
@@ -128,7 +147,8 @@ def emit_runsh(spec):
     ad('mkdir -p "$CAMPAIGN_DIR/done"')
     ad('if [ ! -f "$CAMPAIGN_DIR/meta.txt" ]; then')
     ad('  { echo "date=$(date -Iseconds)"; echo "model=$MODEL"; '
-       f'echo "backend={backend}"; echo "tuning=ub{ub} b{b} fa{fa}"; '
+       + (f'echo "engine=vllm profile={spec["profile"]} served_model={served}"; ' if vllm else
+          f'echo "backend={backend}"; echo "tuning=ub{ub} b{b} fa{fa}"; ') +
        'echo "vram_budget_mib=$VRAM_BUDGET_MIB"; } > "$CAMPAIGN_DIR/meta.txt"')
     ad('fi')
     ad("")
@@ -196,13 +216,37 @@ def emit_runsh(spec):
     ad('    touch "$CAMPAIGN_DIR/done/$slug"')
     ad('  else echo "  FAILED: $slug" | tee -a "$CAMPAIGN_DIR/failures.txt"; fi; }')
     ad("")
-    ad(f'stop_server () {{ PORT={port} "$EB/serve_llamacpp.sh" stop 2>/dev/null || true; }}')
+    if any(p.get("mode") == "conversation" for srv in spec["servers"] for p in srv["probes"]):
+        ad("run_conv () {  # slug reps max_tokens start step max_depth chat_kwargs_json prompt_file")
+        ad("  local slug=$1 reps=$2 maxt=$3 start=$4 step=$5 depth=$6 kw=$7 pf=$8")
+        ad('  if [ -f "$CAMPAIGN_DIR/done/$slug" ]; then echo "  skip (done): $slug"; return 0; fi')
+        ad('  if ! want_probe "$slug"; then echo "  skip (ONLY filter): $slug"; return 0; fi')
+        ad('  [ -n "$REPS_OVERRIDE" ] && reps="$REPS_OVERRIDE"')
+        ad('  [ -n "$MAXTOK_OVERRIDE" ] && maxt="$MAXTOK_OVERRIDE"')
+        ad('  if MODE=conversation PROMPT_FILE="$GEN/$pf" SLUG="$slug" MAX_TOKENS="$maxt" REPS="$reps" \\')
+        ad('       START_TOKENS="$start" STEP_TOKENS="$step" MAX_DEPTH="$depth" CHAT_KWARGS="$kw" \\')
+        ad('       SAMPLE_VRAM=1 "$EB/run.sh"; then')
+        ad('    local rd; rd=$(ls -td "$ROOT"/bench/runs/*-engine-"$slug"/ 2>/dev/null | head -1)')
+        ad('    [ -n "$rd" ] && [ -f "$rd/results.jsonl" ] \\')
+        ad('      && cat "$rd/results.jsonl" >> "$CAMPAIGN_DIR/results.jsonl"')
+        ad('    touch "$CAMPAIGN_DIR/done/$slug"')
+        ad('  else echo "  FAILED: $slug" | tee -a "$CAMPAIGN_DIR/failures.txt"; fi; }')
+        ad("")
+    if vllm:
+        ad(f'stop_server () {{ PORT={port} "$EB/vllm/serve_vllm.sh" stop 2>/dev/null || true; }}')
+    else:
+        ad(f'stop_server () {{ PORT={port} "$EB/serve_llamacpp.sh" stop 2>/dev/null || true; }}')
     ad("start_server () {  # name ctx kv -> 0 up, nonzero (recorded) on failure; run CONTINUES")
     ad('  local name=$1 ctx=$2 kv=$3 mtp=$4 np=$5')
     ad('  echo ">>> starting $name (ctx=$ctx kv=$kv mtp=$mtp np=$np)"')
-    ad(f'  if BACKEND={backend} CTX="$ctx" NP="$np" KV="$kv" MTP="$mtp" UB={ub} B={b} FA={fa} '
-       'PORT=' + str(port) + ' \\')
-    ad('       "$EB/serve_llamacpp.sh" start; then return 0; fi')
+    if vllm:
+        ad(f'  if PROFILE={sh_quote(spec["profile"])} MAXLEN="$ctx" MAXSEQS="$np" KV_DTYPE="$kv" '
+           f'PORT={port} \\')
+        ad('       "$EB/vllm/serve_vllm.sh" start; then return 0; fi')
+    else:
+        ad(f'  if BACKEND={backend} CTX="$ctx" NP="$np" KV="$kv" MTP="$mtp" UB={ub} B={b} FA={fa} '
+           'PORT=' + str(port) + ' \\')
+        ad('       "$EB/serve_llamacpp.sh" start; then return 0; fi')
     ad('  echo "SERVER-FAILED (start OOM/other; expected near the ceiling): $name ctx=$ctx kv=$kv" \\')
     ad('    | tee -a "$CAMPAIGN_DIR/failures.txt"; stop_server; return 1; }')
     ad('trap stop_server EXIT')
@@ -231,7 +275,21 @@ def emit_runsh(spec):
            f'{srv["mtp"]} {srv["np"]}; then')
         for p in srv["probes"]:
             files = " ".join(sh_quote(f) for f in p["prompts"])
-            ad('    run_probe {slug} {conc} {reps} {maxt} {api} {prefix} {files}'.format(
+            if p.get("mode") == "conversation":
+                kw = json.dumps(p["chat_template_kwargs"]) if p.get("chat_template_kwargs") else ""
+                tp = ""
+                if p.get("turn_prompt"):
+                    if not re.fullmatch(r"[\w.-]+", p["turn_prompt"]) or not os.path.isfile(
+                            os.path.join(REPO, "bench", "workloads", "tasks", p["turn_prompt"])):
+                        sys.exit(f"turn_prompt {p['turn_prompt']!r}: not a file in bench/workloads/tasks/")
+                    tp = f'TURN_PROMPT="$ROOT/bench/workloads/tasks/{p["turn_prompt"]}" '
+                ad('    {tp}run_conv {slug} {reps} {maxt} {st} {sp} {md} {kw} {pf}'.format(
+                    slug=sh_quote(p["slug"]), reps=p.get("reps", 2), maxt=p.get("max_tokens", 256),
+                    st=p.get("start_tokens", 10000), sp=p.get("step_tokens", 15000),
+                    md=p.get("max_depth", srv["ctx"]), kw=sh_quote(kw), pf=sh_quote(p["prompts"][0]), tp=tp))
+                continue
+            wu = f'WARMUP={int(p["warmup"])} ' if "warmup" in p else ""   # untimed warm-up requests (run.sh default 1)
+            ad('    {wu}run_probe {slug} {conc} {reps} {maxt} {api} {prefix} {files}'.format(wu=wu,
                 slug=sh_quote(p["slug"]), conc=p.get("concurrency", 1),
                 reps=p.get("reps", 2), maxt=p.get("max_tokens", 256),
                 api=p.get("api", "completions"), prefix=p.get("prefix_mode", "unique"),
@@ -265,15 +323,21 @@ def emit_readme(spec):
                         f"{srv['mtp']} | `{p['slug']}` | {p.get('concurrency',1)} | "
                         f"{', '.join(p['prompts'])} |")
     tune = spec.get("tuning", {})
+    if spec.get("engine") == "vllm":
+        fixed = (f"- Model `{os.path.basename(spec['model'])}` · engine **vLLM (docker)** · profile "
+                 f"`{spec['profile']}` (`bench/engine-bench/vllm/profiles/`) · served as "
+                 f"`{spec['served_model']}` · server on :{spec.get('port', 8000)}.")
+    else:
+        fixed = (f"- Model `{os.path.basename(spec['model'])}` · backend **{spec.get('backend','vulkan')}** ·\n"
+                 f"  tuning `-ub {tune.get('ub',2048)} -b {tune.get('b',4096)} -fa {tune.get('fa','on')}` ·\n"
+                 f"  server on :{spec.get('port', BACKEND_PORT.get(spec.get('backend','vulkan'),8080))}.")
     return f"""# {title} (R9700, {date})
 
 Scaffolded by `bench/gen_campaign.py`. The executable driver is **`run.sh`** in this folder
 (resumable — per-probe markers in `done/`, rerun to continue). Fill in the prose below.
 
 ## Fixed parameters
-- Model `{os.path.basename(spec['model'])}` · backend **{spec.get('backend','vulkan')}** ·
-  tuning `-ub {tune.get('ub',2048)} -b {tune.get('b',4096)} -fa {tune.get('fa','on')}` ·
-  server on :{spec.get('port', BACKEND_PORT.get(spec.get('backend','vulkan'),8080))}.
+{fixed}
 
 ## Fixtures (auto-built)
 `run.sh` **auto-builds any missing prompt fixture** into `bench/workloads/generated/` from its
@@ -523,8 +587,19 @@ def cmd_emit(args):
             sys.exit("probe slugs must be unique across the campaign")
         # Loud warning if the VRAM guard can't act — otherwise the "GPU/VRAM-only" safety is a silent
         # no-op (servers launch regardless of budget → risk of GTT spill / GPU freeze at high ctx).
+        if spec.get("engine") == "vllm":
+            for k in ("profile", "served_model"):
+                if k not in spec:
+                    sys.exit(f"vllm spec missing required key: {k}")
+            prof = os.path.join(REPO, "bench", "engine-bench", "vllm", "profiles", spec["profile"] + ".env")
+            if not os.path.exists(prof):
+                sys.exit(f"vllm profile not found: {prof}")
+            if any(int(s.get("mtp", 0)) for s in spec["servers"]):
+                sys.exit("vllm servers must have mtp 0 (speculative decoding is configured in the profile)")
+            print("note: vllm engine — no emit-time VRAM prediction; vLLM reserves --gpu-memory-utilization "
+                  "at boot and serve_vllm.sh's watchdog kills a boot that fills the card.", file=sys.stderr)
         unpredictable = [s["name"] for s in spec["servers"] if predict_vram_mib(spec, s) < 0]
-        if unpredictable:
+        if unpredictable and spec.get("engine") != "vllm":
             print("⚠️  WARNING: no VRAM prediction for server(s): " + ", ".join(unpredictable))
             print("    → the pre-flight guard is DISABLED for them; they WILL launch regardless of the")
             print("      VRAM budget (risk of GTT spill / GPU freeze at high context).")
