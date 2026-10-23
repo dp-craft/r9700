@@ -186,7 +186,7 @@ The "normal" radiance is `stilldeadcode/vllm-radiance` (Docker Hub; source <http
 | checkpoint `amd__Qwen3.8-27B-Quark-AWQ-MXFP4@5233554c`, `--quantization quark` | attention: Sly `R4D_HYBRID` · radiance `R4D` |
 | DFlash: drafter `syvai…DFlash2-W4A16@4d30ec73`, k=7, greedy draft, drafter `TRITON_ATTN` | `--max-num-batched-tokens`: Sly 2048 · radiance 16384 |
 | MTP: `{"method":"mtp","num_speculative_tokens":4,"attention_backend":"R4D","disable_padded_drafter_batch":true}` + `--no-async-scheduling` (Sly `serve.sh:155-159` = our 2026-09 radiance row) · `--enforce-eager` on **both** (2026-10-23) | — (cudagraph removed; see the eager note below) |
-| template (md5 above) · `reasoning_effort: medium` · sampler 1.0/0.95/20/0, `presence_penalty` 0 | plugin env: Sly `RADIANCE_MXFP4_*` (W4A8) · radiance AITER matrix + `FAST_DRAFT` |
+| template (md5 above) · `reasoning_effort: medium` · sampler 1.0/0.95/20/0, `presence_penalty` 0.1 (was 0; anti-loop 2026-10-23) | plugin env: Sly `RADIANCE_MXFP4_*` (W4A8) · radiance AITER matrix + `FAST_DRAFT` |
 | ctx 190000 · np 1 · fp8 KV · util 0.90 · `HIP_FORCE_DEV_KERNARG=0` | Sly-only: Cactus (`RADIANCE_CACTUS_DELTA`), KVCACHE=ram tier |
 
 **Cactus confound, and why the Sly arms must run at delta 0:**
@@ -226,6 +226,8 @@ The "normal" radiance is `stilldeadcode/vllm-radiance` (Docker Hub; source <http
    - One long-output thinking task with `max_tokens` 32k, n=3 per arm.
    - A run that exceeds 3× the median length with no tool call / `stop` counts as a loop.
    - Report loops/n per arm. A killed run is quarantined, not graded (rule 18).
+   - **2026-10-23 evidence:** a reasoning loop recurred in Claude Code on `qwen38-27b-mxfp4-dflash-kvfp8-vllm` with `RADIANCE_CACTUS_DELTA=0` (MEASURED: container env), so Cactus is not the whole cause. Response (user decision): `presence_penalty` 0.1 (output tokens only, incl. reasoning; DFlash stays on: both VERIFIED in the 0.31 source) and `CLAUDE_CODE_MAX_OUTPUT_TOKENS` 32000 (also fixes the HTTP 400 at prompt >126k + 64000 > 190000).
+   - Extra arms on S1 (one variable each): presence **0** vs **0.1** (is 0.1 enough?); `KV_DTYPE=auto` vs fp8 (fp8 KV runs with an uncalibrated scale 1.0, a remaining loop suspect, INFERRED); eager vs graphs if loops differ.
 4. **RAM tier smoke** (Sly llama-swap rows, `kv_ram_gib: 8`):
    - `bash $D/swaptest.sh qwen38-27b-mxfp4-dflash-kvfp8-vllm ramtier`, then the same for `qwen38-27b-mxfp4-mtp-kvfp8-vllm`.
    - Before 2026-10-23 the RAM tier faulted 3/3. Those runs predate the kernarg fix, so this re-checks it.
@@ -234,7 +236,7 @@ The "normal" radiance is `stilldeadcode/vllm-radiance` (Docker Hub; source <http
 **llama-swap rows** (`~/.config/llama-swap/models.yaml`, generated ids):
 - Sly: `qwen38-27b-mxfp4-dflash-kvfp8-vllm`, `qwen38-27b-mxfp4-mtp-kvfp8-vllm` (both `kv_ram_gib: 8`).
 - radiance: `qwen38-27b-mxfp4-radiance-kvfp8-vllm`, `qwen38-27b-mxfp4-radiance-dflash-kvfp8-vllm`, `qwen38-27b-mxfp4-radiance-mtp-kvfp8-vllm`.
-- All take the sampler from `generate.py` (`vllm_sampler()`, QWEN38 planning recipe, `presence_penalty` pinned 0).
+- All take the sampler from `generate.py` (`vllm_sampler()`, QWEN38 planning recipe, `presence_penalty` pinned 0.1).
 
 ## Task 2 — flint GGUF in llama-swap
 

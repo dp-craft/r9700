@@ -1,0 +1,8 @@
+derived_from=amd/Qwen3.8-27B-Quark-AWQ-MXFP4@5233554c5fa56afda40150556b95573c2d7d29c0 config.json
+sha256_upstream=4a139d3e01df039e17b4c8b8362f7944674d76051a8cd96f213c6bc332d69f55
+change=strip ".weight" from the 15 quantization_config.exclude entries "mtp.*.weight"
+cmd=sed -E 's/"(mtp\.[^"]*)\.weight"/"\1"/' <upstream>/config.json > config.json
+why=vLLM quark should_ignore_layer matches LAYER names (mtp.fc, mtp.layers.0.mlp.gate_up_proj), never
+    "<layer>.weight", so upstream's excludes miss and the BF16 MTP head is built as MXFP4 -> load-time
+    "assert self.data.shape == loaded_weight.shape" (2026-10-23, Sly 1.6.0 / vLLM 0.31). Verified in-image:
+    upstream -> 5/5 MTP layers not ignored; this file -> 5/5 ignored.

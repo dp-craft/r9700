@@ -24,6 +24,8 @@
 #   CHAT_TEMPLATE=<host .jinja>  mounted read-only and passed as --chat-template (replaces the profile's)
 #   PY_OVERLAY=<host dir>  mounted read-only at /py-overlay and put on PYTHONPATH, so its modules shadow the
 #     image's (e.g. overlays/sly-pad-a). Not combinable with KVCACHE=ram.
+#   MODEL_CONFIG=<host config.json>  mounted read-only OVER /model/config.json -- fixes a checkpoint's config
+#     without touching the fetched snapshot (e.g. overlays/qwen38-mxfp4-mtp-config, see its SOURCE.txt).
 #   KVCACHE=ram KVCACHE_RAM_GIB(16)  Sly's GPU->RAM prefix-cache tier (src/<ver>/kv-cache/README.md):
 #     the 6 "always" patches applied at container start from KVCACHE_PATCHES (Sly source of the SAME
 #     tag), their RADIANCE_* switches, --kv-offloading-size/--kv-offloading-backend native, and a
@@ -185,6 +187,10 @@ CMD=(docker run "${DETACH[@]}" --name "$NAME"
      -v "$HF_CACHE:/hf" -e HF_HOME=/hf)   # any in-container HF fetch (drafter, processor) lands on Lin1
 for m in "${CACHE_MOUNTS[@]}"; do CMD+=(-v "$CACHE_DIR/${m%%:*}:${m#*:}"); done
 if [ -n "${DRAFT_DIR:-}" ]; then CMD+=(-v "$DRAFT_DIR:/draft:ro"); fi   # speculative drafter (profile sets it)
+if [ -n "${MODEL_CONFIG:-}" ]; then   # corrected config.json shadowing the snapshot's (profile or env sets it)
+  [ -f "$MODEL_CONFIG" ] || { echo "MODEL_CONFIG not found: $MODEL_CONFIG" >&2; exit 2; }
+  CMD+=(-v "$MODEL_CONFIG:/model/config.json:ro")
+fi
 if [ -n "${PY_OVERLAY:-}" ]; then   # python modules that shadow the image's (profile or env sets it)
   [ -d "$PY_OVERLAY" ] || { echo "PY_OVERLAY is not a directory: $PY_OVERLAY" >&2; exit 2; }
   [ -z "$KVC_PRELUDE" ] || { echo "PY_OVERLAY and KVCACHE=ram both set PYTHONPATH; use one" >&2; exit 2; }
@@ -230,6 +236,7 @@ DIGEST=$(docker image inspect -f '{{index .RepoDigests 0}}' "$IMAGE" 2>/dev/null
   echo "# image_digest=$DIGEST"
   echo "# profile=$PROFILE $(grep -E '^(repo|revision)=' "$MODEL_DIR/SOURCE.txt" 2>/dev/null | tr '\n' ' ')"
   [ -n "${DRAFT_DIR:-}" ] && echo "# drafter $(grep -E '^(repo|revision)=' "$DRAFT_DIR/SOURCE.txt" 2>/dev/null | tr '\n' ' ')"
+  [ -n "${MODEL_CONFIG:-}" ] && echo "# model_config_override=$MODEL_CONFIG sha256=$(sha256sum "$MODEL_CONFIG" | cut -d' ' -f1)"
   echo "# started_utc=$(date -u +%FT%TZ)"; } > "$CMDFILE"
 rm -f "$RUNDIR/$PORT.watchdog"
 if [ "${1:-start}" = run ]; then

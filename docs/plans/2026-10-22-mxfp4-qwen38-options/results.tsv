@@ -1,0 +1,28 @@
+2026-10-22_19:41:31	radiance-093	radiance/qwen38-mxfp4  GPU_UTIL=0.90 EXTRA_ARGS= IMAGE=default ROUNDS=1	PASS	boot=403s r1p0=57s r1p1=40s r1p2=43s r1p3=43s r1p4=43s 
+2026-10-22_19:51:25	radiance-swap	llama-swap qwen38-27b-mxfp4-radiance-kvfp8-vllm	PASS	 p0=391s p1=40s p2=44s p3=45s p4=43s
+2026-10-22_19:57:55	baseline-rerun	sly-radiance/qwen38-mxfp4-dflash  GPU_UTIL=0.90 EXTRA_ARGS= IMAGE=default ROUNDS=1	PASS	boot=260s r1p0=14s r1p1=9s r1p2=5s r1p3=6s r1p4=6s 
+2026-10-22_20:05:54	claude-direct	sly-radiance/qwen38-mxfp4-dflash (direct :8000, real claude -p, 4 turns --continue)	FAULT@t0	 t0=5s radiance_mxfp4_fp8_gemm_folded
+2026-10-22_20:13:48	claude-baseline-2	claude: sly-radiance/qwen38-mxfp4-dflash  GPU_UTIL=0.90 EXTRA_ARGS= IMAGE=default TURNS=4	FAULT@t0	boot=158s t0=10s kernel: void radiance_mxfp4_fp8_gemm_folded
+2026-10-22_20:24:50	B1	claude: sly-radiance/qwen38-mxfp4 RADIANCE_MXFP4_PADOUT=65536 GPU_UTIL=0.85 EXTRA_ARGS=--max-num-batched-tokens 4096 IMAGE=default TURNS=4	CLAUDE_FAIL@t1(rc=1,err)	boot=188s t0=397s t1=20s 
+2026-10-22_20:58:27	mhist	claude: sly-radiance/qwen38-mxfp4-dflash RADIANCE_MXFP4_MHIST=1 GPU_UTIL=0.90 EXTRA_ARGS= IMAGE=default TURNS=4	CLAUDE_FAIL@t3(rc=1,err)	boot=166s t0=85s t1=66s t2=75s t3=10s 
+2026-10-22_21:14:59	swap-180k	llama-swap qwen38-27b-mxfp4-dflash-kvfp8-vllm	FAULT@p0	
+2026-10-22_21:39:19	v151	claude: sly-radiance/qwen38-mxfp4-dflash  MAXLEN=180000 GPU_UTIL=0.90 EXTRA_ARGS= IMAGE=ghcr.io/slybase/vllm-sly-radiance:1.5.1-rocm10.1 TURNS=4	PASS	boot=494s t0=151s t1=90s t2=96s t3=211s 
+2026-10-22_21:44:50	v151-2	claude: sly-radiance/qwen38-mxfp4-dflash  MAXLEN=180000 GPU_UTIL=0.90 EXTRA_ARGS= IMAGE=ghcr.io/slybase/vllm-sly-radiance:1.5.1-rocm10.1 TURNS=4	FAULT@t0	boot=322s t0=5s kernel: void radiance_mxfp4_fp8_gemm_atiled
+2026-10-22_21:48:34	lad-120k-r1	claude: sly-radiance/qwen38-mxfp4-dflash RADIANCE_MXFP4_MHIST=1 MAXLEN=120000 COMPACT=69% GPU_UTIL=0.90 EXTRA_ARGS= IMAGE=default TURNS=4	FAULT@t0	boot=167s t0=25s kernel: void radiance_mxfp4_fp8_gemm_atiled
+2026-10-22_22:01:50	pada-1	claude: sly-radiance/qwen38-mxfp4-dflash-pada  MAXLEN=180000 COMPACT=75% GPU_UTIL=0.90 EXTRA_ARGS= IMAGE=default TURNS=2	FAULT@t0	boot=151s t0=5s kernel: void radiance_mxfp4_fp8_gemm_folded
+2026-10-22_22:05:26	padao-1	claude: sly-radiance/qwen38-mxfp4-dflash-pada  MAXLEN=180000 COMPACT=75% GPU_UTIL=0.90 EXTRA_ARGS= IMAGE=default TURNS=2	FAULT@t0	boot=158s t0=5s kernel: void radiance_mxfp4_fp8_gemm_atiled
+2026-10-22_22:08:27	ptrlog-1	claude: sly-radiance/qwen38-mxfp4-dflash-pada RADIANCE_MXFP4_PTRLOG=1	BOOT_FAILED	/home/dev/work/dp-craft/amd/docs/plans/2026-10-22-mxfp4-qwen38-options/logs/ptrlog-1.server:Error response from daemon: No such container: vllm-8000
+2026-10-22_22:13:38	ptrlog-2	claude: sly-radiance/qwen38-mxfp4-dflash-pada RADIANCE_MXFP4_PTRLOG=1 MAXLEN=180000 COMPACT=75% GPU_UTIL=0.90 EXTRA_ARGS= IMAGE=default TURNS=1	PASS	boot=153s t0=122s 
+2026-10-22_22:18:53	ptrlog-3	claude: sly-radiance/qwen38-mxfp4-dflash-pada RADIANCE_MXFP4_PTRLOG=1 MAXLEN=180000 COMPACT=75% GPU_UTIL=0.90 EXTRA_ARGS= IMAGE=default TURNS=2	PASS	boot=149s t0=86s t1=61s 
+2026-10-22_22:21:34	ptrlog-4	claude: sly-radiance/qwen38-mxfp4-dflash-pada RADIANCE_MXFP4_PTRLOG=1 MAXLEN=180000 COMPACT=75% GPU_UTIL=0.90 EXTRA_ARGS= IMAGE=default TURNS=2	FAULT@t0	boot=152s t0=5s kernel: void radiance_mxfp4_fp8_gemm_atiled
+2026-10-22_22:31:37	warm-1	claude: sly-radiance/qwen38-mxfp4-dflash  MAXLEN=180000 COMPACT=75% GPU_UTIL=0.90 EXTRA_ARGS= IMAGE=default TURNS=4	FAULT@t0	boot=312s warmboots=2 t0=15s kernel: void radiance_mxfp4_fp8_gemm_atiled
+2026-10-22_22:38:18	split-1	claude: sly-radiance/qwen38-mxfp4-dflash-split  MAXLEN=180000 COMPACT=75% GPU_UTIL=0.90 EXTRA_ARGS= IMAGE=default TURNS=2	PASS	boot=152s t0=86s t1=65s 
+2026-10-22_22:47:34	split-2	claude: sly-radiance/qwen38-mxfp4-dflash-split  MAXLEN=180000 COMPACT=75% GPU_UTIL=0.90 EXTRA_ARGS= IMAGE=default TURNS=4	PASS	boot=152s t0=90s t1=65s t2=76s t3=146s 
+2026-10-22_22:54:23	split-3	claude: sly-radiance/qwen38-mxfp4-dflash-split  MAXLEN=180000 COMPACT=75% GPU_UTIL=0.90 EXTRA_ARGS= IMAGE=default TURNS=4	FAULT@t3	boot=158s t0=85s t1=65s t2=86s t3=10s kernel: void radiance_mxfp4_fp8_gemm_decode
+2026-10-22_23:46:18	k34-1	claude: sly-radiance/qwen38-mxfp4-dflash  MAXLEN=180000 COMPACT=75% GPU_UTIL=0.90 EXTRA_ARGS= IMAGE=default TURNS=4	CLAUDE_FAIL@t3(rc=1,err)	boot=191s t0=96s t1=65s t2=91s t3=15s 
+2026-10-22_23:49:31	k34-2	claude: sly-radiance/qwen38-mxfp4-dflash  MAXLEN=180000 COMPACT=75% GPU_UTIL=0.90 EXTRA_ARGS= IMAGE=default TURNS=4	FAULT@t0	boot=147s t0=10s kernel: void radiance_mxfp4_fp8_gemm_atiled
+2026-10-23_00:03:20	hostka-1	claude: sly-radiance/qwen38-mxfp4-dflash HIP_FORCE_DEV_KERNARG=0 MAXLEN=180000 COMPACT=75% GPU_UTIL=0.90 EXTRA_ARGS= IMAGE=default TURNS=4	PASS	boot=149s t0=91s t1=65s t2=256s t3=236s 
+2026-10-23_00:11:50	hostka-2	claude: sly-radiance/qwen38-mxfp4-dflash HIP_FORCE_DEV_KERNARG=0 MAXLEN=180000 COMPACT=75% GPU_UTIL=0.90 EXTRA_ARGS= IMAGE=default TURNS=4	PASS	boot=154s t0=81s t1=75s t2=70s t3=126s 
+2026-10-23_00:20:28	hostka-3	claude: sly-radiance/qwen38-mxfp4-dflash HIP_FORCE_DEV_KERNARG=0 MAXLEN=180000 COMPACT=75% GPU_UTIL=0.90 EXTRA_ARGS= IMAGE=default TURNS=4	PASS	boot=167s t0=70s t1=51s t2=75s t3=151s 
+2026-10-23_00:20:48	swap-ka	llama-swap qwen38-27b-mxfp4-dflash-kvfp8-vllm	HTTP_FAIL@p0(000)	
+2026-10-23_00:27:09	swap-ka	llama-swap qwen38-27b-mxfp4-dflash-kvfp8-vllm	PASS	 p0=181s p1=7s p2=4s p3=4s p4=5s
