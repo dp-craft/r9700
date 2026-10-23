@@ -1,0 +1,4 @@
+date=2026-10-22T15:13:31+02:00
+workload=/home/dev/work/dp-craft/amd/bench/workloads/generated/codereview-200000.txt
+max_tokens=1024 concurrency=1 reps=2 warmup=1 prefix_mode=none
+mode=conversation start_tokens=150000 step_tokens=0 max_depth=170000 chat_kwargs={"reasoning_effort": "high"} turn_prompt=/home/dev/work/dp-craft/amd/bench/workloads/tasks/thinking-hard.prompt.txt

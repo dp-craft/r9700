@@ -1,0 +1,20 @@
+{"kind": "request", "label": "mx-cr8000", "engine": "vllm-sly-radiance-qwen38-mxfp4", "rep": 0, "stream": 0, "concurrency": 1, "prefix_mode": "unique", "error": "no tokens received"}
+{"kind": "request", "label": "mx-cr8000", "engine": "vllm-sly-radiance-qwen38-mxfp4", "rep": 1, "stream": 0, "concurrency": 1, "prefix_mode": "unique", "error": "no tokens received"}
+{"kind": "aggregate", "label": "mx-cr8000", "engine": "vllm-sly-radiance-qwen38-mxfp4", "error": "all requests failed"}
+{"kind": "gpu", "label": "mx-cr8000", "vram_used_mib_at_load": 29642, "peak_vram_mib": 30022, "peak_gtt_mib": 73, "avg_power_w": 199.6}
+{"kind": "request", "label": "mx-cr20000", "engine": "vllm-sly-radiance-qwen38-mxfp4", "rep": 0, "stream": 0, "concurrency": 1, "prefix_mode": "unique", "error": "no tokens received"}
+{"kind": "request", "label": "mx-cr20000", "engine": "vllm-sly-radiance-qwen38-mxfp4", "rep": 1, "stream": 0, "concurrency": 1, "prefix_mode": "unique", "error": "no tokens received"}
+{"kind": "aggregate", "label": "mx-cr20000", "engine": "vllm-sly-radiance-qwen38-mxfp4", "error": "all requests failed"}
+{"kind": "gpu", "label": "mx-cr20000", "vram_used_mib_at_load": 30022, "peak_vram_mib": 30022, "peak_gtt_mib": 74, "avg_power_w": 191.1}
+{"kind": "request", "label": "mx-cr40000", "engine": "vllm-sly-radiance-qwen38-mxfp4", "rep": 0, "stream": 0, "concurrency": 1, "prefix_mode": "unique", "error": "no tokens received"}
+{"kind": "request", "label": "mx-cr40000", "engine": "vllm-sly-radiance-qwen38-mxfp4", "rep": 1, "stream": 0, "concurrency": 1, "prefix_mode": "unique", "error": "no tokens received"}
+{"kind": "aggregate", "label": "mx-cr40000", "engine": "vllm-sly-radiance-qwen38-mxfp4", "error": "all requests failed"}
+{"kind": "gpu", "label": "mx-cr40000", "vram_used_mib_at_load": 30022, "peak_vram_mib": 30024, "peak_gtt_mib": 74, "avg_power_w": 195.8}
+{"kind": "request", "label": "mx-cr140000", "engine": "vllm-sly-radiance-qwen38-mxfp4", "rep": 0, "stream": 0, "concurrency": 1, "prefix_mode": "unique", "error": "no tokens received"}
+{"kind": "request", "label": "mx-cr140000", "engine": "vllm-sly-radiance-qwen38-mxfp4", "rep": 1, "stream": 0, "concurrency": 1, "prefix_mode": "unique", "error": "no tokens received"}
+{"kind": "aggregate", "label": "mx-cr140000", "engine": "vllm-sly-radiance-qwen38-mxfp4", "error": "all requests failed"}
+{"kind": "gpu", "label": "mx-cr140000", "vram_used_mib_at_load": 30024, "peak_vram_mib": 30024, "peak_gtt_mib": 74, "avg_power_w": 209.2}
+{"kind": "turn", "label": "mx-conv", "engine": "vllm-sly-radiance-qwen38-mxfp4", "rep": 0, "turn": 0, "conversation_id": "5c05fd812e15", "error": "no tokens received", "total_s": 12.421}
+{"kind": "turn", "label": "mx-conv", "engine": "vllm-sly-radiance-qwen38-mxfp4", "rep": 1, "turn": 0, "conversation_id": "8cccb330543f", "error": "no tokens received", "total_s": 11.498}
+{"kind": "conversation_summary", "label": "mx-conv", "engine": "vllm-sly-radiance-qwen38-mxfp4", "model": "qwen38-27b-mxfp4", "url": "http://localhost:8000/v1", "prompt_files": ["/home/dev/work/dp-craft/amd/bench/workloads/generated/codereview-150000.txt"], "start_tokens": 10000, "step_tokens": 15000, "max_depth": 145000, "max_tokens": 256, "reps": 2, "chat_template_kwargs": {"reasoning_effort": "low"}, "conversations": [{"rep": 0, "turns": 0, "final_context_tokens": null}, {"rep": 1, "turns": 0, "final_context_tokens": null}], "n_err": 2}
+{"kind": "gpu", "label": "mx-conv", "vram_used_mib_at_load": 30011, "peak_vram_mib": 30011, "peak_gtt_mib": 74, "avg_power_w": 191.3}

@@ -1,0 +1,4 @@
+date=2026-10-22T15:06:30+02:00
+model=/mnt/Lin1/work/vllm/sly-radiance/models/amd__Qwen3.8-27B-Quark-AWQ-MXFP4@5233554c
+engine=vllm profile=sly-radiance/qwen38-mxfp4-dflash served_model=qwen38-27b-mxfp4-dflash
+vram_budget_mib=32400

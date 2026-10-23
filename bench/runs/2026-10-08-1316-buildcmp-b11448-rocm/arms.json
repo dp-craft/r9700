@@ -1,0 +1,62 @@
+{
+  "stamp": "2026-10-08-1316",
+  "new": "b11448-rocm",
+  "config": {
+    "model": "/home/dev/models/gguf/unsloth/Qwen3.8-27B-UD-Q4_K_XL.gguf",
+    "shapes": [
+      [
+        128,
+        64
+      ],
+      [
+        512,
+        256
+      ],
+      [
+        2048,
+        512
+      ],
+      [
+        8192,
+        1024
+      ],
+      [
+        32768,
+        2048
+      ]
+    ],
+    "ub": 2048,
+    "batch": 4096,
+    "kv": "q8_0",
+    "reps": 1,
+    "warmup": {
+      "pp": 1000,
+      "pg": [
+        1000,
+        32
+      ]
+    },
+    "parallel": 0
+  },
+  "arms": [
+    {
+      "name": "b790cf51aa-stew675-10.1-rocm",
+      "backend": "rocm",
+      "kind": "shapes",
+      "secs": 232.5,
+      "run_dir": "bench/runs/2026-10-08-1316-model-buildcmp-b790cf51aa-stew675-10.1-rocm"
+    },
+    {
+      "name": "b11448-rocm",
+      "backend": "rocm",
+      "kind": "shapes",
+      "secs": 258.8,
+      "run_dir": "bench/runs/2026-10-08-1320-model-buildcmp-b11448-rocm"
+    }
+  ],
+  "env": {
+    "kernel": "7.0.0-34-generic",
+    "hip": "7.16.26385-0000000",
+    "mesa": "Mesa 26.2.4 - kisak-mesa PPA"
+  }
+}

@@ -1,0 +1,3 @@
+date=2026-10-22T14:18:14+02:00
+workload= /home/dev/work/dp-craft/amd/bench/workloads/generated/codereview-20000.txt
+max_tokens=256 concurrency=1 reps=2 warmup=1 prefix_mode=unique

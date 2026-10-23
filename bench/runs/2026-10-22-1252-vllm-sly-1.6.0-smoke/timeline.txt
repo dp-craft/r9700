@@ -1,0 +1,5 @@
+===== qwen38-mxfp4  10:52:15
+qwen38-mxfp4 boot_ok wall_s=448 10:59:43
+stopped vllm-8000 (log kept: /home/dev/work/dp-craft/amd/bench/.servers/8000.log)
+qwen38-mxfp4 after_stop free_mib=32101 10:59:51
+===== qwen38-nvfp4  10:59:51
