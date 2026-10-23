@@ -1,5 +1,7 @@
 # ISSUE SUMMARY — Sly radiance vLLM + Qwen3.8-27B MXFP4: intermittent GPU memory fault
 
+> **DO NOT FILE AS IS (2026-10-23):** the fault is not a Sly kernel bug. It goes away with `HIP_FORCE_DEV_KERNARG=0` (a kernel-argument pointer arrives with bit 44 cleared) — see `docs/analysis/2026-10-23-0023-vllm-gpu-fault-solved-hip-kernarg.md`. An upstream report, if any, belongs to ROCm/HIP.
+
 - **Written:** 2026-10-22 ~19:00 local (end of session) · **Status:** OPEN, not fixed
 - **Companion files:** `PLAN.md` (next steps: Batched search, Batches 1–6; options A–I as the catalog), `vllmtest.sh` / `swaptest.sh` (repro harness), `fixtures/` (repro prompts: a shared-prefix series, NOT independent cold prompts — see PLAN.md Batched search)
 - **Earlier write-up** (timeline up to 17:20, partly superseded by this file): `docs/analysis/2026-10-22-1643-vllm-mxfp4-atiled-fault-and-llama-swap-serving.md`

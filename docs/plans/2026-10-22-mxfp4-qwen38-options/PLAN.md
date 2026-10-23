@@ -1,8 +1,10 @@
 # PLAN — stable MXFP4 Qwen3.8-27B at 150k (8-bit KV) + two llama-swap additions
 
+> **STATUS 2026-10-23: SOLVED — `HIP_FORCE_DEV_KERNARG=0`** (`docs/analysis/2026-10-23-0023-vllm-gpu-fault-solved-hip-kernarg.md`; working notes in `FASTPATH.md`). The unchanged Sly 1.6.0 + DFlash config (`sly-radiance/qwen38-mxfp4-dflash`, llama-swap `qwen38-27b-mxfp4-dflash-kvfp8-vllm`) is the solution; the batches/options below are kept for history and are not needed for the fault.
+
 - **Written:** 2026-10-22 (end of the Sly-radiance fault session) · **Executor:** a fresh Claude session; a small model can run it
 - **Background (read only if stuck):** `docs/analysis/2026-10-22-1643-vllm-mxfp4-atiled-fault-and-llama-swap-serving.md`
-- **This folder:** `PLAN.md` (this file), `vllmtest.sh`, `swaptest.sh`, `fixtures/p0..p4.json`, `results.tsv` (created by the scripts), `logs/`
+- **This folder:** `PLAN.md` (this file), `claudetest.sh` (**the fault gate**, see below), `vllmtest.sh`, `swaptest.sh`, `fixtures/p0..p4.json`, `results.tsv` (created by the scripts), `logs/`
 
 ## Rules for the executor (from CLAUDE.md — do not skip)
 
@@ -30,13 +32,18 @@
 
 ```bash
 D=/home/dev/work/dp-craft/amd/docs/plans/2026-10-22-mxfp4-qwen38-options
+bash $D/claudetest.sh <label> <engine>/<profile> [ENV=VAL ...] # THE GATE: boots :8000 like vllmtest, load = real Claude Code
 bash $D/vllmtest.sh <label> <engine>/<profile> [ENV=VAL ...]   # vLLM option, boots its own server on :8000
 bash $D/swaptest.sh <llama-swap-model-id> [label]              # anything already in llama-swap
 ```
 
-- **PASS** means all 5 prompts (shared-prefix series: p0 ~25k tokens cold, p1/p2 cache hits, p3/p4 ~5k new tokens each on a cached prefix) return HTTP 200 with no `MEMORY_FAULT`.
-- **Baseline** (Sly 1.6.0 profile, MEASURED 2026-10-22): FAULT@p4 in `radiance_mxfp4_fp8_gemm_atiled`. The p0..p3 times were 13 / 7 / 5 / 5 s.
-- **Task 3 uses stricter rules** (see "Batched search"): `ROUNDS=2` (10 requests per boot), and a PASS counts only after a second, identical confirmation boot also PASSes.
+- **Gate = `claudetest.sh`** (added 2026-10-22 evening). It boots exactly like `vllmtest.sh` (same temp profile, `VLLM_DISABLE_COMPILE_CACHE=1`, same knobs: `IMAGE KV_DTYPE MAXLEN MAXSEQS GPU_UTIL EXTRA_ARGS`), then drives a **real `claude -p` session** with `~/.config/claude/local_vllm_direct/settings.json` (= `local_muxik` pointed at `:8000`, **no llama-swap**): 4 read-heavy turns chained with `--continue`, so the context grows like an agent's. The served model name is read from `/v1/models` and written into a per-run copy of the settings (`logs/<label>.settings.json`), so it works for every profile. **PASS** = all 4 turns exit 0 with `is_error=false` and no `MEMORY_FAULT`. Result line: `PASS | FAULT@tN | CLAUDE_FAIL@tN | BOOT_FAILED`.
+  - **Why it replaces the fixtures as the gate** (MEASURED 2026-10-22): the unchanged baseline PASSed `vllmtest.sh` once (`baseline-rerun`, 14/9/5/6/6 s) and then faulted on the **first** real Claude request, ~5 s in (`claude-direct`, `radiance_mxfp4_fp8_gemm_folded`), with llama-swap not involved. The fixtures only reach the `atiled` path and fault intermittently; Claude's request shapes reach `folded` at once.
+  - `vllmtest.sh` stays for timing comparisons (fixed p0..p4 shape).
+  - **Budget (user, 2026-10-22, synced):** `~/.config/claude/local_muxik` (via llama-swap) and `local_vllm_direct` (direct, `:8000`) now differ only in URL + model id. Both: `CLAUDE_CODE_MAX_CONTEXT_TOKENS=180000`, `CLAUDE_CODE_MAX_OUTPUT_TOKENS=33000`, `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=75`, no `CLAUDE_CODE_AUTO_COMPACT_WINDOW`. The llama-swap row `qwen38-27b-mxfp4-dflash` is at ctx 180000 (id unchanged). The gate boots at `MAXLEN` = that window (override with `MAXLEN=`) and takes every other budget value from `local_vllm_direct`. `~/.config/claude/local_vllm_direct/vllm.sh start|stop|status|logs` serves the same config by hand. vLLM accepts prompts only up to 180000 − 33000 = 147k. Compaction was 85% ≈ 153k, which left a 147k–153k HTTP 400 gap; then 81%, now **75% ≈ 135k** (user, 2026-10-22: "safe values") — 81% sat only ~1k under the 147k limit, and Claude Code's own token estimate can differ from vLLM's count. If MAXLEN or the output budget changes, keep PCT < (MAXLEN − MAX_OUTPUT) / MAXLEN.
+- **`vllmtest.sh` PASS** means all 5 prompts (shared-prefix series: p0 ~25k tokens cold, p1/p2 cache hits, p3/p4 ~5k new tokens each on a cached prefix) return HTTP 200 with no `MEMORY_FAULT`.
+- **Baseline** (Sly 1.6.0 profile, MEASURED 2026-10-22): `vllmtest.sh` FAULT@p4 in `radiance_mxfp4_fp8_gemm_atiled` (p0..p3 13 / 7 / 5 / 5 s), then once PASS (`baseline-rerun`); `claudetest`-style run FAULT@t0 in `radiance_mxfp4_fp8_gemm_folded`.
+- **Task 3 uses stricter rules** (see "Batched search"): the gate is `claudetest.sh`, and a PASS counts only after a second, identical confirmation boot also PASSes.
 - **Confirmed winner** → § "Apply a winner", then one real Claude Code session:
   ```
   claude --settings /home/dev/.config/claude/local_muxik/settings.json
@@ -103,7 +110,9 @@ The "normal" radiance is `stilldeadcode/vllm-radiance` (Docker Hub; source <http
    ```
 3. **Create the engine profile** `bench/engine-bench/vllm/profiles/radiance/_engine.env`.
    - The args are taken from the last working llama-swap row for this image (git `~/.config/llama-swap` b589e8b, `config.yaml` line 336ff).
-   - MTP and `--language-model-only` are dropped: the AMD checkpoint has no MTP head, and that flag was INT4-specific.
+   - `--language-model-only` is dropped: that flag was INT4-specific.
+   - **CORRECTED 2026-10-23:** this line used to say the AMD checkpoint has no MTP head. **Wrong.** `config.json` has `mtp_num_hidden_layers: 1` and the safetensors header holds 15 BF16 `mtp.*` tensors (MEASURED, header read). MTP profiles now exist; see Task 1b.
+   - **Superseded 2026-10-23:** the block below is the first version. The live `radiance/_engine.env` also restores the measured AITER `=0` matrix and `RADIANCE_FAST_DRAFT/DRAFT_TAU/SKINNY_GEMM` (both from git `b589e8b` `config.yaml:346-362`), and adds Sly's template, kwargs and sampler. See Task 1b. Also on 2026-10-23 the live `sly-radiance/_engine.env` runs `RADIANCE_CACTUS_DELTA=0` (the 10-22 fault-reproduction default was the image's 0.5) and `--enforce-eager` (the `FULL_DECODE_ONLY` flags are gone) — to reproduce the 10-22 baseline exactly: `CACTUS_DELTA=0.5` + restore the two `--compilation-config` lines.
    ```bash
    # Engine layer: upstream StillDeadcode/vllm-radiance (https://codeberg.org/StillDeadcode/vllm-radiance).
    # Args from the 2026-09 llama-swap row that ran this image (git ~/.config/llama-swap b589e8b).
@@ -159,6 +168,74 @@ The "normal" radiance is `stilldeadcode/vllm-radiance` (Docker Hub; source <http
    - Run `bash $D/swaptest.sh <generated-id> radiance-swap`.
    - The id rule: `useModelName` rewrites the request to the profile's `SERVED_NAME`. Make sure the generated row's `useModelName` equals `qwen38-27b-mxfp4-radiance`, same as the Sly row works.
 
+## Task 1b — Sly vs upstream radiance, identical configs: performance A/B (POSTPONED, user 2026-10-23)
+
+**Status:** configs written and reviewed **without a GPU** (2026-10-23). Not booted. Run this after Task 2, or whenever the user asks for it.
+
+**Image:** `stilldeadcode/vllm-radiance:0.9.3` (vLLM 0.27.1). It is the newest Docker Hub tag **and** the newest code on Codeberg (last commit 2026-08-26, "add dflash2 support"). `docker pull` on 2026-10-23 confirmed the local copy is current.
+
+**What was verified without a GPU (2026-10-23):**
+- **Flags:** all present in the 0.9.3 source (grep): `--override-generation-config`, `--default-chat-template-kwargs`, the Quark MXFP4 scheme, `dflash`, `R4D`, the Anthropic `/v1/messages` endpoint, and `--kv-offloading-size`.
+- **Template:** `templates/qwen-fixed-sly-1.6.0.jinja` was extracted from Sly's `/opt/qwen-fixed.jinja`. md5 `5c928b42…` equals `~/.config/llama-swap/templates/froggeric-chat_template.jinja`. Note that `amd/llama-swap/templates/froggeric…` is a **different** file.
+- **Dry run:** every llama-swap vLLM row passes `serve_vllm.sh print` through the config-dir symlink (exit 0). The llama-swap sampler is the **last** `--override-generation-config` in the argv, so it wins. 2026-10-23 re-print after `--enforce-eager`: all 5 rows show it, and the Sly rows no longer show the `--compilation-config` flags.
+
+**The A/B design: identical model-facing settings, each engine's own tuned kernels.**
+
+| Same on both engines | Engine-specific (each engine's measured recipe) |
+|---|---|
+| checkpoint `amd__Qwen3.8-27B-Quark-AWQ-MXFP4@5233554c`, `--quantization quark` | attention: Sly `R4D_HYBRID` · radiance `R4D` |
+| DFlash: drafter `syvai…DFlash2-W4A16@4d30ec73`, k=7, greedy draft, drafter `TRITON_ATTN` | `--max-num-batched-tokens`: Sly 2048 · radiance 16384 |
+| MTP: `{"method":"mtp","num_speculative_tokens":4,"attention_backend":"R4D","disable_padded_drafter_batch":true}` + `--no-async-scheduling` (Sly `serve.sh:155-159` = our 2026-09 radiance row) · `--enforce-eager` on **both** (2026-10-23) | — (cudagraph removed; see the eager note below) |
+| template (md5 above) · `reasoning_effort: medium` · sampler 1.0/0.95/20/0, `presence_penalty` 0 | plugin env: Sly `RADIANCE_MXFP4_*` (W4A8) · radiance AITER matrix + `FAST_DRAFT` |
+| ctx 190000 · np 1 · fp8 KV · util 0.90 · `HIP_FORCE_DEV_KERNARG=0` | Sly-only: Cactus (`RADIANCE_CACTUS_DELTA`), KVCACHE=ram tier |
+
+**Cactus confound, and why the Sly arms must run at delta 0:**
+- Sly's Cactus (image default delta 0.5) is a **lossy** acceptance transform. It patches the V2-runner rejection kernel for every sampled spec request (`sly/patch_cactus.py`).
+- Upstream radiance has no Cactus, so it runs stock acceptance, which equals Sly at `RADIANCE_CACTUS_DELTA=0`.
+- So the **identical** comparison is Sly at delta 0. Delta 0.5 is a separate "as shipped" arm.
+- Delta 0.5 is also the main suspect for the infinite loops (Sly issue #164).
+
+**Eager mode (DEPLOYED 2026-10-23, user decision):** `--enforce-eager` is now in both `_engine.env` files.
+- Sly: replaces the README quickstart's `FULL_DECODE_ONLY` + capture sizes (`README.md:125-126,226`). Radiance: overrides the 0.27 default.
+- Verified in both images' source: `enforce_eager` → `CompilationMode.NONE`, `CUDAGraphMode.NONE`, capture sizes cleared, one warning (1.6.0 = vLLM 0.31 `config/vllm.py:1694-1712,1967-1972`; 0.9.3 = vLLM 0.27 `config/vllm.py:1210,1442`) — a clean override, not a flag conflict.
+- vLLM's own ROCm eager fallback applies only to encoder-decoder models (`config/model.py:_verify_cuda_graph` in both images), which Qwen3.8 does not trigger — so without this flag, both arms would have been graphing.
+- INFERRED rationale: the ROCm fault history (`ISSUE-SUMMARY.md`) and Cactus #164 make the graph path a variable the A/B does not need.
+- If a graph on/off comparison is wanted later: restore Sly `FULL_DECODE_ONLY` + `CUDAGRAPH_SIZES` and run as separate S*/R* arms — do not mix with the eager arms.
+
+**Arms** (one boot each, sequentially, `bench/lib/gpu_exclusive.sh 30000` before each):
+
+| # | Profile | Extra env | Purpose |
+|---|---|---|---|
+| S1 | `sly-radiance/qwen38-mxfp4-dflash` | — (profile default: Cactus 0) | identical twin of R1 |
+| S1c | `sly-radiance/qwen38-mxfp4-dflash` | `CACTUS_DELTA=0.5` | as shipped; loop check |
+| S2 | `sly-radiance/qwen38-mxfp4-mtp` | — (profile default: Cactus 0) | identical twin of R2 |
+| R1 | `radiance/qwen38-mxfp4-dflash` | — | |
+| R2 | `radiance/qwen38-mxfp4-mtp` | — | |
+| R2k8 | `radiance/qwen38-mxfp4-mtp` | `SPEC_K=8` | radiance's own default depth (dynamic draft treats k as a ceiling) |
+| R0 | `radiance/qwen38-mxfp4` | — | no speculation; separates the engine from the drafter |
+
+**Cactus knob (DEPLOYED 2026-10-23, user decision):** `sly-radiance/_engine.env` now sets `RADIANCE_CACTUS_DELTA=${CACTUS_DELTA:-0}`, so every Sly profile and llama-swap row runs Cactus **off**. For the S1c arm, prefix the run with `CACTUS_DELTA=0.5`.
+
+**Procedure**
+1. **Boot gate:** `bash $D/vllmtest.sh <arm> <profile>`. PASS means the profile boots and loads. If 0.9.3 rejects Quark MXFP4 or the drafter, record that and drop the radiance arms (Task 1 step 5 rules). If a boot rejects ctx 190000 (KV pool too small), rerun it at `MAXLEN=150000` and use 150000 for **all** arms.
+2. **Throughput:** scaffold a campaign via **`/benchmark-new-campaign`** (rule 6; do not hand-write a driver). Use `capture_engine.py probe` against `serve_vllm.sh start`.
+   - Prefill at **≥4 depths** (e.g. 8k/36k/90k/160k). Fit log-log and quote the exponent and R² (rule 16).
+   - Also measure multi-turn growth with prefix reuse (rule 17), decode tok/s, TTFT, and draft acceptance.
+   - Read the KV pool tokens from the boot log, and the VRAM peak from `vram_sampler.py` (rule 7).
+3. **Loop check** (S1c vs S1, plus the MTP arms):
+   - One long-output thinking task with `max_tokens` 32k, n=3 per arm.
+   - A run that exceeds 3× the median length with no tool call / `stop` counts as a loop.
+   - Report loops/n per arm. A killed run is quarantined, not graded (rule 18).
+4. **RAM tier smoke** (Sly llama-swap rows, `kv_ram_gib: 8`):
+   - `bash $D/swaptest.sh qwen38-27b-mxfp4-dflash-kvfp8-vllm ramtier`, then the same for `qwen38-27b-mxfp4-mtp-kvfp8-vllm`.
+   - Before 2026-10-23 the RAM tier faulted 3/3. Those runs predate the kernarg fix, so this re-checks it.
+5. **Document** via **`/benchmark-results`** into a co-located `analysis.md`. The memory column is mandatory. Record the ROCm/image digest/model rev per arm.
+
+**llama-swap rows** (`~/.config/llama-swap/models.yaml`, generated ids):
+- Sly: `qwen38-27b-mxfp4-dflash-kvfp8-vllm`, `qwen38-27b-mxfp4-mtp-kvfp8-vllm` (both `kv_ram_gib: 8`).
+- radiance: `qwen38-27b-mxfp4-radiance-kvfp8-vllm`, `qwen38-27b-mxfp4-radiance-dflash-kvfp8-vllm`, `qwen38-27b-mxfp4-radiance-mtp-kvfp8-vllm`.
+- All take the sampler from `generate.py` (`vllm_sampler()`, QWEN38 planning recipe, `presence_penalty` pinned 0).
+
 ## Task 2 — flint GGUF in llama-swap
 
 Model: `unsloth/flint-GGUF`, file `flint-UD-Q4_K_XL.gguf`.
@@ -206,6 +283,7 @@ Use the **`/llama-swap-add-model` skill**. It owns the download → `models.yaml
 **Goal:** a working **MXFP4 Qwen3.8-27B, ctx 150000, 8-bit KV**, without quality loss.
 
 **What we know** (MEASURED 2026-10-22):
+- **Reproducible without llama-swap:** the unchanged baseline on `:8000`, driven by a real Claude Code session, faulted on its first request (`claude-direct`, `_folded`). llama-swap is not a cause.
 - The fault is an intermittent GPU "page not present" fault inside Sly's MXFP4 **W4A8** GEMM kernels: `radiance_mxfp4_fp8_gemm_atiled` and `_folded`.
 - It is prompt-dependent.
 - It is NOT caused by ctx 180k, the sharp template, the RAM KV tier, np, request order, or A-tiled alone.
@@ -215,6 +293,20 @@ Use the **`/llama-swap-add-model` skill**. It owns the download → `models.yaml
   - `PYTORCH_HIP_ALLOC_CONF=expandable_segments:True` can't boot.
   - `RADIANCE_MXFP4_PADOUT` only pads the output, but the author says the kernel never writes out of bounds, so it doesn't target the bug.
 
+### Image-version options — DO THESE FIRST (user, 2026-10-22)
+
+The fault is in Sly's compiled W4A8 kernels, so the cheapest test is another Sly image with the profile unchanged (`IMAGE=` override only):
+
+| # | Option | How | Status |
+|---|--------|-----|--------|
+| V1 | **Sly 1.5.1** (older published image, `ghcr.io/slybase/vllm-sly-radiance:1.5.1-rocm10.1`) — does the fault predate 1.6.0? | `IMAGE=ghcr.io/slybase/vllm-sly-radiance:1.5.1-rocm10.1 bash $D/claudetest.sh v151 sly-radiance/qwen38-mxfp4-dflash` | **FAULT 1/2** (v151 PASS t0..t3 = 151/90/96/211 s; v151-2 FAULT@t0 after 5 s, `_atiled`, grid [139264,7,1]) → the fault **predates 1.6.0**; 1.5.1 is not a fallback |
+| V2 | **Sly 1.7.0 / `main`, custom build** (vLLM 0.32.0, AITER 0.1.24.post1, transformers 5.19.0 per Sly README; no published image) — does `main` still fault? Upstream will ask this first | build from Sly's Dockerfile as `vllm-sly-radiance:1.7.0-local` (CPU only), then the same gate with `IMAGE=` | optional — 1.5.1 also faults, so 1.7.0 matters only if its changelog/kernel changed (none mentions this fault) |
+| L1 | **Context ladder** (user, 2026-10-22) on the mhist config (unchanged 1.6.0 + DFlash + `RADIANCE_MXFP4_MHIST=1`, which PASSed once @160k): 120k → 135k → 150k → 165k → 180k, 2 gate runs per step, stop at the first non-PASS. A shorter window = a different KV pool = a different layout, so this tests whether some ctx is reliably clean, not whether long prompts fault | `bash $D/ladder.sh lad sly-radiance/qwen38-mxfp4-dflash RADIANCE_MXFP4_MHIST=1` (`START/STEP/END/RUNS` knobs). Gate compaction per step = min(75, floor((MAXLEN − 33000)/MAXLEN·100) − 3): 69/72/75/75/75 % | **FAULT at the first step** (lad-120k-r1, t0 after 25 s, `_atiled`, grid [65536,7,1]) → a smaller window does not avoid it; mhist @160k was luck |
+
+1.5.1 vs 1.6.0 (MEASURED, md5 inside the images): same vLLM 0.31.0 / AITER 0.1.23 / transformers 5.17.0 / `/opt/qwen-fixed.jinja`, every RADIANCE_* var the profile sets exists; **only `radiance_mxfp4_fp8.so` differs** (`3f57393c…` vs `89d18c15…`; autoround/escha/gdn/paroquant .so identical) → V1 isolates exactly the faulting kernel library. 1.5.1's plugin also has debug knobs `RADIANCE_MXFP4_CHECKX/SANITIZE/CLONE/SHADOW`.
+Our 1.6.0 image (MEASURED): vLLM 0.31.0, AITER 0.1.23, transformers 5.17.0, torch 2.13.0+rocm10.1.0, triton 3.8.0. Host ROCm is 10.1.0 (HIP 7.16) — the container brings its own user space, so only the kernel driver is shared.
+If V1 PASSes 2/2, 1.6.0 introduced the regression → it becomes the serving fallback and the bisect target for the upstream issue. If it faults, go to V2.
+
 ### Batched search — DO THIS (the table further down is the reference catalog)
 
 A vLLM boot costs ~10 min, so several **quality- and ctx-neutral** changes go into ONE boot. If a batch PASSes, split it in half and test again (bisect) until one change is left. If a batch FAULTs, every change in it is ruled out together and you move to the next batch.
@@ -222,8 +314,7 @@ A vLLM boot costs ~10 min, so several **quality- and ctx-neutral** changes go in
 **Rules for batches**
 - **Stop rule:** the first confirmed winner (PASS twice, and bisected if it was a multi-change batch) ends Task 3 → § "Apply a winner". Later batches run only if nothing has passed, or if the user asks for alternatives (e.g. llama.cpp for comparison).
 - **Order:** Batch 1 → 2 → 3 → 4 → 5; Batch 6 only if the user agrees (lowest priority, optional). Batch 2 needs the Task 1 `radiance` profile; Batch 3 needs the user's OK for disk space.
-- **The `ROUNDS` loop in `vllmtest.sh` has not run yet** (added at hand-off, syntax-checked only). On the first Batch 1 run, check that `results.tsv` shows `r2p0..r2p4` times; if round 2 is missing or errors, fix the loop before trusting any PASS.
-- Always `ROUNDS=2` → 10 requests per boot (the baseline faulted on request 5). A batch "PASSes" only with all 10 clean.
+- **Gate = `claudetest.sh`** (real Claude Code, 4 turns). A batch "PASSes" only with all 4 turns clean. The commands below were written for `vllmtest.sh ROUNDS=2` and are now given as `claudetest.sh`; same arguments, same env knobs. If a batch PASSes `claudetest.sh`, also run `ROUNDS=2 bash $D/vllmtest.sh <label>-fx …` once with the same arguments, for the timing comparison against the baseline and as a second load shape.
 - **Confirm before bisecting:** a PASS can be luck (the fault is stochastic). Re-run the same batch once. Bisect only if the second run also PASSes (cost: 1 extra boot; saves a whole bisection built on luck).
 - Only combine changes that keep quality, keep ctx 150000 and keep 8-bit KV. Never put an image change and knob changes in the same batch.
 - Write each run's line into the Results table at the bottom (`results.tsv` has the raw line).
@@ -239,49 +330,49 @@ A vLLM boot costs ~10 min, so several **quality- and ctx-neutral** changes go in
 | other chunk rhythm | `EXTRA_ARGS="--max-num-batched-tokens 4096"` | different chunk remainders M |
 
 ```bash
-ROUNDS=2 GPU_UTIL=0.85 EXTRA_ARGS="--max-num-batched-tokens 4096" \
-  bash $D/vllmtest.sh B1 sly-radiance/qwen38-mxfp4 RADIANCE_MXFP4_PADOUT=65536
+GPU_UTIL=0.85 EXTRA_ARGS="--max-num-batched-tokens 4096" \
+  bash $D/claudetest.sh B1 sly-radiance/qwen38-mxfp4 RADIANCE_MXFP4_PADOUT=65536
 ```
 - **FAULT** → all four ruled out (INFERRED: a combination could in principle mask a single fix, accepted to save boots). Chunk **1024** is not covered by Batch 1; it stays untested unless the user asks. Go to Batch 2.
 - **PASS** → re-run as `B1-confirm`. If that also PASSes, bisect:
 
-| Step | Run | Command (all `ROUNDS=2`) |
+| Step | Run | Command  |
 |---|---|---|
-| 1a | no DFlash + util 0.85 | `ROUNDS=2 GPU_UTIL=0.85 bash $D/vllmtest.sh B1a sly-radiance/qwen38-mxfp4` |
-| 1b | (only if 1a FAULTs) DFlash on + PADOUT + chunk 4096 | `ROUNDS=2 EXTRA_ARGS="--max-num-batched-tokens 4096" bash $D/vllmtest.sh B1b sly-radiance/qwen38-mxfp4-dflash RADIANCE_MXFP4_PADOUT=65536` |
-| 2 | split the passing pair into its two single changes (one boot each; each = baseline + ONE change) | if 1a passed: `ROUNDS=2 bash $D/vllmtest.sh B1-nodflash sly-radiance/qwen38-mxfp4` and `ROUNDS=2 GPU_UTIL=0.85 bash $D/vllmtest.sh B1-util sly-radiance/qwen38-mxfp4-dflash`. If 1b passed: `ROUNDS=2 bash $D/vllmtest.sh B1-pad sly-radiance/qwen38-mxfp4-dflash RADIANCE_MXFP4_PADOUT=65536` and `ROUNDS=2 EXTRA_ARGS="--max-num-batched-tokens 4096" bash $D/vllmtest.sh B1-chunk sly-radiance/qwen38-mxfp4-dflash` |
+| 1a | no DFlash + util 0.85 | `GPU_UTIL=0.85 bash $D/claudetest.sh B1a sly-radiance/qwen38-mxfp4` |
+| 1b | (only if 1a FAULTs) DFlash on + PADOUT + chunk 4096 | `EXTRA_ARGS="--max-num-batched-tokens 4096" bash $D/claudetest.sh B1b sly-radiance/qwen38-mxfp4-dflash RADIANCE_MXFP4_PADOUT=65536` |
+| 2 | split the passing pair into its two single changes (one boot each; each = baseline + ONE change) | if 1a passed: `bash $D/claudetest.sh B1-nodflash sly-radiance/qwen38-mxfp4` and `GPU_UTIL=0.85 bash $D/claudetest.sh B1-util sly-radiance/qwen38-mxfp4-dflash`. If 1b passed: `bash $D/claudetest.sh B1-pad sly-radiance/qwen38-mxfp4-dflash RADIANCE_MXFP4_PADOUT=65536` and `EXTRA_ARGS="--max-num-batched-tokens 4096" bash $D/claudetest.sh B1-chunk sly-radiance/qwen38-mxfp4-dflash` |
 | — | if BOTH halves FAULT | the fix needs the combination → keep the full Batch 1 set (it passed twice) and stop bisecting |
 | — | winner | the smallest set that passed; confirm it once more, then **Apply a winner** |
 
 If a single winner costs speed (no DFlash = slower decode; util 0.85 = smaller KV pool), report the p-times to the user and let them choose; don't decide alone.
 
-**Batch 2 — upstream radiance** (Option D / Task 1): `stilldeadcode/vllm-radiance:0.9.3` or newer, via the `radiance/qwen38-mxfp4` profile from Task 1. It uses libr4d directly, not Sly's W4A8/WPERM plugin, so different kernel code. Task 1 step 5 already runs it once; for the stability verdict re-run with `ROUNDS=2`:
+**Batch 2 — upstream radiance** (Option D / Task 1): `stilldeadcode/vllm-radiance:0.9.3` or newer, via the `radiance/qwen38-mxfp4` profile from Task 1. It uses libr4d directly, not Sly's W4A8/WPERM plugin, so different kernel code. Task 1 (MEASURED 2026-10-22): `vllmtest.sh` PASS and llama-swap PASS, but ~40–57 s per prompt vs the baseline's 5–14 s (no drafter, no Sly MXFP4 kernels — INFERRED). For the stability verdict run the gate:
 ```bash
-ROUNDS=2 bash $D/vllmtest.sh B2-upstream radiance/qwen38-mxfp4
+bash $D/claudetest.sh B2-upstream radiance/qwen38-mxfp4
 ```
 If it cannot load MXFP4 (BOOT_FAILED), record it and move on.
 
 **Batch 3 — other engine** (Option B, llama.cpp MXFP4 GGUF): follow § "Option B detail" (ask the user about disk space first; it needs ~15–17 GB on `/mnt/LinBackup`, which flint fills). No vLLM boot; `bash $D/swaptest.sh <id> B3-gguf` twice (the two calls = PASS + confirm).
 
-**Batch 4 — other checkpoint on Sly 1.6.0** (Option H): one boot per checkpoint, `ROUNDS=2`.
+**Batch 4 — other checkpoint on Sly 1.6.0** (Option H): one boot per checkpoint, gate `claudetest.sh`.
 
 **Batch 5 — Hail Mary (Sly 1.6.0, baseline config + one change each; one boot each)**
 
 | Run | Command | Note |
 |---|---|---|
-| 5a PADOUT 128 | `ROUNDS=2 bash $D/vllmtest.sh B5a-pad128 sly-radiance/qwen38-mxfp4-dflash RADIANCE_MXFP4_PADOUT=128` | Smaller padding than Batch 1's 65536. 128 bf16 = 256 B, likely below the allocator's 512 B rounding, so it may change nothing (INFERRED). Skip if Batch 1 (which had PADOUT 65536) already FAULTed and you are short on time |
-| 5b KV int8 | first list the accepted names: `docker run --rm --entrypoint python3 ghcr.io/slybase/vllm-sly-radiance:1.6.0-rocm10.1 -c "import typing,vllm.config.cache as c;print(typing.get_args(c.CacheDType))"`, then `ROUNDS=2 KV_DTYPE=<the int8 name> bash $D/vllmtest.sh B5b-int8 sly-radiance/qwen38-mxfp4-dflash` | **Expect BOOT_FAILED**: FROM-CODE, R4D_HYBRID only accepts `auto/float16/bfloat16/fp8*`; int8 variants exist only on TRITON_ATTN. The fp8 KV scale (1.0) and the W4A8 activation scales are separate tensors in separate kernels, so an interaction is unlikely (INFERRED). Record the result either way. Do not switch the attention backend to make it boot (that changes more than one thing) |
+| 5a PADOUT 128 | `bash $D/claudetest.sh B5a-pad128 sly-radiance/qwen38-mxfp4-dflash RADIANCE_MXFP4_PADOUT=128` | Smaller padding than Batch 1's 65536. 128 bf16 = 256 B, likely below the allocator's 512 B rounding, so it may change nothing (INFERRED). Skip if Batch 1 (which had PADOUT 65536) already FAULTed and you are short on time |
+| 5b KV int8 | first list the accepted names: `docker run --rm --entrypoint python3 ghcr.io/slybase/vllm-sly-radiance:1.6.0-rocm10.1 -c "import typing,vllm.config.cache as c;print(typing.get_args(c.CacheDType))"`, then `KV_DTYPE=<the int8 name> bash $D/claudetest.sh B5b-int8 sly-radiance/qwen38-mxfp4-dflash` | **Expect BOOT_FAILED**: FROM-CODE, R4D_HYBRID only accepts `auto/float16/bfloat16/fp8*`; int8 variants exist only on TRITON_ATTN. The fp8 KV scale (1.0) and the W4A8 activation scales are separate tensors in separate kernels, so an interaction is unlikely (INFERRED). Record the result either way. Do not switch the attention backend to make it boot (that changes more than one thing) |
 
 **Batch 6 — OPTIONAL, lowest priority (user: only if time allows)**
 - 6a older Sly tags, baseline config. If 1.4.0 passes at 150k / util 0.90, the fault is a 1.6.0 regression:
   ```bash
   docker pull ghcr.io/slybase/vllm-sly-radiance:1.5.1-rocm10.1
-  ROUNDS=2 IMAGE=ghcr.io/slybase/vllm-sly-radiance:1.5.1-rocm10.1 bash $D/vllmtest.sh B6a-151 sly-radiance/qwen38-mxfp4-dflash
+  IMAGE=ghcr.io/slybase/vllm-sly-radiance:1.5.1-rocm10.1 bash $D/claudetest.sh B6a-151 sly-radiance/qwen38-mxfp4-dflash
   docker pull ghcr.io/slybase/vllm-sly-radiance:1.4.0-rocm10.1
-  ROUNDS=2 IMAGE=ghcr.io/slybase/vllm-sly-radiance:1.4.0-rocm10.1 bash $D/vllmtest.sh B6a-140 sly-radiance/qwen38-mxfp4-dflash
+  IMAGE=ghcr.io/slybase/vllm-sly-radiance:1.4.0-rocm10.1 bash $D/claudetest.sh B6a-140 sly-radiance/qwen38-mxfp4-dflash
   ```
   An older image may not know a `RADIANCE_*` knob (silently ignored, fine) or an engine arg (boot error → record BOOT_FAILED with the error line and move on; do not edit `_engine.env`).
-- 6b magiccodingman fork: `docker pull magiccodingman/vllm-radiance:1.0.397`, then `ROUNDS=2 IMAGE=magiccodingman/vllm-radiance:1.0.397 bash $D/vllmtest.sh B6b-magic radiance/qwen38-mxfp4`.
+- 6b magiccodingman fork: `docker pull magiccodingman/vllm-radiance:1.0.397`, then `IMAGE=magiccodingman/vllm-radiance:1.0.397 bash $D/claudetest.sh B6b-magic radiance/qwen38-mxfp4`.
 
 **Last resort** — W4A8 off (Option A, MEASURED stable on 5 requests but ~12× slower) and the upstream report (Option I, user decides).
 
@@ -352,7 +443,7 @@ If the research names a fixed version or a specific env flag, test that **first*
    - The user's original target was ctx 180000 + `templates: [sharp]`. Ask whether to restore those now; they were ruled out as fault causes.
 3. **Run the checks:**
    - `bash $D/swaptest.sh <id> final-swap`
-   - then one real Claude Code session: `claude --settings /home/dev/.config/claude/local_muxik/settings.json`
+   - then one real Claude Code session through llama-swap: `claude --settings /home/dev/.config/claude/local_muxik/settings.json` (the direct-to-vLLM gate `claudetest.sh` already passed by then; this checks the llama-swap path)
 4. **Update `~/.config/claude/local_muxik/settings.json`** model ids to the new llama-swap id (ask first).
 5. **Speed note for the user:** compare the p0..p3 times in `results.tsv` with the baseline (13 / 7 / 5 / 5 s). Also report decode (`output_tokens / time` from `logs/<label>.p*.out`).
 6. **Document:** append a dated "Update" section to `docs/analysis/2026-10-22-1643-vllm-mxfp4-atiled-fault-and-llama-swap-serving.md`. Use a table of every option tried, with result and provenance tags, then run `python3 docs/reindex.py`.
@@ -366,3 +457,14 @@ If the research names a fixed version or a specific env flag, test that **first*
 | — | expseg | BOOT_FAILED | — | — | silent death at weight load |
 | A | w4a4 (first try) | BOOT_FAILED | — | — | KeyError 'radiance_wref' = stale AOT compile cache, not W4A4 |
 | A | w4a4 + VLLM_DISABLE_COMPILE_CACHE=1 | **PASS** (1 run) | ~10 min | 295/152/63/61/62 s (steady ~12× baseline) | stable but too slow; keep as the last resort. Start the new session at Batch 1 (Batched search) |
+| T1 | radiance-093 (`vllmtest.sh`, upstream `stilldeadcode/vllm-radiance:0.9.3`, no drafter, no plugin env) | **PASS** (1 run) | 403 s | 57/40/43/43/43 s | loads Quark MXFP4; stable but ~6–8× slower than baseline (no DFlash drafter = likely cause, INFERRED) (2026-10-22) |
+| T1 | radiance-swap (`swaptest.sh qwen38-27b-mxfp4-radiance-kvfp8-vllm`) | **PASS** | in p0 | 391(incl. boot)/40/44/45/43 s | llama-swap row added; `useModelName` = `qwen38-27b-mxfp4-radiance` (2026-10-22) |
+| baseline | baseline-rerun (unchanged Sly 1.6.0 DFlash profile, after the `serve_vllm.sh` contract changes) | PASS (1 run, ROUNDS=1) | 260 s | 14/9/5/6/6 s | speed matches the original baseline; no fault at p4 this time → the atiled fault is intermittent, 1 PASS proves nothing (2026-10-22) |
+| baseline | claude-direct (unchanged Sly 1.6.0 DFlash profile on :8000, NO llama-swap; real `claude -p` with `~/.config/claude/local_vllm_direct/settings.json`) | **FAULT@t0** (1st Claude request, ~5 s in) | 188 s | — | MEMORY_FAULT in `radiance_mxfp4_fp8_gemm_folded<2,true,true,false>`, grid [20480,7,1] — a different kernel from the atiled one in the synthetic test; llama-swap ruled out as the cause (2026-10-22) |
+| baseline | claude-baseline-2 (`claudetest.sh`, unchanged Sly 1.6.0 DFlash profile) | **FAULT@t0** (~10 s into the 1st turn) | 158 s | — | 2nd independent repro, same `radiance_mxfp4_fp8_gemm_folded<2,true,true,false>`; also the end-to-end check of `claudetest.sh` (cleanup verified: container gone, temp profile removed, :8000 free) (2026-10-22) |
+| B1 | B1 (`claudetest.sh`: no DFlash + PADOUT 65536 + util 0.85 + chunk 4096) | **CLAUDE_FAIL@t1** — not a fault | 188 s | t0=397 s (9 tool rounds, clean) | no MEMORY_FAULT; t1 hit HTTP 400 prompt 86001 + max_tokens 64000 > 150000 (the known `CLAUDE_CODE_MAX_OUTPUT_TOKENS` issue, a gate bug). KV pool 384,224 tok at util 0.85 (≥150k ✓). Caveat: chunk 4096 moves the prefill remainder M, so surviving t0 may be shape luck, not a fix (2026-10-22) |
+| diag | mhist (`claudetest.sh`, unchanged baseline + `RADIANCE_MXFP4_MHIST=1`, MAXLEN 160000) | **no fault**; CLAUDE_FAIL@t3 | 166 s | t0..t2 = 85/66/75 s | t3 = HTTP 400 at prompt 127,001 + 33,000 output > 160,000 (compaction at 90% ≈ 144k never reached). The N=5120 K=6144 layer ran at M=1760 and 1706/1587/1560 (all 7 tiles of 256, i.e. the faulting grid's shape class) with NO fault. KV pool 349,295 (vs 345,297 at 150k) → a small change in memory layout made the 2/2 fault vanish; consistent with a placement-dependent over-read, NOT proof. Faulting shape not captured (2026-10-22) |
+| baseline | swap-180k (`swaptest.sh qwen38-27b-mxfp4-dflash-kvfp8-vllm`, unchanged Sly 1.6.0 DFlash via llama-swap, ctx 180000, KV pool 354,661) | **FAULT@p0** | in p0 | p0 = HTTP 500 after 537 s (fault + hang) | `radiance_mxfp4_fp8_gemm_atiled<2,…>`, grid [20480,7,1] — same launch shape as the direct repros; fixture load (not Claude) faults at 180k too. llama-swap unloaded (GET /unload 200), VRAM 575 MiB after (2026-10-22) |
+| V1 | v151 (`claudetest.sh`, `IMAGE=…1.5.1-rocm10.1`, unchanged DFlash profile, MAXLEN 180000) | PASS | 494 s | t0..t3 = 151/90/96/211 s | decode med 59 tok/s, prefill med 2226 / max 3194 tok/s, accept 4.64 (`speeds.py`, 10 s windows) (2026-10-22) |
+| V1 | v151-2 (same, 2nd boot) | **FAULT@t0** (5 s) | 322 s | — | `radiance_mxfp4_fp8_gemm_atiled`, grid [139264,7,1] → 1.5.1 faults too (2026-10-22) |
+| L1 | lad-120k-r1 (`ladder.sh`: unchanged 1.6.0 DFlash + `RADIANCE_MXFP4_MHIST=1`, MAXLEN 120000, compaction 69%) | **FAULT@t0** (25 s) | 167 s | — | `radiance_mxfp4_fp8_gemm_atiled`, grid [65536,7,1]; ladder stopped, no ctx is clean (2026-10-22) |

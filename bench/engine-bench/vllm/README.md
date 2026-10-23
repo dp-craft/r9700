@@ -87,7 +87,10 @@ VRAM drops below `WATCHDOG_MIB` (default 256; the desktop shares the card — se
 ## Deviations from the Sly README quickstart (and why)
 
 - `--gpu-memory-utilization 0.90` (README 0.98): the desktop GUI shares the card.
-- Speculative decoding off; cudagraph capture sizes `[1,2,4,8]` (README's `[8..64]` assume k=7 × 8 seqs).
+- Speculative decoding off (drafter arms are separate profiles). `--enforce-eager` (2026-10-23 user decision)
+  replaces the README quickstart's `FULL_DECODE_ONLY` + capture sizes `[1,2,4,8]` (README's `[8..64]` assume
+  k=7 × 8 seqs); verified in the image source that eager cleanly overrides the compilation flags. Restoring
+  graphs = re-add `--compilation-config.cudagraph_mode FULL_DECODE_ONLY` + `CUDAGRAPH_SIZES` to `_engine.env`.
 - `--shm-size 16g` instead of `--ipc=host`; port bound to `127.0.0.1`; `no-new-privileges`;
   numeric render/video GIDs read from the host (here 992/44, README assumes 109/44).
 - Containers run as root (image default): cache files under `cache/` are root-owned.

@@ -19,14 +19,29 @@
 #   FREE_MIB_FLOOR PORT(8000) WAIT(1200s; first boot compiles ~10 min) EXTRA_ARGS VLLM_ROOT HF_CACHE
 #   WATCHDOG_MIB(256: kill the container if free VRAM drops below this while booting; 0 = off)
 #   CONTAINER_NAME(vllm-$PORT) FLOOR_WAIT(90, run mode only)
+#   AUTO_PULL(1: `start`/`run` docker-pull a missing IMAGE once, then go on; 0 = refuse instead). Under
+#     llama-swap a first pull counts against its healthCheckTimeout -- pre-pull big images by hand.
 #   CHAT_TEMPLATE=<host .jinja>  mounted read-only and passed as --chat-template (replaces the profile's)
+#   PY_OVERLAY=<host dir>  mounted read-only at /py-overlay and put on PYTHONPATH, so its modules shadow the
+#     image's (e.g. overlays/sly-pad-a). Not combinable with KVCACHE=ram.
 #   KVCACHE=ram KVCACHE_RAM_GIB(16)  Sly's GPU->RAM prefix-cache tier (src/<ver>/kv-cache/README.md):
 #     the 6 "always" patches applied at container start from KVCACHE_PATCHES (Sly source of the SAME
 #     tag), their RADIANCE_* switches, --kv-offloading-size/--kv-offloading-backend native, and a
 #     /dev/shm large enough to hold the tier. Off by default; with it off the argv is unchanged.
 # New engine/fork: add profiles/<engine>/_engine.env with its IMAGE; new model: one <model>.env.
+#
+# Profile contract -- checked right after sourcing, in every mode incl. `print`; a violation exits 2
+# naming each missing field, before any docker call:
+#   scalars (non-empty): IMAGE MODEL_DIR SERVED_NAME MAXLEN GPU_UTIL MAXSEQS KV_DTYPE FREE_MIB_FLOOR
+#     (MAXLEN MAXSEQS FREE_MIB_FLOOR integers). Paths: build them from $VLLM_ROOT, never hard-code it.
+#   arrays (may be empty, must be declared as arrays): CACHE_MOUNTS ENGINE_ENV MODEL_ENV ENGINE_ARGS MODEL_ARGS
+#   CACHE_MOUNTS entries are <host-subdir>:<abs container path>; the host side is created dev-owned
+#     under $VLLM_ROOT/cache/<image@tag>/ (docker would create it root-owned).
+#   chat template: --chat-template in ENGINE_ARGS/MODEL_ARGS, or CHAT_TEMPLATE=<host .jinja>, or
+#     CHAT_TEMPLATE_NONE="<why none: e.g. model dir's own chat_template.jinja>" -- silence is an error,
+#     because an image without the template a profile was copied from fails only at the first request.
 set -euo pipefail
-HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HERE="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"   # readlink: llama-swap runs it via ~/.config/llama-swap/serve_vllm.sh
 REPO="$(cd "$HERE/../../.." && pwd)"
 
 : "${VLLM_ROOT:=/mnt/Lin1/work/vllm/sly-radiance}"
@@ -90,6 +105,34 @@ PDIR="$HERE/profiles/${PROFILE%%/*}"
 source "$HERE/profiles/$PROFILE.env"
 source "$PDIR/_engine.env"
 
+PERR=()
+for v in IMAGE MODEL_DIR SERVED_NAME MAXLEN GPU_UTIL MAXSEQS KV_DTYPE FREE_MIB_FLOOR; do
+  [ -n "${!v:-}" ] || PERR+=("$v is not set")
+done
+for v in MAXLEN MAXSEQS FREE_MIB_FLOOR; do
+  [ -z "${!v:-}" ] || [[ "${!v}" =~ ^[0-9]+$ ]] || PERR+=("$v must be an integer (got: ${!v})")
+done
+for v in CACHE_MOUNTS ENGINE_ENV MODEL_ENV ENGINE_ARGS MODEL_ARGS; do
+  [[ "$(declare -p "$v" 2>/dev/null)" == "declare -a"* ]] || PERR+=("$v must be declared as an array: $v=(...)")
+done
+if [[ "$(declare -p CACHE_MOUNTS 2>/dev/null)" == "declare -a"* ]]; then
+  for m in ${CACHE_MOUNTS[@]+"${CACHE_MOUNTS[@]}"}; do
+    [[ "$m" =~ ^[A-Za-z0-9._-]+:/ ]] || PERR+=("CACHE_MOUNTS entry '$m' must be <host-subdir>:<abs container path>")
+  done
+fi
+CT_DECLARED=0
+for a in ${ENGINE_ARGS[@]+"${ENGINE_ARGS[@]}"} ${MODEL_ARGS[@]+"${MODEL_ARGS[@]}"}; do
+  [ "$a" = --chat-template ] && CT_DECLARED=1
+done
+if [ "$CT_DECLARED" = 0 ] && [ -z "${CHAT_TEMPLATE:-}" ] && [ -z "${CHAT_TEMPLATE_NONE:-}" ]; then
+  PERR+=("no chat template: add --chat-template to ENGINE_ARGS, pass CHAT_TEMPLATE=<host .jinja>, or set CHAT_TEMPLATE_NONE=\"<reason>\" in the profile")
+fi
+if [ "${#PERR[@]}" -gt 0 ]; then
+  echo "profile $PROFILE violates the contract ($HERE/profiles/$PROFILE.env + $PDIR/_engine.env):" >&2
+  printf '  - %s\n' "${PERR[@]}" >&2
+  echo "see the 'Profile contract' block in the header of $0" >&2; exit 2
+fi
+
 TAG=${IMAGE##*/}; CACHE_DIR="$VLLM_ROOT/cache/${TAG//:/@}"
 RENDER_GID=$(getent group render | cut -d: -f3); VIDEO_GID=$(getent group video | cut -d: -f3)
 
@@ -142,6 +185,11 @@ CMD=(docker run "${DETACH[@]}" --name "$NAME"
      -v "$HF_CACHE:/hf" -e HF_HOME=/hf)   # any in-container HF fetch (drafter, processor) lands on Lin1
 for m in "${CACHE_MOUNTS[@]}"; do CMD+=(-v "$CACHE_DIR/${m%%:*}:${m#*:}"); done
 if [ -n "${DRAFT_DIR:-}" ]; then CMD+=(-v "$DRAFT_DIR:/draft:ro"); fi   # speculative drafter (profile sets it)
+if [ -n "${PY_OVERLAY:-}" ]; then   # python modules that shadow the image's (profile or env sets it)
+  [ -d "$PY_OVERLAY" ] || { echo "PY_OVERLAY is not a directory: $PY_OVERLAY" >&2; exit 2; }
+  [ -z "$KVC_PRELUDE" ] || { echo "PY_OVERLAY and KVCACHE=ram both set PYTHONPATH; use one" >&2; exit 2; }
+  CMD+=(-v "$PY_OVERLAY:/py-overlay:ro" -e PYTHONPATH=/py-overlay)
+fi
 for e in "${ENGINE_ENV[@]}" "${MODEL_ENV[@]}" ${KVC_ENV[@]+"${KVC_ENV[@]}"}; do CMD+=(-e "$e"); done
 CMD+=(${CT_MOUNT[@]+"${CT_MOUNT[@]}"} ${KVC_MOUNT[@]+"${KVC_MOUNT[@]}"})
 if [ -n "$KVC_PRELUDE" ]; then CMD+=(--entrypoint bash "$IMAGE" -c "$KVC_PRELUDE" _); else CMD+=("$IMAGE"); fi
@@ -154,7 +202,11 @@ if [ "${1:-start}" = print ]; then printf '%q ' "${CMD[@]}"; echo; exit 0; fi
 # --- preconditions: nothing below this line runs in `print` mode ---
 [ -f "$MODEL_DIR/config.json" ] || { echo "model not found: $MODEL_DIR (fetch_model.sh)" >&2; exit 1; }
 if [ -n "${DRAFT_DIR:-}" ] && [ ! -f "$DRAFT_DIR/config.json" ]; then echo "drafter not found: $DRAFT_DIR (fetch_model.sh)" >&2; exit 1; fi
-docker image inspect "$IMAGE" >/dev/null 2>&1 || { echo "image not pulled: docker pull $IMAGE" >&2; exit 1; }
+if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
+  [ "${AUTO_PULL:-1}" = 1 ] || { echo "image not present: $IMAGE (AUTO_PULL=0 -- docker pull $IMAGE)" >&2; exit 1; }
+  echo "image not present: $IMAGE -- pulling once (can take minutes)" >&2
+  docker pull "$IMAGE" >&2 || { echo "docker pull $IMAGE failed -- check the tag, registry login and disk (df -h /)" >&2; exit 1; }
+fi
 if [ "${1:-start}" = run ] && docker inspect "$NAME" >/dev/null 2>&1 && ! running; then
   docker rm -f "$NAME" >/dev/null 2>&1   # a dead leftover of a crashed supervised boot; a LIVE one still refuses below
 fi
@@ -171,7 +223,7 @@ if [ "${1:-start}" = run ]; then
 else
   "$REPO/bench/lib/gpu_exclusive.sh" "$FREE_MIB_FLOOR"   # iron rule 14: free-VRAM floor or refuse
 fi
-mkdir -p "$CACHE_DIR"/{root-cache,triton,aiter}
+for m in "${CACHE_MOUNTS[@]}"; do mkdir -p "$CACHE_DIR/${m%%:*}"; done   # profile-driven, dev-owned
 
 DIGEST=$(docker image inspect -f '{{index .RepoDigests 0}}' "$IMAGE" 2>/dev/null || echo "$IMAGE")
 { printf '%q ' "${CMD[@]}"; echo
