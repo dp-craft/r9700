@@ -30,7 +30,7 @@ an issue lives in `settings.md`; a fix that was version/env-specific lives in `h
 - **workaround:** boot watchdog (sysfs 0.2 s poll, `docker kill` below 256 MiB free);
   `RADIANCE_NVFP4_LMHEAD=fp8` (keep the 0.6 GiB lm_head out of bf16); run with the GUI stopped.
 - **report:** `campaigns/2026-10-22-vllm-sly-mxfp4-depth/analysis.md` (setup lesson);
-  `bench/engine-bench/vllm/README.md` (Plan step 4, A2).
+  `docs/vllm/workflows.md` (Roadmap, A2).
 
 ## `.rad`-vs-HF-checkpoint loading distinction — **live (design, not a bug)**
 - **symptom:** not a fault — a loading distinction. **sly loads HF checkpoints only; radiance loads
@@ -40,7 +40,7 @@ an issue lives in `settings.md`; a fix that was version/env-specific lives in `h
 - **version seen:** sly (all), radiance (native `.rad`).
 - **workaround:** use the right engine for the checkpoint format — sly → HF checkpoint (e.g. the
   Quark MXFP4), radiance → `.rad`.
-- **report:** `profiles/sly-official/heretic-mxfp4.env` (comment); `profiles/radiance/` (native `.rad`).
+- **report:** `profiles/sly-radiance/qwen38-heretic-mxfp4.env` (comment); `profiles/radiance/` (native `.rad`).
 
 ## Cactus lossy acceptance — Sly issue #164 (repetition lock-in) — **live on the current model**
 - **symptom:** the image-default Cactus (`RADIANCE_CACTUS_DELTA=0.5`) is a **lossy acceptance

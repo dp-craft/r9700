@@ -47,7 +47,7 @@ an issue cross-links to `known-issues.md`. `HIP_FORCE_DEV_KERNARG=0` is **not** 
   --speculative-config.num_speculative_tokens 7 --speculative-config.draft_sample_method
   greedy|probabilistic --speculative-config.attention_backend TRITON_ATTN`; `DRAFT_DIR` mounted
   read-only at `/draft`.
-- **side-effect:** KV pool −20% (drafter + padding), VRAM +1.2 GiB, prefix-cache granularity
+- **side-effect:** KV pool −20% (drafter + padding), +1.2 GiB drafter model memory (peak VRAM +401 MiB), prefix-cache granularity
   64 → 880 tokens, decode becomes **acceptance-bound** (acceptance 30–67%, τ 3–6). Cold decode
   33.8 → 136.6 tok/s @8k. `draft_sample_method`: greedy (sly-radiance) vs probabilistic (sly-official).
 - **version measured:** sly-radiance 1.6.0 (dflash campaign), sly-official 1.8.1 (probabilistic).

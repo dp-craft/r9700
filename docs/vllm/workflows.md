@@ -89,3 +89,5 @@ python3 bench/lib/report.py <run_dir> --charts ... --appendix ...          # cha
 - **ParoQuant `z-lab/Qwen3.8-27B-PARO`** (W4A8): kernel not in the image → a derived image
   (`FROM ghcr.io/slybase/vllm-sly-radiance:<tag>` + `setup-paroquant.sh`), still docker-only.
 - **`/vllm-image` skill** (pull tag → smoke → bench vs previous → promote), like `/llamacpp-build`.
+- **Unsloth Studio** (standing goal): get at least one working vLLM solution running in Unsloth Studio —
+  check for a custom OpenAI-compatible endpoint → point it at `127.0.0.1:8000/v1`.

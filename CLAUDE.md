@@ -47,7 +47,7 @@ bench/                 ← two tracks (see bench/README.md); how-to in docs/GUID
                        run.sh + campaign.sh (MTP×KV×depth×parallel matrix, resumable) — all driving
                        bench/lib/capture_engine.py; llama-benchy (dl/benchy-venv)
   engine-bench/vllm/ ← vLLM (Sly radiance) tools: serve_vllm.sh + profiles/ + capture_proxy.py +
-                       monitor.sh (observe)
+                       fetch_model.sh (observe via bench/lib/monitor.py; claude/monitor.sh wrapper)
   workloads/         ← build_prompt.py + tasks/ + corpus/ (tracked TS+Python source, ~565K tok);
                        generated/ ignored
   lib/               ← gpu_env.sh (AMD/NVIDIA vendor abstraction) + vram_sampler.py +

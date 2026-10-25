@@ -14,7 +14,7 @@ forks = a new image tag or a new `profiles/<engine>/` folder; nothing compiles o
 | `/mnt/Lin1/work/vllm/sly-radiance/src/<tag>/` | upstream source checkout (templates, docs, reference scripts) |
 | `/mnt/Lin1/work/vllm/sly-radiance/tools/hf-venv/` | `hf` CLI used by `fetch_model.sh` |
 | `/mnt/Lin1/work/hf/` | shared `HF_HOME` (hub cache, xet chunks): `fetch_model.sh` on the host + mounted at `/hf` (`HF_HOME=/hf`) in every container. Default ACL `u:dev:rwX`, so root-written files stay dev-writable. **Not** set globally: `~/.cache/huggingface` keeps the GGUFs CLAUDE.md/llama-swap reference by path |
-| `/mnt/Lin1/work/docker/` | docker data-root (**pending, needs root** — see below) |
+| `/mnt/Lin1/work/docker/` | docker data-root (**pending, needs root**) |
 
 ## Models (pinned)
 
@@ -27,14 +27,14 @@ forks = a new image tag or a new `profiles/<engine>/` folder; nothing compiles o
 
 ```bash
 ./fetch_model.sh <org/repo> <40-hex-rev>                       # pinned, resumable download
-PROFILE=sly-radiance/qwen38-mxfp4 ./serve_vllm.sh print        # show the docker argv (no GPU)
+PROFILE=sly-radiance/qwen38-mxfp4 ./serve_vllm.sh print        # show the full resolved config (no GPU)
 PROFILE=sly-radiance/qwen38-mxfp4 PORT=8000 ./serve_vllm.sh    # boot: gpu_exclusive.sh floor first
 PORT=8000 ./serve_vllm.sh stop|status|logs
 IMAGE=ghcr.io/slybase/vllm-sly-radiance:<new-tag> PROFILE=... ./serve_vllm.sh   # try a new image
 ```
 Every boot writes `bench/.servers/<port>.cmdline`: argv, image digest, model repo+revision, vLLM version.
 While booting, a **VRAM watchdog** polls sysfs every 0.2 s and `docker kill`s the container if free
-VRAM drops below `WATCHDOG_MIB` (default 256; the desktop shares the card — see step 4, A2).
+VRAM drops below `WATCHDOG_MIB` (default 256; the desktop shares the card — see `docs/vllm/workflows.md`, A2).
 
 ## Monitoring
 

@@ -208,7 +208,7 @@ if [ "${1:-start}" = print ]; then
   # with no GPU (docker image inspect + local file reads only). `print` is the read-only preview.
   DIGEST=$(docker image inspect -f '{{index .RepoDigests 0}}' "$IMAGE" 2>/dev/null || echo "$IMAGE")
   {
-    echo "# resolved config (PROFILE=$PROFILE) — identical to what start records in bench/.servers/$PORT.cmdline"
+    echo "# resolved config (PROFILE=$PROFILE) — same as what start records in bench/.servers/$PORT.cmdline (print can't fetch vllm_version/up_after_s without a GPU)"
     echo "#   IMAGE=$IMAGE"
     echo "#   MODEL_DIR=$MODEL_DIR"
     echo "#   SERVED_NAME=$SERVED_NAME  MAXLEN=$MAXLEN  GPU_UTIL=$GPU_UTIL  MAXSEQS=$MAXSEQS  KV_DTYPE=$KV_DTYPE  FREE_MIB_FLOOR=${FREE_MIB_FLOOR}MiB"
