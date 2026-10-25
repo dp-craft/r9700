@@ -440,6 +440,19 @@ class TestRender(unittest.TestCase):
         self.assertIn("comp", rows[0])     # non-cached input tokens
         self.assertIn("full", rows[0])     # full round-trip time
 
+    def test_history_row_idle_marker(self):
+        # An idle poll (n_req=0, in_tok=0, out_tok=0) shows a short "idle" marker
+        # instead of a row of zeros/n-a. A first poll (per empty) is also idle.
+        idle = monitor.collect(METRICS_CURRENT, METRICS_CURRENT, time.time() - 2, None, LOG_LINES)
+        self.assertEqual(idle["per"].get("in_tok"), 0)   # prev == current -> zero diffs
+        rows = monitor._history_rows([idle])
+        self.assertIn("idle", rows[1])
+        self.assertIn("KV", rows[1])                    # current state still shown
+        # An active poll (requests moved) shows the normal row, not the marker.
+        active = self._snap()
+        rows = monitor._history_rows([active])
+        self.assertNotIn("idle", rows[1])
+
     def test_idle_cache_block(self):
         # Reproduce render's idle condition: kv==0, running==0, waiting==0 -> single line.
         m = dict(METRICS_CURRENT)

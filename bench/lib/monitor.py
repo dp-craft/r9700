@@ -2,10 +2,10 @@
 """monitor.py — live view of a running vLLM server (per-call metrics + GPU + log).
 
 Read-only: polls the server's /metrics + rocm-smi + the log, shows a live table, and
-records the session to JSONL (one row per poll) so a full session can be charted later
-(see bench/lib/report.py). Zero-install (Python stdlib + rocm-smi). Reuses
-vram_sampler.read_amd() for the GPU (iron rule 6). The log section is a compact table
-of the recent loggers.py/metrics.py entries (not the raw lines).
+optionally records the session to JSONL (one row per poll, with --out) so a full session
+can be charted later (see bench/lib/report.py). Zero-install (Python stdlib + rocm-smi).
+Reuses vram_sampler.read_amd() for the GPU (iron rule 7 — measure, don't calculate). The
+log section is a compact table of the recent loggers.py/metrics.py entries (not the raw lines).
 
 Per-call metrics come from diffing vLLM's per-request histograms (prompt tokens,
 generation tokens, TTFT, decode time, prefill time) between polls -> input/output
@@ -26,7 +26,7 @@ Usage:
   --once     single snapshot, then exit (for a quick check)
   --out      append one JSONL row per poll (the session record)
   --log      the engine log to tail (default bench/.servers/<port>.log)
-  --history  number of past request rows under the current poll (default 15; 0 hides it)
+  --history  number of past request rows under the current poll (default 15; 0 hides the past rows — the current poll row always shows)
 
 It does NOT touch the server (no requests, no kill) — it only reads /metrics + rocm-smi + the log.
 """
@@ -404,6 +404,13 @@ def _window_sum(window, key):
     return total if found else None
 
 
+def _is_idle(per):
+    """True when no request moved in the poll (n_req / in_tok / out_tok all 0/None).
+    The single source for the "active" check in main() (history rows) and the
+    idle-marker in _history_rows."""
+    return (per.get("n_req") or 0) == 0 and (per.get("in_tok") or 0) == 0 and (per.get("out_tok") or 0) == 0
+
+
 def _trend(cur, prev):
     """Trend arrow: ▲ rising, ▼ falling, – flat/none. None-safe (no arrow if either
     value is missing)."""
@@ -514,18 +521,23 @@ def _history_rows(history):
     ]
     for h in history:
         per, state, g = h["per"], h["state"], h["gpu"]
-        rows.append(
-            f"{time.strftime('%H:%M:%S', time.localtime(h['ts'])):>8} "
-            f"{_fmt(per.get('n_req'), 4, '.0f')} "
-            f"{_fmt(per.get('in_tok'), 8, '.0f')} "
-            f"{_fmt(per.get('computed_tok'), 8, '.0f')} "
-            f"{_fmt(per.get('out_tok'), 8, '.0f')} "
-            f"{_fmt(per.get('ttft_s'), 7, '.2f')} "
-            f"{_fmt(per.get('prefill_tps'), 8, '.0f')} "
-            f"{_fmt(per.get('decode_tps'), 8, '.1f')} "
-            f"{_fmt(per.get('e2e_s'), 7, '.2f')} "
-            f"{_fmt(state.get('kv_pct'), 5, '.1f')} "
-            f"{_fmt(g[7] if g else None, 5, '.0f')}")
+        if _is_idle(per):
+            # An idle poll: a short marker (KV/busy are current state, so they stay).
+            rows.append(
+                f"{time.strftime('%H:%M:%S', time.localtime(h['ts'])):>8}   idle (KV {_f(state.get('kv_pct'), '.1f')}%   busy {_f(g[7] if g else None, '.0f')}%)")
+        else:
+            rows.append(
+                f"{time.strftime('%H:%M:%S', time.localtime(h['ts'])):>8} "
+                f"{_fmt(per.get('n_req'), 4, '.0f')} "
+                f"{_fmt(per.get('in_tok'), 8, '.0f')} "
+                f"{_fmt(per.get('computed_tok'), 8, '.0f')} "
+                f"{_fmt(per.get('out_tok'), 8, '.0f')} "
+                f"{_fmt(per.get('ttft_s'), 7, '.2f')} "
+                f"{_fmt(per.get('prefill_tps'), 8, '.0f')} "
+                f"{_fmt(per.get('decode_tps'), 8, '.1f')} "
+                f"{_fmt(per.get('e2e_s'), 7, '.2f')} "
+                f"{_fmt(state.get('kv_pct'), 5, '.1f')} "
+                f"{_fmt(g[7] if g else None, 5, '.0f')}")
     return rows
 
 
@@ -571,21 +583,21 @@ def main():
                "  monitor.py --port 8000 --out session.jsonl   live + record one JSONL row per poll (chart via bench/lib/report.py)\n"
                "  bench/engine-bench/claude/monitor.sh         same, with PORT/paths from _lib.sh\n\n"
                "blocks:\n"
-               "  polls (requests)  current poll + one row per past poll that moved a request (in/comp/out tokens, TTFT, prefill/decode TPS, full, KV %, busy %)\n"
+               "  polls (requests)  current poll + one row per past poll that moved a request (n = request count, in/comp/out tokens, TTFT, prefill/decode TPS, full, KV %, busy %); idle polls show a short \"idle\" marker\n"
                "  avg (last 5 min)  weighted-average TTFT/prefill/decode (TPS by time, TTFT by requests; trend arrows) + window req/comp/out totals\n"
                "  session           cumulative since server start (req, in/cached/comp/out, TTFT, prefill/decode TPS, gap = inter-token latency, queue, full)\n"
                "  cache/queue/spec  KV %, prefix-cache hit, spec acceptance, running/waiting\n"
                "  GPU               VRAM/GTT/power/temp/clocks/busy (rocm-smi)\n"
-               "  log               tail of the loggers.py/metrics.py lines (stale mtime > 120 s -> flagged)")
+               "  log               parsed table of the last 5 loggers.py/metrics.py entries (stale mtime > 120 s -> flagged)")
     ap.add_argument("--port", type=int, default=8000, help="server port (default 8000)")
     ap.add_argument("--interval", type=float, default=2.0, help="poll interval in seconds (default 2.0)")
     ap.add_argument("--log", default=None, help="engine log to tail (default bench/.servers/<port>.log)")
     ap.add_argument("--out", default=None,
                     help="append one JSONL row per poll — the session record, chartable via bench/lib/report.py")
-    ap.add_argument("--no-gpu", action="store_true", help="skip rocm-smi (no GPU block)")
+    ap.add_argument("--no-gpu", action="store_true", help="skip rocm-smi (GPU block shows 'no rocm-smi')")
     ap.add_argument("--once", action="store_true", help="single snapshot, then exit")
     ap.add_argument("--history", type=int, default=15,
-                    help="number of past request rows under the current poll (default 15; 0 hides it)")
+                    help="number of past request rows under the current poll (default 15; 0 hides the past rows — the current poll row always shows)")
     a = ap.parse_args()
 
     url = f"http://127.0.0.1:{a.port}/metrics"
@@ -623,11 +635,8 @@ def main():
             # so those land in ADJACENT polls — a row must be added when tokens move too, not
             # only when n_req>0, or the request's result row (in/out/speed) is never recorded.
             if history is not None:
-                per = snap["per"]
-                active = (per.get("n_req") or 0) > 0 \
-                    or (per.get("in_tok") or 0) > 0 \
-                    or (per.get("out_tok") or 0) > 0
-                if active:
+                # a row only when a request moved (see _is_idle for the single source)
+                if not _is_idle(snap["per"]):
                     history.append(snap)
 
             # 5-min weighted averages (TPS by time, TTFT by requests) + trend vs previous poll
