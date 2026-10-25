@@ -44,19 +44,29 @@ and the log (`bench/.servers/<port>.log`).
 **Quick check (one-liner):**
 ```bash
 watch -n 2 'curl -s http://127.0.0.1:8000/metrics \
-  | grep -E "prefix_cache_(hits|queries)_total|kv_cache_usage_perc|num_requests_running|spec_decode_num_(accepted|drafted)_tokens" \
+  | grep -E "prefix_cache_(hits|queries)_total|kv_cache_usage_perc|num_requests_running|spec_decode_num_(accepted|draft)_tokens" \
   | grep -v "^#"'
 ```
 Prefix-cache hit rate = `hits / queries` — watch it go >0 after a prefix-caching boot.
 
 **Live view (`bench/lib/monitor.py`):** zero-install (Python + rocm-smi). Polls `/metrics` + rocm-smi
-every 2s and shows a live table — **per-call** input/output tokens, prefill TPS, decode TPS, TTFT
-(diffed from the per-request histograms), a **min over the last 60 s**, KV usage %, prefix-cache hit
-rate, spec acceptance, VRAM/power/temp, plus a log tail. `--out` records the session to JSONL for a
-chart (`bench/lib/report.py`). It is the "observe" half of the bench 3-task model (probe / monitor / report).
+every 2s and shows a live table of separated blocks — **polls (requests)** (one row for the current
+poll plus one row per past poll that moved a request: input/output/computed tokens, TTFT,
+prefill/decode TPS, full round-trip, KV %, busy %), **avg (last 5 min)** (weighted-average TTFT/
+prefill/decode — TPS weighted by *time*, TTFT by requests — with ▲/▼ trend arrows vs the previous
+poll), **session** (since server start time: request count, input/cached/computed/output
+tokens, TTFT, prefill/decode TPS, token gap (inter-token latency), queue time, full round-trip),
+**cache/queue/spec** (KV %, prefix-cache hit, spec acceptance, running/waiting), **GPU**
+(VRAM/GTT/power/temp/clocks/busy), and a log tail. The log TPS (loggers.py line) is the
+authoritative per-interval throughput; a stale log (mtime > 120 s) is flagged, not shown. Prefill TPS
+is computed-token based so prefix-cached prompt tokens are not counted. Anomalies are highlighted
+red (KV > 90 %, power > 200 W). `--history N` sets the past request rows (default 15); `--out`
+appends one JSONL row per poll for a chart (`bench/lib/report.py`). It is the "observe" half of the
+bench 3-task model (probe / monitor / report).
 ```bash
 python3 bench/lib/monitor.py --port 8000 --out session.jsonl   # live, records the session
 python3 bench/lib/monitor.py --port 8000 --once               # single snapshot
+python3 bench/lib/monitor.py --port 8000 --history 50         # show 50 history rows
 ```
 
 **Log:** `tail -f bench/.servers/8000.log` (like llama-swap `status`).
