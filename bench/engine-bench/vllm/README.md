@@ -36,6 +36,31 @@ Every boot writes `bench/.servers/<port>.cmdline`: argv, image digest, model rep
 While booting, a **VRAM watchdog** polls sysfs every 0.2 s and `docker kill`s the container if free
 VRAM drops below `WATCHDOG_MIB` (default 256; the desktop shares the card — see step 4, A2).
 
+## Monitoring
+
+A live server exposes three data sources (no extra setup): vLLM `/metrics` (Prometheus), `amd-smi`,
+and the log (`bench/.servers/<port>.log`).
+
+**Quick check (one-liner):**
+```bash
+watch -n 2 'curl -s http://127.0.0.1:8000/metrics \
+  | grep -E "prefix_cache_(hits|queries)_total|kv_cache_usage_perc|num_requests_running|spec_decode_num_(accepted|drafted)_tokens" \
+  | grep -v "^#"'
+```
+Prefix-cache hit rate = `hits / queries` — watch it go >0 after a prefix-caching boot.
+
+**Live view (`bench/lib/monitor.py`):** zero-install (Python + rocm-smi). Polls `/metrics` + rocm-smi
+every 2s and shows a live table — **per-call** input/output tokens, prefill TPS, decode TPS, TTFT
+(diffed from the per-request histograms), a **min over the last 60 s**, KV usage %, prefix-cache hit
+rate, spec acceptance, VRAM/power/temp, plus a log tail. `--out` records the session to JSONL for a
+chart (`bench/lib/report.py`). It is the "observe" half of the bench 3-task model (probe / monitor / report).
+```bash
+python3 bench/lib/monitor.py --port 8000 --out session.jsonl   # live, records the session
+python3 bench/lib/monitor.py --port 8000 --once               # single snapshot
+```
+
+**Log:** `tail -f bench/.servers/8000.log` (like llama-swap `status`).
+
 ## Plan
 
 0. ✅ **Root, one-time:** fresh docker data-root at `/mnt/Lin1/work/docker` (old images not
