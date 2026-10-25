@@ -17,7 +17,6 @@ and sourced research (`docs/research/`), backed by two benchmark tracks (`bench/
 - **Models under test:** `Qwen3.6-35B-A3B` (MoE, ~3B active) · `Qwen3.6-27B` · `Ornith-1.0-35B`
   (qwen35moe hybrid) · `Gemma-4-31B-it-qat` (gemma4 dense) · GGUF Q4 / AWQ. New models may live
   in the **HF cache**, not `/home/dev/models/gguf` — see "New-model benchmarking" below for paths.
-- **ROCm engines: set `HIP_FORCE_DEV_KERNARG=0`.** Without it, random `HSA_STATUS_ERROR_MEMORY_FAULT` in any kernel (address = a valid pointer with bit 44 cleared); kernargs in host memory fixed it (vLLM, 2026-10-23, `docs/analysis/2026-10-23-0023-vllm-gpu-fault-solved-hip-kernarg.md`). Likely also the 2026-10-07 llama.cpp ROCm `-fa on` fault (untested).
 - **Native support:** FP8 (E4M3) yes, FP4 no WMMA. 32 GB is memory-bound at long context → Q4_K_M is optimal, not a compromise.
 
 ## Repo map — what goes where
