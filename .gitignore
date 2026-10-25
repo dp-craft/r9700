@@ -12,3 +12,5 @@ llamacpp/builds/
 .claude/skills/tmp/
 llama-swap/llama-swap/
 /llama-swap/.go-toolchain/
+# monitor.py live-output artifact (README example writes it to the repo root)
+/session.jsonl
