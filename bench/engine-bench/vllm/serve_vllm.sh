@@ -203,7 +203,25 @@ CMD+=(--model /model --served-model-name "$SERVED_NAME" --host 0.0.0.0 --port 80
       --max-model-len "$MAXLEN" "${MODEL_ARGS[@]}" "${ENGINE_ARGS[@]}" ${KVC_ARGS[@]+"${KVC_ARGS[@]}"})
 if [ -n "${EXTRA_ARGS:-}" ]; then read -r -a XA <<<"$EXTRA_ARGS"; CMD+=("${XA[@]}"); fi
 
-if [ "${1:-start}" = print ]; then printf '%q ' "${CMD[@]}"; echo; exit 0; fi
+if [ "${1:-start}" = print ]; then
+  # Surface the same resolved config `start` records in bench/.servers/<port>.cmdline, in one command,
+  # with no GPU (docker image inspect + local file reads only). `print` is the read-only preview.
+  DIGEST=$(docker image inspect -f '{{index .RepoDigests 0}}' "$IMAGE" 2>/dev/null || echo "$IMAGE")
+  {
+    echo "# resolved config (PROFILE=$PROFILE) — identical to what start records in bench/.servers/$PORT.cmdline"
+    echo "#   IMAGE=$IMAGE"
+    echo "#   MODEL_DIR=$MODEL_DIR"
+    echo "#   SERVED_NAME=$SERVED_NAME  MAXLEN=$MAXLEN  GPU_UTIL=$GPU_UTIL  MAXSEQS=$MAXSEQS  KV_DTYPE=$KV_DTYPE  FREE_MIB_FLOOR=${FREE_MIB_FLOOR}MiB"
+    echo "#   DRAFT_DIR=${DRAFT_DIR:-none}  MODEL_CONFIG=${MODEL_CONFIG:-none}  CHAT_TEMPLATE=${CHAT_TEMPLATE:-none}  KVCACHE=${KVCACHE:-off}"
+    echo "# image_digest=$DIGEST"
+    echo "# profile=$PROFILE $(grep -E '^(repo|revision)=' "$MODEL_DIR/SOURCE.txt" 2>/dev/null | tr '\n' ' ')"
+    [ -n "${DRAFT_DIR:-}" ] && echo "# drafter $(grep -E '^(repo|revision)=' "$DRAFT_DIR/SOURCE.txt" 2>/dev/null | tr '\n' ' ')"
+    [ -n "${MODEL_CONFIG:-}" ] && echo "# model_config_override=$MODEL_CONFIG sha256=$(sha256sum "$MODEL_CONFIG" | cut -d' ' -f1)"
+    echo "# printed_utc=$(date -u +%FT%TZ)"
+    echo "docker_argv=$(printf '%q ' "${CMD[@]}")"
+  }
+  exit 0
+fi
 
 # --- preconditions: nothing below this line runs in `print` mode ---
 [ -f "$MODEL_DIR/config.json" ] || { echo "model not found: $MODEL_DIR (fetch_model.sh)" >&2; exit 1; }

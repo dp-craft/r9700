@@ -14,3 +14,5 @@ llama-swap/llama-swap/
 /llama-swap/.go-toolchain/
 # monitor.py live-output artifact (README example writes it to the repo root)
 /session.jsonl
+# Python cache artifacts (e.g. bench/engine-bench/vllm/overlays/__pycache__)
+__pycache__/

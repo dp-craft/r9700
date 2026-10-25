@@ -32,6 +32,7 @@ docs/
                        scans docs/{analysis,research}/ AND campaigns/*/analysis.md
   research/          ← EXTERNAL synthesis: what the world knows, sourced   (dated)
   analysis/          ← OUR measurements: standalone/one-off reports         (dated)
+  vllm/              ← vLLM knowledge base (versions / settings / known-issues / workflows / sources)
 campaigns/           ← (PROJECT ROOT) self-contained campaigns = "runbooks" (starter-baseline,
                        deep-context, …); each holds spec.json + generated run.sh + README + its
                        co-located analysis.md write-up; scaffold new via /benchmark-new-campaign
@@ -45,6 +46,8 @@ bench/                 ← two tracks (see bench/README.md); how-to in docs/GUID
   engine-bench/      ← cross-engine + serving combos: serve_llamacpp.sh (BACKEND/MTP/KV/NP launcher),
                        run.sh + campaign.sh (MTP×KV×depth×parallel matrix, resumable) — all driving
                        bench/lib/capture_engine.py; llama-benchy (dl/benchy-venv)
+  engine-bench/vllm/ ← vLLM (Sly radiance) tools: serve_vllm.sh + profiles/ + capture_proxy.py +
+                       monitor.sh (observe)
   workloads/         ← build_prompt.py + tasks/ + corpus/ (tracked TS+Python source, ~565K tok);
                        generated/ ignored
   lib/               ← gpu_env.sh (AMD/NVIDIA vendor abstraction) + vram_sampler.py +
