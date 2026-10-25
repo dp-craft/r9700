@@ -294,12 +294,12 @@ def collect(m, prev, prev_t, g, log_lines):
     kv = _first(m, "vllm:kv_cache_usage_perc")
     running = _first(m, "vllm:num_requests_running")
     waiting = _first(m, "vllm:num_requests_waiting")
-    ph = _first(m, "vllm:prefix_cache_hits_total", 0)
-    pq = _first(m, "vllm:prefix_cache_queries_total", 0)
+    ph = _first(m, "vllm:prefix_cache_hits_total")
+    pq = _first(m, "vllm:prefix_cache_queries_total")
     tc = _first(m, "vllm:prompt_tokens_cached_total")
     tp = _first(m, "vllm:prompt_tokens_total")
-    sa = _first(m, "vllm:spec_decode_num_accepted_tokens_total", 0)
-    sd = _first(m, "vllm:spec_decode_num_draft_tokens_total", 0)
+    sa = _first(m, "vllm:spec_decode_num_accepted_tokens_total")
+    sd = _first(m, "vllm:spec_decode_num_draft_tokens_total")
     spec_rate = _ratio(sa, sd)
     log_pp, log_gen = log_throughput(log_lines)
     log_spec_len, log_spec_rate = log_spec(log_lines)
@@ -323,7 +323,12 @@ def collect(m, prev, prev_t, g, log_lines):
 
 
 def _f(x, spec=""):
-    """Format a value, or 'n/a' when it is None (None-safe display)."""
+    """Format a value, or 'n/a' when it is None (None-safe display).
+
+    n/a vs 0 is intentional: 'n/a' means *no data / can't compute* (first poll,
+    counter reset, no requests so the rate/latency denominator is 0); 0 means
+    *measured zero* (e.g. an idle poll where tokens diff to 0). Both are shown
+    as-is — a 0 is a real reading, not a placeholder."""
     return "n/a" if x is None else format(x, spec)
 
 

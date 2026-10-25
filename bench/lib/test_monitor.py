@@ -166,12 +166,11 @@ class TestPromParse(unittest.TestCase):
 class TestHelpers(unittest.TestCase):
     def test_first(self):
         # _first(m, *names) returns the first present name's value; all args are NAMES
-        # (no default value). The `0`/`9` fallbacks are no-op names that never match a
-        # string key, so an absent metric yields None (None-safe downstream).
+        # (no default value). An absent metric yields None (None-safe downstream).
         m = {"x": 1.0}
-        self.assertEqual(monitor._first(m, "x", 0), 1.0)   # x present
-        self.assertIsNone(monitor._first(m, "y", 9))      # y absent (9 is a no-op name)
-        self.assertIsNone(monitor._first(m, "y"))         # y absent
+        self.assertEqual(monitor._first(m, "x"), 1.0)   # x present
+        self.assertIsNone(monitor._first(m, "y"))      # y absent
+        self.assertEqual(monitor._first(m, "x", "y"), 1.0)  # first present wins
 
     def test_diff_normal(self):
         self.assertEqual(monitor._diff({"a": 5.0}, {"a": 2.0}, "a"), 3.0)
@@ -209,6 +208,27 @@ class TestHelpers(unittest.TestCase):
         self.assertEqual(monitor._ttft_base({"vllm:request_time_to_first_token_seconds_sum": 1.0}),
                          "vllm:request_time_to_first_token_seconds")  # old vLLM
         self.assertIsNone(monitor._ttft_base({}))
+
+    def test_flag(self):
+        # _flag: red-highlight when over the threshold; 'n/a' when None; plain otherwise.
+        self.assertEqual(monitor._flag(50.0, 90, ".1f"), "50.0")
+        self.assertEqual(monitor._flag(95.0, 90, ".1f"), "\033[31m95.0\033[0m")
+        self.assertEqual(monitor._flag(None, 90, ".1f"), "n/a")
+        self.assertEqual(monitor._flag(90.0, 90, ".1f"), "90.0")  # at threshold -> no highlight
+
+    def test_trend(self):
+        # _trend: ▲ rising, ▼ falling, – flat, "" when either is None.
+        self.assertEqual(monitor._trend(1.0, 0.5), "▲")
+        self.assertEqual(monitor._trend(0.5, 1.0), "▼")
+        self.assertEqual(monitor._trend(1.0, 1.0), "–")
+        self.assertEqual(monitor._trend(None, 1.0), "")
+        self.assertEqual(monitor._trend(1.0, None), "")
+
+    def test_visible_len(self):
+        # _visible_len ignores ANSI escape codes (so colored lines align correctly).
+        self.assertEqual(monitor._visible_len("hello"), 5)
+        self.assertEqual(monitor._visible_len("\033[31mhello\033[0m"), 5)
+        self.assertEqual(monitor._visible_len("a\033[31mb\033[0mc"), 3)
 
 
 # --------------------------------------------------------------------------- collect
@@ -343,6 +363,27 @@ class TestLogParse(unittest.TestCase):
         self.assertEqual(len(lines), 5)
         self.assertIn("prompt", lines[0])
         self.assertIn("acc", lines[0])
+
+
+class TestLogStale(unittest.TestCase):
+    def test_log_stale(self):
+        import os
+        import tempfile
+
+        # Missing file -> stale.
+        self.assertTrue(monitor.log_stale("/nonexistent/path/to/log.log"))
+
+        # Fresh file -> not stale.
+        fd, path = tempfile.mkstemp()
+        os.close(fd)
+        try:
+            self.assertFalse(monitor.log_stale(path, max_age=120.0))
+            # A file whose mtime is forced into the past -> stale.
+            old = time.time() - 300
+            os.utime(path, (old, old))
+            self.assertTrue(monitor.log_stale(path, max_age=120.0))
+        finally:
+            os.unlink(path)
 
 
 # --------------------------------------------------------------------------- window
