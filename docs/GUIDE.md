@@ -91,6 +91,15 @@ docker run --rm -it --device /dev/kfd --device /dev/dri -p 8000:8000 \
   vllm serve /models/Qwen3.6-35B-A3B-AWQ-4bit --port 8000
 ```
 
+**Observe a running server** (any engine with a log; vLLM also gets `/metrics` + rocm-smi): ✅
+```bash
+python3 bench/lib/monitor.py --port 8000        # live table: per-request tokens/TTFT/TPS + 5-min avg + session + GPU + log (Ctrl-C quits)
+python3 bench/lib/monitor.py --port 8000 --once # single snapshot
+```
+Read-only — no requests, no kill. `--out FILE` records one JSONL row per poll (chart via
+`bench/lib/report.py`); `--help` lists usage + what each block shows. The "observe" half of the
+bench 3-task model (probe = `bench/lib/capture_engine.py` / monitor / report).
+
 ---
 
 ## 4. engine-bench — measure

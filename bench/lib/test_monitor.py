@@ -368,6 +368,21 @@ class TestWindow(unittest.TestCase):
         self.assertIsNone(monitor._window_avg(window, "missing", "prefill_t"))
         self.assertIsNone(monitor._window_avg([], "prefill_tps", "prefill_t"))
 
+    def test_window_sum(self):
+        # Sum of per[key] over the window (a TOTAL over the window, not a rate):
+        # Σ per[key] across all samples. None when no sample has the value (all None)
+        # — an idle window shows 'n/a', not a misleading 0.
+        window = [
+            (100, {"n_req": 6, "computed_tok": 17302, "out_tok": 7587}),
+            (102, {"n_req": 2, "computed_tok": 500, "out_tok": 100}),
+            (104, {"n_req": None, "computed_tok": None, "out_tok": None}),
+        ]
+        self.assertEqual(monitor._window_sum(window, "n_req"), 8)
+        self.assertEqual(monitor._window_sum(window, "computed_tok"), 17802)
+        self.assertEqual(monitor._window_sum(window, "out_tok"), 7687)
+        self.assertIsNone(monitor._window_sum([(104, {"n_req": None})], "n_req"))  # all None
+        self.assertIsNone(monitor._window_sum([], "n_req"))                        # empty
+
 
 # --------------------------------------------------------------------------- render
 class TestRender(unittest.TestCase):

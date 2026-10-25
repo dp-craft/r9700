@@ -31,7 +31,7 @@ checkpoint dirs only; pointing it at the heretic dir (`/mnt/Lin1/work/vllm/sly-r
 - `tools/hf-venv` — `hf` CLI (used by `vllm/fetch_model.sh`); `.venv` — scratch; `logs/` — fetch/pull logs
 - `run.sh` — hand-written `docker run` for heretic-on-vLLM: **does not work** (see above); `--restart unless-stopped` is why it keeps coming back. The launchers remove such a container automatically
 
-In the repo: `bench/engine-bench/radiance/serve_radiance.sh` (native engine), `bench/engine-bench/vllm/{serve_vllm.sh,profiles/<engine>/*.env}` (sly; `_engine.env` = image + shared flags, `<model>.env` = model flags; see `vllm/README.md`).
+In the repo: `bench/engine-bench/radiance/serve_radiance.sh` (native engine), `bench/engine-bench/vllm/{serve_vllm.sh,profiles/<engine>/*.env}` (sly; `_engine.env` = image + shared flags, `<model>.env` = model flags; see `vllm/README.md`), `monitor.sh` — live view of the booted server (wraps `bench/lib/monitor.py` with `PORT`/paths from `_lib.sh`, records to `$RUNDIR/<port>.session.jsonl`; see `vllm/README.md` §Monitoring).
 
 ## Configs that matter
 

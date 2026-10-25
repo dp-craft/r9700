@@ -20,7 +20,8 @@ Log-derived values (the authoritative per-interval TPS): the vLLM loggers.py lin
 the spec-decoding line ("Mean acceptance length: N, average draft acceptance rate: P%").
 
 Usage:
-    python3 monitor.py [--port 8000] [--interval 2] [--log PATH] [--out JSONL] [--no-gpu] [--once] [--history 20]
+    python3 monitor.py [--port 8000] [--interval 2] [--log PATH] [--out JSONL] [--no-gpu] [--once] [--history 15]
+    (see --help for the same, with usage examples)
 
   --once     single snapshot, then exit (for a quick check)
   --out      append one JSONL row per poll (the session record)
@@ -384,6 +385,20 @@ def _window_avg(window, key, wkey):
     return num / den if den > 0 else None
 
 
+def _window_sum(window, key):
+    """Sum of per[key] over the window (a TOTAL over the window, not a rate):
+    Σ per[key] over all samples. None if no sample has the value (all None) —
+    so an idle window shows 'n/a' rather than a misleading 0."""
+    total = 0.0
+    found = False
+    for _, p in window:
+        v = p.get(key)
+        if v is not None:
+            total += v
+            found = True
+    return total if found else None
+
+
 def _trend(cur, prev):
     """Trend arrow: ▲ rising, ▼ falling, – flat/none. None-safe (no arrow if either
     value is missing)."""
@@ -424,7 +439,8 @@ def render(a, snap, window, history, log_lines, log_stale, cur_avg, prev_avg):
         ("avg (last 5 min)", [
             f"TTFT {_f(cur_avg['ttft'], '.2f')} s {_trend(cur_avg['ttft'], prev_avg['ttft'])}   "
             f"prefill {_f(cur_avg['prefill'], '.0f')} tok/s {_trend(cur_avg['prefill'], prev_avg['prefill'])}   "
-            f"decode {_f(cur_avg['decode'], '.1f')} tok/s {_trend(cur_avg['decode'], prev_avg['decode'])}",
+            f"decode {_f(cur_avg['decode'], '.1f')} tok/s {_trend(cur_avg['decode'], prev_avg['decode'])}   "
+            f"req {_f(cur_avg['n_req'], '.0f')}   comp {_f(cur_avg['comp'], '.0f')} tok   out {_f(cur_avg['out'], '.0f')} tok",
         ]),
         ("session" + (f" (since {time.strftime('%H:%M:%S', time.localtime(session.get('start_ts')))})"
                      if session.get("start_ts") else ""),
@@ -541,13 +557,28 @@ def _row(snap):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="live vLLM monitor (read-only)")
-    ap.add_argument("--port", type=int, default=8000)
-    ap.add_argument("--interval", type=float, default=2.0)
-    ap.add_argument("--log", default=None)
-    ap.add_argument("--out", default=None)
-    ap.add_argument("--no-gpu", action="store_true")
-    ap.add_argument("--once", action="store_true")
+    ap = argparse.ArgumentParser(
+        description="live vLLM server monitor — read-only: polls /metrics + rocm-smi + the log, never touches the server",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="examples:\n"
+               "  monitor.py --port 8000                       live table, polls every 2 s (Ctrl-C to quit)\n"
+               "  monitor.py --port 8000 --once                single snapshot, then exit\n"
+               "  monitor.py --port 8000 --out session.jsonl   live + record one JSONL row per poll (chart via bench/lib/report.py)\n"
+               "  bench/engine-bench/claude/monitor.sh         same, with PORT/paths from _lib.sh\n\n"
+               "blocks:\n"
+               "  polls (requests)  current poll + one row per past poll that moved a request (in/comp/out tokens, TTFT, prefill/decode TPS, full, KV %, busy %)\n"
+               "  avg (last 5 min)  weighted-average TTFT/prefill/decode (TPS by time, TTFT by requests; trend arrows) + window req/comp/out totals\n"
+               "  session           cumulative since server start (req, in/cached/comp/out, TTFT, prefill/decode TPS, gap = inter-token latency, queue, full)\n"
+               "  cache/queue/spec  KV %, prefix-cache hit, spec acceptance, running/waiting\n"
+               "  GPU               VRAM/GTT/power/temp/clocks/busy (rocm-smi)\n"
+               "  log               tail of the loggers.py/metrics.py lines (stale mtime > 120 s -> flagged)")
+    ap.add_argument("--port", type=int, default=8000, help="server port (default 8000)")
+    ap.add_argument("--interval", type=float, default=2.0, help="poll interval in seconds (default 2.0)")
+    ap.add_argument("--log", default=None, help="engine log to tail (default bench/.servers/<port>.log)")
+    ap.add_argument("--out", default=None,
+                    help="append one JSONL row per poll — the session record, chartable via bench/lib/report.py")
+    ap.add_argument("--no-gpu", action="store_true", help="skip rocm-smi (no GPU block)")
+    ap.add_argument("--once", action="store_true", help="single snapshot, then exit")
     ap.add_argument("--history", type=int, default=15,
                     help="number of past request rows under the current poll (default 15; 0 hides it)")
     a = ap.parse_args()
@@ -559,7 +590,7 @@ def main():
     prev, prev_t = None, None
     window = []  # rolling (ts, per) list, pruned to the last 5 min
     history = deque(maxlen=a.history) if a.history > 0 else None
-    prev_avg = {"ttft": None, "prefill": None, "decode": None}
+    prev_avg = {"ttft": None, "prefill": None, "decode": None, "n_req": None, "comp": None, "out": None}
     out = open(a.out, "a") if a.out else None
 
     try:
@@ -599,6 +630,9 @@ def main():
                 "ttft": _window_avg(window, "ttft_s", "n_req"),
                 "prefill": _window_avg(window, "prefill_tps", "prefill_t"),
                 "decode": _window_avg(window, "decode_tps", "decode_t"),
+                "n_req": _window_sum(window, "n_req"),
+                "comp": _window_sum(window, "computed_tok"),
+                "out": _window_sum(window, "out_tok"),
             }
             render(a, snap, window, history, log_lines, log_stale(a.log), cur_avg, prev_avg)
             prev_avg = cur_avg
