@@ -1,0 +1,54 @@
+{
+  "slug": "vllm-redhat-sly-mtp-depth",
+  "date": "2026-10-30",
+  "title": "Sly 1.8.1 \u00b7 RedHatAI Qwen3.8-27B-MXFP4 \u00b7 MTP k=4 \u00b7 fp8 KV \u00b7 depth 10k/50k/100k",
+  "notes": [
+    "same probes/ctx as vllm-redhat-sly-depth (no-spec baseline); one variable = speculative method"
+  ],
+  "engine": "vllm",
+  "profile": "sly-redhat/redhat-mxfp4-mtp",
+  "served_model": "qwen38-27b-redhat-mxfp4-mtp",
+  "model": "/mnt/Lin1/work/vllm/sly-radiance/models/RedHatAI__Qwen3.8-27B-MXFP4@16a86728",
+  "port": 8000,
+  "servers": [
+    {
+      "name": "redhat-sly-mtp-fp8kv-ctx110000",
+      "ctx": 110000,
+      "np": 1,
+      "kv": "fp8",
+      "mtp": 0,
+      "probes": [
+        {
+          "slug": "redhat-sly-mtp-cr10000",
+          "prompts": [
+            "codereview-10000.txt"
+          ],
+          "api": "chat",
+          "reps": 2,
+          "max_tokens": 256,
+          "warmup": 1
+        },
+        {
+          "slug": "redhat-sly-mtp-cr50000",
+          "prompts": [
+            "codereview-50000.txt"
+          ],
+          "api": "chat",
+          "reps": 2,
+          "max_tokens": 256,
+          "warmup": 0
+        },
+        {
+          "slug": "redhat-sly-mtp-cr100000",
+          "prompts": [
+            "codereview-100000.txt"
+          ],
+          "api": "chat",
+          "reps": 2,
+          "max_tokens": 256,
+          "warmup": 0
+        }
+      ]
+    }
+  ]
+}

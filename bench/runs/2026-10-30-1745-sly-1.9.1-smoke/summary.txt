@@ -1,0 +1,47 @@
+before: VRAM used 1303 MiB
+start rc=0, VRAM used 30852 MiB
+{%- set template_version = "qwen3.8-froggeric-v22.5-sly2" %}
+RADIANCE_ADAPTIVE_WIDTH=perseq
+RADIANCE_ATTN_Q_FP8=1
+RADIANCE_CACTUS_DELTA=0.5
+RADIANCE_DFLASH_FC_TILED_MIN_M=513
+RADIANCE_DFLASH_PREFILL_WINDOW_SKIP=1
+RADIANCE_DRAFT_SCHEDULE=1:8,2:7,4:6,8:5,16:4
+RADIANCE_DRAFT_TAU=0.35
+RADIANCE_DYNAMIC_DRAFT=1
+RADIANCE_EMBED_BITS=4
+RADIANCE_EMBED_INT8=1
+RADIANCE_FUSED_NORM_QUANT=1
+RADIANCE_FUSED_NQ_REG=1
+RADIANCE_FUSE_RMS_QUANT=1
+RADIANCE_GDN_SCAN_VARIANT=s3
+RADIANCE_GFX_ARCH=gfx1201
+RADIANCE_KV_GROUP_SIZE=8
+RADIANCE_LMHEAD_FP8=1
+RADIANCE_LMHEAD_INT4=1
+RADIANCE_MXFP4=1
+RADIANCE_MXFP4_AT_SKIP_PAD=1
+RADIANCE_MXFP4_A_TILED_MIN_M=513
+RADIANCE_MXFP4_DECODE_MAX_M=128
+RADIANCE_MXFP4_SANITIZE=0
+RADIANCE_MXFP4_TALL=1
+RADIANCE_MXFP4_TILED_OPROJ=1
+RADIANCE_MXFP4_TN4_MIN_M=513
+RADIANCE_MXFP4_W4A8=1
+RADIANCE_MXFP4_W4A8_MIN_M=0
+RADIANCE_MXFP4_WIDE_MAX_M=192
+RADIANCE_MXFP4_WPERM=1
+RADIANCE_PRESHUFFLE=1
+RADIANCE_RUN_BWTEST=1
+RADIANCE_USE_R4D=1
+RADIANCE_USE_R4D_AR=1
+RADIANCE_USE_R4D_AR_QUANT=1
+RADIANCE_VERSION=1.9.1
+vllm 0.32.0
+replay test input_tokens: {'base': 56, 'older_long': 56, 'newest_long': 1225}
+  older turn's reasoning replayed: False | newest turn's reasoning replayed: True
+generation: 5.6s, stop=end_turn, out_tokens=749, thinking 915 chars, text 734 chars, ~134.1 tok/s end-to-end
+(APIServer pid=1) INFO 10-30 16:52:17 [loggers.py:335] Engine 000: Avg prompt throughput: 312.7 tokens/s, Avg generation throughput: 79.7 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage
+(APIServer pid=1) INFO 10-30 16:52:17 [metrics.py:120] SpecDecoding metrics: Mean acceptance length: 6.38, Accepted throughput: 31.40 tokens/s, Drafted throughput: 40.84 tokens/s, Accepted: 678 tokens
+(APIServer pid=1) INFO 10-30 16:52:27 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0
+after stop: port 8000 free, VRAM used 1223 MiB

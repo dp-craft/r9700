@@ -1,0 +1,4 @@
+date=2026-10-30T07:59:44+01:00
+model=/mnt/Lin1/work/vllm/sly-radiance/models/slybase__Swift-1.5-Qwen3.8-27B-heretic-MXFP4-GPTQ@3bb379dc
+engine=vllm profile=sly-official/heretic-mxfp4 served_model=swift-1.5
+vram_budget_mib=32400
