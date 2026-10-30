@@ -1,6 +1,6 @@
 # Claude Code on local radiance / vllm-sly-radiance
 
-Four launchers: each frees the GPU, boots ONE server (via `radiance/serve_radiance.sh` or `vllm/serve_vllm.sh`),
+Five launchers: each frees the GPU, boots ONE server (via `radiance/serve_radiance.sh` or `vllm/serve_vllm.sh`),
 waits for `/health`, writes per-run Claude settings, runs `claude`, and stops the server when Claude exits (`KEEP=1` leaves it up).
 Extra args go to `claude` (`-c`, `-p "…"`). Verified 2026-10-24: each answered a `claude -p` prompt (log: `bench/.servers/8000.{log,boot}`).
 
@@ -10,6 +10,7 @@ Extra args go to `claude` (`-c`, `-p "…"`). Verified 2026-10-24: each answered
 | `claude-rad-heretic.sh` | native radiance (same image) | `/mnt/Lin1/work/vllm/sly-radiance/models/swift-heretic-gptq/*.rad` (16.8 GiB, target only, no drafter) | ~55 s | `qwen35` | research-only, safety removed; flags from the file's README |
 | `claude-sly-amd.sh` | `ghcr.io/slybase/vllm-sly-radiance:1.6.0-rocm10.1` (vLLM 0.32) | `amd/Qwen3.8-27B-Quark-AWQ-MXFP4@5233554c` (HF checkpoint) | ~3 min (+compile on a new image tag) | `qwen38-27b-mxfp4` | profile `sly-radiance/qwen38-mxfp4`, ctx 150000, drafter off |
 | `claude-sly-heretic.sh` | `vllm-sly-radiance:1.6.0` (vLLM) | `slybase/Swift-1.5-Qwen3.8-27B-heretic-MXFP4-GPTQ@3bb379dc` (compressed-tensors GPTQ-MXFP4, HF checkpoint, ~20 GB) | ~3 min | `swift-1.5-heretic` | profile `sly-radiance/qwen38-heretic-mxfp4`; research-only, safety removed |
+| `claude-sly-redhat.sh` | `ghcr.io/slybase/vllm-sly-radiance:1.9.1-rocm10.1` (vLLM 0.32.0; since 2026-10-30, was 1.8.1 — `IMAGE=…:1.8.1-rocm10.1` rolls back) | `RedHatAI/Qwen3.8-27B-MXFP4@16a86728` (compressed-tensors MXFP4, HF checkpoint, 19 GB) + `syvai/Qwen3.8-27B-DFlash2-W4A16@4d30ec73` drafter | ~7 min (400–419 s) | `qwen38-27b-redhat-mxfp4-dflash` | profile `sly-redhat/redhat-mxfp4-dflash` (heretic's sly-official engine layer), DFlash2 k=7, ctx 262000, `WATCHDOG_MIB=32` |
 
 Knobs: `PORT` (8000) `KEEP` `WAIT` `MAXLEN` `IMAGE` `RAD_FILE` `EXTRA_ARGS` `CLAUDE_BASE_SETTINGS`. The Claude env block comes from
 `~/.config/claude/local_vllm_direct/settings.json`; the launcher rewrites URL, model names, context window and the autocompact % (so compaction fires before prompt+output > window).
@@ -31,7 +32,7 @@ checkpoint dirs only; pointing it at the heretic dir (`/mnt/Lin1/work/vllm/sly-r
 - `tools/hf-venv` — `hf` CLI (used by `vllm/fetch_model.sh`); `.venv` — scratch; `logs/` — fetch/pull logs
 - `run.sh` — hand-written `docker run` for heretic-on-vLLM: **does not work** (see above); `--restart unless-stopped` is why it keeps coming back. The launchers remove such a container automatically
 
-In the repo: `bench/engine-bench/radiance/serve_radiance.sh` (native engine), `bench/engine-bench/vllm/{serve_vllm.sh,profiles/<engine>/*.env}` (sly; `_engine.env` = image + shared flags, `<model>.env` = model flags; see `vllm/README.md`), `monitor.sh` — live view of the booted server (wraps `bench/lib/monitor.py` with `PORT`/paths from `_lib.sh`, records to `$RUNDIR/<port>.session.jsonl`; see `vllm/README.md` §Monitoring).
+In the repo: `bench/engine-bench/radiance/serve_radiance.sh` (native engine), `bench/engine-bench/vllm/{serve_vllm.sh,profiles/<engine>/*.env}` (sly; `_engine.env` = image + shared flags, `<model>.env` = model flags; see `vllm/README.md`), `monitor.sh` — live view of the booted server (wraps `bench/lib/monitor.py` with `PORT`/paths from `_lib.sh`, records to `$RUNDIR/<port>.session.jsonl`; GPU bars + temps + fan, cache, server uptime, live polls, 5-min avg; see `vllm/README.md` §Monitoring).
 
 ## Configs that matter
 

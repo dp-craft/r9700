@@ -50,16 +50,18 @@ watch -n 2 'curl -s http://127.0.0.1:8000/metrics \
 Prefix-cache hit rate = `hits / queries` — watch it go >0 after a prefix-caching boot.
 
 **Live view (`bench/lib/monitor.py`):** zero-install (Python + rocm-smi), read-only. Polls
-`/metrics` + rocm-smi every 2 s and shows live blocks — what each shows is in `python3
-bench/lib/monitor.py --help` (usage + blocks):
-- **polls (requests)** — the current poll plus one row per past poll that moved a request (in/comp/out tokens, TTFT, prefill/decode TPS, full round-trip, KV %, busy %)
+`/metrics` + rocm-smi every 2 s and shows live blocks (top→bottom) — what each shows is in
+`python3 bench/lib/monitor.py --help` (usage + blocks):
+- **GPU** — VRAM/GTT + 5 colored bars (GPU use / power / VRAM / edge temp / mem temp) + fan + clocks; green→yellow→red thresholds (red over 80/90 C)
+- **cache/queue/spec** — KV %, prefix-cache hit % + cached-token counts, block hit %, spec acceptance % + draft-token counts, running/waiting (idle collapses to one line)
+- **server** — cumulative since server start (title shows `up Xm, since HH:MM:SS`) (req, in/cached/comp/out tokens, TTFT, prefill/decode TPS, gap = inter-token latency, queue, full round-trip)
+- **polls (requests)** — a live row (in-flight elapsed + progress tokens + GPU % + watts + KV %) above a separator, then one row per past poll that moved a request (newest first; idle rows dropped) (in/comp/out tokens, TTFT, prefill/decode TPS, full round-trip, KV %, GPU %)
 - **avg (last 5 min)** — weighted-average TTFT/prefill/decode (TPS by *time*, TTFT by requests; ▲/▼ trend vs the previous poll) + the window's request count and comp/output token sums
-- **session** — cumulative since server start (req, in/cached/comp/out tokens, TTFT, prefill/decode TPS, gap = inter-token latency, queue, full round-trip)
-- **cache/queue/spec** — KV %, prefix-cache hit, spec acceptance, running/waiting
-- **GPU** — VRAM/GTT/power/temp/clocks/busy · **log** — a tail of the loggers.py/metrics.py lines
+- **log** — a tail of the loggers.py/metrics.py lines
 vLLM-specific: the log TPS (loggers.py line) is the authoritative per-interval throughput; a stale
 log (mtime > 120 s) is flagged, not shown. Prefill TPS is computed-token based so prefix-cached
-prompt tokens are not counted. Anomalies are highlighted red (KV > 90 %, power > 200 W).
+prompt tokens are not counted. Values are colored green/yellow/red by threshold (e.g. KV > 90 %, power > 200 W, edge temp > 80 C, mem temp > 90 C).
+In the polls rows, `in_tok` is the **total prompt size of all requests completed in that poll window** (not a rate) — a large value is a long-context/agentic request finishing, not a spike.
 `--history N` sets the past request rows (default 15); `--out` appends one JSONL row per poll for a
 chart (`bench/lib/report.py`). It is the "observe" half of the bench 3-task model (probe / monitor / report).
 ```bash

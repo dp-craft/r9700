@@ -50,6 +50,17 @@ an issue lives in `settings.md`; a fix that was version/env-specific lives in `h
   deliberately uses `0` (bit-exact stock acceptance) to avoid it (2026-10-23 user decision, quality first).
 - **version seen:** sly-radiance 1.6.0 (Cactus off), sly-official 1.8.1 (Cactus 0.5).
 - **workaround:** `RADIANCE_CACTUS_DELTA=0` for bit-exact stock acceptance (what upstream radiance runs).
+- **upstream mitigation (2026-10-30):** Sly 1.9.0 adds a fade (δ falls to 0 between 4,096 and 16,384 output
+  tokens; `RADIANCE_CACTUS_FADE_END=0` = off) and a cap (`RADIANCE_CACTUS_CAP_R`, default 0.5); 1.9.1 adds the
+  `v22.5-sly2` template (older turns' reasoning not replayed). CLAIMED: loops 20/32 → 3/32; #164 still open.
+  The sly-redhat profile runs 1.9.1 since 2026-10-30 (smoke test `bench/runs/2026-10-30-1745-sly-1.9.1-smoke/`);
+  MEASURED on a real session (`docs/analysis/2026-10-30-1552-dpf-brief-fix-heretic-vs-redhat.md`, Claude Code
+  dp-forge brief fix W2-08, RedHat MXFP4 + DFlash2 k=7, budget RUNBOOK): **reduced, not removed**. 10-s decode windows
+  at acceptance ≥ 7 of 8 = 58 of 514 (11.3 %) on 1.9.1 (δ 0.5 + fade/cap, `v22.5-sly2`), vs 777 of 1,067 (72.8 %) on
+  1.8.1 δ 0.5 (whole 3-h run, 0 of 3 briefs finished) and 7 of 650 (1.1 %) on 1.8.1 δ 0 (not a controlled A/B: RUNBOOK and briefs in the prompt differ too). Still 3 decision loops and
+  1 output-cap hit on 1.9.1; the largest began at δ 0.5 and kept going after the fade reached δ 0, so pinned acceptance
+  is a symptom rather than the cause (INFERRED). Short-probe speed is unchanged vs 1.8.1 (depth 10k/50k/100k,
+  `docs/analysis/2026-10-30-0900-vllm-redhat-mxfp4-depth-transposed.md`).
 - **report:** `settings.md` (RADIANCE_CACTUS_DELTA); `profiles/sly-radiance/_engine.env` (comment);
   Sly issue #164.
 

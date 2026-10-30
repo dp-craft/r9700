@@ -18,6 +18,7 @@ Three engines, one per `bench/engine-bench/vllm/profiles/<engine>/` folder:
 | `radiance/` | `stilldeadcode/vllm-radiance:0.9.3` (vLLM 0.27.1 + libr4d kernels) | **native upstream R4D** — the "tuned" build behind Puget's R9700 numbers; runs the INT4 checkpoint. Dead image (not migrated to the new data-root). |
 | `sly-radiance/` | `ghcr.io/slybase/vllm-sly-radiance:1.6.0-rocm10.1` (vLLM 0.31.0) | **Sly MXFP4 base track** — our MXFP4 + fp8-KV + DFlash2 campaign track (host-driven deviations: eager, Cactus off, drafter arms). |
 | `sly-official/` | `ghcr.io/slybase/vllm-sly-radiance:1.8.1-rocm10.1` | **Sly-docs official recipe** — the **current model under test** (Swift-1.5 heretic GPTQ-MXFP4 + DFlash2), flag-for-flag from the Sly docs. |
+| `sly-redhat/` | `ghcr.io/slybase/vllm-sly-radiance:1.9.1-rocm10.1` (vLLM 0.32.0) since 2026-10-30; was 1.8.1 (rollback: profile comment) | **RedHatAI/Qwen3.8-27B-MXFP4 + DFlash2** on sly-official's engine layer (sources `sly-official/_engine.env`, overrides only the image). |
 
 ## Routing table
 

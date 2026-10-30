@@ -11,6 +11,7 @@ that actually ran.
 | sly-radiance | `ghcr.io/slybase/vllm-sly-radiance:1.6.0-rocm10.1` @ `sha256:bf153fa38868…7506` | **0.31.0 (image reports) — OPEN discrepancy: Sly PR #162 says 1.6.0 = 0.32.0; do not assert** | 1.6.0 | 10.1 (in-image) / 10.1.0 host | `amd/Qwen3.8-27B-Quark-AWQ-MXFP4@5233554c` (Quark MXFP4 W4A8) + DFlash2 `syvai/…@4d30ec73` k=7 | MXFP4 W4A8 (fp8 WMMA all linears), fp8 KV, R4D_HYBRID, eager, Cactus 0, ctx 150000/170000 | peak **30,259 MiB** (170k cold prefill) → flat 29,774; KV pool 433,957 tok @150k / 332,822 tok @170k; GTT 64–120 MiB (no spill) | MEASURED (4 campaigns: depth, dflash, dflash-170k, + fault) |
 | radiance (native R4D) | `stilldeadcode/vllm-radiance:0.9.3` (vLLM 0.27.1 + libr4d) | 0.27.1 | 0.6.2 (provenance discrepancy inside tag 0.9.3) | 7.14 userspace (in-image) / 10.0.0 host | `RedHatAI/Qwen3.8-27B-INT4@bf08f3db` (W4A16) | R4D + MTP, fp8 KV (R5), TRITON_ATTN (host 0.29.0 venv), ctx 114688 | peak **28,706 MiB** (R4 MTP8); KV pool 138,416 tok @114688 (MTP3) | **dead image** (not migrated to the new data-root); MEASURED 2026-09 |
 | radiance (native `.rad`) | `stilldeadcode/radiance:1.11.0` | n/a (native radiance, not vLLM) | 1.11.0 | n/a | a `.rad` checkpoint (not an HF checkpoint) | native `.rad` load path | n/a | **native `.rad` path** — the only engine that loads `.rad` (sly loads HF only); citation: the `.rad`-vs-HF distinction (known-issues.md) |
+| **sly-redhat** (RedHat image since 2026-10-30; was 1.8.1) | `ghcr.io/slybase/vllm-sly-radiance:1.9.1-rocm10.1` @ `sha256:9744caf31e96…abc8` | 0.32.0 (image reports) | 1.9.1 | 10.1 | `RedHatAI/Qwen3.8-27B-MXFP4@16a86728` (compressed-tensors MXFP4) + DFlash2 `syvai/…@4d30ec73` k=7 | sly-official engine layer (MXFP4 W4A8, fp8 KV, R4D_HYBRID, FULL_DECODE_ONLY graphs), Cactus 0.5 + 1.9.x fade (4096→16384 out tok) and cap (defaults), template `qwen3.8-froggeric-v22.5-sly2`, ctx 262000 | **30,852 MiB** used after boot; KV pool 370,702 tok @262000 (= 1.8.1) | MEASURED: smoke test + depth probe at ctx 110000 (decode = 1.8.1 within n=2 noise; DFlash2 k=7 122.72/86.34/86.24 tok/s at 10k/50k/100k) + one real Claude Code session (W2-08); citation below |
 
 ## Citation notes (provenance per row)
 
@@ -27,6 +28,14 @@ that actually ran.
   `docs/analysis/2026-09-11-2047-vllm-qwen38-27b-int4.md` (host 0.29.0 venv).
 - **sly-official 1.8.1** (row 1): config-only (profile `sly-official/heretic-mxfp4.env`). The
   MEASURED row is added when the campaign lands — the update-trigger rule in `README.md`.
+- **sly-redhat 1.9.1** (row 5): MEASURED smoke test `bench/runs/2026-10-30-1745-sly-1.9.1-smoke/` (`summary.txt`: boot 475 s
+  incl. first compile, VRAM, `RADIANCE_VERSION=1.9.1`, vLLM 0.32.0, template line; replay check: an older turn's
+  reasoning adds 0 prompt tokens, the newest turn's adds 1,169). Fade/cap/template behaviour and the loop and speed
+  gains are CLAIMED (Sly v1.9.0/v1.9.1 release notes). Depth probe (MEASURED, 2026-10-30 19:32-19:59, ctx 110000,
+  fp8 KV, 1 stream, 256 tok, 2 reps): `docs/analysis/2026-10-30-0900-vllm-redhat-mxfp4-depth-transposed.md` § "Sly 1.9.1
+  rerun" (run dirs `bench/runs/2026-10-30-vllm-redhat-sly191{,-mtp,-dflash}-depth/`). Real session (loops reduced, not
+  removed): `docs/analysis/2026-10-30-1552-dpf-brief-fix-heretic-vs-redhat.md`. Previous RedHat image 1.8.1: profile comment
+  `profiles/sly-redhat/_engine.env` (rollback) and `docs/analysis/2026-10-30-0900-vllm-redhat-mxfp4-depth-transposed.md`.
 - **`.rad` native** (row 4): the `.rad`-vs-HF-checkpoint loading distinction is documented in
   `known-issues.md` (sly loads HF only, radiance loads `.rad`).
 
