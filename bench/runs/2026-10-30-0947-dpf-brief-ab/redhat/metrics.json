@@ -1,0 +1,363 @@
+{
+ "arm": "redhat",
+ "calls": [
+  {
+   "file": "session-0.jsonl",
+   "result": {
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 4992271,
+    "duration_api_ms": 4986712,
+    "num_turns": 76,
+    "usage": {
+     "input_tokens": 71353,
+     "cache_creation_input_tokens": 337920,
+     "cache_read_input_tokens": 4110480,
+     "output_tokens": 413314,
+     "output_tokens_details": {
+      "thinking_tokens": 0
+     },
+     "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+     },
+     "service_tier": "standard",
+     "cache_creation": {
+      "ephemeral_1h_input_tokens": 0,
+      "ephemeral_5m_input_tokens": 0
+     },
+     "inference_geo": "",
+     "iterations": [],
+     "speed": "standard",
+     "fallback_credit": null
+    },
+    "modelUsage": {
+     "qwen38-27b-redhat-mxfp4-dflash": {
+      "inputTokens": 84796,
+      "outputTokens": 769001,
+      "cacheReadInputTokens": 5363600,
+      "cacheCreationInputTokens": 411840,
+      "webSearchRequests": 0,
+      "costUSD": 24.904804999999993,
+      "contextWindow": 262000,
+      "maxOutputTokens": 32000,
+      "thinkingTokens": 0,
+      "cacheCreationEphemeral5mInputTokens": 0,
+      "cacheCreationEphemeral1hInputTokens": 0,
+      "canonicalModel": "qwen38-27b-redhat-mxfp4-dflash",
+      "provider": "firstParty",
+      "costBasis": "unknown"
+     }
+    }
+   }
+  },
+  {
+   "file": "session-1.jsonl",
+   "result": {
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 310532,
+    "duration_api_ms": 5297121,
+    "num_turns": 2,
+    "usage": {
+     "input_tokens": 1943,
+     "cache_creation_input_tokens": 880,
+     "cache_read_input_tokens": 254320,
+     "output_tokens": 47129,
+     "output_tokens_details": {
+      "thinking_tokens": 0
+     },
+     "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+     },
+     "service_tier": "standard",
+     "cache_creation": {
+      "ephemeral_1h_input_tokens": 0,
+      "ephemeral_5m_input_tokens": 0
+     },
+     "inference_geo": "",
+     "iterations": [],
+     "speed": "standard",
+     "fallback_credit": null
+    },
+    "modelUsage": {
+     "qwen38-27b-redhat-mxfp4-dflash": {
+      "inputTokens": 86739,
+      "outputTokens": 816130,
+      "thinkingTokens": 0,
+      "cacheReadInputTokens": 5617920,
+      "cacheCreationInputTokens": 412720,
+      "cacheCreationEphemeral5mInputTokens": 0,
+      "cacheCreationEphemeral1hInputTokens": 0,
+      "webSearchRequests": 0,
+      "costUSD": 26.22540499999999,
+      "contextWindow": 262000,
+      "maxOutputTokens": 32000,
+      "canonicalModel": "qwen38-27b-redhat-mxfp4-dflash",
+      "provider": "firstParty",
+      "costBasis": "unknown"
+     }
+    }
+   }
+  },
+  {
+   "file": "session-2.jsonl",
+   "result": {
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 1506520,
+    "duration_api_ms": 6802411,
+    "num_turns": 17,
+    "usage": {
+     "input_tokens": 16892,
+     "cache_creation_input_tokens": 57200,
+     "cache_read_input_tokens": 2134000,
+     "output_tokens": 156907,
+     "output_tokens_details": {
+      "thinking_tokens": 0
+     },
+     "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+     },
+     "service_tier": "standard",
+     "cache_creation": {
+      "ephemeral_1h_input_tokens": 0,
+      "ephemeral_5m_input_tokens": 0
+     },
+     "inference_geo": "",
+     "iterations": [],
+     "speed": "standard",
+     "fallback_credit": null
+    },
+    "modelUsage": {
+     "qwen38-27b-redhat-mxfp4-dflash": {
+      "inputTokens": 108509,
+      "outputTokens": 1042502,
+      "thinkingTokens": 0,
+      "cacheReadInputTokens": 8159360,
+      "cacheCreationInputTokens": 472560,
+      "cacheCreationEphemeral5mInputTokens": 0,
+      "cacheCreationEphemeral1hInputTokens": 0,
+      "webSearchRequests": 0,
+      "costUSD": 33.638274999999986,
+      "contextWindow": 262000,
+      "maxOutputTokens": 32000,
+      "canonicalModel": "qwen38-27b-redhat-mxfp4-dflash",
+      "provider": "firstParty",
+      "costBasis": "unknown"
+     }
+    }
+   }
+  },
+  {
+   "file": "session-3.jsonl",
+   "result": {
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 850827,
+    "duration_api_ms": 7652828,
+    "num_turns": 5,
+    "usage": {
+     "input_tokens": 4741,
+     "cache_creation_input_tokens": 14960,
+     "cache_read_input_tokens": 755920,
+     "output_tokens": 39291,
+     "output_tokens_details": {
+      "thinking_tokens": 0
+     },
+     "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+     },
+     "service_tier": "standard",
+     "cache_creation": {
+      "ephemeral_1h_input_tokens": 0,
+      "ephemeral_5m_input_tokens": 0
+     },
+     "inference_geo": "",
+     "iterations": [],
+     "speed": "standard",
+     "fallback_credit": null
+    },
+    "modelUsage": {
+     "qwen38-27b-redhat-mxfp4-dflash": {
+      "inputTokens": 118019,
+      "outputTokens": 1171087,
+      "thinkingTokens": 0,
+      "cacheReadInputTokens": 9471440,
+      "cacheCreationInputTokens": 490160,
+      "cacheCreationEphemeral5mInputTokens": 0,
+      "cacheCreationEphemeral1hInputTokens": 0,
+      "webSearchRequests": 0,
+      "costUSD": 37.666489999999996,
+      "contextWindow": 262000,
+      "maxOutputTokens": 32000,
+      "canonicalModel": "qwen38-27b-redhat-mxfp4-dflash",
+      "provider": "firstParty",
+      "costBasis": "unknown"
+     }
+    }
+   }
+  },
+  {
+   "file": "session-4.jsonl",
+   "result": {
+    "subtype": "success",
+    "is_error": true,
+    "duration_ms": 1215160,
+    "duration_api_ms": 8856898,
+    "num_turns": 150,
+    "usage": {
+     "input_tokens": 192762,
+     "cache_creation_input_tokens": 37840,
+     "cache_read_input_tokens": 33758560,
+     "output_tokens": 37053,
+     "output_tokens_details": {
+      "thinking_tokens": 0
+     },
+     "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+     },
+     "service_tier": "standard",
+     "cache_creation": {
+      "ephemeral_1h_input_tokens": 0,
+      "ephemeral_5m_input_tokens": 0
+     },
+     "inference_geo": "",
+     "iterations": [],
+     "speed": "standard",
+     "fallback_credit": null
+    },
+    "modelUsage": {
+     "qwen38-27b-redhat-mxfp4-dflash": {
+      "inputTokens": 315196,
+      "outputTokens": 1310399,
+      "thinkingTokens": 0,
+      "cacheReadInputTokens": 43830160,
+      "cacheCreationInputTokens": 530640,
+      "cacheCreationEphemeral5mInputTokens": 0,
+      "cacheCreationEphemeral1hInputTokens": 0,
+      "webSearchRequests": 0,
+      "costUSD": 59.56753499999998,
+      "contextWindow": 262000,
+      "maxOutputTokens": 32000,
+      "canonicalModel": "qwen38-27b-redhat-mxfp4-dflash",
+      "provider": "firstParty",
+      "costBasis": "unknown"
+     }
+    }
+   }
+  },
+  {
+   "file": "session-5.jsonl",
+   "result": null
+  }
+ ],
+ "first_ts": "2026-10-30T09:35:54.209Z",
+ "last_ts": "2026-10-30T12:33:12.823Z",
+ "assistant_messages": 241,
+ "tool_calls": {
+  "Read": 164,
+  "Bash": 74,
+  "Glob": 2,
+  "Write": 2,
+  "Edit": 9
+ },
+ "tool_calls_total": 251,
+ "tool_errors": 18,
+ "thinking_chars": 3119780,
+ "text_chars": 3730,
+ "compactions": [
+  {
+   "pre_tokens": 140516,
+   "post_tokens": 19096,
+   "trigger": "auto"
+  },
+  {
+   "pre_tokens": 142443,
+   "post_tokens": 74197,
+   "trigger": "auto"
+  },
+  {
+   "pre_tokens": 239119,
+   "post_tokens": 17280,
+   "trigger": "auto"
+  }
+ ],
+ "compactions_failed": 15,
+ "empty_assistant_turns": 19,
+ "no_visible_output_nudges": 8,
+ "output_cap_hits": 8,
+ "runaway_thinking_blocks": [
+  {
+   "ts": "2026-10-30T09:45:07.136Z",
+   "chars": 246747,
+   "lines": 2585,
+   "distinct": 202
+  },
+  {
+   "ts": "2026-10-30T09:54:34.646Z",
+   "chars": 216736,
+   "lines": 2280,
+   "distinct": 207
+  },
+  {
+   "ts": "2026-10-30T10:14:02.305Z",
+   "chars": 136922,
+   "lines": 1377,
+   "distinct": 116
+  },
+  {
+   "ts": "2026-10-30T10:20:09.437Z",
+   "chars": 235414,
+   "lines": 2565,
+   "distinct": 117
+  },
+  {
+   "ts": "2026-10-30T10:48:20.196Z",
+   "chars": 235296,
+   "lines": 2515,
+   "distinct": 104
+  },
+  {
+   "ts": "2026-10-30T11:16:34.160Z",
+   "chars": 260925,
+   "lines": 1397,
+   "distinct": 56
+  },
+  {
+   "ts": "2026-10-30T12:20:13.751Z",
+   "chars": 222137,
+   "lines": 3567,
+   "distinct": 469
+  },
+  {
+   "ts": "2026-10-30T12:25:59.474Z",
+   "chars": 120423,
+   "lines": 1969,
+   "distinct": 201
+  },
+  {
+   "ts": "2026-10-30T12:33:12.810Z",
+   "chars": 240814,
+   "lines": 2032,
+   "distinct": 10
+  }
+ ],
+ "first_write_per_output": {
+  "W2-06.md": "2026-10-30T11:56:33.852Z",
+  "W2-06.compare.md": "2026-10-30T11:22:21.388Z",
+  "W2-06.refine-27b.md": "2026-10-30T11:07:31.586Z"
+ },
+ "runbook": {
+  "opus_read_before_blind_review_written": [],
+  "edit_tool_outside_allowed": [],
+  "tracked_changes_outside_allowed": [],
+  "git_commit_attempts": 0,
+  "progress_w2_lines": [],
+  "progress_lines_format_ok": []
+ }
+}

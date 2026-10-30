@@ -1,0 +1,280 @@
+{
+ "heretic_W2-06": {
+  "window": [
+   "2026-10-30T08:51:20.181Z",
+   "2026-10-30T09:10:27.884Z"
+  ],
+  "tool_calls_by_name": {
+   "Bash": 42,
+   "Read": 10,
+   "Edit": 10,
+   "Write": 2
+  },
+  "subagent_calls": 0,
+  "rule_file_accesses": {
+   "RUNBOOK": 1,
+   "04-check-method": 2,
+   "01-writer-brief": 3,
+   "03-review-protocol": 2,
+   "02-contracts": 3,
+   "W2-04 example": 2
+  },
+  "compactions": 1,
+  "A_first_brief_body_access": "2026-10-30T08:52:02.562Z",
+  "A_first_review_write": "2026-10-30T08:56:48.245Z",
+  "A_part1_written_before_body": false,
+  "A_review_writes": 1,
+  "opus_first_access": "2026-10-30T08:56:51.562Z",
+  "opus_before_review_written": false,
+  "B_tool_calls_before_compare_write": 3,
+  "B_code_checks": 2,
+  "C_brief_writes": 8,
+  "C_brief_written_before_compare": false,
+  "probe_runs_tsc_eslint": 7,
+  "probe_runs_after_opus": 3,
+  "reads": 10,
+  "reads_without_limit_or_over_80": 1,
+  "reads_over_80_returned_lines_median": 9,
+  "reads_over_80_returned_gt80": 0,
+  "tool_result_chars_total": 95437,
+  "tool_result_chars_by_name": {
+   "Bash": 78662,
+   "Read": 14923,
+   "Edit": 1443,
+   "Write": 409
+  },
+  "tool_errors": 2
+ },
+ "heretic_W2-07": {
+  "window": [
+   "2026-10-30T09:10:27.884Z",
+   "2026-10-30T09:19:53.762Z"
+  ],
+  "tool_calls_by_name": {
+   "Bash": 19,
+   "Read": 14,
+   "Edit": 12,
+   "Write": 2
+  },
+  "subagent_calls": 0,
+  "rule_file_accesses": {
+   "RUNBOOK": 1,
+   "04-check-method": 1,
+   "01-writer-brief": 1,
+   "03-review-protocol": 0,
+   "02-contracts": 2,
+   "W2-04 example": 1
+  },
+  "compactions": 0,
+  "A_first_brief_body_access": "2026-10-30T09:11:11.784Z",
+  "A_first_review_write": "2026-10-30T09:14:26.150Z",
+  "A_part1_written_before_body": false,
+  "A_review_writes": 1,
+  "opus_first_access": "2026-10-30T09:14:32.284Z",
+  "opus_before_review_written": false,
+  "B_tool_calls_before_compare_write": 5,
+  "B_code_checks": 5,
+  "C_brief_writes": 10,
+  "C_brief_written_before_compare": false,
+  "probe_runs_tsc_eslint": 7,
+  "probe_runs_after_opus": 5,
+  "reads": 14,
+  "reads_without_limit_or_over_80": 6,
+  "reads_over_80_returned_lines_median": 118,
+  "reads_over_80_returned_gt80": 3,
+  "tool_result_chars_total": 66472,
+  "tool_result_chars_by_name": {
+   "Bash": 19856,
+   "Read": 44164,
+   "Edit": 2043,
+   "Write": 409
+  },
+  "tool_errors": 0
+ },
+ "heretic_W2-08": {
+  "window": [
+   "2026-10-30T09:19:53.762Z",
+   "2026-10-30T09:31:49.707Z"
+  ],
+  "tool_calls_by_name": {
+   "Bash": 27,
+   "Read": 19,
+   "Write": 3,
+   "Edit": 1
+  },
+  "subagent_calls": 0,
+  "rule_file_accesses": {
+   "RUNBOOK": 0,
+   "04-check-method": 0,
+   "01-writer-brief": 0,
+   "03-review-protocol": 0,
+   "02-contracts": 3,
+   "W2-04 example": 1
+  },
+  "compactions": 1,
+  "A_first_brief_body_access": "2026-10-30T09:20:15.046Z",
+  "A_first_review_write": "2026-10-30T09:25:38.578Z",
+  "A_part1_written_before_body": false,
+  "A_review_writes": 1,
+  "opus_first_access": "2026-10-30T09:25:42.045Z",
+  "opus_before_review_written": false,
+  "B_tool_calls_before_compare_write": 21,
+  "B_code_checks": 16,
+  "C_brief_writes": 1,
+  "C_brief_written_before_compare": true,
+  "probe_runs_tsc_eslint": 6,
+  "probe_runs_after_opus": 6,
+  "reads": 19,
+  "reads_without_limit_or_over_80": 5,
+  "reads_over_80_returned_lines_median": 119,
+  "reads_over_80_returned_gt80": 3,
+  "tool_result_chars_total": 76835,
+  "tool_result_chars_by_name": {
+   "Bash": 22598,
+   "Read": 53415,
+   "Write": 610,
+   "Edit": 212
+  },
+  "tool_errors": 0
+ },
+ "redhat_d05_W2-06": {
+  "window": [
+   "2026-10-30T09:35:54.810Z",
+   "2026-10-30T12:26:56.175Z"
+  ],
+  "tool_calls_by_name": {
+   "Read": 164,
+   "Bash": 74,
+   "Edit": 9,
+   "Glob": 2,
+   "Write": 2
+  },
+  "subagent_calls": 0,
+  "rule_file_accesses": {
+   "RUNBOOK": 2,
+   "04-check-method": 3,
+   "01-writer-brief": 4,
+   "03-review-protocol": 2,
+   "02-contracts": 19,
+   "W2-04 example": 2
+  },
+  "compactions": 3,
+  "A_first_brief_body_access": "2026-10-30T09:36:11.404Z",
+  "A_first_review_write": "2026-10-30T11:07:31.586Z",
+  "A_part1_written_before_body": false,
+  "A_review_writes": 1,
+  "opus_first_access": "2026-10-30T11:17:04.551Z",
+  "opus_before_review_written": false,
+  "B_tool_calls_before_compare_write": 0,
+  "B_code_checks": 0,
+  "C_brief_writes": 9,
+  "C_brief_written_before_compare": false,
+  "probe_runs_tsc_eslint": 25,
+  "probe_runs_after_opus": 11,
+  "reads": 164,
+  "reads_without_limit_or_over_80": 155,
+  "reads_over_80_returned_lines_median": 0,
+  "reads_over_80_returned_gt80": 9,
+  "tool_result_chars_total": 296373,
+  "tool_result_chars_by_name": {
+   "Read": 136590,
+   "Bash": 157506,
+   "Edit": 1552,
+   "Glob": 318,
+   "Write": 407
+  },
+  "tool_errors": 12
+ },
+ "redhat_d0_W2-08": {
+  "window": [
+   "2026-10-30T12:39:23.291Z",
+   "2026-10-30T14:46:02.840Z"
+  ],
+  "tool_calls_by_name": {
+   "Bash": 152,
+   "Read": 51,
+   "Write": 28,
+   "Edit": 11
+  },
+  "subagent_calls": 0,
+  "rule_file_accesses": {
+   "RUNBOOK": 2,
+   "04-check-method": 4,
+   "01-writer-brief": 8,
+   "03-review-protocol": 4,
+   "02-contracts": 12,
+   "W2-04 example": 6
+  },
+  "compactions": 6,
+  "A_first_brief_body_access": "2026-10-30T12:39:33.653Z",
+  "A_first_review_write": "2026-10-30T12:43:42.244Z",
+  "A_part1_written_before_body": false,
+  "A_review_writes": 2,
+  "opus_first_access": "2026-10-30T13:43:36.591Z",
+  "opus_before_review_written": false,
+  "B_tool_calls_before_compare_write": 30,
+  "B_code_checks": 26,
+  "C_brief_writes": 1,
+  "C_brief_written_before_compare": false,
+  "probe_runs_tsc_eslint": 68,
+  "probe_runs_after_opus": 9,
+  "reads": 51,
+  "reads_without_limit_or_over_80": 27,
+  "reads_over_80_returned_lines_median": 57,
+  "reads_over_80_returned_gt80": 13,
+  "tool_result_chars_total": 426757,
+  "tool_result_chars_by_name": {
+   "Bash": 202483,
+   "Read": 218104,
+   "Write": 4265,
+   "Edit": 1905
+  },
+  "tool_errors": 6
+ },
+ "redhat_191_W2-08": {
+  "window": [
+   "2026-10-30T17:02:43.242Z",
+   "2026-10-30T18:28:48.841Z"
+  ],
+  "tool_calls_by_name": {
+   "Bash": 77,
+   "Read": 61,
+   "Edit": 41,
+   "Write": 7
+  },
+  "subagent_calls": 0,
+  "rule_file_accesses": {
+   "RUNBOOK": 3,
+   "04-check-method": 4,
+   "01-writer-brief": 8,
+   "03-review-protocol": 3,
+   "02-contracts": 11,
+   "W2-04 example": 5
+  },
+  "compactions": 2,
+  "A_first_brief_body_access": "2026-10-30T17:03:04.312Z",
+  "A_first_review_write": "2026-10-30T17:16:47.705Z",
+  "A_part1_written_before_body": false,
+  "A_review_writes": 1,
+  "opus_first_access": "2026-10-30T17:16:31.314Z",
+  "opus_before_review_written": true,
+  "B_tool_calls_before_compare_write": 7,
+  "B_code_checks": 3,
+  "C_brief_writes": 36,
+  "C_brief_written_before_compare": false,
+  "probe_runs_tsc_eslint": 15,
+  "probe_runs_after_opus": 15,
+  "reads": 61,
+  "reads_without_limit_or_over_80": 12,
+  "reads_over_80_returned_lines_median": 66,
+  "reads_over_80_returned_gt80": 5,
+  "tool_result_chars_total": 282321,
+  "tool_result_chars_by_name": {
+   "Bash": 78448,
+   "Read": 196492,
+   "Edit": 5987,
+   "Write": 1394
+  },
+  "tool_errors": 0
+ }
+}

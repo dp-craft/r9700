@@ -1,0 +1,114 @@
+{
+ "arm": "delta0-w208",
+ "calls": [
+  {
+   "file": "session-0.jsonl",
+   "result": {
+    "subtype": "error_during_execution",
+    "is_error": true,
+    "duration_ms": 277953,
+    "duration_api_ms": 272737,
+    "num_turns": 34,
+    "usage": {
+     "input_tokens": 37419,
+     "cache_creation_input_tokens": 86240,
+     "cache_read_input_tokens": 1499520,
+     "output_tokens": 19504,
+     "output_tokens_details": {
+      "thinking_tokens": 0
+     },
+     "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+     },
+     "service_tier": "standard",
+     "cache_creation": {
+      "ephemeral_1h_input_tokens": 0,
+      "ephemeral_5m_input_tokens": 0
+     },
+     "inference_geo": "",
+     "iterations": [],
+     "speed": "standard",
+     "fallback_credit": null
+    },
+    "modelUsage": {
+     "qwen38-27b-redhat-mxfp4-dflash": {
+      "inputTokens": 37419,
+      "outputTokens": 19504,
+      "cacheReadInputTokens": 1499520,
+      "cacheCreationInputTokens": 86240,
+      "webSearchRequests": 0,
+      "costUSD": 1.963455,
+      "contextWindow": 262000,
+      "maxOutputTokens": 32000,
+      "thinkingTokens": 0,
+      "cacheCreationEphemeral5mInputTokens": 0,
+      "cacheCreationEphemeral1hInputTokens": 0,
+      "canonicalModel": "qwen38-27b-redhat-mxfp4-dflash",
+      "provider": "firstParty",
+      "costBasis": "unknown"
+     }
+    }
+   }
+  },
+  {
+   "file": "session-1.jsonl",
+   "result": null
+  }
+ ],
+ "first_ts": "2026-10-30T12:39:22.946Z",
+ "last_ts": "2026-10-30T13:58:50.950Z",
+ "assistant_messages": 157,
+ "tool_calls": {
+  "Read": 35,
+  "Bash": 130,
+  "Write": 12,
+  "Edit": 1
+ },
+ "tool_calls_total": 178,
+ "tool_errors": 8,
+ "thinking_chars": 639293,
+ "text_chars": 10254,
+ "compactions": [
+  {
+   "pre_tokens": 136881,
+   "post_tokens": 27759,
+   "trigger": "auto"
+  },
+  {
+   "pre_tokens": 136466,
+   "post_tokens": 14168,
+   "trigger": "auto"
+  },
+  {
+   "pre_tokens": 136042,
+   "post_tokens": 18056,
+   "trigger": "auto"
+  }
+ ],
+ "compactions_failed": 0,
+ "empty_assistant_turns": 0,
+ "no_visible_output_nudges": 0,
+ "output_cap_hits": 0,
+ "runaway_thinking_blocks": [],
+ "first_write_per_output": {
+  "W2-08.refine-27b.md": "2026-10-30T12:43:42.244Z",
+  "fix-probe.cjs": "2026-10-30T13:32:25.670Z",
+  "resolve-confirm.test.ts": "2026-10-30T13:20:25.682Z",
+  "resolve-confirm.ts": "2026-10-30T13:20:19.235Z",
+  "pattern.ts": "2026-10-30T13:20:15.785Z",
+  "ir.d.ts": "2026-10-30T13:20:08.830Z",
+  "resolve-confirm.d.ts": "2026-10-30T13:20:07.234Z",
+  "screen.d.ts": "2026-10-30T13:20:02.783Z",
+  "resolution.d.ts": "2026-10-30T13:20:01.443Z",
+  "protocol.d.ts": "2026-10-30T13:19:57.376Z"
+ },
+ "runbook": {
+  "opus_read_before_blind_review_written": [],
+  "edit_tool_outside_allowed": [],
+  "tracked_changes_outside_allowed": [],
+  "git_commit_attempts": 0,
+  "progress_w2_lines": [],
+  "progress_lines_format_ok": []
+ }
+}

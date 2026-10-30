@@ -1,0 +1,120 @@
+{
+ "arm": "heretic",
+ "calls": [
+  {
+   "file": "session-0.jsonl",
+   "result": {
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 2468572,
+    "duration_api_ms": 2431239,
+    "num_turns": 165,
+    "usage": {
+     "input_tokens": 196913,
+     "cache_creation_input_tokens": 387200,
+     "cache_read_input_tokens": 12753840,
+     "output_tokens": 256514,
+     "output_tokens_details": {
+      "thinking_tokens": 0
+     },
+     "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+     },
+     "service_tier": "standard",
+     "cache_creation": {
+      "ephemeral_1h_input_tokens": 0,
+      "ephemeral_5m_input_tokens": 0
+     },
+     "inference_geo": "",
+     "iterations": [],
+     "speed": "standard",
+     "fallback_credit": null
+    },
+    "modelUsage": {
+     "swift-1.5": {
+      "inputTokens": 199091,
+      "outputTokens": 276888,
+      "cacheReadInputTokens": 13010800,
+      "cacheCreationInputTokens": 390720,
+      "webSearchRequests": 0,
+      "costUSD": 16.86505500000001,
+      "contextWindow": 262000,
+      "maxOutputTokens": 32000,
+      "thinkingTokens": 0,
+      "cacheCreationEphemeral5mInputTokens": 0,
+      "cacheCreationEphemeral1hInputTokens": 0,
+      "canonicalModel": "swift-1.5",
+      "provider": "firstParty",
+      "costBasis": "unknown"
+     }
+    }
+   }
+  }
+ ],
+ "first_ts": "2026-10-30T08:51:19.558Z",
+ "last_ts": "2026-10-30T09:32:14.790Z",
+ "assistant_messages": 149,
+ "tool_calls": {
+  "Bash": 88,
+  "Write": 7,
+  "Read": 43,
+  "Edit": 23
+ },
+ "tool_calls_total": 161,
+ "tool_errors": 8,
+ "thinking_chars": 716470,
+ "text_chars": 15201,
+ "compactions": [
+  {
+   "pre_tokens": 189736,
+   "post_tokens": 14535,
+   "trigger": "auto"
+  },
+  {
+   "pre_tokens": 138150,
+   "post_tokens": 20034,
+   "trigger": "auto"
+  }
+ ],
+ "compactions_failed": 0,
+ "empty_assistant_turns": 1,
+ "no_visible_output_nudges": 0,
+ "output_cap_hits": 1,
+ "runaway_thinking_blocks": [
+  {
+   "ts": "2026-10-30T09:07:53.250Z",
+   "chars": 246214,
+   "lines": 1072,
+   "distinct": 55
+  }
+ ],
+ "first_write_per_output": {
+  "progress.md": "2026-10-30T09:10:27.884Z",
+  "W2-08.compare.md": "2026-10-30T09:31:39.880Z",
+  "W2-08.md": "2026-10-30T09:30:36.950Z",
+  "W2-08.refine-27b.md": "2026-10-30T09:25:38.578Z",
+  "W2-07.compare.md": "2026-10-30T09:16:43.351Z",
+  "W2-07.md": "2026-10-30T09:16:53.414Z",
+  "W2-07.refine-27b.md": "2026-10-30T09:14:26.150Z",
+  "W2-06.compare.md": "2026-10-30T08:57:51.748Z",
+  "W2-06.md": "2026-10-30T08:59:17.224Z",
+  "W2-06.refine-27b.md": "2026-10-30T08:56:48.245Z"
+ },
+ "runbook": {
+  "opus_read_before_blind_review_written": [],
+  "edit_tool_outside_allowed": [],
+  "tracked_changes_outside_allowed": [],
+  "git_commit_attempts": 0,
+  "progress_w2_lines": [
+   "W2-06 | 27B 6 | Opus 9 | both 3 | real: 27B-only 3, Opus-only 6, both 3 | not real: 27B 0, Opus 0 | unsure 0 | fixed 12 | ESLINT-UNCHECKED? no | BLOCKED: none",
+   "W2-07 | 27B 8 | Opus 11 | both 5 | real: 27B-only 2, Opus-only 7, both 5 | not real: 27B 1, Opus 0 | unsure 0 | fixed 14 | ESLINT-UNCHECKED? no | BLOCKED: none",
+   "W2-08 | 27B 6 | Opus 19 | both 6 | real: 27B-only 0, Opus-only 13, both 6 | not real: 27B 0, Opus 0 | unsure 0 | fixed 19 | ESLINT-UNCHECKED? no | BLOCKED: none"
+  ],
+  "progress_lines_format_ok": [
+   true,
+   true,
+   true
+  ]
+ }
+}

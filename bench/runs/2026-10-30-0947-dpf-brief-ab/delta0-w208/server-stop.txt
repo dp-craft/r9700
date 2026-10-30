@@ -1,0 +1,1 @@
+stopped vllm-8000 (log kept: /home/dev/work/dp-craft/amd/bench/.servers/8000.log)

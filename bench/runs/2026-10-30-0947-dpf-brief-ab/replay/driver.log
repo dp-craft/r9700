@@ -1,0 +1,20 @@
+13:35:50 [replay] boot B
+13:39:06 [replay] B: RADIANCE_CACTUS_DELTA=0 | overridden by the model's `generation_config.json`: `{'presence_penalty': 0.0, 'temperature': 1.0, 'top_k': 20, 'top_p': 0.95, 'min_p': 0.0}`. If this is not intended, please relaunch vLLM instance wi
+13:39:09 [replay] capture session (cap 2700s)
+13:43:45 [replay] W2-08 blind-review Write seen -- stopping the capture session
+13:43:49 [replay] main checkout untouched
+picked req-027_v1_messages.json of 28 main-loop bodies: 58 messages, 305617 bytes, max_tokens 64000
+{"label": "smoke-B", "rep": 1, "wall_s": 1.5, "stop_reason": "max_tokens", "output_tokens": 64, "thinking_chars": 205, "distinct_ratio": 1.0, "wrote_review": false, "loop": true, "acceptance": {"windows": 0, "mean": null, "frac_ge7": null}, "error": null}
+13:43:50 [replay] replay B x5 (max_tokens 40000)
+13:43:51 [watch] B capture: stable runaway_blocks=0 cap_hits=0
+13:43:54 [watch] chain stopped (B replays skipped); stopping the B server
+13:43:55 [watch] control: arm A (Cactus 0.5) x3 on the same body
+13:43:55 [replay] boot A
+13:47:06 [replay] A: RADIANCE_CACTUS_DELTA=0.5 | overridden by the model's `generation_config.json`: `{'presence_penalty': 0.0, 'temperature': 1.0, 'top_k': 20, 'top_p': 0.95, 'min_p': 0.0}`. If this is not intended, please relaunch vLLM instance wi
+{"label": "smoke-A", "rep": 1, "wall_s": 34.2, "stop_reason": "max_tokens", "output_tokens": 64, "thinking_chars": 228, "distinct_ratio": 1.0, "wrote_review": false, "loop": true, "acceptance": {"windows": 0, "mean": null, "frac_ge7": null}, "error": null}
+13:47:40 [replay] replay A x3 (max_tokens 40000)
+{"label": "A", "rep": 1, "wall_s": 2.6, "stop_reason": "tool_use", "output_tokens": 164, "thinking_chars": 275, "distinct_ratio": 1.0, "wrote_review": false, "loop": false, "acceptance": {"windows": 0, "mean": null, "frac_ge7": null}, "error": null}
+{"label": "A", "rep": 2, "wall_s": 40.8, "stop_reason": "tool_use", "output_tokens": 3741, "thinking_chars": 12294, "distinct_ratio": 1.0, "wrote_review": false, "loop": false, "acceptance": {"windows": 4, "mean": 3.86, "frac_ge7": 0.0}, "error": null}
+{"label": "A", "rep": 3, "wall_s": 49.0, "stop_reason": "tool_use", "output_tokens": 4448, "thinking_chars": 6049, "distinct_ratio": 1.0, "wrote_review": true, "loop": false, "acceptance": {"windows": 5, "mean": 3.85, "frac_ge7": 0.0}, "error": null}
+13:49:18 [replay] done
+13:49:18 [watch] control done

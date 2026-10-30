@@ -1,0 +1,6 @@
+1.8.1 (v22.5)        kwargs={}                          reasoning in prompt for steps [1, 2, 3]; empty think blocks: 0; prompt chars 2674
+1.8.1 (v22.5)        kwargs={"preserve_thinking": true} reasoning in prompt for steps [1, 2, 3]; empty think blocks: 0; prompt chars 2674
+1.9.1 (v22.5-sly2)   kwargs={}                          reasoning in prompt for steps [3]; empty think blocks: 2; prompt chars 2436
+1.9.1 (v22.5-sly2)   kwargs={"preserve_thinking": true} reasoning in prompt for steps [1, 2, 3]; empty think blocks: 0; prompt chars 2674
+model stock          kwargs={}                          reasoning in prompt for steps [1, 2, 3]; empty think blocks: 0; prompt chars 2400
+model stock          kwargs={"preserve_thinking": true} reasoning in prompt for steps [1, 2, 3]; empty think blocks: 0; prompt chars 2400

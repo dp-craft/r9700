@@ -1,0 +1,1 @@
+{%- set template_version = "qwen3.8-froggeric-v22.5-sly2" %}

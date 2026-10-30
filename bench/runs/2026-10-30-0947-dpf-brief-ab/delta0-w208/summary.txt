@@ -1,0 +1,1 @@
+wall_s=3600 continuation_calls=2 session=4457f2c5-eacd-4e5c-bea1-92a85557e9b6 w2_08_lines=0 (plus the 4.5 min capture, session-0)

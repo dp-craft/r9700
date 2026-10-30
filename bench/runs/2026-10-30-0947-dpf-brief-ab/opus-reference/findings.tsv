@@ -1,0 +1,40 @@
+brief	n	sev	item	problem (first 300 chars)
+W2-06	1	high	TESTS	 the test import `'../src/ui/external.js'` from tools/dpf/tests/ui/external.test.ts resolves to tools/dpf/tests/src/ui/external.js — the module is never found 
+W2-06	2	med	D2-D4	 "await the child's close" with no 'error' path: a missing command resolves silently (close fires with -2), and dpf goes on as if the person had edited the file 
+W2-06	3	med	D2	 `$VISUAL`/`$EDITOR` is spawned whole, while `$PAGER` is split on spaces: `EDITOR='code --wait'` (common) fails with ENOENT 
+W2-06	4	med	PATTERN	 "src/ui/screen.ts from W2-01b, verbatim" is not W2-01b's lineIO (that one uses `createInterface({ input, terminal: false })` and its async iterator, not `rl.question`), and it is not a sibling of spawning anyway 
+W2-06	5	med	D2-D4	 each function takes 4 parameters (path, env, tty, deps?) — over max-params 3 (warn, eslint.config.mjs:46); C7 names 3 (02-contracts.md:154) 
+W2-06	6	low	TESTS	 the example line 68 is not code (`{ spawn: ..., write: ... }`, an IIFE); the fake's `as ChildProcess` needs the probe 
+W2-06	7	low	D4	 a nested ternary returning `null` for the opener 
+W2-06	8	low	TESTS	 branches without a test: `page` with no TTY, `openFiles` on win32 (paths written), the spawn-error branch (#2) 
+W2-06	9	low	DO NOT	 line 2 is the old text (no lint-forced helper exception) 
+W2-07	1	high	TESTS	 `'../src/run/paths.js'` from tools/dpf/tests/run/request.test.ts resolves to tools/dpf/tests/src/… — the module is never found 
+W2-07	2	high	D2	 the code fails STEP 5: 5 eslint errors, and complexity 11, `let` and `for` warnings 
+W2-07	3	high	D1	 `import { mkdirSync, writeFileSync, readFileSync }` fails simple-import-sort (an error) 
+W2-07	4	med	D2, S5, DO NOT	 the four leads are copied, but W1-10 now exports them from tools/shared/request-refs.ts. Two owners of the same texts; S5 ("W1-10 does NOT export them") and the DO NOT "copy them verbatim" are stale 
+W2-07	5	med	D3, WHY	 WHY calls a ref that will not be read a "hard stop", but the screen ignores `blocking`: `c` continues past it, and `PreflightState.blocking` is never read. The contract only names the field 
+W2-07	6	med	FILES, S1, S2	 the paths are package-relative (`src/run/request.ts`), but the header says "run every command from the repo root" and STEPS use `tools/dpf/…`: a writer at the root creates `src/run/request.ts` there 
+W2-07	7	med	D2	 an existing empty file passes as `(0 KB)`, not blocking, yet the pipeline names it `no content (missing, empty or unreadable)` and reads nothing — a ref that will not be read, by the row's own rule 
+W2-07	8	low	D2	 a bare path written twice warns twice; two `replace` calls where one regex does 
+W2-07	9	low	TESTS	 T5 is prose; no test for the outside-root and not-a-file branches, the empty file, or the blocked screen 
+W2-07	10	low	PATTERN	 not verbatim (W2-01b's runPaths returns a multi-line object) and not a sibling of a screen 
+W2-07	11	low	DO NOT	 line 2 is the old text, with no lint-forced helper exception 
+W2-08	1	high	D3, D4 (C3, C8)	 edited goals can never be confirmed from the screen. `w` returns `edit`, and applyResolve writes goals.json but not confirmed.json. The flow resumes, resolve-confirm pauses again (its output is missing), and the C8 re-pause guard sends the person to the operator; a third pause → exit 4 
+W2-08	2	high	D2, D3	 the walk duplicates every goal. The initial state's goals are `input.goals.goals`, and keep/replace append to them, so T3 yields `[G-1, G-2, G-1, G-2']`: T3's exact value fails, and ir refuses the duplicate ids 
+W2-08	3	high	D4, TESTS	 T3 cannot pass. The fake's plan has a single `{ exit: 0 }` entry, but D4 spawns twice (irSet, then irValidate). The second call reads `plan[1]` = undefined → TypeError → exit 1, irValidate is not ok, and applyResolve throws. irValidate is also EXTRA: `ir set` parses the whole document before it
+W2-08	4	high	TESTS	 T3 asserts G-2's source in calls.jsonl, but irSet passes the value as `--value @<tmp>` and deletes the temp file in a `finally`; the fake records argv only 
+W2-08	5	high	TESTS	 `'../src/screens/resolve-confirm.js'` from tools/dpf/tests/screens/ resolves to tools/dpf/tests/src/… 
+W2-08	6	high	D2, D4	 the import lines fail simple-import-sort (an error): the specifiers are unsorted, and node:fs comes after the relative imports 
+W2-08	7	med	D2, D3	 the screen is a prose state machine (four phases, two flags, index arithmetic) with no code. M9 cannot run on prose, and #2 hides there 
+W2-08	8	med	D3	 `r` then Enter replaces the text with `''`. GoalEntrySchema refuses it, ir refuses the write, and applyResolve throws in the middle of the flow 
+W2-08	9	med	D3	 dropping every goal leaves `goals: []`, which `.min(1)` refuses, so applyResolve throws 
+W2-08	10	med	D4	 applyResolve has 4 params. That is only a warn, and STEP 5's `--quiet` hides it 
+W2-08	11	med	ResolveConfirmInput (C11 item 6)	 nobody turns ledger residue rows into `cuts`. The row gives W2-08 "the cut lines from `residue` rows"; the brief takes `cuts: string[]` from "the flow", and W2-13 does not name it 
+W2-08	12	med	TESTS	 T1 and T2 assert order and containment only: a missing `blast:` line, a wrong goal line or a dropped diffLines line passes. `a`, `c` and `q` have no unit test, though the row lists "`a` → result accept" 
+W2-08	13	med	STEPS	 STEPS 2 says "Write T1-T4 … T1-T4 MUST fail", but TESTS defines T1-T3 and the FINAL REPORT lists T1…T3 
+W2-08	14	low	D2	 `ResolveConfirmInput.record` is never read by the screen (EXTRA); applyResolve takes the record itself 
+W2-08	15	low	D2, D3	 `goalsChanged` / `nonGoalsChanged` are never read (D4 compares with JSON.stringify), and `d` does not set them 
+W2-08	16	low	D3	 walk-summary `q` → "phase 'main' (abort)" does not say what happens to the partial walk; with #2's state it stays in the lists 
+W2-08	17	low	FILES, S1	 the paths are package-relative (`src/screens/…`), but the header says "run every command from the repo root" and STEPS use `tools/dpf/…` 
+W2-08	18	low	PATTERN	 runScreen is the loop, not a screen; the sibling to copy is W2-05's clarifyScreen 
+W2-08	19	low	DO NOT	 line 2 is the old text, with no lint-forced helper exception 

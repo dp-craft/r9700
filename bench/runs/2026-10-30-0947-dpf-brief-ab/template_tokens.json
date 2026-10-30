@@ -1,0 +1,131 @@
+{
+ "heretic_w208_v22.5": {
+  "transcripts": "heretic/claude-project/*.jsonl",
+  "requests": 43,
+  "compactions": 1,
+  "compaction_pre_post_tokens": [
+   [
+    138150,
+    20034
+   ]
+  ],
+  "residual_median_abs_if_v22.5": 41,
+  "residual_median_abs_if_sly2": 228,
+  "output_tokens": 62793,
+  "thinking_tokens": 44203,
+  "prompt_tokens_total": 4240919,
+  "prompt_tokens_total_if_sly2": 3404973,
+  "old_reasoning_tokens_total": 835946,
+  "context_median": 103508,
+  "context_median_if_sly2": 73218,
+  "context_max": 134273,
+  "context_max_if_sly2": 133765,
+  "prefilled_tokens_total": 190279,
+  "prefilled_median_per_request": 2302,
+  "cached_share_pct": 95.5,
+  "old_reasoning_at_each_compaction": [
+   529
+  ],
+  "context_growth_total": 83218,
+  "context_growth_total_if_sly2": 39871,
+  "compaction_budget_tokens": 118116,
+  "compactions_est_from_growth": 0.7,
+  "compactions_est_if_sly2": 0.3
+ },
+ "redhat_d0_w208_v22.5": {
+  "transcripts": "delta0-w208-part2/claude-project/*.jsonl",
+  "requests": 208,
+  "compactions": 6,
+  "compaction_pre_post_tokens": [
+   [
+    136881,
+    27759
+   ],
+   [
+    136466,
+    14168
+   ],
+   [
+    136042,
+    18056
+   ],
+   [
+    139102,
+    28658
+   ],
+   [
+    138220,
+    20666
+   ],
+   [
+    136249,
+    18478
+   ]
+  ],
+  "residual_median_abs_if_v22.5": 41,
+  "residual_median_abs_if_sly2": 370,
+  "output_tokens": 387077,
+  "thinking_tokens": 307297,
+  "prompt_tokens_total": 18999173,
+  "prompt_tokens_total_if_sly2": 14297212,
+  "old_reasoning_tokens_total": 4701961,
+  "context_median": 90379,
+  "context_median_if_sly2": 68397,
+  "context_max": 135626,
+  "context_max_if_sly2": 97452,
+  "prefilled_tokens_total": 1229333,
+  "prefilled_median_per_request": 2681,
+  "cached_share_pct": 93.5,
+  "old_reasoning_at_each_compaction": [
+   50010,
+   47216,
+   47995,
+   58372,
+   53110,
+   37957
+  ],
+  "context_growth_total": 503301,
+  "context_growth_total_if_sly2": 215986,
+  "compaction_budget_tokens": 115862,
+  "compactions_est_from_growth": 4.3,
+  "compactions_est_if_sly2": 1.9
+ },
+ "redhat_191_w208_sly2": {
+  "transcripts": "sly191-w208/claude-project/*.jsonl",
+  "requests": 174,
+  "compactions": 2,
+  "compaction_pre_post_tokens": [
+   [
+    135166,
+    24229
+   ],
+   [
+    160590,
+    22134
+   ]
+  ],
+  "residual_median_abs_if_v22.5": 242,
+  "residual_median_abs_if_sly2": 46,
+  "output_tokens": 503092,
+  "thinking_tokens": 450363,
+  "prompt_tokens_total": 15049265,
+  "prompt_tokens_total_if_v22.5": 32075056,
+  "old_reasoning_tokens_total": 17025791,
+  "context_median": 88071,
+  "context_median_if_v22.5": 180922,
+  "context_max": 131913,
+  "context_max_if_v22.5": 336639,
+  "prefilled_tokens_total": 1213905,
+  "prefilled_median_per_request": 4361,
+  "cached_share_pct": 91.9,
+  "old_reasoning_at_each_compaction": [
+   207346,
+   152323
+  ],
+  "context_growth_total": 153806,
+  "context_growth_total_if_v22.5": 531645,
+  "compaction_budget_tokens": 124696,
+  "compactions_est_from_growth": 1.2,
+  "compactions_est_if_v22.5": 4.3
+ }
+}

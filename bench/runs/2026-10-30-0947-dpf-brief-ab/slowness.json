@@ -1,0 +1,343 @@
+{
+ "heretic_all": {
+  "stream": {
+   "assistant_messages": 149,
+   "model_s": 2418,
+   "tool_s": 37,
+   "wasted_call_reads": 1,
+   "compaction_s_in_model_s": 193,
+   "compaction_pre_tokens": [
+    189736,
+    138150
+   ],
+   "hedge_markers_per_10k_chars": {
+    "wait": 3.52,
+    "actually": 4.72,
+    "let me re": 10.37,
+    "double-check": 0.14,
+    "hmm": 3.2
+   },
+   "phases": {},
+   "thinking_s_client": 1509,
+   "compactions_ok": 2,
+   "compactions_failed": 0,
+   "thinking_blocks": 149,
+   "thinking_chars": 716470,
+   "within_block_distinct_line_ratio_weighted": 0.717,
+   "blocks_lt_0.7_distinct": 3,
+   "cross_block_repeated_lines_pct": 8.4,
+   "cross_block_repeated_8gram_pct": 10.1,
+   "tool_calls": 161,
+   "identical_tool_calls_repeated": 1,
+   "files_read_3x_or_more": 6,
+   "max_reads_of_one_file": 8
+  },
+  "transcript": {
+   "requests": 149,
+   "output_tokens": 256514,
+   "context_tokens_sent_total": 13337953,
+   "context_median": 92099,
+   "context_mean": 89516,
+   "context_max": 134273,
+   "cached_share_pct": 95.6,
+   "thinking_turns_tested": 12,
+   "next_prompt_growth_over_output_median": 1.09,
+   "share_turns_reasoning_replayed": 1.0
+  },
+  "server": {
+   "generated_tokens_server": 276818,
+   "prefilled_tokens_server": 589781,
+   "decode_window_s": 2450,
+   "prefill_window_s": 930,
+   "prefill_only_window_s": 0,
+   "decode_tok_s": 113.0,
+   "acceptance_mean": 5.5,
+   "acceptance_ge7_pct": 15.5
+  }
+ },
+ "heretic_w208": {
+  "stream": {
+   "assistant_messages": 43,
+   "model_s": 709,
+   "tool_s": 10,
+   "wasted_call_reads": 1,
+   "compaction_s_in_model_s": 90,
+   "compaction_pre_tokens": [
+    138150
+   ],
+   "hedge_markers_per_10k_chars": {
+    "wait": 4.07,
+    "actually": 6.14,
+    "let me re": 7.23,
+    "double-check": 0.19,
+    "hmm": 0.65
+   },
+   "phases": {
+    "A_blind": {
+     "requests": 18,
+     "model_s": 348,
+     "thinking_chars": 71819,
+     "tool_calls": 25
+    },
+    "B_compare": {
+     "requests": 24,
+     "model_s": 325,
+     "thinking_chars": 82180,
+     "tool_calls": 23
+    },
+    "C_fix_and_rest": {
+     "requests": 3,
+     "model_s": 35,
+     "thinking_chars": 794,
+     "tool_calls": 3
+    }
+   },
+   "thinking_s_client": 366,
+   "compactions_ok": 1,
+   "compactions_failed": 0,
+   "thinking_blocks": 42,
+   "thinking_chars": 154793,
+   "within_block_distinct_line_ratio_weighted": 0.928,
+   "blocks_lt_0.7_distinct": 1,
+   "cross_block_repeated_lines_pct": 6.0,
+   "cross_block_repeated_8gram_pct": 6.5,
+   "tool_calls": 51,
+   "identical_tool_calls_repeated": 0,
+   "files_read_3x_or_more": 3,
+   "max_reads_of_one_file": 4
+  },
+  "transcript": {
+   "requests": 43,
+   "output_tokens": 62793,
+   "context_tokens_sent_total": 4240919,
+   "context_median": 103508,
+   "context_mean": 98626,
+   "context_max": 134273,
+   "cached_share_pct": 95.5,
+   "thinking_turns_tested": 6,
+   "next_prompt_growth_over_output_median": 1.1,
+   "share_turns_reasoning_replayed": 1.0
+  },
+  "server": {
+   "generated_tokens_server": 72255,
+   "prefilled_tokens_server": 191208,
+   "decode_window_s": 710,
+   "prefill_window_s": 270,
+   "prefill_only_window_s": 0,
+   "decode_tok_s": 101.8,
+   "acceptance_mean": 5.02,
+   "acceptance_ge7_pct": 1.4
+  }
+ },
+ "redhat_d05_all": {
+  "stream": {
+   "assistant_messages": 241,
+   "model_s": 9375,
+   "tool_s": 23,
+   "wasted_call_reads": 133,
+   "compaction_s_in_model_s": 1781,
+   "compaction_pre_tokens": [
+    140516,
+    142443,
+    239119
+   ],
+   "hedge_markers_per_10k_chars": {
+    "wait": 7.73,
+    "actually": 12.57,
+    "let me re": 22.95,
+    "double-check": 0.18,
+    "hmm": 3.73
+   },
+   "phases": {},
+   "thinking_s_client": 5262,
+   "compactions_ok": 3,
+   "compactions_failed": 15,
+   "thinking_blocks": 240,
+   "thinking_chars": 3119780,
+   "within_block_distinct_line_ratio_weighted": 0.246,
+   "blocks_lt_0.7_distinct": 24,
+   "cross_block_repeated_lines_pct": 43.3,
+   "cross_block_repeated_8gram_pct": 45.0,
+   "tool_calls": 251,
+   "identical_tool_calls_repeated": 185,
+   "files_read_3x_or_more": 2,
+   "max_reads_of_one_file": 137
+  },
+  "transcript": {
+   "requests": 240,
+   "output_tokens": 887952,
+   "context_tokens_sent_total": 43114538,
+   "context_median": 223320,
+   "context_mean": 179643,
+   "context_max": 238880,
+   "cached_share_pct": 98.0,
+   "thinking_turns_tested": 33,
+   "next_prompt_growth_over_output_median": 0.01,
+   "share_turns_reasoning_replayed": 0.48
+  },
+  "server": {
+   "generated_tokens_server": 1599249,
+   "prefilled_tokens_server": 961118,
+   "decode_window_s": 10670,
+   "prefill_window_s": 1400,
+   "prefill_only_window_s": 0,
+   "decode_tok_s": 149.9,
+   "acceptance_mean": 7.18,
+   "acceptance_ge7_pct": 72.8
+  }
+ },
+ "redhat_d0_w208": {
+  "stream": {
+   "assistant_messages": 208,
+   "model_s": 6109,
+   "tool_s": 152,
+   "wasted_call_reads": 0,
+   "compaction_s_in_model_s": 1286,
+   "compaction_pre_tokens": [
+    136881,
+    136466,
+    136042,
+    139102,
+    138220,
+    136249
+   ],
+   "hedge_markers_per_10k_chars": {
+    "wait": 7.09,
+    "actually": 2.9,
+    "let me re": 1.61,
+    "double-check": 0.16,
+    "hmm": 5.26
+   },
+   "phases": {
+    "A_blind": {
+     "requests": 142,
+     "model_s": 2556,
+     "thinking_chars": 488931,
+     "tool_calls": 155
+    },
+    "B_compare": {
+     "requests": 22,
+     "model_s": 1298,
+     "thinking_chars": 259374,
+     "tool_calls": 31
+    },
+    "C_fix_and_rest": {
+     "requests": 46,
+     "model_s": 2255,
+     "thinking_chars": 329391,
+     "tool_calls": 56
+    }
+   },
+   "thinking_s_client": 3893,
+   "compactions_ok": 6,
+   "compactions_failed": 0,
+   "thinking_blocks": 208,
+   "thinking_chars": 1077696,
+   "within_block_distinct_line_ratio_weighted": 0.96,
+   "blocks_lt_0.7_distinct": 0,
+   "cross_block_repeated_lines_pct": 9.8,
+   "cross_block_repeated_8gram_pct": 4.8,
+   "tool_calls": 242,
+   "identical_tool_calls_repeated": 10,
+   "files_read_3x_or_more": 7,
+   "max_reads_of_one_file": 7
+  },
+  "transcript": {
+   "requests": 208,
+   "output_tokens": 387077,
+   "context_tokens_sent_total": 18999173,
+   "context_median": 90379,
+   "context_mean": 91342,
+   "context_max": 135626,
+   "cached_share_pct": 93.5,
+   "thinking_turns_tested": 22,
+   "next_prompt_growth_over_output_median": 1.07,
+   "share_turns_reasoning_replayed": 1.0
+  },
+  "server": {
+   "generated_tokens_server": 489768,
+   "prefilled_tokens_server": 1258644,
+   "decode_window_s": 6500,
+   "prefill_window_s": 1680,
+   "prefill_only_window_s": 10,
+   "decode_tok_s": 75.3,
+   "acceptance_mean": 3.59,
+   "acceptance_ge7_pct": 1.1
+  }
+ },
+ "redhat_191_w208": {
+  "stream": {
+   "assistant_messages": 174,
+   "model_s": 5164,
+   "tool_s": 29,
+   "wasted_call_reads": 0,
+   "compaction_s_in_model_s": 614,
+   "compaction_pre_tokens": [
+    135166,
+    160590
+   ],
+   "hedge_markers_per_10k_chars": {
+    "wait": 9.77,
+    "actually": 10.56,
+    "let me re": 15.49,
+    "double-check": 0.22,
+    "hmm": 2.93
+   },
+   "phases": {
+    "A_blind": {
+     "requests": 42,
+     "model_s": 842,
+     "thinking_chars": 242742,
+     "tool_calls": 51
+    },
+    "B_compare": {
+     "requests": 6,
+     "model_s": 241,
+     "thinking_chars": 100176,
+     "tool_calls": 6
+    },
+    "C_fix_and_rest": {
+     "requests": 128,
+     "model_s": 4081,
+     "thinking_chars": 1248091,
+     "tool_calls": 129
+    }
+   },
+   "thinking_s_client": 3562,
+   "compactions_ok": 2,
+   "compactions_failed": 0,
+   "thinking_blocks": 174,
+   "thinking_chars": 1591009,
+   "within_block_distinct_line_ratio_weighted": 0.696,
+   "blocks_lt_0.7_distinct": 9,
+   "cross_block_repeated_lines_pct": 7.7,
+   "cross_block_repeated_8gram_pct": 8.8,
+   "tool_calls": 186,
+   "identical_tool_calls_repeated": 5,
+   "files_read_3x_or_more": 5,
+   "max_reads_of_one_file": 27
+  },
+  "transcript": {
+   "requests": 174,
+   "output_tokens": 503092,
+   "context_tokens_sent_total": 15049265,
+   "context_median": 88071,
+   "context_mean": 86490,
+   "context_max": 131913,
+   "cached_share_pct": 91.9,
+   "thinking_turns_tested": 28,
+   "next_prompt_growth_over_output_median": 1.0,
+   "share_turns_reasoning_replayed": 0.75
+  },
+  "server": {
+   "generated_tokens_server": 567488,
+   "prefilled_tokens_server": 1219722,
+   "decode_window_s": 5140,
+   "prefill_window_s": 1280,
+   "prefill_only_window_s": 0,
+   "decode_tok_s": 110.4,
+   "acceptance_mean": 5.26,
+   "acceptance_ge7_pct": 11.3
+  }
+ }
+}

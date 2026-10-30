@@ -1,0 +1,118 @@
+{
+ "arm": "delta0-w208-part2",
+ "calls": [
+  {
+   "file": "session-1.jsonl",
+   "result": {
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 2796371,
+    "duration_api_ms": 3022779,
+    "num_turns": 68,
+    "usage": {
+     "input_tokens": 65172,
+     "cache_creation_input_tokens": 388960,
+     "cache_read_input_tokens": 4570720,
+     "output_tokens": 171181,
+     "output_tokens_details": {
+      "thinking_tokens": 0
+     },
+     "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+     },
+     "service_tier": "standard",
+     "cache_creation": {
+      "ephemeral_1h_input_tokens": 0,
+      "ephemeral_5m_input_tokens": 0
+     },
+     "inference_geo": "",
+     "iterations": [],
+     "speed": "standard",
+     "fallback_credit": null
+    },
+    "modelUsage": {
+     "qwen38-27b-redhat-mxfp4-dflash": {
+      "inputTokens": 106170,
+      "outputTokens": 241949,
+      "thinkingTokens": 0,
+      "cacheReadInputTokens": 6460960,
+      "cacheCreationInputTokens": 479600,
+      "cacheCreationEphemeral5mInputTokens": 0,
+      "cacheCreationEphemeral1hInputTokens": 0,
+      "webSearchRequests": 0,
+      "costUSD": 12.807555000000002,
+      "contextWindow": 262000,
+      "maxOutputTokens": 32000,
+      "canonicalModel": "qwen38-27b-redhat-mxfp4-dflash",
+      "provider": "firstParty",
+      "costBasis": "unknown"
+     }
+    }
+   }
+  }
+ ],
+ "first_ts": "2026-10-30T14:04:13.725Z",
+ "last_ts": "2026-10-30T14:49:02.774Z",
+ "assistant_messages": 51,
+ "tool_calls": {
+  "Bash": 22,
+  "Read": 16,
+  "Write": 16,
+  "Edit": 10
+ },
+ "tool_calls_total": 64,
+ "tool_errors": 2,
+ "thinking_chars": 438403,
+ "text_chars": 8011,
+ "compactions": [
+  {
+   "pre_tokens": 139102,
+   "post_tokens": 28658,
+   "trigger": "auto"
+  },
+  {
+   "pre_tokens": 138220,
+   "post_tokens": 20666,
+   "trigger": "auto"
+  },
+  {
+   "pre_tokens": 136249,
+   "post_tokens": 18478,
+   "trigger": "auto"
+  }
+ ],
+ "compactions_failed": 0,
+ "empty_assistant_turns": 0,
+ "no_visible_output_nudges": 0,
+ "output_cap_hits": 0,
+ "runaway_thinking_blocks": [],
+ "first_write_per_output": {
+  "progress.md": "2026-10-30T14:46:02.840Z",
+  "W2-08.compare.md": "2026-10-30T14:11:39.914Z",
+  "W2-08.md": "2026-10-30T14:43:02.757Z",
+  "resolve-confirm.test.ts": "2026-10-30T14:26:46.100Z",
+  "resolve-confirm.ts": "2026-10-30T14:26:26.170Z",
+  "fix-probe.cjs": "2026-10-30T14:36:06.110Z",
+  "index.d.ts": "2026-10-30T14:28:08.335Z",
+  "lint-probe.cjs": "2026-10-30T14:27:12.123Z",
+  "pattern.ts": "2026-10-30T14:27:10.067Z",
+  "ir.d.ts": "2026-10-30T14:26:06.999Z",
+  "ledger.d.ts": "2026-10-30T14:26:05.198Z",
+  "residue.d.ts": "2026-10-30T14:26:03.872Z"
+ },
+ "runbook": {
+  "opus_read_before_blind_review_written": [
+   "W2-08"
+  ],
+  "edit_tool_outside_allowed": [],
+  "tracked_changes_outside_allowed": [],
+  "git_commit_attempts": 0,
+  "progress_w2_lines": [
+   "W2-08 | 27B 14 | Opus 19 | both 9 | real: 27B-only 3, Opus-only 8, both 9 | not real: 27B 0, Opus 2 | unsure 0 | fixed 20 | ESLINT-UNCHECKED? no | BLOCKED: none"
+  ],
+  "progress_lines_format_ok": [
+   true
+  ]
+ }
+}

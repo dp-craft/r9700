@@ -1,0 +1,6 @@
+09:47:40 [heretic] booting /home/dev/work/dippe/dp-forge/vllm-heretic.sh
+09:51:04 [heretic] claude call 0 (left 10800s, W2 lines 0)
+10:32:15 [heretic] call 0 rc=0 session=91c706e0-f9c2-42bf-8f60-b8ccfec21dad W2 lines 3
+10:32:15 [heretic] all 3 W2 lines recorded
+10:32:21 [heretic] main checkout untouched
+10:32:21 [heretic] done: arm=heretic wall_s=2471 calls=1 session=91c706e0-f9c2-42bf-8f60-b8ccfec21dad w2_lines=3

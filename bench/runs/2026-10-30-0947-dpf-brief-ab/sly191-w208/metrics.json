@@ -1,0 +1,102 @@
+{"assistant_messages": 174, "tool_calls_total": 186, "tool_errors": 1, "empty_assistant_turns": 2, "no_visible_output_nudges": 1, "output_cap_hits": 1, "compactions_failed": 0} 
+runaway [{'ts': '2026-10-30T17:10:33.719Z', 'chars': 106245, 'lines': 878, 'distinct': 814}, {'ts': '2026-10-30T18:19:40.942Z', 'chars': 240904, 'lines': 1664, 'distinct': 150}] 
+compactions [{'pre_tokens': 135166, 'post_tokens': 24229, 'trigger': 'auto'}, {'pre_tokens': 160590, 'post_tokens': 22134, 'trigger': 'auto'}] 
+runbook {
+ "opus_read_before_blind_review_written": [
+  "W2-08"
+ ],
+ "edit_tool_outside_allowed": [
+  "/home/dev/work/dippe/dpf-bench-redhat191/docs/plans/2026-10-28-2239-dpf-tui-f0-f1/review/27b-fix/..W2-08.probe.ts",
+  "/home/dev/work/dippe/dpf-bench-redhat191/docs/plans/2026-10-28-2239-dpf-tui-f0-f1/review/27b-fix/opus/W2-08.md"
+ ],
+ "tracked_changes_outside_allowed": [
+  "docs/plans/2026-10-28-2239-dpf-tui-f0-f1/review/27b-fix/RUNBOOK.md"
+ ],
+ "git_commit_attempts": 0,
+ "progress_w2_lines": [
+  "W2-08 | 27B 1 | Opus 19 | both 1 | real: 27B-only 0, Opus-only 16, both 1 | not real: 27B 0, Opus 3 | unsure 0 | fixed 17 | ESLINT-UNCHECKED? no | BLOCKED: none"
+ ],
+ "progress_lines_format_ok": [
+  true
+ ]
+}
+tionEphemeral1hInputTokens": 0,
+      "canonicalModel": "qwen38-27b-redhat-mxfp4-dflash",
+      "provider": "firstParty",
+      "costBasis": "unknown"
+     }
+    }
+   }
+  }
+ ],
+ "first_ts": "2026-10-30T17:02:43.239Z",
+ "last_ts": "2026-10-30T18:29:16.514Z",
+ "assistant_messages": 174,
+ "tool_calls": {
+  "Read": 61,
+  "Bash": 77,
+  "Write": 7,
+  "Edit": 41
+ },
+ "tool_calls_total": 186,
+ "tool_errors": 1,
+ "thinking_chars": 1591009,
+ "text_chars": 15593,
+ "compactions": [
+  {
+   "pre_tokens": 135166,
+   "post_tokens": 24229,
+   "trigger": "auto"
+  },
+  {
+   "pre_tokens": 160590,
+   "post_tokens": 22134,
+   "trigger": "auto"
+  }
+ ],
+ "compactions_failed": 0,
+ "empty_assistant_turns": 2,
+ "no_visible_output_nudges": 1,
+ "output_cap_hits": 1,
+ "runaway_thinking_blocks": [
+  {
+   "ts": "2026-10-30T17:10:33.719Z",
+   "chars": 106245,
+   "lines": 878,
+   "distinct": 814
+  },
+  {
+   "ts": "2026-10-30T18:19:40.942Z",
+   "chars": 240904,
+   "lines": 1664,
+   "distinct": 150
+  }
+ ],
+ "first_write_per_output": {
+  "progress.md": "2026-10-30T18:28:35.878Z",
+  "W2-08.compare.md": "2026-10-30T17:21:05.200Z",
+  "W2-08.md": "2026-10-30T17:16:18.972Z",
+  "..W2-08.probe.ts": "2026-10-30T17:40:06.266Z",
+  "W2-08.refine-27b.md": "2026-10-30T17:16:47.705Z",
+  "d4.probe.ts": "2026-10-30T17:11:24.757Z"
+ },
+ "runbook": {
+  "opus_read_before_blind_review_written": [
+   "W2-08"
+  ],
+  "edit_tool_outside_allowed": [
+   "/home/dev/work/dippe/dpf-bench-redhat191/docs/plans/2026-10-28-2239-dpf-tui-f0-f1/review/27b-fix/..W2-08.probe.ts",
+   "/home/dev/work/dippe/dpf-bench-redhat191/docs/plans/2026-10-28-2239-dpf-tui-f0-f1/review/27b-fix/opus/W2-08.md"
+  ],
+  "tracked_changes_outside_allowed": [
+   "docs/plans/2026-10-28-2239-dpf-tui-f0-f1/review/27b-fix/RUNBOOK.md"
+  ],
+  "git_commit_attempts": 0,
+  "progress_w2_lines": [
+   "W2-08 | 27B 1 | Opus 19 | both 1 | real: 27B-only 0, Opus-only 16, both 1 | not real: 27B 0, Opus 3 | unsure 0 | fixed 17 | ESLINT-UNCHECKED? no | BLOCKED: none"
+  ],
+  "progress_lines_format_ok": [
+   true
+  ]
+ }
+}

@@ -1,0 +1,31 @@
+1c1
+< {%- set template_version = "qwen3.8-froggeric-v22.5" %}
+---
+> {%- set template_version = "qwen3.8-froggeric-v22.5-sly2" %}
+7a8,13
+> {#- sly1 (vllm-sly-radiance): without an explicit preserve_thinking / preserve_reasoning, the reasoning of
+>     earlier assistant turns is NOT replayed (empty think block kept). Agents send their old thinking back,
+>     and the model locks into the repetition loops it contains: one 163k agent request looped in 11/16
+>     seeds with the replayed reasoning, 1/32 without (bf16 cloud reference: 6/16 vs 0/32). -#}
+> {%- set _drop_old_reasoning = not ((preserve_reasoning is defined and preserve_reasoning is not none)
+>                                     or (preserve_thinking is defined and preserve_thinking is not none)) %}
+223c229
+< {%- set ns = namespace(multi_step_tool=true, last_query_index=_last_idx) %}
+---
+> {%- set ns = namespace(multi_step_tool=true, last_query_index=_last_idx, last_assistant_index=-1) %}
+225a232,234
+>     {%- if ns.last_assistant_index < 0 and message.role == 'assistant' %}
+>         {%- set ns.last_assistant_index = index %}
+>     {%- endif %}
+332c341,349
+<         {%- if (_preserve_thinking or loop.index0 > ns.last_query_index) %}
+---
+>         {#- sly2: keep the reasoning of the MOST RECENT assistant turn only. The multi-turn value lives
+>             one turn back (an agent reads its own last scratchpad); the older turns are what grew the
+>             163k agent prompt and primed the repetition loops (sly1 dropped them all and cost 5/16 of
+>             the multi-turn recall tasks: 6/16 -> 1/16, with the newest turn kept 9/16). -#}
+>         {%- if _drop_old_reasoning and loop.index0 != ns.last_assistant_index %}
+>             {%- set reasoning_content = '' %}
+>         {%- endif %}
+>         {%- if (_preserve_thinking or loop.index0 > ns.last_query_index
+>                or (loop.index0 == ns.last_assistant_index and reasoning_content)) %}

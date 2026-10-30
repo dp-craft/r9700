@@ -1,0 +1,41 @@
+--- RUNBOOK.orig.md	2026-10-30 17:51:00.912930346 +0100
++++ RUNBOOK.optimized.md	2026-10-30 17:51:13.108381864 +0100
+@@ -1,11 +1,11 @@
+ # 27B brief fix — runbook
+ 
+-One 27B session runs this file top to bottom, one brief at a time: a blind review, a comparison with the Opus review, a fix of the findings that hold at the code. After a context reset: read this file again, resume after the last line of `progress.md`.
++One 27B session runs this file top to bottom, one brief at a time: a blind review, a comparison with the Opus review, a fix of the findings that hold at the code. After a context reset: read this file again, resume after the last line of `progress.md`, read the files you already wrote for the current brief, and continue at the first missing part. Do not redo a finished part.
+ 
+ - P = `docs/plans/2026-10-28-2239-dpf-tui-f0-f1` (the plan dir); O = `P/review/27b-fix` (this dir).
+ - Run every command from the repo root.
+ 
+-## 0. Rules — re-read them; your memory of them is stale
++## 0. Rules — read them at the start of a session; after a context reset, re-read only the section the current step uses (`grep -n` its heading, then Read ≤ 80 lines)
+ 
+ 1. `P/04-check-method.md`, whole: E, S, M1–M11, § Severity, the stack profile.
+ 2. `P/01-writer-brief.md`: `sed -n '/^## REFINE prompt/,/^## RESUME brief/p'` — items 1–9, the Brief template (SITES header, STEPS, the two fixed DO NOT lines).
+@@ -15,6 +15,15 @@
+ 
+ Do NOT open `O/opus/` or `docs/reviews/` before step B of a brief.
+ 
++## 0b. Budget — every step
++
++- Read: `grep -n` the anchor first, then Read ≤ 80 lines (offset + limit). Never Read a whole file of more than 80 lines; this file and `progress.md` excepted.
++- Command output: end tsc, eslint, grep and find with `| head -40`.
++- Lint a probe only as `npx eslint --stdin --stdin-filename <real target path> < <probe>` (04 § stack profile, M9 lint). `File ignored because outside of base path` means NOT checked. For the canonical import order add `--fix-dry-run --format json` and read `output`.
++- At most 3 attempts to make one probe run. Still failing: the row says `unsure: probe (<last error line>)`; go on.
++- Evidence already quoted in this brief's files is cited (file:line), not read or probed again.
++- Decide, then act. Do not restate the plan or recap finished steps.
++
+ ## 1. Work list, in this order
+ 
+ W1-06b · W1-07a · W1-07b · W1-07c · W1-07d · W1-08 · W1-08b · W1-09 · W1-10 · W2-06 · W2-07 · W2-08
+@@ -23,7 +32,7 @@
+ 
+ ## 2. Per brief: A review → B compare → C fix → D record
+ 
+-**A. Review, blind.** § REFINE-CHECK with `<out>` = `P/review/<Id>.refine-27b.md`: Part 1 before you read the brief body, then Parts 2 and 3. Change no other file in A.
++**A. Review, blind.** § REFINE-CHECK with `<out>` = `P/review/<Id>.refine-27b.md`: Part 1 before you read the brief body, then Parts 2 and 3. Change no other file in A. A spec contradiction (an arity, type or path that differs from its contract) is ONE finding row quoting both sides; do not design its fix in A. Deriving the same point a second time: write the finding and move on.
+ 
+ **B. Compare.** Now read `O/opus/<Id>.md`; absent → write "no opus review" and go on with your own findings. Write `O/<Id>.compare.md`, one table:
+ 
