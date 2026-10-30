@@ -10,8 +10,9 @@ Usage (from a run script):
     ... run the benchmark ...
     kill $SAMPLER_PID
 
-CSV columns: unix_ts, vram_used_mib, vram_total_mib, gtt_used_mib, power_w, temp_c, sclk_mhz,
-             mclk_mhz, gpu_busy_pct
+CSV columns: unix_ts, vram_used_mib, vram_total_mib, gtt_used_mib, power_w, temp_c, mem_temp_c,
+             sclk_mhz, mclk_mhz, gpu_busy_pct, fan_pct
+temp_c = edge temperature (°C); mem_temp_c = memory temperature (°C); fan_pct = fan speed (%).
 gtt_used_mib = GPU-accessible SYSTEM RAM in use. On a healthy VRAM-only run it stays ~flat at the
 idle baseline; a rising GTT figure means the model/KV spilled into host RAM (the freeze risk) and
 the run is NOT VRAM-only. Summary appended as a final comment line on SIGTERM/INT:
@@ -34,7 +35,7 @@ def _digits(s):
 
 def read_amd():
     out = subprocess.run(["rocm-smi", "--showmeminfo", "vram", "gtt", "--showpower",
-                          "--showtemp", "--showclocks", "--showuse", "--json"],
+                          "--showtemp", "--showclocks", "--showuse", "--showfan", "--json"],
                          capture_output=True, text=True, timeout=10).stdout
     card = next(iter(json.loads(out).values()))
     used = int(card["VRAM Total Used Memory (B)"]) // 2**20
@@ -55,6 +56,10 @@ def read_amd():
     for k, v in card.items():
         if "Temperature" in k and "edge" in k.lower():
             temp = _digits(v); break
+    mem_temp = None                               # memory temperature (°C) — "Sensor memory"
+    for k, v in card.items():
+        if "Temperature" in k and "memory" in k.lower():
+            mem_temp = _digits(v); break
     sclk = None                                   # GPU core clock (MHz)
     for k, v in card.items():
         if "sclk" in k.lower() and "clock" in k.lower():
@@ -67,7 +72,11 @@ def read_amd():
     for k, v in card.items():
         if "use" in k.lower() and "%" in k:
             busy = _digits(v); break
-    return used, total, gtt, power, temp, sclk, mclk, busy
+    fan = None                                    # "Fan speed (%)" — 0/None on a passive card
+    for k, v in card.items():
+        if "Fan speed" in k and "%" in k:
+            fan = _digits(v); break
+    return used, total, gtt, power, temp, mem_temp, sclk, mclk, busy, fan
 
 def read_nvidia():
     out = subprocess.run(["nvidia-smi",
@@ -78,7 +87,7 @@ def read_nvidia():
     parts = [x.strip() for x in out.splitlines()[0].split(",")]
     used, total, power, temp, sclk, mclk, busy = parts[:7]
     return (int(float(used)), int(float(total)), None, float(power),  # no GTT concept on NVIDIA
-            _digits(temp), _digits(sclk), _digits(mclk), _digits(busy))
+            _digits(temp), None, _digits(sclk), _digits(mclk), _digits(busy), None)  # mem_temp/fan: no query
 
 def main():
     ap = argparse.ArgumentParser()
@@ -102,15 +111,15 @@ def main():
 
     def _n(x): return "" if x is None else x
     with open(a.out, "w") as f:
-        f.write("unix_ts,vram_used_mib,vram_total_mib,gtt_used_mib,power_w,temp_c,sclk_mhz,"
-                "mclk_mhz,gpu_busy_pct\n")
+        f.write("unix_ts,vram_used_mib,vram_total_mib,gtt_used_mib,power_w,temp_c,mem_temp_c,sclk_mhz,"
+                "mclk_mhz,gpu_busy_pct,fan_pct\n")
         while not stop:
             try:
-                used, total, gtt, power, temp, sclk, mclk, busy = reader()
+                used, total, gtt, power, temp, mem_temp, sclk, mclk, busy, fan = reader()
                 f.write(f"{time.time():.1f},{used},{total},{_n(gtt)},{_n(power)},{_n(temp)},"
-                        f"{_n(sclk)},{_n(mclk)},{_n(busy)}\n")
+                        f"{_n(mem_temp)},{_n(sclk)},{_n(mclk)},{_n(busy)},{_n(fan)}\n")
                 f.flush()
-                rows.append((used, gtt, power, temp, sclk, mclk, busy))
+                rows.append((used, gtt, power, temp, mem_temp, sclk, mclk, busy, fan))
             except Exception:
                 pass  # transient smi hiccup — keep sampling
             # sleep in small slices so signals interrupt promptly
@@ -126,10 +135,11 @@ def main():
                 return f"{sum(vals)/len(vals):.1f}" if vals else "n/a"
             f.write(f"# load_vram_used_mib={rows[0][0]} peak_vram_used_mib={max(r[0] for r in rows)} "
                     f"peak_gtt_used_mib={_peak(1)} avg_power_w={_avg(2)} peak_power_w={_peak(2)} "
-                    f"peak_temp_c={_peak(3)} avg_sclk_mhz={_avg(4)} peak_sclk_mhz={_peak(4)} "
-                    f"avg_mclk_mhz={_avg(5)} peak_mclk_mhz={_peak(5)} "
-                    f"avg_gpu_busy_pct={_avg(6)} peak_gpu_busy_pct={_peak(6)} "
-                    f"samples={len(rows)}\n")
+                    f"peak_temp_c={_peak(3)} peak_mem_temp_c={_peak(4)} "
+                    f"avg_sclk_mhz={_avg(5)} peak_sclk_mhz={_peak(5)} "
+                    f"avg_mclk_mhz={_avg(6)} peak_mclk_mhz={_peak(6)} "
+                    f"avg_gpu_busy_pct={_avg(7)} peak_gpu_busy_pct={_peak(7)} "
+                    f"peak_fan_pct={_peak(8)} samples={len(rows)}\n")
 
 if __name__ == "__main__":
     main()

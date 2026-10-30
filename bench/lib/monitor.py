@@ -133,7 +133,7 @@ def _ttft_base(m):
 
 def gpu():
     """GPU metrics via vram_sampler.read_amd (rocm-smi) ->
-    (used_mib, total_mib, gtt_mib, power_w, temp_c, sclk_mhz, mclk_mhz, busy_pct); None on error."""
+    (used_mib, total_mib, gtt_mib, power_w, temp_c, mem_temp_c, sclk_mhz, mclk_mhz, busy_pct, fan_pct); None on error."""
     try:
         sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
         from vram_sampler import read_amd
@@ -311,12 +311,17 @@ def collect(m, prev, prev_t, g, log_lines):
         "prefix_tok_n": tc,
         "prefix_tok_d": tp,
         "spec": spec_rate,
+        "spec_accepted": sa,
+        "spec_draft": sd,
+        "itl_count": m.get("vllm:inter_token_latency_seconds_count"),
         "running": running,
         "waiting": waiting,
         "log_prompt_tps": log_pp,
         "log_gen_tps": log_gen,
         "log_spec_len": log_spec_len,
         "log_spec_rate": log_spec_rate,
+        "flight_elapsed": None,
+        "flight_gen": None,
     }
 
     return {"ts": t, "per": per, "session": session, "state": state, "gpu": g}
@@ -350,6 +355,96 @@ def _flag(x, threshold, spec=""):
     if x > threshold:
         return "\033[31m" + s + "\033[0m"
     return s
+
+
+_COLORS = {"g": "\033[32m", "y": "\033[33m", "r": "\033[31m"}  # green/yellow/red
+_RESET = "\033[0m"
+
+
+def _color_level(value, low, high, invert=False):
+    """Color level ('g'/'y'/'r') for a value against (low, high) thresholds.
+    invert=True: higher is better (TPS) — green above high, red below low.
+    invert=False: higher is worse (temp/power) — green below low, red above high."""
+    if value is None:
+        return None
+    if invert:
+        return "g" if value >= high else ("r" if value <= low else "y")
+    return "g" if value < low else ("r" if value > high else "y")
+
+
+def _color(value, spec, low, high, invert=False):
+    """Format a value (spec) and color it green/yellow/red by thresholds; 'n/a' if None."""
+    if value is None:
+        return "n/a"
+    lvl = _color_level(value, low, high, invert)
+    return _COLORS[lvl] + format(value, spec) + _RESET
+
+
+def _bar(value, max_value, width=16, color=None):
+    """A bar of width chars, filled to value/max_value, optionally colored by level.
+    'n/a' if value is None (no data). The bar is a VISIBLE-width string (ANSI-aware
+    alignment is handled by _visible_len)."""
+    if value is None or max_value is None or max_value <= 0:
+        return "n/a"
+    frac = max(0.0, min(1.0, value / max_value))
+    filled = int(round(frac * width))
+    bar = "█" * filled + "░" * (width - filled)
+    return _COLORS[color] + bar + _RESET if color else bar
+
+
+def _human(n):
+    """Human-friendly number: 1.2M, 93.7k, 500, etc.; 'n/a' if None."""
+    if n is None:
+        return "n/a"
+    if abs(n) >= 1e6:
+        return f"{n/1e6:.1f}M"
+    if abs(n) >= 1e3:
+        return f"{n/1e3:.1f}k"
+    return f"{n:.0f}"
+
+
+def _fmt_uptime(seconds):
+    """Format a duration as '2h 14m', '14m 30s', '30s'; 'n/a' if None."""
+    if seconds is None:
+        return "n/a"
+    h = int(seconds // 3600)
+    m = int((seconds % 3600) // 60)
+    s = int(seconds % 60)
+    if h:
+        return f"{h}h {m}m"
+    if m:
+        return f"{m}m {s}s"
+    return f"{s}s"
+
+
+def _fmt_color(value, width, spec, low, high, invert=False):
+    """Color a value (spec) and right-align it to width (visible-length aware)."""
+    s = _color(value, spec, low, high, invert)
+    pad = width - _visible_len(s)
+    return " " * max(0, pad) + s
+
+
+def _metric_line(label, value, spec, max_v, low, high, unit):
+    """A GPU metric line: label + colored value + bar (same color level)."""
+    lvl = _color_level(value, low, high)
+    return f"{label:<6} {_color(value, spec, low, high)}{unit}   {_bar(value, max_v, color=lvl)}"
+
+
+def _live_row(snap):
+    """The live row: in-flight request elapsed time, progress tokens, GPU %, wattage, KV %.
+    Visually distinct (▶ prefix, bright color) from the past poll rows below it."""
+    state = snap["state"]
+    g = snap["gpu"]
+    busy = g[8] if g else None
+    power = g[3] if g else None
+    kv = state.get("kv_pct")
+    parts = ["\033[1m▶ live\033[0m",
+             f"req {_f(state.get('flight_elapsed'), '.0f')}s",
+             f"gen {_f(state.get('flight_gen'), '.0f')} tok",
+             f"GPU {_color(busy, '.0f', 50, 80)}%",
+             f"{_f(power, '.0f')}W",
+             f"KV {_color(kv, '.1f', 50, 80)}%"]
+    return " ".join(parts)
 
 
 def section(title, lines, width=None):
@@ -436,38 +531,62 @@ def render(a, snap, window, history, log_lines, log_stale, cur_avg, prev_avg):
     if idle:
         cache_lines = [f"idle   KV {_f(state.get('kv_pct'), '.1f')}%   running {_f(state.get('running'), '.0f')}   waiting {_f(state.get('waiting'), '.0f')}"]
     else:
+        pt = state.get("prefix_tok")
+        pb = state.get("prefix_block")
+        spec = state.get("spec")
+        spec_line = f"spec      {_f(spec * 100 if spec is not None else None, '.1f')}% accepted " \
+                   f"({_human(state.get('spec_accepted'))}/{_human(state.get('spec_draft'))} draft)"
+        # log spec values are only shown when present (they're absent when spec decode is off)
+        if state.get("log_spec_len") is not None and state.get("log_spec_rate") is not None:
+            spec_line += f"   (log: len {_f(state.get('log_spec_len'), '.2f')}   rate {_f(state.get('log_spec_rate'), '.1f')}%)"
         cache_lines = [
-            f"KV        {_flag(state.get('kv_pct'), 90, '.1f')}%",
-            f"prefix    {_f(state.get('prefix_tok') * 100 if state.get('prefix_tok') is not None else None, '.1f')} tok "
-            f"({_f(state.get('prefix_tok_n'), '.0f')}/{_f(state.get('prefix_tok_d'), '.0f')})   block {_f(state.get('prefix_block') * 100 if state.get('prefix_block') is not None else None, '.1f')}%",
-            f"spec      {_f(state.get('spec') * 100 if state.get('spec') is not None else None, '.1f')}% accepted "
-            f"(log: len {_f(state.get('log_spec_len'), '.2f')}   rate {_f(state.get('log_spec_rate'), '.1f')}%)",
+            f"KV        {_fmt_color(state.get('kv_pct'), 8, '.1f', 50, 80)}%",
+            f"prefix    {_f(pt * 100 if pt is not None else None, '.1f')}% cached "
+            f"({_human(state.get('prefix_tok_n'))}/{_human(state.get('prefix_tok_d'))} tok)   block hit {_f(pb * 100 if pb is not None else None, '.1f')}%",
+            spec_line,
             f"queue     running {_f(state.get('running'), '.0f')}   waiting {_f(state.get('waiting'), '.0f')}",
         ]
-    # polls table: current poll row first, then one row per past poll that moved
-    # a request (recorded in main() — idle polls do not fill the table).
+
+    # server block: cumulative since server start + uptime (elapsed since start_ts)
+    start_ts = session.get("start_ts")
+    if start_ts:
+        server_title = f"server (up {_fmt_uptime(time.time() - start_ts)}, since {time.strftime('%H:%M:%S', time.localtime(start_ts))})"
+    else:
+        server_title = "server"
+
+    # GPU block: 5 colored bars + edge/mem temp + fan + clocks
+    if g is not None:
+        used, total, gtt, power, temp, mem_temp, sclk, mclk, busy, fan = g
+        vram_pct = (used / total * 100) if (total and used is not None) else None
+        gpu_lines = [
+            f"VRAM  {_f(used)}/{_f(total)} MiB   GTT {_f(gtt)} MiB",
+            _metric_line("GPU", busy, ".0f", 100, 50, 80, "%"),
+            _metric_line("power", power, ".0f", 250, 100, 200, "W"),
+            _metric_line("vram", vram_pct, ".0f", 100, 50, 80, "%"),
+            _metric_line("edge", temp, ".0f", 100, 55, 80, "C"),
+            _metric_line("mem", mem_temp, ".0f", 100, 65, 90, "C"),
+            f"fan    {_f(fan, '.0f')}%   sclk {_f(sclk, '.0f')} MHz   mclk {_f(mclk, '.0f')} MHz",
+        ]
+        gpu_block = ("GPU  (rocm-smi)", gpu_lines)
+    else:
+        gpu_block = ("GPU  (rocm-smi)", ["(no rocm-smi)"])
+
+    # polls block: live row + separator + past rows (newest first, idle dropped)
+    hist = list(history) if history is not None else []
+    polls_lines = [_live_row(snap), "─" * 78] + _history_rows(hist)
+
     blocks = [
-        ("polls (requests)", _history_rows([snap] + (list(history) if history is not None else []))),
+        gpu_block,
+        ("cache / queue / spec", cache_lines),
+        (server_title, _session_rows(session)),
+        ("polls (requests)", polls_lines),
         ("avg (last 5 min)", [
             f"TTFT {_f(cur_avg['ttft'], '.2f')} s {_trend(cur_avg['ttft'], prev_avg['ttft'])}   "
             f"prefill {_f(cur_avg['prefill'], '.0f')} tok/s {_trend(cur_avg['prefill'], prev_avg['prefill'])}   "
             f"decode {_f(cur_avg['decode'], '.1f')} tok/s {_trend(cur_avg['decode'], prev_avg['decode'])}   "
             f"req {_f(cur_avg['n_req'], '.0f')}   comp {_f(cur_avg['comp'], '.0f')} tok   out {_f(cur_avg['out'], '.0f')} tok",
         ]),
-        ("session" + (f" (since {time.strftime('%H:%M:%S', time.localtime(session.get('start_ts')))})"
-                     if session.get("start_ts") else ""),
-         _session_rows(session)),
-        ("cache / queue / spec", cache_lines),
     ]
-    if g is not None:
-        used, total, gtt, power, temp, sclk, mclk, busy = g
-        blocks.append(("GPU  (rocm-smi)", [
-            f"VRAM  {_f(used)}/{_f(total)} MiB   GTT {_f(gtt)} MiB",
-            f"power {_flag(power, 200, '.0f')} W   temp {_f(temp, '.0f')} C   busy {_f(busy, '.0f')}%",
-            f"sclk  {_f(sclk, '.0f')} MHz   mclk {_f(mclk, '.0f')} MHz",
-        ]))
-    else:
-        blocks.append(("GPU  (rocm-smi)", ["(no rocm-smi)"]))
     if log_lines:
         if log_stale:
             blocks.append(("log", ["(log stale — not the current server)"]))
@@ -508,36 +627,34 @@ def _session_rows(session):
 
 
 def _history_rows(history):
-    """Fixed-width table of poll rows (one per poll: the batch of requests that
-    completed in that window). render() passes [current poll] + past request rows,
-    so this is the whole "polls (requests)" block. The widest block — the other
-    boxes align to this width (2-char padding is applied by section(), so it is NOT
-    added here).
-    Columns: in_tok (total prompt tokens) | comp (non-cached prompt tokens, what
-    was actually prefilled) | out_tok (generated) | ttft (first token) | prefill/decode
-    TPS | full (full round-trip time) | KV% | busy%."""
+    """Fixed-width table of past poll rows (newest first; idle/0 rows dropped).
+    render() passes the past request rows (the current poll is shown as the live row).
+    The widest block — the other boxes align to this width (2-char padding is applied
+    by section(), so it is NOT added here).
+    Columns: time | n (request count) | in_tok (TOTAL prompt tokens of the requests
+    that completed in that window — not a rate; big for long-context/agentic requests) |
+    comp (non-cached prompt tokens, what was actually prefilled) | out_tok (generated) |
+    ttft (first token) | prefill/decode TPS | full (full round-trip time) | KV% | GPU%."""
     rows = [
-        f"{'time':>8} {'n':>4} {'in_tok':>8} {'comp':>8} {'out_tok':>8} {'ttft':>7} {'prefill':>8} {'decode':>8} {'full':>7} {'KV%':>5} {'busy%':>5}",
+        f"{'time':>8} {'n':>4} {'in_tok':>8} {'comp':>8} {'out_tok':>8} {'ttft':>7} {'prefill':>8} {'decode':>8} {'full':>7} {'KV%':>5} {'GPU%':>5}",
     ]
-    for h in history:
+    # newest first: reverse the history (it's a deque, oldest-first); drop idle rows.
+    for h in reversed(list(history)):
         per, state, g = h["per"], h["state"], h["gpu"]
         if _is_idle(per):
-            # An idle poll: a short marker (KV/busy are current state, so they stay).
-            rows.append(
-                f"{time.strftime('%H:%M:%S', time.localtime(h['ts'])):>8}   idle (KV {_f(state.get('kv_pct'), '.1f')}%   busy {_f(g[7] if g else None, '.0f')}%)")
-        else:
-            rows.append(
-                f"{time.strftime('%H:%M:%S', time.localtime(h['ts'])):>8} "
-                f"{_fmt(per.get('n_req'), 4, '.0f')} "
-                f"{_fmt(per.get('in_tok'), 8, '.0f')} "
-                f"{_fmt(per.get('computed_tok'), 8, '.0f')} "
-                f"{_fmt(per.get('out_tok'), 8, '.0f')} "
-                f"{_fmt(per.get('ttft_s'), 7, '.2f')} "
-                f"{_fmt(per.get('prefill_tps'), 8, '.0f')} "
-                f"{_fmt(per.get('decode_tps'), 8, '.1f')} "
-                f"{_fmt(per.get('e2e_s'), 7, '.2f')} "
-                f"{_fmt(state.get('kv_pct'), 5, '.1f')} "
-                f"{_fmt(g[7] if g else None, 5, '.0f')}")
+            continue  # no request moved in this window — drop the 0/n-a row
+        rows.append(
+            f"{time.strftime('%H:%M:%S', time.localtime(h['ts'])):>8} "
+            f"{_fmt(per.get('n_req'), 4, '.0f')} "
+            f"{_fmt(per.get('in_tok'), 8, '.0f')} "
+            f"{_fmt(per.get('computed_tok'), 8, '.0f')} "
+            f"{_fmt(per.get('out_tok'), 8, '.0f')} "
+            f"{_fmt(per.get('ttft_s'), 7, '.2f')} "
+            f"{_fmt(per.get('prefill_tps'), 8, '.0f')} "
+            f"{_fmt(per.get('decode_tps'), 8, '.1f')} "
+            f"{_fmt(per.get('e2e_s'), 7, '.2f')} "
+            f"{_fmt_color(state.get('kv_pct'), 5, '.1f', 50, 80)} "
+            f"{_fmt_color(g[8] if g else None, 5, '.0f', 50, 80)}")
     return rows
 
 
@@ -569,7 +686,8 @@ def _row(snap):
     }
     if g is not None:
         row.update({"vram_used_mib": g[0], "vram_total_mib": g[1], "gtt_mib": g[2],
-                    "power_w": g[3], "temp_c": g[4], "sclk_mhz": g[5], "busy_pct": g[7]})
+                    "power_w": g[3], "temp_c": g[4], "mem_temp_c": g[5],
+                    "sclk_mhz": g[6], "busy_pct": g[8], "fan_pct": g[9]})
     return row
 
 
@@ -583,11 +701,11 @@ def main():
                "  monitor.py --port 8000 --out session.jsonl   live + record one JSONL row per poll (chart via bench/lib/report.py)\n"
                "  bench/engine-bench/claude/monitor.sh         same, with PORT/paths from _lib.sh\n\n"
                "blocks:\n"
-               "  polls (requests)  current poll + one row per past poll that moved a request (n = request count, in/comp/out tokens, TTFT, prefill/decode TPS, full, KV %, busy %); idle polls show a short \"idle\" marker\n"
+               "  GPU               VRAM/GTT + 5 colored bars (GPU use / power / VRAM / edge temp / mem temp) + fan + clocks; red over 80/90 C\n"
+               "  cache/queue/spec  KV % (colored), prefix-cache % cached + block hit rate, spec acceptance (accepted/draft tokens), running/waiting\n"
+               "  server            cumulative since server start (uptime shown in the title; req, in/cached/comp/out, TTFT, prefill/decode TPS, gap = inter-token latency, queue, full)\n"
+               "  polls (requests)  live row (in-flight elapsed + progress tokens + GPU % + W + KV %) + past rows newest first (in_tok = total prompt tokens of completed requests, not a rate); idle/0 rows dropped\n"
                "  avg (last 5 min)  weighted-average TTFT/prefill/decode (TPS by time, TTFT by requests; trend arrows) + window req/comp/out totals\n"
-               "  session           cumulative since server start (req, in/cached/comp/out, TTFT, prefill/decode TPS, gap = inter-token latency, queue, full)\n"
-               "  cache/queue/spec  KV %, prefix-cache hit, spec acceptance, running/waiting\n"
-               "  GPU               VRAM/GTT/power/temp/clocks/busy (rocm-smi)\n"
                "  log               parsed table of the last 5 loggers.py/metrics.py entries (stale mtime > 120 s -> flagged)")
     ap.add_argument("--port", type=int, default=8000, help="server port (default 8000)")
     ap.add_argument("--interval", type=float, default=2.0, help="poll interval in seconds (default 2.0)")
@@ -608,6 +726,8 @@ def main():
     window = []  # rolling (ts, per) list, pruned to the last 5 min
     history = deque(maxlen=a.history) if a.history > 0 else None
     prev_avg = {"ttft": None, "prefill": None, "decode": None, "n_req": None, "comp": None, "out": None}
+    flight_start = None  # time.time() when running went 0->>0 (in-flight request elapsed base)
+    flight_base = None   # itl_count when running went 0->>0 (progress token base)
     out = open(a.out, "a") if a.out else None
 
     try:
@@ -625,6 +745,22 @@ def main():
                 continue
 
             snap = collect(m, prev, prev_t, g, log_lines)
+
+            # flight tracking: in-flight request elapsed time + progress (tokens generated).
+            # When a request is running (running > 0), track how long it has been in flight
+            # and how many tokens it has generated (itl_count delta). Approximate per-batch.
+            running = snap["state"].get("running") or 0
+            itl_count = snap["state"].get("itl_count")
+            if running > 0 and flight_start is None:
+                flight_start = time.time()
+                flight_base = itl_count
+            elif running == 0 and flight_start is not None:
+                flight_start = None
+                flight_base = None
+            if flight_start is not None:
+                snap["state"]["flight_elapsed"] = time.time() - flight_start
+                if itl_count is not None and flight_base is not None:
+                    snap["state"]["flight_gen"] = max(0, itl_count - flight_base)
 
             # rolling window (last 5 min) -> weighted average; pruned by each sample's age
             if snap["per"]:
