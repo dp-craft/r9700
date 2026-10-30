@@ -89,6 +89,28 @@ the generic how-to is `docs/GUIDE.md`.
    subset or shorten), (c) write up with the **benchmark-results** skill → co-located
    `campaigns/<date>-<slug>/analysis.md`, then add a `<!-- meta -->` block and run `docs/reindex.py`.
 
+## vllm throughput specs: `image` and `env`
+For `engine: "vllm"` a spec may pin the docker **`image`** (default = the profile's `IMAGE`; a run-time
+`IMAGE=` beats both) and pass **`env`** to `serve_vllm.sh` (top-level and per-server, server wins), e.g.
+`{"CACTUS_DELTA": "0"}` for a profile `${KNOB:-default}`. Rejected on llamacpp; reserved keys
+(PROFILE IMAGE MAXLEN MAXSEQS KV_DTYPE PORT) have their own fields. The driver saves
+`serve_vllm.sh print` (resolved image + digest, env, argv) per server to `server-<name>.txt` — cite it.
+
+## `kind: "agentic"` — real Claude Code sessions (`claude -p`) against a vllm server
+**Pick it** for an A/B of engine / sampler / template configs on a *real agentic task* (not a synthetic
+probe). Schema: `bench/gen_campaign.py example --agentic` (+ the module docstring). Design rules:
+- **One variable per arm** (profile, image, env knob or server override); everything else is identical.
+- **Pin every task input via `install`** (prompts, runbooks, briefs): src is copied into each fresh
+  worktree and its sha256 is recorded (README table at emit + `installs.sha256` per arm). Base is a commit, not a branch.
+- **Fresh server + fresh worktree per (rep, arm)** → no prefix-cache carry-over between sessions.
+- **Reps interleave arms** (reps outer, arms inner) so drift hits all arms alike.
+- **`cap` / `max_resumes` are measured results** (the model did not finish); **`interrupted` / `claude_error`
+  are quarantined**, never auto-retried (iron rule 18).
+- **1 session per arm is n=1** — say so in the write-up; no significance claims. Use `reps` ≥ 3 for those.
+- **Emit-time validation** (fix the spec, don't hand-edit `run.sh`): claude settings port and model names
+  vs `served_model`, `base` resolves to a sha in `repo`, every `install` src exists, `done_when.regex` compiles.
+- Hand-off is step 7 above, plus knobs `ONLY REPS CAP_S MAX_RESUMES RUN_DIR IMAGE`; see `docs/GUIDE.md` §7.
+
 ## Token policy
 Planning is reasoning — do it in the main context. Shell out for `ls`/`vram-ctx`/gguf parsing
 directly. Don't read llama.cpp binaries or `*.log`. Keep the spec + README lean and English.

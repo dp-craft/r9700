@@ -37,7 +37,7 @@ campaigns/           ← (PROJECT ROOT) self-contained campaigns = "runbooks" (s
                        deep-context, …); each holds spec.json + generated run.sh + README + its
                        co-located analysis.md write-up; scaffold new via /benchmark-new-campaign
 bench/                 ← two tracks (see bench/README.md); how-to in docs/GUIDE.md
-  gen_campaign.py    ← deterministic campaign scaffolder (spec.json → resumable run.sh + README;
+  gen_campaign.py    ← deterministic campaign scaffolder, kinds throughput | quality | agentic (spec.json → resumable run.sh + README;
                        continue-on-fail + pre-flight VRAM guard); also `vram-ctx` calculator
   gguf_kv.py         ← read KV-cache geometry from a .gguf → KiB/tok + paste-ready `vram` block
                        (authoritative source for the guard; beats online "will it fit" tools)
@@ -104,9 +104,10 @@ above. (Charts are now committed SVGs under `<campaign>/charts/`, embedded in `a
    *before* proceeding to write by hand. "It was faster to write it" is not a valid reason.
    Skills: **`/benchmark-new-campaign`** (plan+scaffold a campaign) → **`/benchmark-results`**
    (run+document, memory column mandatory) → **`/research`** (external knowledge → `docs/research/`).
-   Legit hand-written exception (must be stated): a **quality** campaign's driver, because
-   `gen_campaign.py` only emits *throughput* probes — reuse `capture.py`+`graders/` (finetune-quality
-   pattern), don't reinvent them.
+   `gen_campaign.py` emits three kinds: *throughput*, *quality* (capture_engine `tasks` +
+   `score_deterministic.py`) and *agentic* (real `claude -p` sessions). Legit hand-written exception
+   (must be stated): a **TS quality** campaign (`tsc + eslint + vitest` grading, hardest-tasks harness),
+   which no kind emits — reuse `capture.py`+`graders/` (finetune-quality pattern), don't reinvent them.
 7. **VRAM: measure, never calculate.** A reported VRAM/GTT *usage* number comes from an actual
    sample (`bench/lib/vram_sampler.py`), tagged `MEASURED`. Never present a calculated estimate as
    usage. (Calculators — `gguf_kv.py`, `gen_campaign.py vram-ctx` — are pre-flight planning bounds /
@@ -193,6 +194,7 @@ above. (Charts are now committed SVGs under `<campaign>/charts/`, embedded in `a
 |------|----------------------------------|-------|
 | Scaffold a campaign (throughput matrix) | **`/benchmark-new-campaign`** → `bench/gen_campaign.py emit --spec …` | `spec.json` → resumable `run.sh` (VRAM guard + **auto-builds missing fixtures**) + README |
 | KV geometry / max-ctx / `vram` block (HYBRID-aware) | `bench/gguf_kv.py MODEL.gguf --weights-gib G` | KiB/tok f16+q8, max ctx, paste-ready guard block |
+| Agentic A/B (real `claude -p` sessions, fresh vllm server + worktree per rep×arm) | **`/benchmark-new-campaign`** → `gen_campaign.py emit` with `kind: "agentic"` (`example --agentic`; GUIDE §7) | resumable `run.sh` (quarantines `interrupted`) + README; `rep<R>/<arm>/` dirs |
 | Quick VRAM↔ctx what-if | `bench/gen_campaign.py vram-ctx --weights-gib G --kv-kib-per-tok K --budget-mib M` | max ctx |
 | Build a prompt fixture (code/agentic/thinking, N tokens) | `bench/workloads/build_prompt.py --task … --src corpus/… --target-tokens N` | `generated/<name>.txt` (also auto-built by campaign `run.sh`) |
 | Find THE tuning optimum (one engine, bracket + KV ≤5%) | `bench/model-bench/sweep.py` | `sweep-summary.json` |
@@ -226,9 +228,9 @@ staged **in the HF cache** (not `models_dir`), so a campaign sets `MODEL=` to th
 - Ornith: `~/.cache/huggingface/hub/models--unsloth--Ornith-1.0-35B-GGUF/snapshots/78e1321ef86b69126dc991f481bb0cdc37614ed0/Ornith-1.0-35B-UD-Q4_K_M.gguf`
 - Gemma:  `~/.cache/huggingface/hub/models--unsloth--gemma-4-31B-it-qat-GGUF/snapshots/43cc1aeb31adf47ec06a854507ce552cd9862e6f/gemma-4-31B-it-qat-UD-Q4_K_XL.gguf`
 
-**Runbook — new-model QUALITY campaign** (`gen_campaign.py` only emits *throughput*; the quality
-track is the legit hand-written exception, iron rule 6 — but REUSE a grader-fixed harness, don't
-reinvent). **Worked example scaffold: `campaigns/2026-07-19-ornith-vs-gemma/`.**
+**Runbook — new-model QUALITY campaign** (`gen_campaign.py`'s `kind: quality` does not cover the TS
+`tsc + eslint + vitest` harness; this track is the legit hand-written exception, iron rule 6 — but
+REUSE a grader-fixed harness, don't reinvent). **Worked example scaffold: `campaigns/2026-07-19-ornith-vs-gemma/`.**
 1. **Canonical harness = the TS `hardest-tasks` one** (`campaigns/2026-07-14-hardest-tasks-27b-vs-35b/`):
    real `tsc + eslint + vitest` grading with a **pre-grade `score_typescript.py selftest`** that aborts
    if vitest can't spawn (the fix for the silent tests=0 bug). It is **`configs.jsonl`-driven** (one JSON

@@ -51,7 +51,7 @@ an issue lives in `settings.md`; a fix that was version/env-specific lives in `h
 - **version seen:** sly-radiance 1.6.0 (Cactus off), sly-official 1.8.1 (Cactus 0.5).
 - **workaround:** `RADIANCE_CACTUS_DELTA=0` for bit-exact stock acceptance (what upstream radiance runs).
 - **upstream mitigation (2026-10-30):** Sly 1.9.0 adds a fade (δ falls to 0 between 4,096 and 16,384 output
-  tokens; `RADIANCE_CACTUS_FADE_END=0` = off) and a cap (`RADIANCE_CACTUS_CAP_R`, default 0.5); 1.9.1 adds the
+  tokens; `RADIANCE_CACTUS_FADE_END=0` = off) and a cap (`RADIANCE_CACTUS_CAP_R`, default 0.5; `0` = off; env knobs `CACTUS_FADE_START/END`, `CACTUS_CAP_R`, see `settings.md`); 1.9.1 adds the
   `v22.5-sly2` template (older turns' reasoning not replayed). CLAIMED: loops 20/32 → 3/32; #164 still open.
   The sly-redhat profile runs 1.9.1 since 2026-10-30 (smoke test `bench/runs/2026-10-30-1745-sly-1.9.1-smoke/`);
   MEASURED on a real session (`docs/analysis/2026-10-30-1552-dpf-brief-fix-heretic-vs-redhat.md`, Claude Code

@@ -71,6 +71,11 @@ an issue cross-links to `known-issues.md`. `HIP_FORCE_DEV_KERNARG=0` is **not** 
   - `RADIANCE_CACTUS_DELTA` — **0** (sly-radiance: bit-exact stock acceptance) vs **0.5** (sly-official:
     the official value; a LOSSY acceptance transform patched into the spec-decode rejection kernel —
     Sly issue #164, open, reports locking into endless repetition on long outputs)
+  - `RADIANCE_CACTUS_FADE_START` / `_FADE_END` / `_CAP_R` — Sly 1.9.x only (the 1.8.1 image reads only `_DELTA`). Per request
+    `req_delta = δ·clamp((END − out_len)/max(END − START, 1), 0, 1)`, `out_len = pos − prompt_len`; cap `h = min(h, 1 − R·(1 − q))`.
+    Defaults 4096 / 16384 / 0.5; **`FADE_END=0` disables the fade** (constant δ), **`CAP_R=0` disables the cap**; R outside [0,1] raises.
+    Read from `rejection_sampler_utils.py:10-16,775-783`, image `vllm-sly-radiance:1.9.1-rocm10.1`. Env knobs (unset = no `-e`):
+    `CACTUS_FADE_START` `CACTUS_FADE_END` `CACTUS_CAP_R` (`profiles/sly-official/_engine.env`; usable in gen_campaign `env`).
   - `RADIANCE_RUN_BWTEST=0` (image default 1 = a P2P bandwidth self-test at every start; diagnostic only)
   - diagnostics: `RADIANCE_MXFP4_PTRLOG=1`, `RADIANCE_MXFP4_SPLIT_M=192`, `RADIANCE_MXFP4_PAD_A`,
     `RADIANCE_MXFP4_PAD_OUT_ROWS`

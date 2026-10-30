@@ -91,6 +91,12 @@ docker run --rm -it --device /dev/kfd --device /dev/dri -p 8000:8000 \
   vllm serve /models/Qwen3.6-35B-A3B-AWQ-4bit --port 8000
 ```
 
+**vLLM via a campaign spec** (`engine: "vllm"`, `bench/engine-bench/vllm/serve_vllm.sh`): optional
+`"image"` pins the docker image (default = the profile's; run-time `IMAGE=` beats both) and `"env"`
+(top-level and per-server, server wins; e.g. `{"CACTUS_DELTA": "0"}`) is passed to `serve_vllm.sh`.
+`run.sh` saves `serve_vllm.sh print` (resolved image + digest, env, argv) to `server-<name>.txt` and
+records image/env in `meta.txt`. Not valid on llamacpp.
+
 **Observe a running server** (any engine with a log; vLLM also gets `/metrics` + rocm-smi): ✅
 ```bash
 python3 bench/lib/monitor.py --port 8000        # live table: per-request tokens/TTFT/TPS + 5-min avg + session + GPU + log (Ctrl-C quits)
@@ -160,6 +166,43 @@ The doc must include (spec + canonical glossary rows live in the skill's output 
 - a **Consequences & root causes** section — relations/interactions, causal explanations, and
   practical consequences, each tagged MEASURED / INFERRED / CLAIMED; root causes that can't be
   established from our data get validated via the `/research` skill, unresolved ones marked OPEN.
+
+---
+
+## 7. Agentic campaigns (real `claude -p` sessions, A/B of vllm configs) ✅
+Scaffold with `/benchmark-new-campaign` (`kind: "agentic"`; `bench/gen_campaign.py example --agentic`):
+```bash
+python3 bench/gen_campaign.py emit --spec campaigns/<date>-<slug>/spec.json   # validates, resolves base sha, hashes installs
+bash campaigns/<date>-<slug>/run.sh                                           # run; the SAME command resumes
+```
+Each (rep, arm) boots a fresh vllm server + fresh git worktree at the base commit, runs `claude -p`
+(resumed with `resume_prompt` until `done_when` / cap), tears down, collects. Reps outer, arms inner.
+Rerun: finished arms are skipped via `done/` markers.
+
+**Knobs:** `ONLY='armglob,..'` (subset) · `REPS=N` · `CAP_S=sec` (wall cap per session) ·
+`MAX_RESUMES=N` · `RUN_DIR=dir` (output; default `bench/runs/<date>-<slug>`) · `IMAGE=ref` (beats per-arm image).
+
+**Statuses** (`summary.tsv`):
+| status | meaning | on rerun |
+|--------|---------|----------|
+| `done`, `cap`, `max_resumes` | result (cap/max_resumes = model did not finish; still measured) | skipped (done marker) |
+| `interrupted`, `claude_error` | started marker, no done marker; quarantined (iron rule 18) | reported and skipped, never deleted |
+| `wt_exists` `gpu_busy` `server_fail` `served_name_mismatch` `wt_fail` `prep_fail` `proxy_fail` | infra failure, in `failures.txt`, no marker | retried |
+
+**Re-collect / retry an interrupted arm:** re-collect by hand with the commands `run.sh` prints (worktree
+status/diff, the spec's `collect` paths, the `~/.claude/projects/` transcript). To retry from scratch:
+remove its `started/rep<R>.<arm>` marker, move `rep<R>/<arm>/` aside, `git worktree remove --force` its
+worktree, then rerun. Move the old data aside, never into the results.
+
+**`rep<R>/<arm>/`:** `server.txt` (resolved image/env/argv) · `calls.tsv` + `session-N.jsonl` (per claude
+call) · `gpu_samples.csv` (VRAM/GTT/power) · `wt.diff` · `outputs/` (collected paths) · `tmp/` (`tmp_dirs`) ·
+`claude-project/` (transcript copy) · `main-*.txt` (main checkout untouched check) · `installs.sha256`.
+Run level: `summary.tsv`, `failures.txt`, `driver.log`, `agentic_helper.py`.
+
+**Optional request capture:** `"capture_requests": true` puts `capture_proxy.py` on the client port and the
+server on port+1; request bodies land in `<arm_dir>/requests/*.gz`.
+
+**Testing the scaffolder** (no GPU, ~20 s): `python3 bench/test_gen_campaign.py -v`.
 
 ---
 
