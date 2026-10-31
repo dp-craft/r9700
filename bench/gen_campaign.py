@@ -20,8 +20,8 @@ Subcommands
           "quality" — configs (model × MTP) × task-suite; emits plan.md; drives capture_engine
               `tasks` (quality + token economy) + deterministic scoring + an in-session judge.
               See `example --quality` for the schema (configs[], tasks, ctx/kv, models_dir).
-          "agentic" — real Claude Code sessions against a vllm server, one FRESH server + git
-              worktree per (rep, arm); emits README.md. See "Agentic specs" below / `example --agentic`.
+          "agentic" — real Claude Code sessions against a vllm server or a llama-swap row, one FRESH
+              server + git worktree per (rep, arm); emits README.md. See "Agentic specs" below / `example --agentic`.
   vram-ctx --weights-gib G --kv-kib-per-tok K --budget-mib M [--np N]
         Deterministic VRAM→max-context helper (the math behind the deep-context campaign).
   example [--quality | --agentic]
@@ -82,12 +82,12 @@ Each probe SLUG must be unique in the campaign (the driver globs its run dir by 
 
 Agentic specs (kind "agentic") — generalises the hand-written run_redhat_w208.sh driver
 -----------------------------------------------------------------------------------
-{ "kind": "agentic", "slug": "...", "date": "...", "engine": "vllm", "port": 8000,
+{ "kind": "agentic", "slug": "...", "date": "...", "engine": "vllm", "port": 8000,   # engine: vllm | llama-swap
   "repo": "/abs/git/repo", "base": "<commit>",          # base is resolved to a sha at emit time
   "worktree": "/abs/path/{arm}-r{rep}",                  # must contain {arm} and {rep}
-  "served_model": "...",   # exported as SERVED_NAME to every arm; must equal the claude settings' model names
+  "served_model": "...",   # vllm: SERVED_NAME, llama-swap: the row id (MODEL); must equal the claude settings' model names
   "server": {"maxlen": 110000, "maxseqs": 1, "kv_dtype": "fp8", "gpu_util": 0.93,
-             "watchdog_mib": 32, "free_mib_floor": 30000},  # maxlen required; the rest default as shown
+             "watchdog_mib": 32, "free_mib_floor": 30000},  # vllm: maxlen required; the rest default as shown
   "env": {...},                                          # optional, merged under each arm's env (Part A rules)
   "claude": {"settings": "/abs/settings.json", "args": ["--dangerously-skip-permissions", ...]},
   "prompt": "...", "resume_prompt": "...",               # verbatim, NO placeholder substitution
@@ -101,13 +101,25 @@ Agentic specs (kind "agentic") — generalises the hand-written run_redhat_w208.
   "post": ["python3 tool.py {arm_dir}"],                 # optional, run after collect (cwd = project root)
   "capture_requests": false,   # true: server on port+1, capture_proxy.py on `port` -> bodies in <arm_dir>/requests/*.gz
   "remove_worktree": false,    # true: remove the worktree only after every collect step succeeded
+  "stop_when": {"tool_regex": "^Read$", "input_regex": "review/opus/"},   # optional, BOTH keys required (python re.search)
   "arms": [{"name": "s1-d0", "profile": "sly-redhat/redhat-mxfp4-dflash", "image": "optional",
             "env": {"CACTUS_DELTA": "0"}, "server": {"maxlen": 90000}}] }   # per-arm server overrides
+stop_when: while a claude call runs, a watcher (`agentic_helper.py watch`) follows its stream-json file; at the first
+assistant tool_use whose name matches tool_regex AND whose input (json.dumps, ensure_ascii=False) matches input_regex
+it writes <arm_dir>/stop_when.txt (call, ts, tool, line, input) and sends SIGINT to the session's process group (then
+TERM/KILL if it lingers). The arm ends with status `stopped` -- a RESULT (done marker, never resumed); stop_when.txt
+takes precedence over done_when/cap/max_resumes/claude_error for that call. tool_result / user / text blocks never match.
 Placeholders (worktree, rewrite.to, server_info, post): {wt} {arm} {rep} {arm_dir} {port} {server_port}
 ({server_port} = port, or port+1 with capture_requests; {wt} is not available inside "worktree").
-Run-time knobs: ONLY (arm globs) REPS CAP_S MAX_RESUMES RUN_DIR IMAGE; tool paths for stub testing:
-SERVE_VLLM GPU_EXCLUSIVE VRAM_SAMPLER CAPTURE_PROXY CLAUDE_BIN DOCKER CURL SS.
-Loop = reps outer, arms inner; every (rep, arm) boots a fresh server. Statuses: done cap max_resumes
+engine "llama-swap": the server is the row `served_model` (the llama-swap model id) of the user's persistent
+llama-swap router on `port`, driven by bench/engine-bench/serve_llamaswap.sh: print -> server.txt, start (preload;
+upstream llama-server log streamed into server-container.log), stop (GET /unload) -> server-stop.txt. The router
+stays up by design, so there is no port-free check: summary.tsv's port_free column is unloaded=yes|no (a WARNING
+on no). The row's config owns model/build/ctx/KV/flags/env, so `server` is optional and takes only free_mib_floor
+(top level and per arm), arms take only name (+ server), and profile/image/env/capture_requests:true are rejected.
+Run-time knobs: ONLY (arm globs) REPS CAP_S MAX_RESUMES RUN_DIR IMAGE (vllm); tool paths for stub testing:
+SERVE_VLLM SERVE_LLAMASWAP GPU_EXCLUSIVE VRAM_SAMPLER CAPTURE_PROXY CLAUDE_BIN DOCKER CURL SS.
+Loop = reps outer, arms inner; every (rep, arm) boots a fresh server. Statuses: done cap max_resumes stopped
 (result, done-marker written) | interrupted claude_error (quarantined, never auto-retried) | wt_exists
 gpu_busy server_fail served_name_mismatch wt_fail prep_fail proxy_fail (no marker; a rerun retries).
 Tests: python3 bench/test_gen_campaign.py -v
@@ -680,15 +692,18 @@ Write `analysis.md` (summary + headline table first, **memory column mandatory**
 
 
 # ======================================================================================
-# kind "agentic": real Claude Code sessions against a vllm server (one fresh server + worktree per rep x arm)
+# kind "agentic": real Claude Code sessions against a vllm server or a llama-swap row
+# (one fresh server + worktree per rep x arm)
 # ======================================================================================
+AGENTIC_ENGINES = ("vllm", "llama-swap")
 AGENTIC_DEFAULTS = {"maxseqs": 1, "kv_dtype": "fp8", "gpu_util": 0.93, "watchdog_mib": 32,
                     "free_mib_floor": 30000}      # dp-forge vllm.sh values; 30000 = sly-official floor
 AGENTIC_SERVER_KEYS = ("maxlen", "maxseqs", "kv_dtype", "gpu_util", "watchdog_mib", "free_mib_floor")
+LLAMASWAP_SERVER_KEYS = ("free_mib_floor",)       # the llama-swap row's config owns everything else
 AGENTIC_KEYS = ("kind", "slug", "date", "title", "notes", "engine", "port", "repo", "base", "worktree",
                 "served_model", "server", "env", "claude", "prompt", "resume_prompt", "install", "rewrite",
                 "symlinks", "done_when", "collect", "tmp_dirs", "cap_s", "max_resumes", "reps", "server_info",
-                "post", "capture_requests", "remove_worktree", "arms")
+                "post", "capture_requests", "remove_worktree", "stop_when", "arms")
 AGENTIC_ARM_KEYS = ("name", "profile", "image", "env", "server")
 ARM_RE = re.compile(r"[a-z0-9][a-z0-9._-]*")
 WT_PLACEHOLDERS = ("arm", "rep", "port", "server_port", "arm_dir")          # allowed inside "worktree"
@@ -827,6 +842,84 @@ if __name__ == "__main__":
     sys.exit(fn(sys.argv[2:]))
 '''
 
+# `watch` subcommand: appended to the helper ONLY for specs with stop_when (other specs' run.sh stay unchanged).
+AGENTIC_HELPER_WATCH = r'''
+
+def _sw_match(obj, tool_re, input_re):
+    """(name, input) of the first matching assistant tool_use block in a stream-json object, else None."""
+    if not isinstance(obj, dict) or obj.get("type") != "assistant":
+        return None
+    msg = obj.get("message")
+    content = msg.get("content") if isinstance(msg, dict) else None
+    if not isinstance(content, list):
+        return None
+    for b in content:
+        if isinstance(b, dict) and b.get("type") == "tool_use" and isinstance(b.get("name"), str):
+            if tool_re.search(b["name"]) and input_re.search(json.dumps(b.get("input"), ensure_ascii=False)):
+                return b["name"], b.get("input")
+    return None
+
+
+def _sw_signal(cpid, sig):
+    for target in (-cpid, cpid):
+        try:
+            os.kill(target, sig)
+            return True
+        except OSError:
+            pass
+    return False
+
+
+def cmd_watch(a):
+    """watch CFG SESSION_FILE OUT_FILE CALL_IDX [CPID]: poll the growing stream-json file; at the first matching
+    tool_use write OUT_FILE, then SIGINT the session's process group (escalating TERM, KILL) and exit 0."""
+    import signal, time, datetime
+    sw = json.load(open(a[0]))["stop_when"]
+    tool_re, input_re = re.compile(sw["tool_regex"]), re.compile(sw["input_regex"])
+    path, out, idx = a[1], a[2], a[3]
+    cpid = int(a[4]) if len(a) > 4 and a[4] not in ("", "0") else 0
+    pos, buf, lineno = 0, b"", 0
+    while True:
+        try:
+            with open(path, "rb") as fh:
+                fh.seek(pos)
+                chunk = fh.read()
+        except OSError:
+            chunk = b""
+        pos += len(chunk)
+        buf += chunk
+        while b"\n" in buf:
+            raw, buf = buf.split(b"\n", 1)
+            lineno += 1
+            try:
+                obj = json.loads(raw.decode("utf-8", errors="replace"))
+            except ValueError:
+                continue
+            hit = _sw_match(obj, tool_re, input_re)
+            if hit:
+                ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+                txt = (f"call={idx}\nts={ts}\ntool={hit[0]}\nline={lineno}\n"
+                       f"input={json.dumps(hit[1], ensure_ascii=False)}\n")
+                with open(out + ".tmp", "w", encoding="utf-8") as fh:
+                    fh.write(txt)
+                os.replace(out + ".tmp", out)
+                if cpid:
+                    for sig, grace in ((signal.SIGINT, 30), (signal.SIGTERM, 30), (signal.SIGKILL, 0)):
+                        if not _sw_signal(cpid, sig):
+                            break
+                        time.sleep(grace)    # the driver kills this watcher once the call has ended
+                return 0
+        time.sleep(1)
+'''
+
+
+def agentic_helper(stop_when):
+    """The helper source embedded in run.sh (the `watch` subcommand only when the spec has stop_when)."""
+    if not stop_when:
+        return AGENTIC_HELPER
+    head, tail = AGENTIC_HELPER.split("\n\nif __name__", 1)
+    return head + "\n" + AGENTIC_HELPER_WATCH.rstrip("\n") + "\n\n\nif __name__" + tail
+
 
 def _is_int(v, lo):
     return isinstance(v, int) and not isinstance(v, bool) and v >= lo
@@ -848,28 +941,33 @@ def _settings_models(settings):
 
 
 def agentic_arms(spec):
-    """Per-arm resolved config: name, profile, image, env (merged), server (defaults < spec < arm)."""
+    """Per-arm resolved config: name, profile, image, env (merged), server (defaults < spec < arm).
+    llama-swap: only free_mib_floor is resolved (profile/image empty, env {})."""
+    ls = spec.get("engine") == "llama-swap"
     arms = []
     for a in spec["arms"]:
-        srv = dict(AGENTIC_DEFAULTS)
+        srv = {k: v for k, v in AGENTIC_DEFAULTS.items() if not ls or k in LLAMASWAP_SERVER_KEYS}
         srv.update(spec.get("server") or {})
         srv.update(a.get("server") or {})
-        arms.append({"name": a["name"], "profile": a["profile"], "image": a.get("image", ""),
+        arms.append({"name": a["name"], "profile": a.get("profile", ""), "image": a.get("image", ""),
                      "env": merge_env(spec.get("env"), a.get("env")), "server": srv})
     return arms
 
 
 def validate_agentic(spec):
     """Emit-time validation for kind "agentic" (sys.exit with a clear message)."""
-    for k in ("slug", "engine", "port", "repo", "base", "worktree", "served_model", "server", "claude",
+    for k in ("slug", "engine", "port", "repo", "base", "worktree", "served_model", "claude",
               "prompt", "resume_prompt", "done_when", "arms"):
         if k not in spec:
             sys.exit(f"agentic spec missing required key: {k}")
     unknown = [k for k in spec if k not in AGENTIC_KEYS]
     if unknown:
         sys.exit(f"agentic spec: unknown key(s) {unknown} (typo? known: {', '.join(AGENTIC_KEYS)})")
-    if spec["engine"] != "vllm":
-        sys.exit('agentic spec: engine must be "vllm" (the only engine the agentic driver launches)')
+    if spec["engine"] not in AGENTIC_ENGINES:
+        sys.exit('agentic spec: engine must be "vllm" or "llama-swap" (the engines the agentic driver launches)')
+    ls = spec["engine"] == "llama-swap"
+    if not ls and "server" not in spec:
+        sys.exit("agentic spec missing required key: server")
     if not isinstance(spec["slug"], str) or not re.fullmatch(r"[A-Za-z0-9._-]+", spec["slug"]):
         sys.exit(f"agentic spec: slug must match [A-Za-z0-9._-]+: {spec['slug']!r}")
     if not _is_int(spec["port"], 1) or spec["port"] > 65534:
@@ -883,6 +981,9 @@ def validate_agentic(spec):
     for k in ("capture_requests", "remove_worktree"):
         if k in spec and not isinstance(spec[k], bool):
             sys.exit(f"agentic spec: {k} must be true or false")
+    if ls and spec.get("capture_requests"):
+        sys.exit("agentic spec: capture_requests is vllm-only -- under engine llama-swap the router's port is fixed, "
+                 "and the capture proxy needs the server on port+1")
     for k, lo in (("cap_s", 1), ("max_resumes", 0), ("reps", 1)):
         if k in spec and not _is_int(spec[k], lo):
             sys.exit(f"agentic spec: {k} must be an integer >= {lo}: {spec[k]!r}")
@@ -892,6 +993,17 @@ def validate_agentic(spec):
     for k in ("server_info", "post"):
         if not all(isinstance(c, str) and c.strip() for c in spec.get(k, [])):
             sys.exit(f"agentic spec: {k} must be a list of non-empty command strings")
+    if "stop_when" in spec:
+        sw = spec["stop_when"]
+        if not isinstance(sw, dict) or set(sw) != {"tool_regex", "input_regex"}:
+            sys.exit('agentic spec: stop_when must be {"tool_regex": "...", "input_regex": "..."} (both keys, no others)')
+        for k, v in sw.items():
+            if not isinstance(v, str) or not v:
+                sys.exit(f"agentic spec: stop_when.{k} must be a non-empty python regex string")
+            try:
+                re.compile(v)
+            except re.error as e:
+                sys.exit(f"agentic spec: stop_when.{k} is not a valid python regex: {e}")
 
     # --- repo / base / worktree
     repo = spec["repo"]
@@ -920,6 +1032,10 @@ def validate_agentic(spec):
 
     # --- server defaults + env
     def check_server(srv, where):
+        vonly = [k for k in srv if ls and k in AGENTIC_SERVER_KEYS and k not in LLAMASWAP_SERVER_KEYS]
+        if vonly:
+            sys.exit(f"{where}: vllm-only key(s) {vonly} under engine llama-swap -- the llama-swap row's config "
+                     f"owns them; allowed: {', '.join(LLAMASWAP_SERVER_KEYS)}")
         extra = [k for k in srv if k not in AGENTIC_SERVER_KEYS]
         if extra:
             sys.exit(f"{where}: unknown server key(s) {extra}; known: {', '.join(AGENTIC_SERVER_KEYS)}")
@@ -932,10 +1048,13 @@ def validate_agentic(spec):
         if "kv_dtype" in srv and not (isinstance(srv["kv_dtype"], str)
                                       and re.fullmatch(r"[A-Za-z0-9_]+", srv["kv_dtype"])):
             sys.exit(f"{where}: kv_dtype must be a name like fp8|auto: {srv['kv_dtype']!r}")
-    if not isinstance(spec["server"], dict):
+    if not isinstance(spec.get("server", {}), dict):
         sys.exit("agentic spec: server must be an object")
-    check_server(spec["server"], "agentic spec server")
+    check_server(spec.get("server", {}), "agentic spec server")
     if "env" in spec:
+        if ls:
+            sys.exit("agentic spec: env is vllm-only -- under engine llama-swap the row's env lives in the "
+                     "llama-swap config")
         validate_env(spec["env"], "agentic spec", AGENTIC_RESERVED_ENV)
 
     # --- arms
@@ -953,11 +1072,17 @@ def validate_agentic(spec):
             sys.exit(f"agentic spec: arm name must match ^[a-z0-9][a-z0-9._-]*$: {n!r}")
         names.append(n)
         where = f"arm {n!r}"
-        if "profile" not in a:
-            sys.exit(f"{where}: missing profile")
-        prof = os.path.join(REPO, "bench", "engine-bench", "vllm", "profiles", str(a["profile"]) + ".env")
-        if not re.fullmatch(r"[\w.-]+/[\w.-]+", str(a["profile"])) or not os.path.exists(prof):
-            sys.exit(f"{where}: vllm profile not found: {prof}")
+        if ls:
+            vonly = [k for k in ("profile", "image", "env") if k in a]
+            if vonly:
+                sys.exit(f"{where}: vllm-only key(s) {vonly} under engine llama-swap -- model, build, flags and env "
+                         "are the llama-swap row's (served_model); an arm takes only name (+ server.free_mib_floor)")
+        else:
+            if "profile" not in a:
+                sys.exit(f"{where}: missing profile")
+            prof = os.path.join(REPO, "bench", "engine-bench", "vllm", "profiles", str(a["profile"]) + ".env")
+            if not re.fullmatch(r"[\w.-]+/[\w.-]+", str(a["profile"])) or not os.path.exists(prof):
+                sys.exit(f"{where}: vllm profile not found: {prof}")
         if "image" in a:
             validate_image(a["image"], where)
         if "env" in a:
@@ -969,7 +1094,7 @@ def validate_agentic(spec):
     if len(names) != len(set(names)):
         sys.exit("agentic spec: arm names must be unique")
     for a in agentic_arms(spec):
-        if "maxlen" not in a["server"]:
+        if not ls and "maxlen" not in a["server"]:
             sys.exit(f"arm {a['name']!r}: server.maxlen is required (campaign-wide in `server` or per arm)")
 
     # --- claude settings
@@ -1069,9 +1194,64 @@ def _heredoc_tag(prefix, *bodies):
         n += 1
 
 
+# Engine-specific run.sh fragments, selected at emit time (@@KEY@@ in AGENTIC_RUNSH), so each run.sh carries only
+# its own engine's code. Everything else (GPU floor, served-name check, worktree, session loop, collect) is shared.
+AGENTIC_ENGINE_SH = {
+    "vllm": {
+        "SERVER_KIND": "vllm server",
+        "ENGINE_HDR": r'''#   * Teardown is trap-protected (Ctrl-C/TERM): sampler, proxy, docker logs, serve_vllm stop, port-free check.
+#   * Knobs: ONLY='armglob,..' REPS=N CAP_S=sec MAX_RESUMES=N RUN_DIR=dir IMAGE=ref (beats the spec's per-arm image).
+#     Tool paths (stub testing): SERVE_VLLM GPU_EXCLUSIVE VRAM_SAMPLER CAPTURE_PROXY CLAUDE_BIN DOCKER CURL SS.''',
+        "SERVE_TOOL": 'SERVE_VLLM="${SERVE_VLLM:-$EB/vllm/serve_vllm.sh}"',
+        "SERVE": "SERVE_VLLM",
+        "SRV_ENV": r'''  # 4. server: provenance (print) then start, fresh container per (rep, arm)
+  local SRV_ENV=(PROFILE="$A_PROFILE" SERVED_NAME="$SERVED" MAXLEN="$A_MAXLEN" MAXSEQS="$A_MAXSEQS" KV_DTYPE="$A_KV"
+                 GPU_UTIL="$A_GPU_UTIL" WATCHDOG_MIB="$A_WD" FREE_MIB_FLOOR="$A_FLOOR" PORT="$SPORT")
+  local img="${IMAGE:-$A_IMAGE}"; [ -n "$img" ] && SRV_ENV+=(IMAGE="$img")
+  SRV_ENV+=(${A_ENV[@]+"${A_ENV[@]}"})''',
+        "PORT_FREE_FN": r'''port_free_check() {
+  local p i held out ports=("$SPORT"); [ "$CAPTURE" = 1 ] && ports+=("$PORT")
+  R_PORTFREE=yes
+  for p in "${ports[@]}"; do
+    held=1
+    for i in $(seq 30); do
+      out=$("$SS" -ltn 2>/dev/null); case "$out" in *":$p "*) ;; *) held=0; break;; esac
+      sleep 1
+    done
+    [ "$held" = 0 ] || { R_PORTFREE=no; log "WARNING port $p still held after teardown"; }
+  done
+}''',
+        "SERVER_DOWN": r'''  "$DOCKER" logs "vllm-$SPORT" > "$ARM_DIR/server-container.log" 2>&1
+  env PORT="$SPORT" "$SERVE_VLLM" stop > "$ARM_DIR/server-stop.txt" 2>&1
+  port_free_check
+  echo "port_free=$R_PORTFREE" >> "$ARM_DIR/server-stop.txt"''',
+    },
+    "llama-swap": {
+        "SERVER_KIND": "llama-server via llama-swap",
+        "ENGINE_HDR": r'''#   * Teardown is trap-protected (Ctrl-C/TERM): sampler, serve_llamaswap stop (GET /unload). The llama-swap router
+#     keeps its port by design (never stopped), so summary.tsv's port_free column is unloaded=yes|no.
+#   * Knobs: ONLY='armglob,..' REPS=N CAP_S=sec MAX_RESUMES=N RUN_DIR=dir.
+#     Tool paths (stub testing): SERVE_LLAMASWAP GPU_EXCLUSIVE VRAM_SAMPLER CLAUDE_BIN CURL.''',
+        "SERVE_TOOL": 'SERVE_LLAMASWAP="${SERVE_LLAMASWAP:-$EB/serve_llamaswap.sh}"',
+        "SERVE": "SERVE_LLAMASWAP",
+        "SRV_ENV": r'''  # 4. server: provenance (print) then start = preload the llama-swap row (gpu_exclusive unloaded everything, so this
+  #    is a fresh llama-server per (rep, arm)); its upstream log streams into server-container.log until stop
+  local SRV_ENV=(MODEL="$SERVED" PORT="$SPORT" LOG_OUT="$ARM_DIR/server-container.log")''',
+        "PORT_FREE_FN": r'''unload_check() {  # the router keeps its port by design: port_free records serve_llamaswap.sh stop's verdict
+  R_PORTFREE=unloaded=no
+  grep -qx 'unloaded=yes' "$ARM_DIR/server-stop.txt" 2>/dev/null && R_PORTFREE=unloaded=yes
+  [ "$R_PORTFREE" = unloaded=yes ] || log "WARNING llama-swap did not confirm the unload of $SERVED (see $ARM_DIR/server-stop.txt)"
+}''',
+        "SERVER_DOWN": r'''  # server-container.log was written by serve_llamaswap.sh's log follower (start .. stop)
+  env PORT="$SPORT" MODEL="$SERVED" "$SERVE_LLAMASWAP" stop > "$ARM_DIR/server-stop.txt" 2>&1
+  unload_check
+  echo "port_free=$R_PORTFREE" >> "$ARM_DIR/server-stop.txt"''',
+    },
+}
+
 AGENTIC_RUNSH = r'''#!/usr/bin/env bash
 # GENERATED by bench/gen_campaign.py -- AGENTIC campaign '@@SLUG@@'. Rerun to continue; edit the spec and regenerate.
-# Loop: reps outer, arms inner. EVERY (rep, arm) boots a FRESH vllm server (no prefix-cache carry-over between
+# Loop: reps outer, arms inner. EVERY (rep, arm) boots a FRESH @@SERVER_KIND@@ (no prefix-cache carry-over between
 # sessions), creates a fresh git worktree at the base commit, runs `claude -p` (same session resumed until
 # done_when / cap / max_resumes), then tears down and collects. Behaviour baked in (no hand-editing needed):
 #   * CONTINUE-ON-FAILURE: wt_exists | gpu_busy | server_fail | served_name_mismatch | wt_fail | prep_fail |
@@ -1079,15 +1259,13 @@ AGENTIC_RUNSH = r'''#!/usr/bin/env bash
 #   * <run>/started/rep<R>.<arm> is written when the session loop begins; <run>/done/... only for the RESULT
 #     statuses done|cap|max_resumes (a cap is a measured outcome). Started-without-done = `interrupted`
 #     (also what a claude_error leaves): recorded, SKIPPED, never auto-deleted or auto-retried (iron rule 18).
-#   * Teardown is trap-protected (Ctrl-C/TERM): sampler, proxy, docker logs, serve_vllm stop, port-free check.
-#   * Knobs: ONLY='armglob,..' REPS=N CAP_S=sec MAX_RESUMES=N RUN_DIR=dir IMAGE=ref (beats the spec's per-arm image).
-#     Tool paths (stub testing): SERVE_VLLM GPU_EXCLUSIVE VRAM_SAMPLER CAPTURE_PROXY CLAUDE_BIN DOCKER CURL SS.
+@@ENGINE_HDR@@
 @@NOTES@@
 set -uo pipefail
 ROOT="${ROOT:-@@ROOT@@}"
 EB="$ROOT/bench/engine-bench"; LIB="$ROOT/bench/lib"
 RUN_DIR="${RUN_DIR:-$ROOT/bench/runs/@@DATE@@-@@SLUG@@}"
-SERVE_VLLM="${SERVE_VLLM:-$EB/vllm/serve_vllm.sh}"
+@@SERVE_TOOL@@
 GPU_EXCLUSIVE="${GPU_EXCLUSIVE:-$LIB/gpu_exclusive.sh}"
 VRAM_SAMPLER="${VRAM_SAMPLER:-$LIB/vram_sampler.py}"
 CAPTURE_PROXY="${CAPTURE_PROXY:-$EB/vllm/capture_proxy.py}"
@@ -1148,39 +1326,25 @@ summary_row() {
 end_arm() {  # status [detail]: record the outcome (non-result statuses also go to failures.txt)
   R_STATUS=$1
   case "$R_STATUS" in
-    done|cap|max_resumes) ;;
+    done|cap|max_resumes@@STOP_STATUS@@) ;;
     *) printf 'rep%s\t%s\t%s\t%s\n' "$REP" "$ARM" "$R_STATUS" "${2:-}" >> "$RUN_DIR/failures.txt"
        log "FAILED $R_STATUS: ${2:-}" ;;
   esac
   summary_row
 }
 
-port_free_check() {
-  local p i held out ports=("$SPORT"); [ "$CAPTURE" = 1 ] && ports+=("$PORT")
-  R_PORTFREE=yes
-  for p in "${ports[@]}"; do
-    held=1
-    for i in $(seq 30); do
-      out=$("$SS" -ltn 2>/dev/null); case "$out" in *":$p "*) ;; *) held=0; break;; esac
-      sleep 1
-    done
-    [ "$held" = 0 ] || { R_PORTFREE=no; log "WARNING port $p still held after teardown"; }
-  done
-}
+@@PORT_FREE_FN@@
 teardown() {  # idempotent; also runs from the EXIT/INT/TERM traps
   [ "${TD_ACTIVE:-0}" = 1 ] || return 0
   TD_ACTIVE=0
   [ -n "${SAMP:-}" ] && { kill "$SAMP" 2>/dev/null; wait "$SAMP" 2>/dev/null; SAMP=""; }
   [ -n "${PROXY:-}" ] && { kill "$PROXY" 2>/dev/null; wait "$PROXY" 2>/dev/null; PROXY=""; }
   [ -d "$ARM_DIR/requests" ] && find "$ARM_DIR/requests" -type f ! -name '*.gz' -exec gzip -f {} +
-  "$DOCKER" logs "vllm-$SPORT" > "$ARM_DIR/server-container.log" 2>&1
-  env PORT="$SPORT" "$SERVE_VLLM" stop > "$ARM_DIR/server-stop.txt" 2>&1
-  port_free_check
-  echo "port_free=$R_PORTFREE" >> "$ARM_DIR/server-stop.txt"
+@@SERVER_DOWN@@
 }
 on_signal() {
   local code=130; [ "$1" = TERM ] && code=143
-  trap - INT TERM
+  trap - INT TERM@@WATCH_SIGNAL@@
   log "caught SIG$1 -- tearing down; the started marker is kept (a rerun reports this arm as interrupted)"
   if [ -n "${CPID:-}" ]; then   # forward to the session (own process group), then reap it
     kill -INT -- "-$CPID" 2>/dev/null || kill -INT "$CPID" 2>/dev/null
@@ -1272,15 +1436,11 @@ run_one() {
   gout=$("$GPU_EXCLUSIVE" "$A_FLOOR" 2>&1); rc=$?
   printf '%s\n' "$gout" > "$ARM_DIR/gpu_exclusive.txt"
   if [ "$rc" -ne 0 ]; then end_arm gpu_busy "$(printf '%s' "$gout" | tr '\t\n' '  ')"; return 0; fi
-  # 4. server: provenance (print) then start, fresh container per (rep, arm)
-  local SRV_ENV=(PROFILE="$A_PROFILE" SERVED_NAME="$SERVED" MAXLEN="$A_MAXLEN" MAXSEQS="$A_MAXSEQS" KV_DTYPE="$A_KV"
-                 GPU_UTIL="$A_GPU_UTIL" WATCHDOG_MIB="$A_WD" FREE_MIB_FLOOR="$A_FLOOR" PORT="$SPORT")
-  local img="${IMAGE:-$A_IMAGE}"; [ -n "$img" ] && SRV_ENV+=(IMAGE="$img")
-  SRV_ENV+=(${A_ENV[@]+"${A_ENV[@]}"})
+@@SRV_ENV@@
   log "booting: ${SRV_ENV[*]}"
   TD_ACTIVE=1
-  env "${SRV_ENV[@]}" "$SERVE_VLLM" print > "$ARM_DIR/server.txt" 2>&1
-  if ! env "${SRV_ENV[@]}" "$SERVE_VLLM" start > "$ARM_DIR/server-start.txt" 2>&1; then
+  env "${SRV_ENV[@]}" "$@@SERVE@@" print > "$ARM_DIR/server.txt" 2>&1
+  if ! env "${SRV_ENV[@]}" "$@@SERVE@@" start > "$ARM_DIR/server-start.txt" 2>&1; then
     detail=$(tail -n 3 "$ARM_DIR/server-start.txt" | tr '\t\n' '  ')
     teardown; end_arm server_fail "$detail"; return 0
   fi
@@ -1341,13 +1501,13 @@ run_one() {
     ( cd "$WT" && exec timeout -k 60 --signal=INT "$left" "$CLAUDE_BIN" "${cargs[@]}" --settings "$SETTINGS" \
         ${CLAUDE_ARGS[@]+"${CLAUDE_ARGS[@]}"} < /dev/null > "$ARM_DIR/session-$n.jsonl" 2> "$ARM_DIR/session-$n.err" 9>&- ) &
     CPID=$!
-    set +m
-    wait "$CPID"; rc=$?
+    set +m@@WATCH_START@@
+    wait "$CPID"; rc=$?@@WATCH_STOP@@
     CPID=""
     te=$(date +%s)
     printf '%s\t%s\t%s\t%s\n' "$n" "$now" "$te" "$rc" >> "$ARM_DIR/calls.tsv"
     s=$(pyh sid "$ARM_DIR/session-$n.jsonl"); [ -n "$s" ] && sid=$s
-    log "call $n rc=$rc session=$sid"
+    log "call $n rc=$rc session=$sid"@@STOP_CHECK@@
     if line=$(pyh done "$CFG" "$WT"); then R_STATUS=done; R_DONE_LINE=$line; break; fi
     [ $(( te - T0 )) -ge "$CAP_S" ] && { R_STATUS=cap; break; }
     [ "$n" -ge "$MAX_RESUMES" ] && { R_STATUS=max_resumes; break; }
@@ -1361,7 +1521,7 @@ run_one() {
   teardown
   collect_arm
   # 11. markers: results get a done marker; claude_error stays quarantined
-  case "$R_STATUS" in done|cap|max_resumes) date -Iseconds > "$RUN_DIR/done/$key";; esac
+  case "$R_STATUS" in done|cap|max_resumes@@STOP_STATUS@@) date -Iseconds > "$RUN_DIR/done/$key";; esac
   # 12. summary
   end_arm "$R_STATUS" "see $ARM_DIR/session-*.err"
 }
@@ -1380,17 +1540,38 @@ exit 0
 '''
 
 
+# run.sh fragments for stop_when (emit-time selection: specs without it get AGENTIC_STOP_OFF = all empty, so their
+# run.sh is unchanged). The watcher is a direct background python (so $WPID is the real pid, killable).
+AGENTIC_STOP_OFF = {k: "" for k in ("STOP_STATUS", "WATCH_SIGNAL", "WATCH_START", "WATCH_STOP", "STOP_CHECK")}
+AGENTIC_STOP_SH = {
+    "STOP_STATUS": "|stopped",
+    "WATCH_SIGNAL": '\n  [ -n "${WPID:-}" ] && { kill "$WPID" 2>/dev/null; wait "$WPID" 2>/dev/null; WPID=""; }',
+    "WATCH_START": '\n    rm -f "$ARM_DIR/stop_when.txt"\n'
+                   '    python3 -I "$RUN_DIR/agentic_helper.py" watch "$CFG" "$ARM_DIR/session-$n.jsonl" '
+                   '"$ARM_DIR/stop_when.txt" "$n" "$CPID" > /dev/null 2>> "$ARM_DIR/watch.err" 9>&- &\n'
+                   '    WPID=$!',
+    "WATCH_STOP": '\n    [ -n "${WPID:-}" ] && { kill "$WPID" 2>/dev/null; wait "$WPID" 2>/dev/null; WPID=""; }',
+    "STOP_CHECK": '\n    # stop_when fired: the watcher wrote stop_when.txt and sent INT -- a RESULT, whatever rc/done_when say\n'
+                  '    [ -s "$ARM_DIR/stop_when.txt" ] && { R_STATUS=stopped; break; }',
+}
+
+
 def emit_agentic_runsh(spec):
     arms = agentic_arms(spec)
     date = spec.get("date") or datetime.date.today().isoformat()
     base = _resolve_base(spec)
     cfg = {"install": _norm_install(spec), "rewrite": spec.get("rewrite", []), "symlinks": spec.get("symlinks", []),
            "done_when": spec["done_when"], "collect": spec.get("collect", []), "spec": spec}
+    if spec.get("stop_when"):
+        cfg["stop_when"] = spec["stop_when"]
     cfg_json = json.dumps(cfg, indent=1, ensure_ascii=False)
     cases = []
     for a in arms:
         sv = a["server"]
         cases.append(f"    {sh_quote(a['name'])})")
+        if spec["engine"] == "llama-swap":       # the row's config owns the rest; A_ENV stays empty
+            cases.append(f"      A_FLOOR={sh_quote(sv['free_mib_floor'])} ;;")
+            continue
         cases.append(f"      A_PROFILE={sh_quote(a['profile'])}; A_IMAGE={sh_quote(a['image'])}; "
                      f"A_MAXLEN={sh_quote(sv['maxlen'])}; A_MAXSEQS={sh_quote(sv['maxseqs'])}; "
                      f"A_KV={sh_quote(sv['kv_dtype'])}; A_GPU_UTIL={sh_quote(sv['gpu_util'])}; "
@@ -1399,7 +1580,8 @@ def emit_agentic_runsh(spec):
                      f"A_ENV_STR={sh_quote(env_assign(a['env']))} ;;")
     notes = spec.get("notes")
     note_lines = "\n".join(f"# NOTE: {l}" for l in ([notes] if isinstance(notes, str) else (notes or [])))
-    helper_tag = _heredoc_tag("GC_HELPER_EOF", AGENTIC_HELPER)
+    sw = spec.get("stop_when")
+    helper_tag = _heredoc_tag("GC_HELPER_EOF", agentic_helper(sw))
     cfg_tag = _heredoc_tag("GC_CFG_EOF", cfg_json)
     vals = {
         "SLUG": spec["slug"], "DATE": date, "ROOT": REPO, "NOTES": note_lines,
@@ -1417,7 +1599,9 @@ def emit_agentic_runsh(spec):
         "POST": " ".join(sh_quote(x) for x in spec.get("post", [])),
         "ARMS": " ".join(sh_quote(a["name"]) for a in arms),
         "ARM_CASES": "\n".join(cases), "HTAG": helper_tag, "CTAG": cfg_tag,
-        "HELPER": AGENTIC_HELPER.rstrip("\n"), "CFGJSON": cfg_json,
+        "HELPER": agentic_helper(sw).rstrip("\n"), "CFGJSON": cfg_json,
+    **(AGENTIC_STOP_SH if sw else AGENTIC_STOP_OFF),
+        **AGENTIC_ENGINE_SH[spec["engine"]],
     }
     return re.sub(r"@@(\w+)@@", lambda m: vals[m.group(1)], AGENTIC_RUNSH)
 
@@ -1433,18 +1617,55 @@ def emit_agentic_readme(spec):
     title = spec.get("title", f"{slug} agentic campaign")
     arms = agentic_arms(spec)
     base = _resolve_base(spec)
-    rows = []
-    for a in arms:
-        sv = a["server"]
-        rows.append(f"| `{a['name']}` | `{a['profile']}` | " + (f"`{a['image']}`" if a["image"] else "profile default")
-                    + f" | {('`' + env_assign(a['env']) + '`') if a['env'] else '-'} | `{spec['served_model']}` | "
-                    f"{sv['maxlen']} | {sv['maxseqs']} | {sv['kv_dtype']} | {sv['gpu_util']} |")
+    served, port = spec["served_model"], spec["port"]
+    if spec["engine"] == "llama-swap":
+        boot = (f"loads the llama-swap row `{served}` **fresh** (`gpu_exclusive.sh` unloads every model first, so the "
+                "prefix cache never carries over)")
+        engine = ("- Engine **llama-swap** via `bench/engine-bench/serve_llamaswap.sh`: the server is the llama-swap row "
+                  f"`{served}` of the\n  persistent router on :{port} (also the client port; the row id must equal the "
+                  "claude settings' model names,\n  checked at emit time and against `/v1/models` per boot). `start` "
+                  "preloads the row and streams its upstream\n  llama-server log into `server-container.log`; after each "
+                  "arm `stop` unloads it (GET `/unload`) and `summary.tsv`'s\n  `port_free` column records "
+                  "`unloaded=yes|no`. The router itself stays up by design (never stopped).")
+        prov = ("- The row's binary, gguf, ctx, KV, flags, env and chat template come from the llama-swap config; "
+                "`serve_llamaswap.sh print`\n  records them (config sha256, resolved cmd, llama-server version, gguf) "
+                "in each arm's `server.txt`.")
+        arms_tbl = ("| arm | served model (llama-swap row) | free_mib_floor |\n|-----|-------------------------------|"
+                    "---------------:|\n" + "\n".join(f"| `{a['name']}` | `{served}` | {a['server']['free_mib_floor']} |"
+                                                     for a in arms))
+        per_boot = "Per boot, `gpu_exclusive.sh <free_mib_floor>` unloads llama-swap and asserts the floor before `start`."
+    else:
+        rows = []
+        for a in arms:
+            sv = a["server"]
+            rows.append(f"| `{a['name']}` | `{a['profile']}` | " + (f"`{a['image']}`" if a["image"] else "profile default")
+                        + f" | {('`' + env_assign(a['env']) + '`') if a['env'] else '-'} | `{served}` | "
+                        f"{sv['maxlen']} | {sv['maxseqs']} | {sv['kv_dtype']} | {sv['gpu_util']} |")
+        boot = "boots a **fresh** vllm server (so the prefix cache never carries over)"
+        engine = (f"- Engine vLLM (docker) via `bench/engine-bench/vllm/serve_vllm.sh` · served model `{served}` (exported as\n"
+                  "  `SERVED_NAME`; must equal the claude settings' model names, checked at emit time and against "
+                  f"`/v1/models` per boot)\n  · client port :{port}"
+                  + (f" (capture proxy; server on :{port + 1})" if spec.get("capture_requests") else "") + ".")
+        prov = ("- Per-arm `IMAGE=` / run-time `IMAGE=` beat the profile default; the resolved image is in each arm's "
+                "`server.txt`.")
+        arms_tbl = ("| arm | profile | image | env | served model | maxlen | maxseqs | kv | gpu_util |\n"
+                    "|-----|---------|-------|-----|--------------|-------:|--------:|----|---------:|\n" + "\n".join(rows))
+        per_boot = ("Also per boot: `WATCHDOG_MIB`/`FREE_MIB_FLOOR` as in `server.txt`; the exact env of every boot is "
+                    "printed there\n(`serve_vllm.sh print`, written before `start`).")
     inst = []
     for it in _norm_install(spec):
         inst.append(f"| `{it['src']}` | `{it['dst']}` | `{_file_sha256(it['src'])}` |")
     inst_tbl = ("| src | dst (worktree-relative) | sha256 at emit time |\n|-----|-----|-----|\n" + "\n".join(inst)
                 if inst else "(none)")
     pf, rf = _fence(spec["prompt"]), _fence(spec["resume_prompt"])
+    swd = spec.get("stop_when")
+    sw_md = ("" if not swd else
+             f"- `stop_when`: tool name `{swd['tool_regex']}` AND tool input (JSON) `{swd['input_regex']}` (python `re.search`). "
+             "A watcher follows each call's stream-json file; at the FIRST assistant `tool_use` matching both it writes "
+             "`<arm_dir>/stop_when.txt` (call, ts, tool, line, input) and sends SIGINT to the session's process group. "
+             "The arm then ends with status `stopped` -- a **result** (done marker written, never resumed); it takes "
+             "precedence over `done_when`/`cap`/`max_resumes`/`claude_error` for that call. Text, `tool_result` and "
+             "user messages never match.\n")
     dw = spec["done_when"]
     wt_extra = []
     for k in ("rewrite", "symlinks", "collect", "tmp_dirs", "server_info", "post"):
@@ -1454,25 +1675,20 @@ def emit_agentic_readme(spec):
     return f"""# {title} (R9700, {date})
 
 Scaffolded by `bench/gen_campaign.py` (`kind: agentic`). The executable driver is **`run.sh`** in this folder.
-Each (rep, arm) boots a **fresh** vllm server (so the prefix cache never carries over), creates a **fresh git
+Each (rep, arm) {boot}, creates a **fresh git
 worktree** of `{spec['repo']}` at `{base}`, runs a real `claude -p` session (same session resumed until `done_when`),
 tears the server down and collects the outputs. Loop order: reps outer, arms inner (arms interleave).
 
 ## Fixed parameters
-- Engine vLLM (docker) via `bench/engine-bench/vllm/serve_vllm.sh` · served model `{spec['served_model']}` (exported as
-  `SERVED_NAME`; must equal the claude settings' model names, checked at emit time and against `/v1/models` per boot)
-  · client port :{spec['port']}{' (capture proxy; server on :' + str(spec['port'] + 1) + ')' if spec.get('capture_requests') else ''}.
+{engine}
 - Claude settings `{spec['claude']['settings']}` · args `{' '.join(spec['claude'].get('args', []))}`.
 - Base `{spec['base']}` = `{base}` · worktree template `{spec['worktree']}`.
-- Per-arm `IMAGE=` / run-time `IMAGE=` beat the profile default; the resolved image is in each arm's `server.txt`.
+{prov}
 
 ## Arms
-| arm | profile | image | env | served model | maxlen | maxseqs | kv | gpu_util |
-|-----|---------|-------|-----|--------------|-------:|--------:|----|---------:|
-{chr(10).join(rows)}
+{arms_tbl}
 
-Also per boot: `WATCHDOG_MIB`/`FREE_MIB_FLOOR` as in `server.txt`; the exact env of every boot is printed there
-(`serve_vllm.sh print`, written before `start`).
+{per_boot}
 
 ## Installs (copied into each fresh worktree)
 {inst_tbl}
@@ -1493,7 +1709,7 @@ Resume (`--resume <session id>`):
 ## Completion, caps
 - `done_when`: file `{dw['file']}` in the worktree, python regex `{dw['regex']}` (`re.search`, MULTILINE) after every call.
 - `cap_s` {cap} s wall per session · `max_resumes` {spec.get('max_resumes', 5)} · `reps` {spec.get('reps', 1)}.
-- Statuses: `done`, `cap`, `max_resumes` are results (done marker written). `interrupted`/`claude_error` are quarantined
+{sw_md}- Statuses: `done`, `cap`, `max_resumes`{', `stopped`' if swd else ''} are results (done marker written). `interrupted`/`claude_error` are quarantined
   (never auto-deleted, never auto-retried). `wt_exists`, `gpu_busy`, `server_fail`, `served_name_mismatch`, `wt_fail`,
   `prep_fail`, `proxy_fail` leave no marker, so a rerun retries them.
 

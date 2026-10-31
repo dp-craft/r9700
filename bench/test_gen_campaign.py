@@ -4,8 +4,8 @@
 Run:  python3 bench/test_gen_campaign.py -v
 
 No GPU, docker, network or real `claude`: the generated agentic run.sh is executed against stub
-tools (SERVE_VLLM, GPU_EXCLUSIVE, VRAM_SAMPLER, DOCKER, CURL, CLAUDE_BIN), in a temp git repo, with
-a temp HOME / RUN_DIR / worktree root. Nothing is written outside temp dirs.
+tools (SERVE_VLLM, SERVE_LLAMASWAP, GPU_EXCLUSIVE, VRAM_SAMPLER, DOCKER, CURL, CLAUDE_BIN), in a temp
+git repo, with a temp HOME / RUN_DIR / worktree root. Nothing is written outside temp dirs.
 """
 import contextlib
 import copy
@@ -256,6 +256,25 @@ case "$1" in
 esac
 exit 0
 '''
+# fake serve_llamaswap.sh: records "<cmd> MODEL= PORT= LOG_OUT=" per call; start writes the upstream log into
+# LOG_OUT (as the real log follower does); stop prints unloaded=yes, or unloaded=no + rc 1 with STUB_UNLOAD_FAIL.
+STUB_LLAMASWAP = r'''#!/usr/bin/env bash
+D="$STUB_DIR"
+echo "$1 MODEL=${MODEL:-} PORT=${PORT:-} LOG_OUT=${LOG_OUT:-}" >> "$D/llamaswap.log"
+case "$1" in
+  print) echo "# resolved config -- print touches no GPU"; echo "MODEL=$MODEL"; echo "PORT=$PORT";;
+  start)
+    n=$(( $(cat "$D/start_count" 2>/dev/null || echo 0) + 1 )); echo $n > "$D/start_count"
+    for f in ${STUB_START_FAIL_ON:-}; do [ "$f" = "$n" ] && { echo "FAIL: preload (stub)" >&2; exit 1; }; done
+    echo "$MODEL" > "$D/served.txt"
+    [ -n "${LOG_OUT:-}" ] && echo "upstream log of $MODEL" > "$LOG_OUT"
+    echo "up after 1s -- $MODEL state=ready";;
+  stop)
+    if [ -n "${STUB_UNLOAD_FAIL:-}" ]; then echo "still resident: {}" >&2; echo "unloaded=no"; exit 1; fi
+    echo "unloaded=yes";;
+esac
+exit 0
+'''
 STUB_GPU = r'''#!/usr/bin/env bash
 echo "gpu_exclusive floor=$1" >> "$STUB_DIR/gpu.log"
 if [ -n "${STUB_GPU_BUSY:-}" ]; then echo "ABORT: need >=$1 MiB free, have 5 MiB"; echo "Holder(s): llama-swap pid 4242"; exit 1; fi
@@ -325,7 +344,8 @@ class AgenticBase(unittest.TestCase):
         self.stubdir = os.path.join(T, "stubstate")
         os.makedirs(self.stubdir)
         self.stub_tmp = os.path.join(T, "tmp-refine")
-        for name, body in (("serve_vllm.sh", STUB_SERVE), ("gpu_exclusive.sh", STUB_GPU),
+        for name, body in (("serve_vllm.sh", STUB_SERVE), ("serve_llamaswap.sh", STUB_LLAMASWAP),
+                           ("gpu_exclusive.sh", STUB_GPU),
                            ("vram_sampler.py", STUB_SAMPLER), ("docker", STUB_DOCKER),
                            ("curl", STUB_CURL), ("claude", STUB_CLAUDE)):
             write(os.path.join(self.stubs, name), body, 0o755)
@@ -359,6 +379,14 @@ class AgenticBase(unittest.TestCase):
         s.update(over)
         return s
 
+    def make_ls_spec(self, **over):
+        """engine llama-swap: no server block, no env, arms carry only a name (+ optional server floor)."""
+        s = self.make_spec(engine="llama-swap",
+                           arms=[{"name": "fast"}, {"name": "slow", "server": {"free_mib_floor": 2000}}])
+        del s["server"], s["env"]
+        s.update(over)
+        return s
+
     # ---- run helpers
     def script(self, spec=None):
         spec = spec or self.spec
@@ -370,7 +398,8 @@ class AgenticBase(unittest.TestCase):
     def env(self, **extra):
         e = dict(os.environ, HOME=self.home, RUN_DIR=self.run_dir, STUB_DIR=self.stubdir,
                  STUB_TMP=self.stub_tmp, GIT_CONFIG_GLOBAL="/dev/null", GIT_CONFIG_SYSTEM="/dev/null",
-                 SERVE_VLLM=self.stubs + "/serve_vllm.sh", GPU_EXCLUSIVE=self.stubs + "/gpu_exclusive.sh",
+                 SERVE_VLLM=self.stubs + "/serve_vllm.sh", SERVE_LLAMASWAP=self.stubs + "/serve_llamaswap.sh",
+                 GPU_EXCLUSIVE=self.stubs + "/gpu_exclusive.sh",
                  VRAM_SAMPLER=self.stubs + "/vram_sampler.py", DOCKER=self.stubs + "/docker",
                  CURL=self.stubs + "/curl", CLAUDE_BIN=self.stubs + "/claude",
                  GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@t", GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@t")
@@ -867,6 +896,405 @@ class AgenticE2E(AgenticBase):
         self.assertTrue(any(l.startswith("stop") for l in self.lines("serve.log")))      # server torn down
         self.assertTrue(os.path.exists(self.arm_dir("never") + "/server-container.log"))
         # the next run reports it as interrupted and does not touch it
+        self.run_script(s)
+        self.assertEqual(self.status_of("never"), "interrupted", self.out)
+
+
+# ======================================================================================
+# Part C: engine "llama-swap" (a row of the user's persistent llama-swap router)
+# ======================================================================================
+class AgenticLlamaSwapValidation(AgenticBase):
+    def bad(self, mutate, *needles):
+        s = self.make_ls_spec()
+        mutate(s)
+        msg = exits(self, gc.validate_spec, s)
+        for n in needles:
+            self.assertIn(n, msg)
+        return msg
+
+    def test_minimal_spec_is_valid(self):
+        s = self.make_ls_spec(arms=[{"name": "only"}])
+        self.assertEqual(gc.validate_spec(s), "README.md")
+        a = gc.agentic_arms(s)
+        self.assertEqual(a[0]["server"], {"free_mib_floor": 30000})   # the only server knob; default kept
+        self.assertEqual(a[0]["env"], {})
+
+    def test_free_mib_floor_top_and_per_arm(self):
+        s = self.make_ls_spec(server={"free_mib_floor": 1000})
+        gc.validate_spec(s)
+        self.assertEqual([a["server"]["free_mib_floor"] for a in gc.agentic_arms(s)], [1000, 2000])
+        self.bad(lambda s: s.update(server={"free_mib_floor": -1}), "free_mib_floor")
+        self.bad(lambda s: s.update(server=[]), "server")
+        self.bad(lambda s: s.update(server={"bogus": 1}), "bogus")
+
+    def test_engine_values(self):
+        self.bad(lambda s: s.update(engine="llamacpp"), "vllm", "llama-swap")
+
+    def test_rejects_vllm_server_knobs(self):
+        for k, v in (("maxlen", 4096), ("maxseqs", 1), ("kv_dtype", "fp8"), ("gpu_util", 0.9), ("watchdog_mib", 32)):
+            self.bad(lambda s, k=k, v=v: s.update(server={k: v}), k, "llama-swap")
+            self.bad(lambda s, k=k, v=v: s["arms"][0].update(server={k: v}), k, "llama-swap")
+
+    def test_rejects_vllm_arm_keys(self):
+        for k, v in (("profile", PROFILE), ("image", "ghcr.io/x/y:1"), ("env", {"CACTUS_DELTA": "0"})):
+            self.bad(lambda s, k=k, v=v: s["arms"][0].update({k: v}), k, "llama-swap")
+
+    def test_rejects_top_env(self):
+        self.bad(lambda s: s.update(env={"SECOND": "top"}), "env", "llama-swap")
+
+    def test_rejects_capture_requests(self):
+        self.bad(lambda s: s.update(capture_requests=True), "capture_requests", "llama-swap")
+        gc.validate_spec(self.make_ls_spec(capture_requests=False))     # false is the default: fine
+
+    def test_common_checks_still_apply(self):
+        p = write(os.path.join(self.T, "s-port.json"), json.dumps({"env": {
+            "ANTHROPIC_BASE_URL": f"http://127.0.0.1:{self.port + 1}", "ANTHROPIC_MODEL": SERVED}}))
+        self.bad(lambda s: s["claude"].update(settings=p), "port")
+        self.bad(lambda s: s.update(served_model="other-row"), "served_model")   # settings names != row id
+        self.bad(lambda s: s["arms"][0].update(name="Bad"), "arm name")
+        self.bad(lambda s: s["arms"][0].update(bogus=1), "bogus")
+
+
+class AgenticLlamaSwapScript(AgenticBase):
+    def test_bash_n_and_shape(self):
+        s = self.make_ls_spec()
+        gc.validate_spec(s)
+        sh = gc.emit_runsh(s)
+        bash_n(self, sh)
+        self.assertIn('SERVE_LLAMASWAP="${SERVE_LLAMASWAP:-$EB/serve_llamaswap.sh}"', sh)
+        self.assertNotIn("SERVE_VLLM", sh)
+        self.assertNotIn('"$DOCKER" logs', sh)
+        self.assertNotIn("\n  port_free_check\n", sh)
+
+    def test_vllm_script_has_no_llamaswap_code(self):
+        sh = gc.emit_runsh(self.spec)
+        self.assertNotIn("SERVE_LLAMASWAP", sh)
+        self.assertIn('"$DOCKER" logs "vllm-$SPORT"', sh)
+        self.assertIn("\n  port_free_check\n", sh)
+
+    def test_shellcheck_if_installed(self):
+        sc = shutil.which("shellcheck")
+        if not sc:
+            self.skipTest("shellcheck not installed")
+        r = subprocess.run([sc, "-s", "bash", "-S", "warning", "-"], input=gc.emit_runsh(self.make_ls_spec()),
+                           capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stdout)
+
+    def test_readme_contents(self):
+        s = self.make_ls_spec()
+        gc.validate_spec(s)
+        rd = gc.emit_readme(s)
+        self.assertIn("llama-swap", rd)
+        self.assertIn("serve_llamaswap.sh", rd)
+        self.assertIn(f"`{SERVED}`", rd)
+        self.assertIn(f":{self.port}", rd)
+        self.assertIn("unloaded", rd)
+        self.assertIn("2000", rd)                                   # slow's floor override
+        self.assertNotIn("serve_vllm", rd)
+        self.assertNotIn("gpu_util", rd)
+
+
+class AgenticLlamaSwapE2E(AgenticBase):
+    def test_two_arms_done_unloaded(self):
+        p = self.run_script(self.make_ls_spec())
+        self.assertEqual(p.returncode, 0, self.out)
+        self.assertEqual(self.status_of("fast"), "done", self.out)
+        self.assertEqual(self.status_of("slow"), "done", self.out)
+        rows = {r["arm"]: r for r in self.summary()}
+        self.assertEqual(rows["slow"]["calls"], "2")
+        for arm in ("fast", "slow"):
+            self.assertEqual(rows[arm]["port_free"], "unloaded=yes")
+            self.assertEqual(rows[arm]["image"], "-")
+            self.assertEqual(rows[arm]["env"], "-")
+        # print -> start -> stop per arm, with MODEL/PORT/LOG_OUT on print+start, PORT on stop
+        ls = self.lines("llamaswap.log")
+        self.assertEqual([l.split()[0] for l in ls], ["print", "start", "stop"] * 2, ls)
+        for i, arm in ((0, "fast"), (3, "slow")):
+            want = f"MODEL={SERVED} PORT={self.port} LOG_OUT={self.arm_dir(arm)}/server-container.log"
+            self.assertEqual(ls[i], "print " + want)
+            self.assertEqual(ls[i + 1], "start " + want)
+            self.assertIn(f"PORT={self.port}", ls[i + 2])
+        self.assertFalse(os.path.exists(os.path.join(self.stubdir, "docker.log")))      # docker never called
+        self.assertEqual(self.lines("gpu.log"), ["gpu_exclusive floor=30000", "gpu_exclusive floor=2000"])
+        ad = self.arm_dir("fast")
+        self.assertIn(f"MODEL={SERVED}", open(ad + "/server.txt").read())
+        self.assertIn("state=ready", open(ad + "/server-start.txt").read())
+        self.assertEqual(open(ad + "/server-container.log").read(), f"upstream log of {SERVED}\n")   # follower's, kept
+        stop = open(ad + "/server-stop.txt").read()
+        self.assertIn("unloaded=yes\n", stop)
+        self.assertTrue(stop.endswith("port_free=unloaded=yes\n"), stop)
+        self.assertIn(f"{SERVED}\n", open(ad + "/served-models.txt").read())
+        # everything else identical to vllm: worktree prep, session, collect, markers
+        self.assertEqual(len(self.lines("claude.log")), 3)
+        self.assertTrue(os.path.exists(ad + "/outputs/progress.md"))
+        self.assertTrue(os.path.exists(ad + "/gpu_samples.csv"))
+        self.assertTrue(os.path.exists(self.run_dir + "/done/rep1.fast"))
+        self.assertTrue(os.path.exists(self.run_dir + "/done/rep1.slow"))
+        self.assertFalse(os.path.exists(self.run_dir + "/failures.txt"))
+        self.assertNotIn("WARNING", self.rd("driver.log"))
+
+    def test_unload_not_confirmed_warns(self):
+        s = self.make_ls_spec(arms=[{"name": "fast"}])
+        p = self.run_script(s, STUB_UNLOAD_FAIL="1")
+        self.assertEqual(p.returncode, 0, self.out)
+        self.assertEqual(self.status_of("fast"), "done", self.out)                         # the session's result stands
+        self.assertEqual(self.summary()[0]["port_free"], "unloaded=no")
+        self.assertIn("WARNING", self.rd("driver.log"))
+        self.assertTrue(open(self.arm_dir("fast") + "/server-stop.txt").read().endswith("port_free=unloaded=no\n"))
+
+    def test_server_fail_tears_down_next_arm_runs(self):
+        p = self.run_script(self.make_ls_spec(), STUB_START_FAIL_ON="1")
+        self.assertEqual(p.returncode, 0, self.out)
+        self.assertEqual(self.status_of("fast"), "server_fail")
+        self.assertEqual(self.status_of("slow"), "done", self.out)
+        self.assertIn("preload (stub)", self.rd("failures.txt"))
+        self.assertEqual([l.split()[0] for l in self.lines("llamaswap.log")],
+                         ["print", "start", "stop", "print", "start", "stop"])
+        self.assertFalse(os.path.exists(f"{self.wt_root}/fast-r1"))
+        self.assertFalse(os.path.exists(self.run_dir + "/started/rep1.fast"))
+        self.assertFalse(os.path.exists(os.path.join(self.stubdir, "docker.log")))
+
+    def test_served_name_mismatch(self):
+        p = self.run_script(self.make_ls_spec(arms=[{"name": "fast"}]), STUB_WRONG_NAME="1")
+        self.assertEqual(p.returncode, 0, self.out)
+        self.assertEqual(self.status_of("fast"), "served_name_mismatch")
+        self.assertEqual(self.lines("claude.log"), [])
+        self.assertEqual(self.lines("llamaswap.log")[-1].split()[0], "stop")
+
+
+# ======================================================================================
+# Part D: optional agentic key "stop_when" (stop the session at the first matching tool call)
+# ======================================================================================
+SW = {"tool_regex": "^(Read|Bash)$", "input_regex": "review/27b-fix/opus/"}
+# fake claude for stop_when e2e: session id line, then (for *stopper*: a matching tool_use; *nomatch*: a
+# non-matching one) and then a long sleep (stopper) -- or a normal completion (nomatch).
+STUB_CLAUDE_SW = r"""#!/usr/bin/env bash
+D="$STUB_DIR"; me=$(basename "$PWD")
+echo "$(date +%s) cwd=$PWD args: $*" >> "$D/claude.log"
+n=$(( $(cat "$D/cnt-$me" 2>/dev/null || echo 0) + 1 )); echo $n > "$D/cnt-$me"
+echo "{\"type\":\"system\",\"subtype\":\"init\",\"session_id\":\"sess-$me\"}"
+case "$me" in
+  *stopper*)
+    echo "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"look review/27b-fix/opus/ here\"}]}}"
+    echo "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"name\":\"Read\",\"input\":{\"file_path\":\"/x/review/27b-fix/opus/review.md\"}}]}}"
+    date +%s.%N > "$D/emitted"
+    exec sleep 119;;
+  *nomatch*)
+    echo "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"name\":\"Read\",\"input\":{\"file_path\":\"/x/other.md\"}}]}}"
+    sleep 2
+    echo "W2-08 | done | call $n" >> progress.md;;
+esac
+echo "{\"type\":\"result\",\"session_id\":\"sess-$me\",\"is_error\":false}"
+"""
+
+
+def tool_line(name, inp):
+    return json.dumps({"type": "assistant", "message": {"content": [
+        {"type": "text", "text": "hi"}, {"type": "tool_use", "id": "t1", "name": name, "input": inp}]}},
+        ensure_ascii=False) + "\n"
+
+
+class StopWhenValidation(AgenticBase):
+    def check_ok(self, sw):
+        s = self.make_spec(stop_when=sw)
+        gc.validate_spec(s)
+
+    def test_valid_accepted(self):
+        self.check_ok(dict(SW))
+
+    def test_bad_values_rejected(self):
+        for sw in ({"tool_regex": "."}, {"input_regex": "."}, {"tool_regex": "(", "input_regex": "."},
+                   {"tool_regex": ".", "input_regex": "[a"}, {"tool_regex": ".", "input_regex": ".", "extra": 1},
+                   {"tool_regex": 1, "input_regex": "."}, {"tool_regex": "", "input_regex": "."}, "x", []):
+            with self.subTest(sw=sw):
+                exits(self, gc.validate_spec, self.make_spec(stop_when=sw))
+
+    def test_in_resolved_cfg_and_not_when_absent(self):
+        self.assertIn('"stop_when"', gc.emit_runsh(self.make_spec(stop_when=dict(SW))))
+        self.assertNotIn("stop_when", gc.emit_runsh(self.spec))
+
+
+class StopWhenWatch(AgenticBase):
+    """Unit level: `agentic_helper.py watch CFG SESSION OUT IDX [CPID]`."""
+
+    def setUp(self):
+        super().setUp()
+        self.helper = write(os.path.join(self.T, "h.py"), gc.agentic_helper(True))
+        self.cfg = write(os.path.join(self.T, "cfg.json"), json.dumps({"stop_when": dict(SW)}))
+        self.sess = os.path.join(self.T, "session-0.jsonl")
+        self.out_f = os.path.join(self.T, "stop_when.txt")
+
+    def start(self):
+        return subprocess.Popen([sys.executable, "-I", self.helper, "watch", self.cfg, self.sess, self.out_f, "3"])
+
+    def append(self, text):
+        with open(self.sess, "a", encoding="utf-8") as fh:
+            fh.write(text)
+            fh.flush()
+
+    def finish(self, p, timeout=8):
+        try:
+            return p.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            p.kill()
+            p.wait()
+            return None
+
+    def test_match_appended_later(self):
+        p = self.start()
+        time.sleep(0.5)                                              # file does not exist yet
+        self.append('{"type":"system","session_id":"s"}\nnot json at all\n')
+        time.sleep(1.2)
+        self.assertIsNone(p.poll())
+        self.append(tool_line("Read", {"file_path": "/x/review/27b-fix/opus/r.md", "ü": "é"}))
+        self.assertEqual(self.finish(p), 0)
+        t = open(self.out_f, encoding="utf-8").read()
+        self.assertIn("call=3\n", t)
+        self.assertIn("tool=Read\n", t)
+        self.assertIn("line=3\n", t)
+        self.assertRegex(t, r"ts=\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d")
+        self.assertIn('input={"file_path": "/x/review/27b-fix/opus/r.md", "ü": "é"}\n', t)
+
+    def test_no_match_other_tool_or_input(self):
+        self.append(tool_line("Grep", {"p": "review/27b-fix/opus/"}) + tool_line("Read", {"file_path": "/x/y"}))
+        p = self.start()
+        self.assertIsNone(self.finish(p, 3))
+        self.assertFalse(os.path.exists(self.out_f))
+
+    def test_result_user_and_text_do_not_trigger(self):
+        self.append(json.dumps({"type": "user", "message": {"content": [
+            {"type": "tool_result", "content": "review/27b-fix/opus/ listing"}]}}) + "\n")
+        self.append(json.dumps({"type": "assistant", "message": {"content": [
+            {"type": "text", "text": "reading review/27b-fix/opus/ soon"}]}}) + "\n")
+        self.append(json.dumps({"type": "user", "message": {"content": [
+            {"type": "tool_use", "name": "Read", "input": {"f": "review/27b-fix/opus/"}}]}}) + "\n")
+        self.append(json.dumps({"type": "assistant", "message": "review/27b-fix/opus/"}) + "\n")
+        p = self.start()
+        self.assertIsNone(self.finish(p, 3))
+        self.assertFalse(os.path.exists(self.out_f))
+
+    def test_partial_line_waits_for_newline(self):
+        full = tool_line("Bash", {"command": "cat review/27b-fix/opus/a.md"})
+        self.append(full[:40])
+        p = self.start()
+        time.sleep(1.5)
+        self.assertIsNone(p.poll())
+        self.assertFalse(os.path.exists(self.out_f))
+        self.append(full[40:-1])
+        time.sleep(1.5)
+        self.assertIsNone(p.poll())                                  # still no newline
+        self.append("\n")
+        self.assertEqual(self.finish(p), 0)
+        self.assertIn("line=1\n", open(self.out_f).read())
+
+    def test_signals_process_group_when_cpid_given(self):
+        victim = subprocess.Popen(["sleep", "119"], start_new_session=True)
+        self.addCleanup(victim.kill)
+        self.append(tool_line("Read", {"f": "review/27b-fix/opus/"}))
+        p = subprocess.Popen([sys.executable, "-I", self.helper, "watch", self.cfg, self.sess, self.out_f, "0",
+                              str(victim.pid)])
+        self.assertEqual(victim.wait(timeout=8), -signal.SIGINT)
+        self.assertTrue(os.path.exists(self.out_f))
+        self.assertIsNone(p.poll())                                   # lingers in its TERM/KILL grace until killed
+        p.kill()
+        p.wait()
+
+
+class StopWhenScript(AgenticBase):
+    def test_bash_n_and_shape(self):
+        s = self.make_spec(stop_when=dict(SW))
+        gc.validate_spec(s)
+        sh = gc.emit_runsh(s)
+        bash_n(self, sh)
+        self.assertIn(" watch ", sh)
+        self.assertIn("stopped", sh)
+        self.assertIn(SW["input_regex"], sh)
+
+    def test_absent_no_watch_code(self):
+        sh = gc.emit_runsh(self.spec)
+        self.assertNotIn("watch", sh.replace("watchdog", ""))
+        self.assertNotIn("stopped", sh)
+        self.assertNotIn("WPID", sh)
+
+    def test_readme(self):
+        s = self.make_spec(stop_when=dict(SW))
+        gc.validate_spec(s)
+        rd = gc.emit_readme(s)
+        self.assertIn("stop_when", rd)
+        self.assertIn(SW["input_regex"], rd)
+        self.assertIn("`stopped`", rd)
+        self.assertIn("result", rd.split("stop_when", 1)[1])
+        self.assertNotIn("stop_when", gc.emit_readme(self.spec))
+
+    def test_docstring_lists_status_and_key(self):
+        self.assertIn("stop_when", gc.__doc__)
+        self.assertIn("stopped", gc.__doc__)
+        self.assertIn("stop_when", gc.AGENTIC_KEYS)
+
+
+class StopWhenE2E(AgenticBase):
+    def sw_spec(self, arms, **over):
+        s = self.make_spec(stop_when=dict(SW), arms=[{"name": a, "profile": PROFILE} for a in arms], **over)
+        return s
+
+    def claude(self):
+        return write(os.path.join(self.stubs, "claude_sw"), STUB_CLAUDE_SW, 0o755)
+
+    def test_stopped_is_a_result(self):
+        t0 = time.time()
+        p = self.run_script(self.sw_spec(["stopper", "nomatch"]), CLAUDE_BIN=self.claude(), timeout=90)
+        wall = time.time() - t0
+        self.assertEqual(p.returncode, 0, self.out)
+        self.assertEqual(self.status_of("stopper"), "stopped", self.out)
+        emitted = float(open(self.stubdir + "/emitted").read())
+        fired = os.path.getmtime(self.arm_dir("stopper") + "/stop_when.txt")
+        print(f"\n[stop latency: tool_use emitted -> stop_when.txt written {fired - emitted:.2f}s; "
+              f"whole 2-arm run {wall:.1f}s (nomatch arm sleeps 2s)]")
+        self.assertLess(fired - emitted, 4)
+        self.assertLess(wall, 20)                                     # the 119 s sleep was cut short
+        self.assertTrue(os.path.exists(self.run_dir + "/done/rep1.stopper"))
+        self.assertFalse(os.path.exists(self.run_dir + "/failures.txt"), self.out)
+        self.assertNotIn("--resume", "".join(self.lines("claude.log")))                  # never resumed
+        self.assertEqual(open(self.arm_dir("stopper") + "/calls.tsv").read().count("\n"), 2)
+        t = open(self.arm_dir("stopper") + "/stop_when.txt").read()
+        for want in ("call=0\n", "tool=Read\n", "line=3\n", '"file_path": "/x/review/27b-fix/opus/review.md"'):
+            self.assertIn(want, t)
+        self.assertIn("status=stopped", open(self.arm_dir("stopper") + "/result.txt").read())
+        self.assertEqual(self.status_of("nomatch"), "done", self.out)      # the other arm is unaffected
+        self.assertFalse(os.path.exists(self.arm_dir("nomatch") + "/stop_when.txt"))
+        # collection + teardown still happened
+        self.assertTrue(os.path.exists(self.arm_dir("stopper") + "/wt.diff"))
+        self.assertTrue(any(l.startswith("stop") for l in self.lines("serve.log")))
+        time.sleep(0.5)
+        orphans = subprocess.run(["pgrep", "-f", "sleep 119"], capture_output=True, text=True).stdout.split()
+        self.assertEqual(orphans, [], "orphan session process")
+        orph2 = subprocess.run(["pgrep", "-f", "agentic_helper.py watch"], capture_output=True, text=True).stdout
+        self.assertNotIn(self.run_dir, orph2)
+
+    def test_non_matching_runs_to_done_when(self):
+        p = self.run_script(self.sw_spec(["nomatch"]), CLAUDE_BIN=self.claude(), timeout=90)
+        self.assertEqual(p.returncode, 0, self.out)
+        self.assertEqual(self.status_of("nomatch"), "done", self.out)
+        self.assertFalse(os.path.exists(self.arm_dir("nomatch") + "/stop_when.txt"))
+        self.assertEqual(open(self.arm_dir("nomatch") + "/calls.tsv").read().count("\n"), 2)   # header + 1 call
+
+    def test_sigint_kills_watcher(self):
+        s = self.sw_spec(["never"], cap_s=600)
+        proc = subprocess.Popen(["bash", self.script(s)], env=self.env(), stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT, text=True, start_new_session=True, preexec_fn=sigint_default)
+        t0 = time.time()
+        while time.time() - t0 < 30 and not self.lines("claude.log"):
+            time.sleep(0.1)
+        time.sleep(1)
+        os.killpg(proc.pid, signal.SIGINT)
+        try:
+            proc.wait(timeout=60)
+        except subprocess.TimeoutExpired:
+            os.killpg(proc.pid, signal.SIGKILL)
+            self.fail("run.sh did not exit after SIGINT")
+        time.sleep(0.5)
+        out = subprocess.run(["pgrep", "-f", self.run_dir], capture_output=True, text=True).stdout.split()
+        self.assertEqual(out, [], "orphan watcher/session")
         self.run_script(s)
         self.assertEqual(self.status_of("never"), "interrupted", self.out)
 
