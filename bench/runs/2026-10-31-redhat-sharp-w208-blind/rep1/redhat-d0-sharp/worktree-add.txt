@@ -1,0 +1,2 @@
+Preparing worktree (detached HEAD de110510)
+HEAD is now at de110510 docs(plans): dpf-tui — W1-07b … W1-10 briefs fixed by the 27B and re-checked by Opus in place (W1-08 OUTPUT_CAP and reportedOf, W1-09 resolveConfirmStep code and red list, W1-10 leads moved and deleted); 27B reviews and compare tables; Opus reviews of W2-06 … W2-08 with corrected code; 04 check method; brief rules condensed

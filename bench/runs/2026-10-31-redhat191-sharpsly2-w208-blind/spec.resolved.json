@@ -1,0 +1,187 @@
+{
+ "install": [
+  {
+   "src": "/home/dev/work/dp-craft/amd/bench/runs/2026-10-30-0947-dpf-brief-ab/heretic/inputs/W2-06.md",
+   "dst": "docs/plans/2026-10-28-2239-dpf-tui-f0-f1/briefs/W2-06.md"
+  },
+  {
+   "src": "/home/dev/work/dp-craft/amd/bench/runs/2026-10-30-0947-dpf-brief-ab/heretic/inputs/W2-07.md",
+   "dst": "docs/plans/2026-10-28-2239-dpf-tui-f0-f1/briefs/W2-07.md"
+  },
+  {
+   "src": "/home/dev/work/dp-craft/amd/bench/runs/2026-10-30-0947-dpf-brief-ab/heretic/inputs/W2-08.md",
+   "dst": "docs/plans/2026-10-28-2239-dpf-tui-f0-f1/briefs/W2-08.md"
+  },
+  {
+   "src": "/home/dev/work/dp-craft/amd/bench/runs/2026-10-30-0947-dpf-brief-ab/heretic/inputs/progress.md",
+   "dst": "docs/plans/2026-10-28-2239-dpf-tui-f0-f1/review/27b-fix/progress.md"
+  }
+ ],
+ "rewrite": [
+  {
+   "glob": "docs/plans/2026-10-28-2239-dpf-tui-f0-f1/briefs/W2-0[678].md",
+   "from": "/home/dev/work/dippe/dpf-bench-heretic",
+   "to": "{wt}"
+  },
+  {
+   "glob": "docs/plans/2026-10-28-2239-dpf-tui-f0-f1/01-writer-brief.md",
+   "from": "/home/dev/work/dippe/dp-forge",
+   "to": "{wt}"
+  }
+ ],
+ "symlinks": [
+  {
+   "src": "/home/dev/work/dippe/dp-forge/node_modules",
+   "dst": "node_modules"
+  },
+  {
+   "src": "/home/dev/work/dippe/dp-forge/tools/node_modules",
+   "dst": "tools/node_modules"
+  },
+  {
+   "src": "/home/dev/work/dippe/dp-forge/tools/task-dag/node_modules",
+   "dst": "tools/task-dag/node_modules"
+  },
+  {
+   "src": "/home/dev/work/dippe/dp-forge/tools/speckit-orchestrator/node_modules",
+   "dst": "tools/speckit-orchestrator/node_modules"
+  },
+  {
+   "src": "/home/dev/work/dippe/dp-forge/tools/spec-pipeline/node_modules",
+   "dst": "tools/spec-pipeline/node_modules"
+  }
+ ],
+ "done_when": {
+  "file": "docs/plans/2026-10-28-2239-dpf-tui-f0-f1/review/27b-fix/progress.md",
+  "regex": "^W2-08 \\|"
+ },
+ "collect": [
+  "docs/plans/2026-10-28-2239-dpf-tui-f0-f1/briefs/W2-08.md",
+  "docs/plans/2026-10-28-2239-dpf-tui-f0-f1/review/27b-fix/progress.md",
+  "docs/plans/2026-10-28-2239-dpf-tui-f0-f1/review/W2-08.refine-27b.md"
+ ],
+ "spec": {
+  "kind": "agentic",
+  "slug": "redhat191-sharpsly2-w208-blind",
+  "date": "2026-10-31",
+  "title": "RedHat Qwen3.8-27B-MXFP4 on Sly 1.9.1 (DFlash2 k=7, fp8, 262000), Cactus delta 0, with the sharp-sly2 chat template (sly2 replay rule = newest assistant reasoning only, plus sharp's terseness block) - W2-08 blind review (RUNBOOK step A); one variable vs the r191-sharp-d0 run (sharp = keep all reasoning)",
+  "engine": "vllm",
+  "port": 8000,
+  "repo": "/home/dev/work/dippe/dp-forge",
+  "base": "de110510",
+  "worktree": "/home/dev/work/dippe/dpf-bench-{arm}-r{rep}",
+  "served_model": "qwen38-27b-redhat-mxfp4-dflash",
+  "server": {
+   "maxlen": 262000,
+   "maxseqs": 1,
+   "kv_dtype": "fp8",
+   "gpu_util": 0.93,
+   "watchdog_mib": 32,
+   "free_mib_floor": 30000
+  },
+  "claude": {
+   "settings": "/home/dev/.config/claude/local_vllm_direct/settings-redhat.json",
+   "args": [
+    "--dangerously-skip-permissions",
+    "--output-format",
+    "stream-json",
+    "--verbose"
+   ]
+  },
+  "prompt": "Run docs/plans/2026-10-28-2239-dpf-tui-f0-f1/review/27b-fix/RUNBOOK.md for brief W2-08 only (W2-06 and W2-07\nare out of scope): read it whole first (cat, it is short), then follow it exactly.",
+  "resume_prompt": "Continue: follow docs/plans/2026-10-28-2239-dpf-tui-f0-f1/review/27b-fix/RUNBOOK.md exactly for brief W2-08 only (W2-06 and W2-07 are out of scope); resume where you stopped.",
+  "install": [
+   {
+    "src": "bench/runs/2026-10-30-0947-dpf-brief-ab/heretic/inputs/W2-06.md",
+    "dst": "docs/plans/2026-10-28-2239-dpf-tui-f0-f1/briefs/W2-06.md"
+   },
+   {
+    "src": "bench/runs/2026-10-30-0947-dpf-brief-ab/heretic/inputs/W2-07.md",
+    "dst": "docs/plans/2026-10-28-2239-dpf-tui-f0-f1/briefs/W2-07.md"
+   },
+   {
+    "src": "bench/runs/2026-10-30-0947-dpf-brief-ab/heretic/inputs/W2-08.md",
+    "dst": "docs/plans/2026-10-28-2239-dpf-tui-f0-f1/briefs/W2-08.md"
+   },
+   {
+    "src": "bench/runs/2026-10-30-0947-dpf-brief-ab/heretic/inputs/progress.md",
+    "dst": "docs/plans/2026-10-28-2239-dpf-tui-f0-f1/review/27b-fix/progress.md"
+   }
+  ],
+  "rewrite": [
+   {
+    "glob": "docs/plans/2026-10-28-2239-dpf-tui-f0-f1/briefs/W2-0[678].md",
+    "from": "/home/dev/work/dippe/dpf-bench-heretic",
+    "to": "{wt}"
+   },
+   {
+    "glob": "docs/plans/2026-10-28-2239-dpf-tui-f0-f1/01-writer-brief.md",
+    "from": "/home/dev/work/dippe/dp-forge",
+    "to": "{wt}"
+   }
+  ],
+  "symlinks": [
+   {
+    "src": "/home/dev/work/dippe/dp-forge/node_modules",
+    "dst": "node_modules"
+   },
+   {
+    "src": "/home/dev/work/dippe/dp-forge/tools/node_modules",
+    "dst": "tools/node_modules"
+   },
+   {
+    "src": "/home/dev/work/dippe/dp-forge/tools/task-dag/node_modules",
+    "dst": "tools/task-dag/node_modules"
+   },
+   {
+    "src": "/home/dev/work/dippe/dp-forge/tools/speckit-orchestrator/node_modules",
+    "dst": "tools/speckit-orchestrator/node_modules"
+   },
+   {
+    "src": "/home/dev/work/dippe/dp-forge/tools/spec-pipeline/node_modules",
+    "dst": "tools/spec-pipeline/node_modules"
+   }
+  ],
+  "done_when": {
+   "file": "docs/plans/2026-10-28-2239-dpf-tui-f0-f1/review/27b-fix/progress.md",
+   "regex": "^W2-08 \\|"
+  },
+  "stop_when": {
+   "tool_regex": ".",
+   "input_regex": "\"(file_)?path\": \"[^\"]*27b-fix/opus|\\b(cat|sed|head|tail|less|more|grep|rg|awk|diff|nl|bat|python3?|node)\\b[^;&|\\n]*27b-fix/opus/"
+  },
+  "collect": [
+   "docs/plans/2026-10-28-2239-dpf-tui-f0-f1/briefs/W2-08.md",
+   "docs/plans/2026-10-28-2239-dpf-tui-f0-f1/review/27b-fix/progress.md",
+   "docs/plans/2026-10-28-2239-dpf-tui-f0-f1/review/W2-08.refine-27b.md"
+  ],
+  "tmp_dirs": [
+   "/tmp/dp-refine"
+  ],
+  "cap_s": 3600,
+  "max_resumes": 1,
+  "reps": 1,
+  "server_info": [
+   "docker exec vllm-{server_port} sh -c 'head -1 /templates/sharp-sly2-chat_template.jinja; sha256sum /templates/sharp-sly2-chat_template.jinja; head -1 /opt/qwen-fixed.jinja'",
+   "docker exec vllm-{server_port} sh -c 'cat /proc/1/cmdline | tr \"\\0\" \" \"'",
+   "docker exec vllm-{server_port} sh -c 'env | grep RADIANCE_CACTUS; head -1 /opt/qwen-fixed.jinja'"
+  ],
+  "capture_requests": false,
+  "remove_worktree": false,
+  "arms": [
+   {
+    "name": "r191-sharpsly2-d0",
+    "profile": "sly-redhat/redhat-mxfp4-dflash",
+    "image": "ghcr.io/slybase/vllm-sly-radiance:1.9.1-rocm10.1",
+    "env": {
+     "CACTUS_DELTA": "0",
+     "CHAT_TEMPLATE": "/home/dev/work/dp-craft/amd/campaigns/2026-10-31-redhat191-sharpsly2-w208-blind/sharp-sly2-chat_template.jinja"
+    }
+   }
+  ]
+ },
+ "stop_when": {
+  "tool_regex": ".",
+  "input_regex": "\"(file_)?path\": \"[^\"]*27b-fix/opus|\\b(cat|sed|head|tail|less|more|grep|rg|awk|diff|nl|bat|python3?|node)\\b[^;&|\\n]*27b-fix/opus/"
+ }
+}

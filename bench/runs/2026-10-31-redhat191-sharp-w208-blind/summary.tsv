@@ -1,0 +1,4 @@
+rep	arm	status	wall_s	calls	resumes	done_line	main_unchanged	port_free	image	env
+1	r191-sharp-d0	stopped	2183	1	0	-	yes	yes	ghcr.io/slybase/vllm-sly-radiance:1.9.1-rocm10.1	CACTUS_DELTA=0 CHAT_TEMPLATE=/home/dev/work/dp-craft/amd/campaigns/2026-10-31-redhat191-sharp-w208-blind/sharp-chat_template.jinja
+1	r191-sharp-d03	stopped	515	1	0	-	yes	yes	ghcr.io/slybase/vllm-sly-radiance:1.9.1-rocm10.1	CACTUS_DELTA=0.3 CHAT_TEMPLATE=/home/dev/work/dp-craft/amd/campaigns/2026-10-31-redhat191-sharp-w208-blind/sharp-chat_template.jinja
+1	r191-sharp-d05	stopped	5338	1	0	-	yes	yes	ghcr.io/slybase/vllm-sly-radiance:1.9.1-rocm10.1	CACTUS_DELTA=0.5 CHAT_TEMPLATE=/home/dev/work/dp-craft/amd/campaigns/2026-10-31-redhat191-sharp-w208-blind/sharp-chat_template.jinja

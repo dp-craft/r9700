@@ -2,7 +2,7 @@
 date: 2026-10-30 15:52
 slug: dpf-brief-fix-heretic-vs-redhat
 title: dp-forge brief review+fix (W2-06..08) - Swift-1.5 heretic vs RedHat MXFP4 (DFlash2, Sly 1.8.1 and 1.9.1) vs Opus, and the Cactus loop fix
-takeaway: On an agentic brief review+fix task, RedHat MXFP4 failed at Sly's default Cactus δ 0.5 (9 runaway thinking loops, 0/3 briefs in 3 h) because the lossy spec-decode acceptance locks in repetition; with CACTUS_DELTA=0 it ran W2-08 loop-free and out-reviewed heretic (9/19 vs 4/19 Opus findings blind, 2 reasoned rejections, own lint-clean fix) at 29-38 % slower decode and ~9x the time (6.8x the generated tokens x 1.35x slower decode, plus 6 compactions fed by the template's reasoning replay; not context size, not literal repetition). Rerun on Sly 1.9.1 (δ 0.5 + fade/cap, template v22.5-sly2 that drops old reasoning, budget RUNBOOK): W2-08 in 87 min (-22 %), 2 compactions instead of 6, decode 102 tok/s, all 6 high Opus findings fixed with a clean probe - but the blind review collapsed to 1/19 (no probes) and 3 decision loops returned (one to the output cap); the template alone cuts prompt tokens 25 % (calculated on the δ 0 session).
+takeaway: On an agentic brief review+fix task, RedHat MXFP4 failed at Sly's default Cactus δ 0.5 (9 runaway thinking loops, 0/3 briefs in 3 h) because the lossy spec-decode acceptance locks in repetition; with CACTUS_DELTA=0 it ran W2-08 loop-free and out-reviewed heretic (9/19 vs 4/19 Opus findings blind, 2 reasoned rejections, own lint-clean fix) at 29-38 % slower decode and ~9x the time (6.8x the generated tokens x 1.35x slower decode, plus 6 compactions fed by the template's reasoning replay; not context size, not literal repetition). Rerun on Sly 1.9.1 (δ 0.5 + fade/cap, template v22.5-sly2 that drops old reasoning, budget RUNBOOK): W2-08 in 87 min (-22 %), 2 compactions instead of 6, decode 102 tok/s, all 6 high Opus findings fixed with a clean probe - but the blind review collapsed to 1/19 (no probes) and 3 decision loops returned (one to the output cap); the template alone cuts prompt tokens 25 % (calculated on the δ 0 session). Added 2026-10-31: unsloth Q4_K_XL on llama-swap (sharp template) found 12/19 blind (high 3/6) vs RedHat δ 0's 9/19 (4/6) under one blind re-grade - grey zone at n = 1; the re-grade also turned one RedHat δ 0 extra finding to wrong (precision 13/14). Then RedHat δ 0 with only the chat template swapped to sharp: 11/19 (high 4/6, 14/14) with 38 % less thinking and 35 % fewer tool calls - no quality loss, +2 not significant; template held equal, Q4_K_XL vs RedHat is a tie (12 vs 11, 4-way blind grade).
 -->
 
 # dp-forge brief review + fix: Swift-1.5 heretic vs RedHat MXFP4 vs Opus, and the Cactus loop fix
@@ -30,7 +30,7 @@ Run key (the first five rows are the configuration; everything not listed is ide
 | Briefs in the prompt | W2-06/07/08 | W2-06/07/08 | W2-08 | W2-08 |
 | Finished | all 3 briefs, 41 min | **0/3**, 3 h cap | W2-08, ~111 min | W2-08, **87 min** (1 call) |
 | Blind review: Opus findings found | 4/19, high 3/6 (all briefs: 11/39, high 6/10) | not reached (W2-06: 3/9) | **9/19, high 4/6** | **1/19, high 1/6** (0 probes in A) |
-| Findings real (precision) | 6/6 on W2-08 (4 = Opus findings, 2 own; all briefs 19/20) | 3/3 (W2-06) | **14/14** (10 rows = 9 Opus findings, 4 own) | 1/1 |
+| Findings real (precision) | 6/6 on W2-08 (4 = Opus findings, 2 own; all briefs 19/20) | 3/3 (W2-06) | **13/14** (10 rows = 9 Opus findings, 3 own real, 1 wrong; corrected 2026-10-31, see "Blind review") | 1/1 |
 | Compare: own checking before agreeing with Opus | accepted all 19 | accepted all 9 (W2-06), 0 tool calls | **~30 tool calls; rejected 2 with reasons** (O7, O18) | 7 tool calls; rejected 3: O18 defensible, **O12 and O19 wrong** |
 | Fix: Opus findings in the fixed brief | — (not graded per row) | — | 20/20 of its real findings | 15/19 + 2 partial, all 6 high; O7 open (the code stayed in the probe) |
 | Fix: Opus code reused (unchanged brief: 9 %) | **67 %** | — | 21 % (own design) | 12 % |
@@ -348,6 +348,67 @@ median error identifies the template:
   budget rules (§ 0b's "cite, not probed again" can be read as permission to skip probes), from the template (the
   model no longer sees older reasoning) or from δ.
 
+## unsloth Q4_K_XL on llama-swap, W2-08 blind review only (run added 2026-10-31)
+
+Full write-up: `campaigns/2026-10-31-q4kxl-sharp-w208-blind/analysis.md`.
+
+**Setup:**
+- llama.cpp b11448 Vulkan via llama-swap, row `qwen38-27b-q4kxl-q8-mtp-kvq8-mtp-sharp-planning` as is: q8_0 KV, ctx 260000,
+  MTP head, sharp template = froggeric v22.5.0 + a terseness directive in the system prompt (otherwise the same as v22.5).
+- Same base, RUNBOOK, inputs and prompt as RedHat δ 0.
+- The session was stopped at step A's end (first read of the Opus review) by the new `gen_campaign.py` `stop_when`.
+- All three W2-08 blind reviews were then re-graded by one blind grader (labels shuffled, paths and names scrubbed).
+
+| W2-08 step A | Q4_K_XL | RedHat δ 0 | heretic |
+|---|---|---|---|
+| Opus findings (blind re-grade) | **12/19** | 9/19 | 4/19 |
+| high · med · low | 3/6 · 4/7 · 5/6 | **4/6** · 3/7 · 2/6 | 3/6 · 1/7 · 0/6 |
+| Precision | 15/15 | 13/14 | 6/6 |
+| Thinking chars · tool calls in A | 242k · 71 | 489k · 156 | — |
+
+All "found/real" values are INFERRED (grading); work counts are MEASURED.
+
+- **The re-grade reproduced the earlier grades exactly:** the same nine Opus numbers for RedHat δ 0 and the same four for
+  heretic.
+- **+3 for Q4_K_XL is inside the grey zone fixed before the run.** No quality difference is demonstrated at n = 1.
+  Q4_K_XL is broader (5/6 lows); RedHat is better on highs. Q4_K_XL missed #6 because its lint probe re-wrote the imports
+  instead of copying them.
+- **The half-sized work is confounded** by the template (the terseness directive) and the engine.
+- **Next (run, below):** the RedHat δ 0 baseline with only the template changed to sharp. A second Q4_K_XL rep remains the
+  noise check.
+
+### RedHat δ 0 + sharp template, W2-08 blind review only (run added 2026-10-31)
+
+Full write-up: `campaigns/2026-10-31-redhat-sharp-w208-blind/analysis.md`.
+
+**Setup:**
+- The RedHat δ 0 server (same image digest, model, draft, `RADIANCE_*` env, argv) with only `--chat-template` swapped to
+  the sharp file (sha256 `cdff39fb…`, the same file as the Q4_K_XL run).
+- One fresh call, stopped at step A's end by `stop_when`.
+- All four W2-08 reviews were then re-graded together by one blind grader (fresh shuffle, 4 labels).
+
+| W2-08 step A (4-way blind grade) | RedHat + sharp | RedHat δ 0 | Q4_K_XL + sharp | heretic |
+|---|---|---|---|---|
+| Opus findings | 11/19 | 9/19 | **12/19** | 4/19 |
+| high · med · low | **4/6** · 3/7 · 4/6 | **4/6** · 3/7 · 2/6 | 3/6 · **5/7** · 4/6 | 3/6 · 1/7 · 0/6 |
+| Weighted (3/2/1, max 38) | 22 | 20 | **23** | 11 |
+| Precision | **14/14** | 13/14 | **16/16** | 6/6 |
+| Thinking chars · tool calls in A | 304k · 101 | 489k · 156 | 242k · 71 | — |
+
+All "found/real" values are INFERRED (grading); work counts are MEASURED.
+
+- **Template effect (only `--chat-template` differs):**
+  - Thinking −38 %, tool calls −35 %, server-generated tokens about −28 %.
+  - +2 Opus findings with the same 4/6 highs and no wrong finding.
+  - Below the pre-registered grey zone (3–4), so the quality gain is not demonstrated, but no loss is seen either.
+  - Severity calibration was weaker: the import-sort error was rated low.
+- **With the template equal, Q4_K_XL vs RedHat is a tie** (12 vs 11, highs 3 vs 4; the grader: "too close to separate").
+  Most of Q4_K_XL's earlier work advantage was the template.
+- **Grader test-retest:** RedHat δ 0 and heretic got identical Opus sets in both blind grades (and in the 2026-10-30
+  grade). Q4_K_XL stayed at 12/19 with one borderline swap (#16 ↔ #11). Grader noise is about ±1 finding.
+- **Next (proposed):** a second RedHat + sharp rep and a second Q4_K_XL rep, graded blind together. Adopting sharp for
+  `sly-redhat` reviews is the user's call (keep v22.5 restorable).
+
 ## Quality, step by step
 
 ### A. Blind review
@@ -369,11 +430,13 @@ On W2-08:
 | 15, 17 (low) | – | 15, 17 |
 | **Total** | **4/19** | **9/19** |
 
-RedHat δ 0 W2-08 extra findings (real, INFERRED):
-- a fabricated "verbatim" PATTERN (heretic found it too);
-- the non-goal walk branch is never tested;
-- the test block's import order;
-- a stale base sha. Checked: `tools/dpf` does not exist at `36ffe5b4`.
+RedHat δ 0 W2-08 extra findings (INFERRED):
+- real: a fabricated "verbatim" PATTERN (heretic found it too);
+- real: the non-goal walk branch is never tested;
+- real: the test block's import order;
+- **wrong** (corrected 2026-10-31): "a stale base sha, move it to `de110510`". `tools/dpf` exists at neither commit, and
+  `git diff --stat 36ffe5b4 de110510 -- tools/` is empty, so moving the base fixes nothing. Found by the blind re-grade
+  in `campaigns/2026-10-31-q4kxl-sharp-w208-blind/` (finding X14); RedHat δ 0's W2-08 precision is 13/14, not 14/14.
 
 It looked at O9 (drop every goal) and ruled it not a finding. On W2-06 (δ 0.5, before the loops took over) RedHat found 3/9
 like heretic, including O5 (the 4-param/C7 conflict), which heretic missed.

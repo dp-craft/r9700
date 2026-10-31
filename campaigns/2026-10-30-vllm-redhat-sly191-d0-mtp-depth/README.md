@@ -5,7 +5,7 @@ Scaffolded by `bench/gen_campaign.py`. The executable driver is **`run.sh`** in 
 
 ## Fixed parameters
 - Model `RedHatAI__Qwen3.8-27B-MXFP4@16a86728` · engine **vLLM (docker)** · profile `sly-redhat/redhat-mxfp4-mtp` (`bench/engine-bench/vllm/profiles/`) · served as `qwen38-27b-redhat-mxfp4-mtp` · server on :8000 · image `ghcr.io/slybase/vllm-sly-radiance:1.9.1-rocm10.1` (resolved per server in `server-<name>.txt` of the run dir).
-- Env (all servers, passed to `serve_vllm.sh`): `CACTUS_DELTA=0`.
+- Env (all servers, passed to `serve_vllm.sh`): `CACTUS_DELTA=0 WATCHDOG_MIB=32`.
 
 ## Fixtures (auto-built)
 `run.sh` **auto-builds any missing prompt fixture** into `bench/workloads/generated/` from its
@@ -38,3 +38,5 @@ GTT are sampled per probe into each run dir's `gpu_samples.csv`.
 first, **memory column mandatory**). `run.sh`'s last step auto-generates theme-aware SVG charts in
 `charts/` + an `appendix.md` (`bench/lib/report.py`) — embed the appendix in `analysis.md`. Add a
 `<!-- meta -->` block and run `docs/reindex.py`.
+
+**Written up together with the DFlash2 campaign:** `campaigns/2026-10-30-vllm-redhat-sly191-d0-dflash-depth/analysis.md` (one analysis for both δ 0 campaigns).

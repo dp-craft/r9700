@@ -1,0 +1,8 @@
+12:42:55 [rep1/redhat-d0-sharp] booting: PROFILE=sly-redhat/redhat-mxfp4-dflash SERVED_NAME=qwen38-27b-redhat-mxfp4-dflash MAXLEN=262000 MAXSEQS=1 KV_DTYPE=fp8 GPU_UTIL=0.93 WATCHDOG_MIB=32 FREE_MIB_FLOOR=30000 PORT=8000 IMAGE=ghcr.io/slybase/vllm-sly-radiance:1.8.1-rocm10.1 CACTUS_DELTA=0 CHAT_TEMPLATE=/home/dev/work/dp-craft/amd/campaigns/2026-10-31-redhat-sharp-w208-blind/sharp-chat_template.jinja
+12:46:11 [rep1/redhat-d0-sharp] claude call 0 (left 9000s)
+13:33:11 [rep1/redhat-d0-sharp] call 0 rc=137 session=0d0a9b2c-a159-4101-adad-512410bbe04b
+13:33:11 [rep1/redhat-d0-sharp] status=stopped wall_s=2820 calls=1 resumes=0 session=0d0a9b2c-a159-4101-adad-512410bbe04b done_line=-
+
+=== run done: /home/dev/work/dp-craft/amd/bench/runs/2026-10-31-redhat-sharp-w208-blind ===
+rep	arm	status	wall_s	calls	resumes	done_line	main_unchanged	port_free	image	env
+1	redhat-d0-sharp	stopped	2820	1	0	-	yes	yes	ghcr.io/slybase/vllm-sly-radiance:1.8.1-rocm10.1	CACTUS_DELTA=0 CHAT_TEMPLATE=/home/dev/work/dp-craft/amd/campaigns/2026-10-31-redhat-sharp-w208-blind/sharp-chat_template.jinja

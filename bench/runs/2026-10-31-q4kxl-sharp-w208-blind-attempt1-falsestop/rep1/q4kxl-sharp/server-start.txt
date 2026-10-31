@@ -1,0 +1,3 @@
+preloading qwen38-27b-q4kxl-q8-mtp-kvq8-mtp-sharp-planning via http://127.0.0.1:9292 (1-token request, timeout 900s)
+up after 10s -- qwen38-27b-q4kxl-q8-mtp-kvq8-mtp-sharp-planning state=ready -- upstream log: /home/dev/work/dp-craft/amd/bench/runs/2026-10-31-q4kxl-sharp-w208-blind/rep1/q4kxl-sharp/server-container.log (follower pid 73719)
+props: {"n_ctx": 260096, "total_slots": 1, "build_info": "b11448-ab09ea4", "model_path": "/home/dev/models/gguf/unsloth/Qwen3.8-27B-UD-Q4_K_XL.gguf", "chat_template_caps": true}

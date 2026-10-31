@@ -1,0 +1,1 @@
+status=stopped wall_s=515 calls=1 resumes=0 session=416ca959-4035-4b26-b5ba-55beccbd1fe2 done_line=-
