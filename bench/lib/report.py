@@ -12,6 +12,9 @@ Stdlib only; self-contained SVGs (light/dark via prefers-color-scheme). Auto-det
               → depth curves, concurrency scaling, thinking ttfa, memory — per engine
   sweep       sweep-summary.json (+ sweep-log.jsonl) from model-bench
               → -ub / -b tuning curves + VRAM, KV f16-vs-q8_0 verdict
+  agentic     rep*/<arm>/claude-project/*.jsonl (gen_campaign kind agentic) + server-container.log + gpu_samples.csv
+              → per-arm speed/work (wall, decode, tokens, thinking, tool calls, acceptance), loop signals,
+                power / memory-clock / VRAM table; --include DIR adds another agentic run's arms
 
 Design (the dataviz method): ONE fixed categorical color per entity (config/engine), assigned in a
 stable order and reused across EVERY chart — never cycled. ONE axis per chart; differently-scaled
@@ -20,6 +23,7 @@ color-independent data table is emitted, so nothing depends on color alone.
 
     python3 report.py RUN_DIR [RUN_DIR ...]          # writes <dir>/charts/*.svg + <dir>/appendix.md
     python3 report.py CAMPAIGN_DIR --charts DIR --appendix FILE
+    python3 report.py AGENTIC_RUN --include OTHER_AGENTIC_RUN --charts DIR --appendix FILE
 """
 import argparse, json, math, os, re, statistics as st
 from collections import defaultdict, OrderedDict
@@ -307,6 +311,8 @@ def detect(d):
         return "quality"
     if _find(d, "results.jsonl"):
         return "throughput"
+    if agentic_arms(d):
+        return "agentic"
     return None
 
 
@@ -674,16 +680,200 @@ def render_sweep(d):
     return {k: v for k, v in files.items() if v}, ap
 
 
-RENDERERS = {"quality": render_quality, "throughput": render_throughput, "sweep": render_sweep}
+# ============================================================ render: agentic (gen_campaign kind agentic)
+# One arm = <run>/rep<R>/<arm>/ (server.txt, server-container.log, gpu_samples.csv, claude-project/*.jsonl,
+# optional stop_when.txt). The window is the session (first transcript timestamp .. stop_when ts, else the
+# last transcript timestamp), so a `stopped` arm is measured up to its boundary only.
+# vLLM: the 10 s `loggers.py` windows (container clock = UTC). decode = median generation throughput over
+# PURE decode windows (prompt throughput 0, >= 1 running). llama.cpp (llama-swap follower log): per-request
+# print_timing after the LAST `llama_server: initializing` (the follower replays earlier loads).
+# Loop signals (transcript): messages at the output cap, the largest message, the repeated-line share of
+# the longest thinking block (lines > 20 chars seen before in the same block), and loop blocks = messages whose
+# thinking has a degenerate loop by the window rule below (the bare share also counts legitimate repetition:
+# a 15.8% "signal" on 2026-10-31 was repeated import lines).
+def _loop_onset(text, win=40, share=0.8):
+    """Char offset where a thinking loop starts: the first window of `win` lines (> 20 chars) of which >= `share`
+    were seen earlier in the same block; None when there is none."""
+    seen, rep, offs, pos = set(), [], [], 0
+    for ln in text.split("\n"):
+        s = ln.strip()
+        if len(s) > 20:
+            rep.append(s in seen); offs.append(pos); seen.add(s)
+        pos += len(ln) + 1
+    acc = sum(rep[:win])
+    for i in range(len(rep) - win + 1):
+        if i:
+            acc += rep[i + win - 1] - rep[i - 1]
+        if acc >= share * win:
+            return offs[i]
+    return None
+
+
+def _utc(s):
+    import datetime as dt
+    return dt.datetime.fromisoformat(s.replace("Z", "+00:00")).replace(tzinfo=None)
+
+
+def _agentic_arm(arm):
+    import datetime as dt, glob
+    msgs, ts = {}, []
+    for f in sorted(glob.glob(os.path.join(arm, "claude-project", "*.jsonl"))):
+        for l in open(f, encoding="utf-8"):
+            try:
+                e = json.loads(l)
+            except ValueError:
+                continue
+            if e.get("timestamp"):
+                ts.append(_utc(e["timestamp"]))
+            m = e.get("message") if e.get("type") == "assistant" else None
+            if isinstance(m, dict) and m.get("id"):
+                rec = msgs.setdefault(m["id"], {"out": 0, "tools": 0, "think": [], "stop": None, "t": _utc(e["timestamp"])})
+                rec["out"] = max(rec["out"], (m.get("usage") or {}).get("output_tokens") or 0)
+                rec["stop"] = m.get("stop_reason") or rec["stop"]
+                for c in m.get("content") or []:
+                    if c.get("type") == "tool_use":
+                        rec["tools"] += 1
+                    elif c.get("type") == "thinking":
+                        rec["think"].append(c.get("thinking") or "")
+    if not ts:
+        return None
+    t0 = min(ts)
+    sw = os.path.join(arm, "stop_when.txt")
+    m = re.search(r"ts=(\S+)", open(sw).read()) if os.path.exists(sw) else None
+    t1 = _utc(m.group(1)) if m else max(ts)
+    msgs = {k: v for k, v in msgs.items() if v["t"] <= t1}
+    thinks = ["".join(v["think"]) for v in msgs.values()]
+    longest = max(thinks, key=len, default="")
+    seen, rep, tot = set(), 0, 0
+    for ln in (x.strip() for x in longest.splitlines()):
+        if len(ln) > 20:
+            tot += 1; rep += ln in seen; seen.add(ln)
+    looping = [v for v in msgs.values() if _loop_onset("".join(v["think"])) is not None]
+    r = {"arm": os.path.basename(arm.rstrip("/")), "stepA_s": round((t1 - t0).total_seconds()),
+         "messages": len(msgs), "tool_calls": sum(v["tools"] for v in msgs.values()),
+         "thinking_chars": sum(len(x) for x in thinks), "out_tokens_transcript": sum(v["out"] for v in msgs.values()),
+         "max_msg_out": max((v["out"] for v in msgs.values()), default=0),
+         "at_cap": sum(1 for v in msgs.values() if v["stop"] == "max_tokens"),
+         "msgs_gt16k": sum(1 for v in msgs.values() if v["out"] > 16384),
+         "longest_think_repeat_pct": round(100 * rep / tot, 1) if tot else 0.0,
+         "loop_blocks": len(looping), "loop_out_tokens": sum(v["out"] for v in looping)}
+    srv = open(os.path.join(arm, "server.txt"), encoding="utf-8").read() if os.path.exists(os.path.join(arm, "server.txt")) else ""
+    log = os.path.join(arm, "server-container.log")
+    lines = open(log, encoding="utf-8", errors="replace").read().splitlines() if os.path.exists(log) else []
+    if "docker" in srv:
+        r["engine"] = "vllm"
+        gen = prm = acc = dra = 0.0; dec = []; k = 7
+        mk = re.search(r"num_speculative_tokens (\d+)", srv)
+        k = int(mk.group(1)) if mk else k
+        for l in lines:
+            mt = re.search(r"INFO (\d\d)-(\d\d) (\d\d:\d\d:\d\d)", l)
+            if not mt:
+                continue
+            t = dt.datetime.strptime(f"{t0.year}-{mt[1]}-{mt[2]} {mt[3]}", "%Y-%m-%d %H:%M:%S")
+            if not (t0 <= t <= t1 + dt.timedelta(seconds=10)):
+                continue
+            g = re.search(r"Avg prompt throughput: ([\d.]+) tokens/s, Avg generation throughput: ([\d.]+) tokens/s, Running: (\d+)", l)
+            if g:
+                p, q, run = float(g[1]), float(g[2]), int(g[3])
+                gen += q * 10; prm += p * 10
+                if p == 0 and run >= 1 and q > 0:
+                    dec.append(q)
+            s = re.search(r"Accepted: (\d+) tokens, Drafted: (\d+)", l)
+            if s:
+                acc += int(s[1]); dra += int(s[2])
+        r.update({"gen_tokens": round(gen), "prompt_tokens": round(prm),
+                  "decode_tok_s": round(st.median(dec), 1) if dec else None,
+                  "accept_rate": round(acc / dra, 3) if dra else None,
+                  "mean_accept_len": round(1 + acc / (dra / k), 2) if dra else None})
+    else:
+        r["engine"] = "llama.cpp"
+        start = max([i for i, l in enumerate(lines) if "llama_server: initializing" in l] or [0])
+        pt = pm = et = em = acc = dra = 0.0; per = []
+        for l in lines[start:]:
+            a = re.search(r"prompt eval time =\s+([\d.]+) ms /\s+(\d+) tokens", l)
+            if a:
+                pm += float(a[1]); pt += int(a[2]); continue
+            b = re.search(r"\beval time =\s+([\d.]+) ms /\s+(\d+) tokens", l)
+            if b:
+                em += float(b[1]); et += int(b[2])
+                if int(b[2]) >= 256:
+                    per.append(int(b[2]) / (float(b[1]) / 1000))
+            c = re.search(r"draft acceptance = [\d.]+ \(\s*(\d+) accepted /\s*(\d+) generated\)", l)
+            if c:
+                acc += int(c[1]); dra += int(c[2])
+        r.update({"gen_tokens": round(et), "prompt_tokens": round(pt),
+                  "decode_tok_s": round(st.median(per), 1) if per else None,
+                  "accept_rate": round(acc / dra, 3) if dra else None, "mean_accept_len": None})
+    gp = os.path.join(arm, "gpu_samples.csv")
+    if os.path.exists(gp):
+        import csv
+        a_, b_ = (x.replace(tzinfo=dt.timezone.utc).timestamp() for x in (t0, t1))
+        rows = [x for x in csv.DictReader(open(gp, encoding="utf-8"))
+                if (x.get("unix_ts") or "")[:1].isdigit() and x.get("mclk_mhz") and a_ <= float(x["unix_ts"]) <= b_]
+        if rows:
+            pw = [float(x["power_w"]) for x in rows]; mc = [float(x["mclk_mhz"]) for x in rows]
+            r.update({"power_w_mean": round(st.mean(pw), 1), "power_w_max": max(pw), "mclk_p50": st.median(mc),
+                      "mclk_lt1000_pct": round(100 * sum(x < 1000 for x in mc) / len(mc), 1),
+                      "sclk_mean": round(st.mean(float(x["sclk_mhz"]) for x in rows)),
+                      "vram_peak_mib": max(int(x["vram_used_mib"]) for x in rows),
+                      "gtt_peak_mib": max(int(x["gtt_used_mib"]) for x in rows)})
+        ml = re.search(r"load_vram_used_mib=(\d+)", open(gp, encoding="utf-8").read())
+        r["vram_load_mib"] = int(ml.group(1)) if ml else None
+    return r
+
+
+def agentic_arms(d):
+    import glob
+    return sorted(p for p in glob.glob(os.path.join(d, "rep*", "*")) if os.path.isdir(os.path.join(p, "claude-project")))
+
+
+def render_agentic(d, include=()):
+    arms = [a for x in list(include) + [d] for a in agentic_arms(x)]
+    rows = [r for r in (_agentic_arm(a) for a in arms) if r]
+    if not rows:
+        return {}, ["_No agentic arms (rep*/<arm>/claude-project) found._"]
+    sm = slot_map([r["arm"] for r in rows])
+    S = lambda r: sm[r["arm"]] % 8
+    files = OrderedDict()
+    files["agentic_speed.svg"] = small_multiples("Step A / session — speed and work per arm", [
+        ("wall (s)", "", "{:.0f}", [(r["arm"], r["stepA_s"], S(r)) for r in rows]),
+        ("decode tok/s (median)", "", "{:.1f}", [(r["arm"], r.get("decode_tok_s"), S(r)) for r in rows]),
+        ("generated tokens (server, k)", "k", "{:.1f}", [(r["arm"], (r.get("gen_tokens") or 0) / 1000, S(r)) for r in rows]),
+        ("thinking chars (k)", "k", "{:.0f}", [(r["arm"], r["thinking_chars"] / 1000, S(r)) for r in rows]),
+        ("tool calls", "", "{:.0f}", [(r["arm"], r["tool_calls"], S(r)) for r in rows]),
+        ("draft acceptance (%)", "%", "{:.1f}", [(r["arm"], 100 * r["accept_rate"] if r.get("accept_rate") else None, S(r)) for r in rows]),
+    ])
+    files["agentic_loops.svg"] = small_multiples("Loop signals per arm", [
+        ("largest message (output tokens, k)", "k", "{:.1f}", [(r["arm"], r["max_msg_out"] / 1000, S(r)) for r in rows]),
+        ("longest thinking: repeated lines (%)", "%", "{:.1f}", [(r["arm"], r["longest_think_repeat_pct"], S(r)) for r in rows]),
+        ("loop blocks (40-line window >= 80% repeated)", "", "{:.0f}", [(r["arm"], r["loop_blocks"], S(r)) for r in rows]),
+    ])
+    cols = ["arm", "engine", "stepA_s", "decode_tok_s", "gen_tokens", "prompt_tokens", "accept_rate", "mean_accept_len",
+            "tool_calls", "thinking_chars", "messages", "max_msg_out", "msgs_gt16k", "at_cap", "longest_think_repeat_pct",
+            "loop_blocks", "loop_out_tokens",
+            "power_w_mean", "power_w_max", "mclk_p50", "mclk_lt1000_pct", "sclk_mean", "vram_load_mib",
+            "vram_peak_mib", "gtt_peak_mib"]
+    ap = ["\n**Speed and work per arm**\n", "![Speed and work](charts/agentic_speed.svg)\n",
+          "> Window = session start .. `stop_when` boundary (or the last transcript event). vLLM decode = median of the "
+          "10 s logger windows with prompt throughput 0; llama.cpp decode = median per request with >= 256 generated "
+          "tokens. The two methods differ, so cross-engine ratios are approximate. All MEASURED.\n",
+          "\n**Loop signals**\n", "![Loop signals](charts/agentic_loops.svg)\n",
+          "\n| " + " | ".join(cols) + " |", "|" + "---|" * len(cols)]
+    ap += ["| " + " | ".join("" if r.get(c) is None else str(r.get(c)) for c in cols) + " |" for r in rows]
+    return {k: v for k, v in files.items() if v}, ap
+
+
+RENDERERS = {"quality": render_quality, "throughput": render_throughput, "sweep": render_sweep,
+             "agentic": render_agentic}
 
 
 # ============================================================ main
-def process(d, charts_dir=None, appendix_path=None):
+def process(d, charts_dir=None, appendix_path=None, include=()):
     kind = detect(d)
     if not kind:
-        print(f"skip {d}: no outputs.jsonl / results.jsonl / sweep-summary.json")
+        print(f"skip {d}: no outputs.jsonl / results.jsonl / sweep-summary.json / rep*/<arm>/claude-project")
         return False
-    files, ap = RENDERERS[kind](d)
+    files, ap = RENDERERS[kind](d, include) if kind == "agentic" else RENDERERS[kind](d)
     cdir = charts_dir or os.path.join(d, "charts")
     os.makedirs(cdir, exist_ok=True)
     for name, content in files.items():
@@ -707,13 +897,15 @@ def main():
     ap.add_argument("run_dirs", nargs="+")
     ap.add_argument("--charts", help="output dir for SVGs (default: <run_dir>/charts)")
     ap.add_argument("--appendix", help="output appendix.md path (default: <run_dir>/appendix.md)")
+    ap.add_argument("--include", action="append", default=[],
+                    help="agentic only: another agentic run dir whose arms join the comparison (repeatable; listed first)")
     a = ap.parse_args()
     ok = False
     for d in a.run_dirs:
         if not os.path.isdir(d):
             print(f"skip {d}: not a directory")
             continue
-        ok = process(d, a.charts, a.appendix) or ok
+        ok = process(d, a.charts, a.appendix, a.include) or ok
     raise SystemExit(0 if ok else 1)
 
 

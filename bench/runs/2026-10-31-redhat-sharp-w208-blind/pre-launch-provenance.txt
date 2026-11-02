@@ -1,0 +1,7 @@
+2026-10-31T12:42:50+01:00
+2.1.312 (Claude Code)
+/sys/class/drm/card1/device/hwmon/hwmon2/power1_cap=210000000
+/sys/class/drm/card1/device/hwmon/hwmon2/power1_cap_default=300000000
+dpm_level=manual
+profile= 2 POWER_SAVING*:
+template_sha256=cdff39fb26b60dc90faa292e726655c6b21f62db497846e02e4c4bbab942a84a

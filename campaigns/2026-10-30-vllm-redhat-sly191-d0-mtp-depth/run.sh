@@ -21,7 +21,7 @@ MAXTOK_OVERRIDE="${MAX_TOKENS:-}"  # override every probe's max_tokens
 IMAGE="${IMAGE:-ghcr.io/slybase/vllm-sly-radiance:1.9.1-rocm10.1}"  # docker image (spec "image"); empty = the profile's IMAGE
 mkdir -p "$CAMPAIGN_DIR/done"
 if [ ! -f "$CAMPAIGN_DIR/meta.txt" ]; then
-  { echo "date=$(date -Iseconds)"; echo "model=$MODEL"; echo "engine=vllm profile=sly-redhat/redhat-mxfp4-mtp served_model=qwen38-27b-redhat-mxfp4-mtp"; echo "image=${IMAGE:-profile default}"; echo 'env[redhat-sly191-d0-mtp-fp8kv-ctx262000]=CACTUS_DELTA=0'; echo "vram_budget_mib=$VRAM_BUDGET_MIB"; } > "$CAMPAIGN_DIR/meta.txt"
+  { echo "date=$(date -Iseconds)"; echo "model=$MODEL"; echo "engine=vllm profile=sly-redhat/redhat-mxfp4-mtp served_model=qwen38-27b-redhat-mxfp4-mtp"; echo "image=${IMAGE:-profile default}"; echo 'env[redhat-sly191-d0-mtp-fp8kv-ctx262000]=CACTUS_DELTA=0 WATCHDOG_MIB=32'; echo "vram_budget_mib=$VRAM_BUDGET_MIB"; } > "$CAMPAIGN_DIR/meta.txt"
 fi
 
 server_needed () {  # any listed probe marker missing?
@@ -95,8 +95,8 @@ start_server () {  # name ctx kv -> 0 up, nonzero (recorded) on failure; run CON
   # provenance: the resolved image + digest, env and argv of this server (no GPU, no pull)
   case "$name" in
     'redhat-sly191-d0-mtp-fp8kv-ctx262000')
-      PROFILE='sly-redhat/redhat-mxfp4-mtp' IMAGE="$IMAGE" MAXLEN="$ctx" MAXSEQS="$np" KV_DTYPE="$kv" CACTUS_DELTA=0 PORT=8000 "$EB/vllm/serve_vllm.sh" print > "$CAMPAIGN_DIR/server-$name.txt" 2>&1
-      if PROFILE='sly-redhat/redhat-mxfp4-mtp' IMAGE="$IMAGE" MAXLEN="$ctx" MAXSEQS="$np" KV_DTYPE="$kv" CACTUS_DELTA=0 PORT=8000 "$EB/vllm/serve_vllm.sh" start; then return 0; fi ;;
+      PROFILE='sly-redhat/redhat-mxfp4-mtp' IMAGE="$IMAGE" MAXLEN="$ctx" MAXSEQS="$np" KV_DTYPE="$kv" CACTUS_DELTA=0 WATCHDOG_MIB=32 PORT=8000 "$EB/vllm/serve_vllm.sh" print > "$CAMPAIGN_DIR/server-$name.txt" 2>&1
+      if PROFILE='sly-redhat/redhat-mxfp4-mtp' IMAGE="$IMAGE" MAXLEN="$ctx" MAXSEQS="$np" KV_DTYPE="$kv" CACTUS_DELTA=0 WATCHDOG_MIB=32 PORT=8000 "$EB/vllm/serve_vllm.sh" start; then return 0; fi ;;
   esac
   echo "SERVER-FAILED (start OOM/other; expected near the ceiling): $name ctx=$ctx kv=$kv" \
     | tee -a "$CAMPAIGN_DIR/failures.txt"; stop_server; return 1; }

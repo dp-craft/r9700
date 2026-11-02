@@ -1,0 +1,17 @@
+{
+  "Y": {
+    "name": "r191-sharp-d0",
+    "review": "/home/dev/work/dp-craft/amd/bench/runs/2026-10-31-redhat191-sharp-w208-blind/rep1/r191-sharp-d0/outputs/docs/plans/2026-10-28-2239-dpf-tui-f0-f1/review/W2-08.refine-27b.md",
+    "probes": "/home/dev/work/dp-craft/amd/bench/runs/2026-10-31-redhat191-sharp-w208-blind/rep1/r191-sharp-d0/tmp/dp-refine/W2-08"
+  },
+  "W": {
+    "name": "r191-sharp-d05",
+    "review": "/home/dev/work/dp-craft/amd/bench/runs/2026-10-31-redhat191-sharp-w208-blind/rep1/r191-sharp-d05/outputs/docs/plans/2026-10-28-2239-dpf-tui-f0-f1/review/W2-08.refine-27b.md",
+    "probes": "/home/dev/work/dp-craft/amd/bench/runs/2026-10-31-redhat191-sharp-w208-blind/rep1/r191-sharp-d05/tmp/dp-refine/W2-08"
+  },
+  "X": {
+    "name": "redhat-d0-sharp",
+    "review": "/home/dev/work/dp-craft/amd/bench/runs/2026-10-31-redhat-sharp-w208-blind/rep1/redhat-d0-sharp/outputs/docs/plans/2026-10-28-2239-dpf-tui-f0-f1/review/W2-08.refine-27b.md",
+    "probes": "/home/dev/work/dp-craft/amd/bench/runs/2026-10-31-redhat-sharp-w208-blind/rep1/redhat-d0-sharp/tmp/dp-refine/W2-08"
+  }
+}

@@ -61,6 +61,20 @@ an issue lives in `settings.md`; a fix that was version/env-specific lives in `h
   1 output-cap hit on 1.9.1; the largest began at δ 0.5 and kept going after the fade reached δ 0, so pinned acceptance
   is a symptom rather than the cause (INFERRED). Short-probe speed is unchanged vs 1.8.1 (depth 10k/50k/100k,
   `docs/analysis/2026-10-30-0900-vllm-redhat-mxfp4-depth-transposed.md`).
+- **mechanism (2026-10-31; code MEASURED, mechanism INFERRED):**
+  - **Rule:** the accept test uses `h = min(1, p + sqrt(2δ·p(1−p)))` instead of the target probability p of the drafted token, so δ is
+    a per-token divergence budget (KL ≈ δ).
+  - **1.8.1 (no cap):** h = 1 for p ≥ 1/(1+2δ) = 0.5 at δ 0.5. Every confident drafted token is accepted with certainty, so a
+    repetition cycle has no exit. MEASURED: the 3 largest loops of the 1.8.1 δ 0.5 run all ran to `max_tokens` 64,000.
+  - **1.9.x cap R = 0.5:** keeps at least half the stock escape. MEASURED: 2 of 3 loops escaped, but only 23-30k tokens after the
+    fade had reached δ 0, because by then the target itself predicts the copy.
+  - **Fade too late:** 4 of 6 1.9.1 loop onsets were before `FADE_START` 4,096 output tokens, at full δ.
+  - **δ 0.3 is not a safe middle:** under the cap it accepts exactly like δ 0.5 for every drafted token with p ≥ 0.29.
+  - **Replay rule:** k = 1 replay (`v22.5-sly2`) did not stop δ 0.5 loops on our workload.
+  - **Verdict:** inherent to lossy acceptance plus a 1.8.1 saturation flaw; not a coding bug (δ 0 is bit-exact).
+  - **Knobs that matter:** `CACTUS_CAP_R` (0.8 keeps ≥ 80% of the escape), an early fade (`FADE_START=0`, `FADE_END` a few
+    thousand), or δ 0.
+  - Full write-up: `docs/analysis/2026-10-31-1745-reasoning-replay-sharp-template-cactus-loops.md` §5.
 - **report:** `settings.md` (RADIANCE_CACTUS_DELTA); `profiles/sly-radiance/_engine.env` (comment);
   Sly issue #164.
 

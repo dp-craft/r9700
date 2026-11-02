@@ -1,0 +1,3 @@
+# reuse_server=true -- server managed by the user, not by this driver
+#   IMAGE=reused (user-managed)
+#   PORT=8000 SERVED=qwen38-27b-redhat-mxfp4-dflash

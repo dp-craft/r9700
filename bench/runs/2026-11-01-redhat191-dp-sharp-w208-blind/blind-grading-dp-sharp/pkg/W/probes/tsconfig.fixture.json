@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "noEmit": true,
+    "strict": true,
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "types": ["node"],
+    "typeRoots": ["<WT>/node_modules/@types"],
+    "baseUrl": ".",
+    "paths": { "spec-pipeline/protocol": ["./protocol.ts"] }
+  },
+  "include": ["dpf/tests/**/*.ts", "dpf/src/**/*.ts", "shared/**/*.ts", "protocol.ts"]
+}

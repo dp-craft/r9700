@@ -1,0 +1,6 @@
+2026-10-31T11:17:43+01:00
+attempt 2 (attempt 1 quarantined: bench/runs/2026-10-31-q4kxl-sharp-w208-blind-attempt1-falsestop)
+2.1.312 (Claude Code)
+/sys/class/drm/card1/device/hwmon/hwmon2/power1_cap=210000000
+/sys/class/drm/card1/device/hwmon/hwmon2/power1_cap_default=300000000
+dpm_level=manual

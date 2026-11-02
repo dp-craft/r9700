@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "noEmit": true,
+    "strict": true,
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "types": ["node"],
+    "typeRoots": ["/home/dev/work/dippe/dpf-bench-r191-dp-sharp-d0-r1/node_modules/@types"],
+    "baseUrl": ".",
+    "paths": { "spec-pipeline/protocol": ["./protocol.ts"] }
+  },
+  "include": ["dpf/src/**/*.ts", "shared/**/*.ts", "protocol.ts"]
+}

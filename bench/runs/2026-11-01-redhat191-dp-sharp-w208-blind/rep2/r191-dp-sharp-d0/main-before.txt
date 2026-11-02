@@ -1,0 +1,8 @@
+de110510eb9a4561a8e412f47a7c8d80fa5f0ebd
+A  docs/plans/2026-10-28-2239-dpf-tui-f0-f1/briefs/W2-06.md
+A  docs/plans/2026-10-28-2239-dpf-tui-f0-f1/briefs/W2-07.md
+A  docs/plans/2026-10-28-2239-dpf-tui-f0-f1/briefs/W2-08.md
+M  docs/plans/2026-10-28-2239-dpf-tui-f0-f1/review/27b-fix/RUNBOOK.md
+A  docs/plans/2026-10-28-2239-dpf-tui-f0-f1/review/27b-fix/progress.md
+A  vllm-heretic.sh
+d41d8cd98f00b204e9800998ecf8427e  -

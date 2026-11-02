@@ -1,0 +1,17 @@
+{
+  "Z": {
+    "name": "q4kxl-sharp",
+    "review": "/home/dev/work/dp-craft/amd/bench/runs/2026-10-31-q4kxl-sharp-w208-blind/rep1/q4kxl-sharp/outputs/docs/plans/2026-10-28-2239-dpf-tui-f0-f1/review/W2-08.refine-27b.md",
+    "probes": "/home/dev/work/dp-craft/amd/bench/runs/2026-10-31-q4kxl-sharp-w208-blind/rep1/q4kxl-sharp/tmp/dp-refine/W2-08"
+  },
+  "X": {
+    "name": "redhat-d0",
+    "review": "/home/dev/work/dp-craft/amd/bench/runs/2026-10-30-0947-dpf-brief-ab/delta0-w208/outputs/W2-08.refine-27b.md",
+    "probes": "/home/dev/work/dp-craft/amd/bench/runs/2026-10-30-0947-dpf-brief-ab/delta0-w208/dp-refine/W2-08"
+  },
+  "Y": {
+    "name": "heretic",
+    "review": "/home/dev/work/dp-craft/amd/bench/runs/2026-10-30-0947-dpf-brief-ab/heretic/outputs/W2-08.refine-27b.md",
+    "probes": "/home/dev/work/dp-craft/amd/bench/runs/2026-10-30-0947-dpf-brief-ab/heretic/dp-refine/W2-08"
+  }
+}

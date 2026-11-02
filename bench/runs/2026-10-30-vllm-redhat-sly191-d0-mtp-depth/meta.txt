@@ -1,0 +1,6 @@
+date=2026-10-30T22:40:08+01:00
+model=/mnt/Lin1/work/vllm/sly-radiance/models/RedHatAI__Qwen3.8-27B-MXFP4@16a86728
+engine=vllm profile=sly-redhat/redhat-mxfp4-mtp served_model=qwen38-27b-redhat-mxfp4-mtp
+image=ghcr.io/slybase/vllm-sly-radiance:1.9.1-rocm10.1
+env[redhat-sly191-d0-mtp-fp8kv-ctx262000]=CACTUS_DELTA=0
+vram_budget_mib=32400

@@ -1,0 +1,98 @@
+2026-10-30T22:32:29+01:00 power1_cap=210000000 default=300000000 (uW) before dflash
+>>> starting redhat-sly191-d0-dflash-fp8kv-ctx262000 (ctx=262000 kv=fp8 mtp=0 np=1)
+GPU exclusive: 31445 MiB free (used 1179 MiB), floor 30000 MiB.
+starting vllm-8000 on 127.0.0.1:8000 (sly-redhat/redhat-mxfp4-dflash, ghcr.io/slybase/vllm-sly-radiance:1.9.1-rocm10.1) — first boot compiles, up to 1200s
+up after 163s — model: qwen38-27b-redhat-mxfp4-dflash — vllm: {"version":"0.32.0"} — cmdline: /home/dev/work/dp-craft/amd/bench/.servers/8000.cmdline
+== vllm-sly-redhat-redhat-mxfp4-dflash (http://localhost:8000/v1) ==
+power redhat-sly191-d0-dflash-cr10000: prefill avg 214.0 W (n=5) decode avg 191.2 W (n=5) 
+→ results: /home/dev/work/dp-craft/amd/bench/runs/2026-10-30-2235-engine-redhat-sly191-d0-dflash-cr10000
+--- summary (aggregate rows) ---
+vllm-sly-redhat-redhat-mxfp4-dflash c=1 ttft_p50=3.1237s prefill_p50=3220.5 dec/stream_p50=91.02 AGG=44.95 tok/s err=0
+== vllm-sly-redhat-redhat-mxfp4-dflash (http://localhost:8000/v1) ==
+power redhat-sly191-d0-dflash-cr50000: prefill avg 212.1 W (n=31) decode avg 206.8 W (n=6) 
+→ results: /home/dev/work/dp-craft/amd/bench/runs/2026-10-30-2235-engine-redhat-sly191-d0-dflash-cr50000
+--- summary (aggregate rows) ---
+vllm-sly-redhat-redhat-mxfp4-dflash c=1 ttft_p50=17.5678s prefill_p50=2786.5 dec/stream_p50=69.57 AGG=12.14 tok/s err=0
+== vllm-sly-redhat-redhat-mxfp4-dflash (http://localhost:8000/v1) ==
+power redhat-sly191-d0-dflash-cr100000: prefill avg 207.0 W (n=73) decode avg 207.5 W (n=4) 
+→ results: /home/dev/work/dp-craft/amd/bench/runs/2026-10-30-2236-engine-redhat-sly191-d0-dflash-cr100000
+--- summary (aggregate rows) ---
+vllm-sly-redhat-redhat-mxfp4-dflash c=1 ttft_p50=40.4525s prefill_p50=2409.7 dec/stream_p50=87.3 AGG=5.91 tok/s err=0
+== vllm-sly-redhat-redhat-mxfp4-dflash (http://localhost:8000/v1) ==
+power redhat-sly191-d0-dflash-cr150000: prefill avg 207.6 W (n=121) decode avg 207.5 W (n=6) 
+→ results: /home/dev/work/dp-craft/amd/bench/runs/2026-10-30-2237-engine-redhat-sly191-d0-dflash-cr150000
+--- summary (aggregate rows) ---
+vllm-sly-redhat-redhat-mxfp4-dflash c=1 ttft_p50=67.8565s prefill_p50=2110.9 dec/stream_p50=79.94 AGG=3.58 tok/s err=0
+stopped vllm-8000 (log kept: /home/dev/work/dp-craft/amd/bench/.servers/8000.log)
+[throughput] wrote 4 charts -> /home/dev/work/dp-craft/amd/bench/runs/2026-10-30-vllm-redhat-sly191-d0-dflash-depth/charts/  + /home/dev/work/dp-craft/amd/bench/runs/2026-10-30-vllm-redhat-sly191-d0-dflash-depth/appendix.md
+    depth_prefill.svg
+    depth_decode.svg
+    memory.svg
+    power_phase.svg
+charts: /home/dev/work/dp-craft/amd/bench/runs/2026-10-30-vllm-redhat-sly191-d0-dflash-depth/charts/  ·  appendix: /home/dev/work/dp-craft/amd/bench/runs/2026-10-30-vllm-redhat-sly191-d0-dflash-depth/appendix.md
+campaign done. consolidated results: /home/dev/work/dp-craft/amd/bench/runs/2026-10-30-vllm-redhat-sly191-d0-dflash-depth/results.jsonl
+no container vllm-8000
+rc=0
+2026-10-30T22:40:08+01:00 power1_cap=210000000 default=300000000 (uW) after dflash / before mtp
+>>> starting redhat-sly191-d0-mtp-fp8kv-ctx262000 (ctx=262000 kv=fp8 mtp=0 np=1)
+GPU exclusive: 31784 MiB free (used 848 MiB), floor 30000 MiB.
+starting vllm-8000 on 127.0.0.1:8000 (sly-redhat/redhat-mxfp4-mtp, ghcr.io/slybase/vllm-sly-radiance:1.9.1-rocm10.1) — first boot compiles, up to 1200s
+WATCHDOG killed vllm-8000: VRAM nearly full during boot (free_mib=107 utc=21:42:49.231, floor 256 MiB)
+container DIED during startup — last log lines (/home/dev/work/dp-craft/amd/bench/.servers/8000.log):
+(EngineCore pid=339) INFO 10-30 21:41:55 [rocm.py:753] Using R4D_HYBRID backend (selected via --attention-backend).
+(EngineCore pid=339) INFO 10-30 21:41:55 [rocm_aiter_unified_attn.py:178] Using aiter unified attention for RocmAiterUnifiedAttentionImpl
+(EngineCore pid=339) INFO 10-30 21:41:55 [radiance_lmhead_int4.py:80] [radiance] language_model.lm_head -> int4 W4A16 (group 128, clip=mse)
+(EngineCore pid=339) WARNING 10-30 21:41:56 [compilation.py:1348] Op 'sparse_attn_indexer' not present in model, enabling with '+sparse_attn_indexer' has no effect
+(EngineCore pid=339) INFO 10-30 21:41:56 [base_loader.py:82] Initializing model took 2.172296 seconds
+(EngineCore pid=339) INFO 10-30 21:41:56 [weight_utils.py:1108] Filesystem type for checkpoints: EXT4. Checkpoint size: 18.47 GiB. Available RAM: 13.56 GiB.
+(EngineCore pid=339) INFO 10-30 21:41:56 [weight_utils.py:1138] Auto-prefetch is disabled because the filesystem (EXT4) is not a recognized network FS (NFS/Lustre) and the checkpoint size (18.47 GiB) exceeds 90% of available RAM (13.56 GiB).
+Loading safetensors checkpoint shards:   0% Completed | 0/2 [00:00<?, ?it/s]
+Loading safetensors checkpoint shards:  50% Completed | 1/2 [00:46<00:46, 46.35s/it]
+Loading safetensors checkpoint shards: 100% Completed | 2/2 [00:46<00:00, 23.20s/it]
+
+(EngineCore pid=339) INFO 10-30 21:42:43 [default_loader.py:512] Loading weights took 47.00 seconds
+(EngineCore pid=339) INFO 10-30 21:42:45 [radiance_embed_int8.py:98] [radiance] embed_tokens quantised to int4: [248320, 5120], 1.76 GiB freed, device free 13.79 GiB
+[radiance.mxfp4] decode kernel ON (M<=128), 72 MiB split-K scratch
+(EngineCore pid=339) INFO 10-30 21:42:48 [radiance_lmhead_int4.py:158] [radiance] lm_head quantised to int4 g128: [248320, 5120], 1.76 GiB freed
+SERVER-FAILED (start OOM/other; expected near the ceiling): redhat-sly191-d0-mtp-fp8kv-ctx262000 ctx=262000 kv=fp8
+no container vllm-8000
+campaign done. consolidated results: /home/dev/work/dp-craft/amd/bench/runs/2026-10-30-vllm-redhat-sly191-d0-mtp-depth/results.jsonl
+no container vllm-8000
+rc=0
+2026-10-30T22:42:50+01:00 power1_cap=210000000 default=300000000 (uW) after mtp
+2026-10-30T22:43:53+01:00 power1_cap=210000000 profile= 2 POWER_SAVING*: before mtp retry (WATCHDOG_MIB=32)
+>>> starting redhat-sly191-d0-mtp-fp8kv-ctx262000 (ctx=262000 kv=fp8 mtp=0 np=1)
+GPU exclusive: 32063 MiB free (used 561 MiB), floor 30000 MiB.
+starting vllm-8000 on 127.0.0.1:8000 (sly-redhat/redhat-mxfp4-mtp, ghcr.io/slybase/vllm-sly-radiance:1.9.1-rocm10.1) — first boot compiles, up to 1200s
+up after 391s — model: qwen38-27b-redhat-mxfp4-mtp — vllm: {"version":"0.32.0"} — cmdline: /home/dev/work/dp-craft/amd/bench/.servers/8000.cmdline
+== vllm-sly-redhat-redhat-mxfp4-mtp (http://localhost:8000/v1) ==
+power redhat-sly191-d0-mtp-cr10000: prefill avg 163.2 W (n=6) decode avg 194.4 W (n=8) 
+→ results: /home/dev/work/dp-craft/amd/bench/runs/2026-10-30-2250-engine-redhat-sly191-d0-mtp-cr10000
+--- summary (aggregate rows) ---
+vllm-sly-redhat-redhat-mxfp4-mtp c=1 ttft_p50=3.229s prefill_p50=2783.2 dec/stream_p50=60.4 AGG=34.19 tok/s err=0
+== vllm-sly-redhat-redhat-mxfp4-mtp (http://localhost:8000/v1) ==
+power redhat-sly191-d0-mtp-cr50000: prefill avg 207.1 W (n=33) decode avg 199.0 W (n=6) 
+→ results: /home/dev/work/dp-craft/amd/bench/runs/2026-10-30-2250-engine-redhat-sly191-d0-mtp-cr50000
+--- summary (aggregate rows) ---
+vllm-sly-redhat-redhat-mxfp4-mtp c=1 ttft_p50=18.4597s prefill_p50=2656.3 dec/stream_p50=66.61 AGG=11.63 tok/s err=0
+== vllm-sly-redhat-redhat-mxfp4-mtp (http://localhost:8000/v1) ==
+power redhat-sly191-d0-mtp-cr100000: prefill avg 206.6 W (n=77) decode avg 225.5 W (n=6) 
+→ results: /home/dev/work/dp-craft/amd/bench/runs/2026-10-30-2251-engine-redhat-sly191-d0-mtp-cr100000
+--- summary (aggregate rows) ---
+vllm-sly-redhat-redhat-mxfp4-mtp c=1 ttft_p50=42.8293s prefill_p50=2253.1 dec/stream_p50=71.96 AGG=5.49 tok/s err=0
+== vllm-sly-redhat-redhat-mxfp4-mtp (http://localhost:8000/v1) ==
+power redhat-sly191-d0-mtp-cr150000: prefill avg 209.3 W (n=129) decode avg 206.3 W (n=7) 
+→ results: /home/dev/work/dp-craft/amd/bench/runs/2026-10-30-2253-engine-redhat-sly191-d0-mtp-cr150000
+--- summary (aggregate rows) ---
+vllm-sly-redhat-redhat-mxfp4-mtp c=1 ttft_p50=71.927s prefill_p50=2016.7 dec/stream_p50=63.09 AGG=3.38 tok/s err=0
+stopped vllm-8000 (log kept: /home/dev/work/dp-craft/amd/bench/.servers/8000.log)
+[throughput] wrote 4 charts -> /home/dev/work/dp-craft/amd/bench/runs/2026-10-30-vllm-redhat-sly191-d0-mtp-depth/charts/  + /home/dev/work/dp-craft/amd/bench/runs/2026-10-30-vllm-redhat-sly191-d0-mtp-depth/appendix.md
+    depth_prefill.svg
+    depth_decode.svg
+    memory.svg
+    power_phase.svg
+charts: /home/dev/work/dp-craft/amd/bench/runs/2026-10-30-vllm-redhat-sly191-d0-mtp-depth/charts/  ·  appendix: /home/dev/work/dp-craft/amd/bench/runs/2026-10-30-vllm-redhat-sly191-d0-mtp-depth/appendix.md
+campaign done. consolidated results: /home/dev/work/dp-craft/amd/bench/runs/2026-10-30-vllm-redhat-sly191-d0-mtp-depth/results.jsonl
+no container vllm-8000
+rc=0
+2026-10-30T22:55:49+01:00 power1_cap=210000000 profile= 2 POWER_SAVING*: after mtp retry
