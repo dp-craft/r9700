@@ -55,12 +55,15 @@ Source: `thinking_digest.jsonl`. "Thinking" = characters in `thinking` blocks. O
 |---|---:|---:|---:|---:|---|---:|---:|---:|---|---:|---:|---:|
 | Q4_K_XL + sharp | **70** | 65 | 241,694 | **3,453** | 719 / 11,966 / 64,038 | 62% | **15** | 2 | 1 (437) | 3,789 | 11.5% | **23** |
 | RedHat 1.9.1 + sharp δ 0 | 80 | 62 | 291,269 | **3,641** | 794 / 13,539 / 53,700 | 50% | 18 | 3 | 1 (327) | 2,181 | 15.0% | 21 |
-| RedHat 1.9.1 + dp-sharp δ 0 | 73 | 54 | 226,522 | **3,103** | 901 / 8,858 / 43,229 | 70% | 17 | 0 | 0 | 1,242 | 0% | **16\*** |
+| RedHat 1.9.1 + dp-sharp V1 δ 0 | 73 | 54 | 226,522 | **3,103** | 901 / 8,858 / 43,229 | 70% | 17 | 0 | 0 | 1,242 | 0% | **16\*** |
+| RedHat 1.9.1 + dp-sharp V2 δ 0 | 125 | 276 | 387,609 | 3,101 | — | — | — | — | — | 2,384 | 0% | **~26\*\*** |
 | RedHat 1.8.1 + sharp δ 0 | 100 | 101 | 304,314 | **3,043** | 596 / 7,387 / 58,253 | 60% | 25 | 3 | 2 (344, 270) | 2,820 | 21.8% | 22 |
 | RedHat 1.8.1 old template δ 0 | 155 | 143 | 488,931 | **3,154** | 1,156 / 6,964 / 56,605 | 58% | 26 | 7 | 2 (179, 219) | 3,867 | 10.3% | 20 |
 | RedHat 1.9.1 + sharp δ 0.3 | 43 | 32 | 116,056 | 2,699 | 1,577 / 8,350 / 26,874 | 50% | 15 | 0 | 0 | 514 | 0% | **FAILED — no blind review** |
 
-\* **dp-sharp** (added 2026-11-01, campaign `2026-11-01-redhat191-dp-sharp-w208-blind`; Opus grade 2026-11-02): the official sharp keep-all template with the dp terse prompt, the one variable vs `RedHat 1.9.1 + sharp δ 0` (keep-all replay + δ 0 held fixed). Its **Opus weighted (16) is the authoritative Opus grade** (prompt-only, no tools — `grading-opus.md`): 8/19 reference findings (high 3/6, med 2/7, low 3/6), precision **11/12** (7 matched + 4 real review-only, 0 wrong, 1 unverifiable; 1 false claim inside finding W7). This run was on a **throttled GPU** (mclk 1,258 MHz, power mean 203 W vs the arms above at 875 MHz / ~137 W), so its **Window (1,242 s)** and the speed table's clock/power are **not comparable** to the other rows; the transcript-derived columns (tool calls, thinking chars, distinct files read, compactions) and the review content are. It **completed** step A (wrote the review), unlike `sharp δ 0.3` above.
+\* **dp-sharp V1** (added 2026-11-01, campaign `2026-11-01-redhat191-dp-sharp-w208-blind`; Opus grade 2026-11-02): the official sharp keep-all template with the dp terse prompt (V1), the one variable vs `RedHat 1.9.1 + sharp δ 0` (keep-all replay + δ 0 held fixed). Its **Opus weighted (16) is the authoritative Opus grade** (prompt-only, no tools — `grading-opus.md`): 8/19 reference findings (high 3/6, med 2/7, low 3/6), precision **11/12** (7 matched + 4 real review-only, 0 wrong, 1 unverifiable; 1 false claim inside finding W7). This run was on a **throttled GPU** (mclk 1,258 MHz, power mean 203 W vs the arms above at 875 MHz / ~137 W), so its **Window (1,242 s)** and the speed table's clock/power are **not comparable** to the other rows; the transcript-derived columns (tool calls, thinking chars, distinct files read, compactions) and the review content are. It **completed** step A (wrote the review), unlike `sharp δ 0.3` above.
+
+\*\* **dp-sharp V2** (rep2, 2026-11-02): same arm with an updated terse prompt (V2: explicit step-by-step mechanics tracing, boundary/failure-case simulation, end-to-end continuity, "never stop at surface/structural checks"). **Preliminary** mapping (pending authoritative Opus grade via `opus-grade-prompt-rep2.md`): **11/19** reference findings (high 4/6, med 3/7, low 4/6), weighted **~26/38**. Recovered #2 (walk duplication, high) and #8 (empty-line→schema, med) that V1 missed; kept all of V1's matches. Still missed #1 (confirm-chain), #4 (T3 source-vs-`@tmp`) — the two remaining highs are cross-contract data-flow defects. 19 findings total (vs V1's 12). Wall 2,384 s (~1.9× V1) on the same throttled GPU.
 
 Tool-call mix (MEASURED). `search` = grep/rg/find/ls · `read` = cat/sed/head/tail/wc + Read · `probe` = tsc/eslint/vitest/npx/node:
 
@@ -119,26 +122,36 @@ findings. This is the review-quality comparison — how much of the reference ea
 | RedHat 1.8.1 + sharp δ 0 | 22 | 11 | 4 / 3 / 4 | 14 | 11 | 3 | 0 | 1.0 |
 | RedHat 1.9.1 + sharp δ 0 (keep-all) | 21 | 10 | 4 / 3 / 3 | 15 | 10 | 4 | 1 | 0.93 |
 | RedHat 1.9.1 + sharp δ 0.5 | 16 | 7 | 3 / 3 / 1 | 8 | 7 | 1 | 0 | 1.0 |
-| **RedHat 1.9.1 + dp-sharp δ 0 (terse)** | **16** | **8** | **3 / 2 / 3** | **12** | **7** | **4** | **0** | **0.92** (11/12) |
+| RedHat 1.9.1 + dp-sharp V1 δ 0 (terse) | **16** | **8** | **3 / 2 / 3** | **12** | **7** | **4** | **0** | **0.92** (11/12, graded) |
+| RedHat 1.9.1 + dp-sharp V2 δ 0 (terse) | **~26** (prelim) | **11** | **4 / 3 / 4** | **19** | TBD | TBD | TBD | TBD (pending grade) |
 
-*dp-sharp row (authoritative Opus grade 2026-11-02, prompt-only — `grading-opus.md`): one finding (W11) is **unverifiable** (its
+*dp-sharp V1 row (authoritative Opus grade 2026-11-02, prompt-only — `grading-opus.md`): one finding (W11) is **unverifiable** (its
 cited W2-04/W2-05 sibling briefs were not embedded in the no-tools grade) — counted against precision per the rubric, so
 real-only = 4 and precision = (7 + 4) / 12 = 11/12. There is also **1 false claim** inside finding W7 (complexity >5 → commit-gate
 error, contradicted by its own probe PB1: complexity 6 → warning, 0 errors); it does not change the W7 match (ref #19).*
 
-- **dp-sharp found 8/19** reference findings (high 3, med 2, low 3), weighted **16/38** (authoritative Opus grade,
+*dp-sharp V2 row (rep2, 2026-11-02): updated terse prompt (explicit step-by-step mechanics tracing, boundary/failure-case simulation,
+end-to-end continuity). **Preliminary** mapping (pending authoritative Opus grade via `opus-grade-prompt-rep2.md`): 11/19 reference
+findings (high 4/6, med 3/7, low 4/6), weighted ~26/38. Recovered #2 (walk duplication, high) and #8 (empty-line→schema, med) that
+V1 missed; kept all of V1's matches. Still missed #1 (confirm-chain), #4 (T3 source-vs-`@tmp`) — cross-contract data-flow defects.
+19 findings total (vs V1's 12); 125 tool calls (vs 74); 387,609 thinking chars (vs 226,522); wall 2,384 s (vs 1,242 s).*
+
+- **dp-sharp V1 found 8/19** reference findings (high 3, med 2, low 3), weighted **16/38** (authoritative Opus grade,
   `campaigns/2026-11-01-redhat191-dp-sharp-w208-blind/grading-opus.md`), precision **11/12** (7 matched + 4 real review-only,
   0 wrong, 1 unverifiable — W11).
+- **dp-sharp V2 (preliminary) found 11/19** reference findings (high 4, med 3, low 4), weighted **~26/38** — a strict improvement
+  over V1 (+3 findings, +10 weighted points). The V2 terse prompt (explicit step-by-step mechanics tracing + boundary/failure-case
+  simulation) recovered #2 (walk duplication) and #8 (empty-line→schema) that V1's terseness had cut. Still missed #1 (confirm-chain)
+  and #4 (T3 source-vs-`@tmp`) — the two remaining highs are **cross-contract data-flow defects** (what the write actually produces
+  vs what the downstream contract/test expects), a different class from the state-machine simulation V2 now performs.
 - It found **fewer reference findings than the keep-all δ 0 arms** (10/19 → 21/38) and **more than sharp δ 0.5** (7/19 → 16/38).
-  Its review was **more focused** (12 findings, 74 tool calls, 0 compactions) with **no wrong finding** (keep-all δ 0 had
-  1 wrong finding + 3 false claims, precision 0.93) — its 0.92 precision is the unverifiable W11 plus the false claim in W7,
-  not a wrong finding.
-- **Every dp-sharp miss is one of the deeper flow/state defects (Opus-confirmed):** the missed highs #1 (edited goals never confirm —
+  Its review was **more focused** (12 findings V1 / 19 V2, 74/125 tool calls, 0 compactions) with **no wrong finding** (keep-all δ 0 had
+  1 wrong finding + 3 false claims, precision 0.93).
+- **Every dp-sharp V1 miss is one of the deeper flow/state defects (Opus-confirmed):** the missed highs #1 (edited goals never confirm —
   applyResolve writes goals.json not confirmed.json + C8 re-pause → operator), #2 (walk duplicates every goal), #4 (T3 asserts G-2
-  source but irSet passes `--value @tmp`, fake records argv only), plus missed meds #8/#9 (applyResolve throw paths). It caught the
-  concrete, locally-probed highs (#3 T3 double-spawn, #5 fixture import path, #6 import-sort) but stopped before the multi-step
-  state/control-flow defects; the Opus grader: it "completely missed the most severe logical and data-flow flaws in the state
-  machine (O1, O2, O8, O9), focusing heavily on syntax and structural discrepancies rather than semantic correctness."
+  source but irSet passes `--value @tmp`, fake records argv only), plus missed meds #8/#9 (applyResolve throw paths). V2 recovered #2
+  and #8; the remaining misses (#1, #4, #7, #9, #11, #12, #14, #16, #18) are either cross-contract data-flow (#1, #4) or
+  assertion-strength/unused-input/abort-class (#9, #12, #14, #16) defects.
   → *Terseness trades coverage for focus: tighter, cleaner review, narrower finding set.* The full finding-by-finding handling
   (each of the 19 accepted/rejected) is in `campaigns/2026-11-01-redhat191-dp-sharp-w208-blind/analysis.md`.
 

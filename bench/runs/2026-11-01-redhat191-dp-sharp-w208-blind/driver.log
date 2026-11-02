@@ -2,3 +2,8 @@
 21:53:58 [rep1/r191-dp-sharp-d0] claude call 0 (left 5400s)
 22:14:41 [rep1/r191-dp-sharp-d0] call 0 rc=137 session=82110e0d-edc4-487d-bb14-a985fb7df5ed
 22:14:41 [rep1/r191-dp-sharp-d0] status=stopped wall_s=1243 calls=1 resumes=0 session=82110e0d-edc4-487d-bb14-a985fb7df5ed done_line=-
+09:44:33 [rep1/r191-dp-sharp-d0] skip (done): rep1.r191-dp-sharp-d0
+09:44:33 [rep2/r191-dp-sharp-d0] reusing user-managed server on :8000 (no boot/stop; no GPU exclusive)
+09:44:34 [rep2/r191-dp-sharp-d0] claude call 0 (left 5400s)
+10:24:18 [rep2/r191-dp-sharp-d0] call 0 rc=137 session=0aab65ee-4411-4d77-8c2a-24b9f6f8fe67
+10:24:18 [rep2/r191-dp-sharp-d0] status=stopped wall_s=2384 calls=1 resumes=0 session=0aab65ee-4411-4d77-8c2a-24b9f6f8fe67 done_line=-

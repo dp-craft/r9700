@@ -1,2 +1,3 @@
 rep	arm	status	wall_s	calls	resumes	done_line	main_unchanged	port_free	image	env
 1	r191-dp-sharp-d0	stopped	1243	1	0	-	yes	reused	reused (user-managed)	CACTUS_DELTA=0 CHAT_TEMPLATE=/home/dev/work/dp-craft/amd/campaigns/2026-11-01-redhat191-dp-sharp-w208-blind/dp-sharp-chat_template.jinja
+2	r191-dp-sharp-d0	stopped	2384	1	0	-	yes	reused	reused (user-managed)	CACTUS_DELTA=0 CHAT_TEMPLATE=/home/dev/work/dp-craft/amd/campaigns/2026-11-01-redhat191-dp-sharp-w208-blind/dp-sharp-chat_template.jinja
