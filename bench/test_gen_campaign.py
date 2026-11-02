@@ -387,6 +387,13 @@ class AgenticBase(unittest.TestCase):
         s.update(over)
         return s
 
+    def make_reuse_spec(self, **over):
+        """reuse_server=true: no server block (ignored), arms carry only a name (env inert)."""
+        s = self.make_spec(reuse_server=True, arms=[{"name": "fast"}])
+        del s["server"]
+        s.update(over)
+        return s
+
     # ---- run helpers
     def script(self, spec=None):
         spec = spec or self.spec
@@ -1297,6 +1304,129 @@ class StopWhenE2E(AgenticBase):
         self.assertEqual(out, [], "orphan watcher/session")
         self.run_script(s)
         self.assertEqual(self.status_of("never"), "interrupted", self.out)
+
+
+# ======================================================================================
+# Part F: reuse_server mode (run against an already-running, user-managed vllm server)
+#   The driver must NOT boot, stop, unload or GPU-exclude the server. It verifies the served
+#   name, samples the GPU, and records port_free=reused. The stub curl reads stubdir/served.txt
+#   (normally written by serve_vllm start; in reuse we seed it, since no start ever happens).
+# ======================================================================================
+STUB_CURL_FAIL = r'''#!/usr/bin/env bash
+# server is down: curl -sf fails (no response).
+echo "connection refused" >&2; exit 7
+'''
+
+class AgenticReuse(AgenticBase):
+    def setUp(self):
+        super().setUp()
+        self.spec = self.make_reuse_spec()
+
+    def seed_served(self, name=SERVED):
+        write(os.path.join(self.stubdir, "served.txt"), name + "\n")
+
+    # --- validation ---
+    def test_reuse_spec_is_valid(self):
+        self.assertEqual(gc.validate_spec(self.make_reuse_spec()), "README.md")
+
+    def test_reuse_must_be_bool(self):
+        # reuse_server ignores the server block (allowed, ignored), but reuse_server itself must be a bool.
+        s = self.make_reuse_spec()
+        s["reuse_server"] = "yes"
+        self.assertIn("reuse_server", exits(self, gc.validate_spec, s))
+
+    def test_reuse_allows_and_ignores_server_block(self):
+        s = self.make_reuse_spec()
+        s["server"] = {"maxlen": 4096, "maxseqs": 1, "kv_dtype": "fp8", "gpu_util": 0.93,
+                       "watchdog_mib": 32, "free_mib_floor": 1000}
+        self.assertEqual(gc.validate_spec(s), "README.md")
+
+    def test_reuse_rejects_capture_requests(self):
+        s = self.make_reuse_spec(capture_requests=True)
+        self.assertIn("mutually exclusive", exits(self, gc.validate_spec, s))
+
+    def test_reuse_arm_needs_no_profile(self):
+        # a reuse arm carries only a name; no profile (the server is user-managed).
+        self.assertEqual(gc.validate_spec(self.make_reuse_spec(arms=[{"name": "only"}])), "README.md")
+
+    def test_reuse_rejects_missing_required(self):
+        # reuse does NOT remove the base required keys; only `server` is optional.
+        s = self.make_reuse_spec()
+        del s["served_model"]
+        self.assertIn("served_model", exits(self, gc.validate_spec, s))
+
+    # --- emitted script ---
+    def test_emit_reuse_no_boot_or_gpu(self):
+        sh = gc.emit_runsh(self.make_reuse_spec())
+        # the server is acquired, not booted: no serve start/print/stop, no gpu_exclusive invocation
+        self.assertIn("reusing user-managed server", sh)
+        self.assertNotIn('"$SERVE_VLLM" start', sh)
+        self.assertNotIn('"$SERVE_VLLM" print', sh)
+        self.assertNotIn('"$SERVE_VLLM" stop', sh)
+        self.assertNotIn('$("$GPU_EXCLUSIVE"', sh)        # the var is defined but never invoked
+        # the shared served-name check still runs
+        self.assertIn("pyh models", sh)
+
+    def test_bash_n_reuse(self):
+        bash_n(self, gc.emit_runsh(self.make_reuse_spec()))
+
+    # --- end-to-end ---
+    def test_reuse_runs_against_running_server(self):
+        self.seed_served()
+        p = self.run_script(self.spec)
+        self.assertEqual(p.returncode, 0, self.out)
+        self.assertEqual(self.status_of("fast"), "done", self.out)
+        rows = {r["arm"]: r for r in self.summary()}
+        self.assertEqual(rows["fast"]["port_free"], "reused")
+        self.assertEqual(rows["fast"]["image"], "reused (user-managed)")
+        # no server boot, no GPU exclusive, no stop
+        self.assertEqual([l for l in self.lines("serve.log")], [])
+        self.assertEqual(self.lines("gpu.log"), [])
+        # the server.txt marker records the reuse
+        st = open(self.arm_dir("fast") + "/server.txt").read()
+        self.assertIn("reuse_server=true", st)
+        self.assertIn("IMAGE=reused (user-managed)", st)
+        # the live /v1/models check captured the running model
+        self.assertIn(SERVED, open(self.arm_dir("fast") + "/served-models-live.txt").read())
+        # teardown left the server untouched (no stop logged)
+        self.assertTrue(os.path.exists(self.arm_dir("fast") + "/server-stop.txt"))
+        self.assertIn("reused", open(self.arm_dir("fast") + "/server-stop.txt").read())
+
+    def test_reuse_server_mismatch(self):
+        self.seed_served("some-other-model")
+        p = self.run_script(self.spec)
+        self.assertEqual(p.returncode, 0, self.out)        # continue-on-failure: run exits 0
+        self.assertEqual(self.status_of("fast"), "served_name_mismatch", self.out)
+        self.assertTrue(os.path.exists(self.run_dir + "/failures.txt"))
+
+    def test_reuse_server_down(self):
+        # a failing curl stub: the shared /v1/models check and the live check both fail
+        cfail = write(os.path.join(self.stubs, "curl_fail"), STUB_CURL_FAIL, 0o755)
+        p = self.run_script(self.spec, CURL=cfail)
+        self.assertEqual(p.returncode, 0, self.out)
+        self.assertEqual(self.status_of("fast"), "server_fail", self.out)
+
+    def test_reuse_does_not_stop_server_on_sigint(self):
+        # even when interrupted, the driver never issues a stop (the server is not ours)
+        self.seed_served()
+        s = self.make_reuse_spec(arms=[{"name": "never"}])   # never finishes -> interrupted
+        proc = subprocess.Popen(["bash", self.script(s)], env=self.env(), stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT, text=True, start_new_session=True, preexec_fn=sigint_default)
+        t0 = time.time()
+        while time.time() - t0 < 30 and not self.lines("claude.log"):
+            time.sleep(0.1)
+        time.sleep(1)
+        os.killpg(proc.pid, signal.SIGINT)
+        try:
+            proc.wait(timeout=60)
+        except subprocess.TimeoutExpired:
+            os.killpg(proc.pid, signal.SIGKILL)
+            self.fail("run.sh did not exit after SIGINT")
+        time.sleep(0.5)
+        orphans = subprocess.run(["pgrep", "-f", self.run_dir], capture_output=True, text=True).stdout.split()
+        self.assertEqual(orphans, [], "orphan session process")
+        # no stop ever issued (the server is not ours to stop)
+        self.assertEqual([l for l in self.lines("serve.log") if l.startswith("stop")], [])
 
 
 if __name__ == "__main__":

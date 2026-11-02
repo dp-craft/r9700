@@ -55,9 +55,12 @@ Source: `thinking_digest.jsonl`. "Thinking" = characters in `thinking` blocks. O
 |---|---:|---:|---:|---:|---|---:|---:|---:|---|---:|---:|---:|
 | Q4_K_XL + sharp | **70** | 65 | 241,694 | **3,453** | 719 / 11,966 / 64,038 | 62% | **15** | 2 | 1 (437) | 3,789 | 11.5% | **23** |
 | RedHat 1.9.1 + sharp δ 0 | 80 | 62 | 291,269 | **3,641** | 794 / 13,539 / 53,700 | 50% | 18 | 3 | 1 (327) | 2,181 | 15.0% | 21 |
+| RedHat 1.9.1 + dp-sharp δ 0 | 73 | 54 | 226,522 | **3,103** | 901 / 8,858 / 43,229 | 70% | 17 | 0 | 0 | 1,242 | 0% | **16\*** |
 | RedHat 1.8.1 + sharp δ 0 | 100 | 101 | 304,314 | **3,043** | 596 / 7,387 / 58,253 | 60% | 25 | 3 | 2 (344, 270) | 2,820 | 21.8% | 22 |
 | RedHat 1.8.1 old template δ 0 | 155 | 143 | 488,931 | **3,154** | 1,156 / 6,964 / 56,605 | 58% | 26 | 7 | 2 (179, 219) | 3,867 | 10.3% | 20 |
 | RedHat 1.9.1 + sharp δ 0.3 | 43 | 32 | 116,056 | 2,699 | 1,577 / 8,350 / 26,874 | 50% | 15 | 0 | 0 | 514 | 0% | **FAILED — no blind review** |
+
+\* **dp-sharp** (added 2026-11-01, campaign `2026-11-01-redhat191-dp-sharp-w208-blind`; Opus grade 2026-11-02): the official sharp keep-all template with the dp terse prompt, the one variable vs `RedHat 1.9.1 + sharp δ 0` (keep-all replay + δ 0 held fixed). Its **Opus weighted (16) is the authoritative Opus grade** (prompt-only, no tools — `grading-opus.md`): 8/19 reference findings (high 3/6, med 2/7, low 3/6), precision **11/12** (7 matched + 4 real review-only, 0 wrong, 1 unverifiable; 1 false claim inside finding W7). This run was on a **throttled GPU** (mclk 1,258 MHz, power mean 203 W vs the arms above at 875 MHz / ~137 W), so its **Window (1,242 s)** and the speed table's clock/power are **not comparable** to the other rows; the transcript-derived columns (tool calls, thinking chars, distinct files read, compactions) and the review content are. It **completed** step A (wrote the review), unlike `sharp δ 0.3` above.
 
 Tool-call mix (MEASURED). `search` = grep/rg/find/ls · `read` = cat/sed/head/tail/wc + Read · `probe` = tsc/eslint/vitest/npx/node:
 
@@ -65,6 +68,7 @@ Tool-call mix (MEASURED). `search` = grep/rg/find/ls · `read` = cat/sed/head/ta
 |---|---:|---:|---:|---:|
 | Q4_K_XL + sharp | 28 | 17 | 18 | 5 |
 | RedHat 1.9.1 + sharp δ 0 | 27 | 24 | 16 | 11 |
+| RedHat 1.9.1 + dp-sharp δ 0 | 18 | 22 | 14 | 13 |
 | RedHat 1.8.1 + sharp δ 0 | 30 | 38 | 26 | 1 |
 | RedHat 1.8.1 old template δ 0 | 28 | 44 | 63 | 13 |
 | RedHat 1.9.1 + sharp δ 0.3 | 19 | 19 | **1** | 0 |
@@ -77,6 +81,7 @@ two methods differ, so cross-engine ratios are approximate.
 |---|---:|---:|---|---:|---:|---:|---|---|---:|
 | Q4_K_XL + sharp | 3,789 | 32.6 | 0.615 (—) | 102,490 | 148,450 (~2.1k) | 0.0% | 875 (100%) | 28,043 / 28,975 | 1,017 |
 | RedHat 1.9.1 + sharp δ 0 | 2,182 | 55.8 | 0.34 (3.38) | 120,001 | 313,201 (~3.9k) | 0.6% | 875 (100%) | 31,046 / 32,285 | 217 |
+| RedHat 1.9.1 + dp-sharp δ 0 (throttled) | 1,242 | N/A | N/A | N/A | N/A | 3.9% | 1,258 (13%) | 31,550 / 31,649 | 143 |
 | RedHat 1.8.1 + sharp δ 0 | 2,819 | 55.5 | 0.348 (3.44) | 144,380 | 447,097 (~4.5k) | 0.0% | 875 (100%) | 30,884 / 32,057 | 261 |
 | RedHat 1.9.1 + sharp δ 0.3 | 514 | **84.2** | 0.55 (4.85) | 38,570 | 138,471 (~3.2k) | **15.8%** | 875 (100%) | 31,238 / **32,433** | 217 |
 
@@ -85,6 +90,11 @@ two methods differ, so cross-engine ratios are approximate.
 >
 > Peak VRAM of the δ 0.3 arm is 191 MiB below physical 32,624 MiB. The Q4 arm's GTT peak of 1,017 MiB is ~940 MiB above the ~77 MiB
 > idle baseline: a host-RAM spill to flag. It is consistent with `--cache-ram 12288` prompt-cache traffic (INFERRED, OPEN).
+>
+> The **dp-sharp** row is **throttled** (mclk 1,258 MHz, power 203 W vs the arms above at 875 MHz / ~137 W), so its Wall / mclk /
+> power are **not comparable**; its Decode/Gen/Prefilled are **N/A** because the vLLM logger reported `output_tokens = 0` (the engine
+> was mislabelled `llama.cpp` by `report.py` for the same reason). Its VRAM / GTT (peak 31,649 / 143 MiB) are still valid — no host-RAM
+> spill (GTT within ~150 MiB of idle). See `campaigns/2026-11-01-redhat191-dp-sharp-w208-blind/analysis.md`.
 
 ## Legend
 
@@ -95,7 +105,42 @@ two methods differ, so cross-engine ratios are approximate.
 | auto-compaction | Claude Code summarizes the history when context passes its threshold | 136-143k trigger; −109…−122k tokens; 179-437 s each | `compact_boundary` records (`preTokens`, `postTokens`, `durationMs`) |
 | sharp template | froggeric v22.5 + a terseness directive | cut steps 155 → 100 (same server) without changing thinking per step | the 2026-10-31 RedHat+sharp campaign |
 | Cactus δ | relaxed speculative acceptance (0 = exact) | δ 0.3: decode +51%, acceptance 0.34 → 0.55 | `RADIANCE_CACTUS_DELTA`, verified in the container env |
-| Opus weighted | blind-graded coverage of the 19 Opus findings, high 3 / med 2 / low 1, max 38 | 20-23 for all non-heretic arms; Δ ≥ 5 pre-registered as significant | one Opus grader per pass; anchor re-graded 22 → 22 |
+| Opus weighted | blind-graded coverage of the 19 Opus findings, high 3 / med 2 / low 1, max 38 | 20-23 for all non-heretic arms; **dp-sharp 16 (authoritative Opus grade 2026-11-02, prompt-only; precision 11/12)**; Δ ≥ 5 pre-registered as significant | one Opus grader per pass; anchor re-graded 22 → 22 |
+
+## Review quality — finding-level Opus coverage (all arms, same W2-08 reference)
+
+Every arm's blind review was graded against the same Opus reference review (19 numbered findings: 6 high, 7 med, 6 low). `Found` =
+reference findings the arm raised; `weighted` = high 3 · med 2 · low 1 (max 38); `precision` = (matched + real review-only) / total
+findings. This is the review-quality comparison — how much of the reference each arm's review actually recovered.
+
+| Arm | Weighted (/38) | Found (n/19) | H / M / L found | findings | matched | real-only | wrong | precision |
+|---|---:|---:|:--:|---:|---:|---:|---:|---:|
+| Q4_K_XL + sharp | 23 | 12 | 3 / 4 / 5 | 15 | 11 | 4 | 0 | 1.0 |
+| RedHat 1.8.1 + sharp δ 0 | 22 | 11 | 4 / 3 / 4 | 14 | 11 | 3 | 0 | 1.0 |
+| RedHat 1.9.1 + sharp δ 0 (keep-all) | 21 | 10 | 4 / 3 / 3 | 15 | 10 | 4 | 1 | 0.93 |
+| RedHat 1.9.1 + sharp δ 0.5 | 16 | 7 | 3 / 3 / 1 | 8 | 7 | 1 | 0 | 1.0 |
+| **RedHat 1.9.1 + dp-sharp δ 0 (terse)** | **16** | **8** | **3 / 2 / 3** | **12** | **7** | **4** | **0** | **0.92** (11/12) |
+
+*dp-sharp row (authoritative Opus grade 2026-11-02, prompt-only — `grading-opus.md`): one finding (W11) is **unverifiable** (its
+cited W2-04/W2-05 sibling briefs were not embedded in the no-tools grade) — counted against precision per the rubric, so
+real-only = 4 and precision = (7 + 4) / 12 = 11/12. There is also **1 false claim** inside finding W7 (complexity >5 → commit-gate
+error, contradicted by its own probe PB1: complexity 6 → warning, 0 errors); it does not change the W7 match (ref #19).*
+
+- **dp-sharp found 8/19** reference findings (high 3, med 2, low 3), weighted **16/38** (authoritative Opus grade,
+  `campaigns/2026-11-01-redhat191-dp-sharp-w208-blind/grading-opus.md`), precision **11/12** (7 matched + 4 real review-only,
+  0 wrong, 1 unverifiable — W11).
+- It found **fewer reference findings than the keep-all δ 0 arms** (10/19 → 21/38) and **more than sharp δ 0.5** (7/19 → 16/38).
+  Its review was **more focused** (12 findings, 74 tool calls, 0 compactions) with **no wrong finding** (keep-all δ 0 had
+  1 wrong finding + 3 false claims, precision 0.93) — its 0.92 precision is the unverifiable W11 plus the false claim in W7,
+  not a wrong finding.
+- **Every dp-sharp miss is one of the deeper flow/state defects (Opus-confirmed):** the missed highs #1 (edited goals never confirm —
+  applyResolve writes goals.json not confirmed.json + C8 re-pause → operator), #2 (walk duplicates every goal), #4 (T3 asserts G-2
+  source but irSet passes `--value @tmp`, fake records argv only), plus missed meds #8/#9 (applyResolve throw paths). It caught the
+  concrete, locally-probed highs (#3 T3 double-spawn, #5 fixture import path, #6 import-sort) but stopped before the multi-step
+  state/control-flow defects; the Opus grader: it "completely missed the most severe logical and data-flow flaws in the state
+  machine (O1, O2, O8, O9), focusing heavily on syntax and structural discrepancies rather than semantic correctness."
+  → *Terseness trades coverage for focus: tighter, cleaner review, narrower finding set.* The full finding-by-finding handling
+  (each of the 19 accepted/rejected) is in `campaigns/2026-11-01-redhat191-dp-sharp-w208-blind/analysis.md`.
 
 ## Consequences & root causes
 
@@ -204,9 +249,9 @@ two methods differ, so cross-engine ratios are approximate.
 | **L2** | Two independent reviews + a verifying merge | quality, paid for by speed | union +2 (same config) … +5 (Q4 + RedHat) weighted; 3 runs → 29/38 (MEASURED grades, INFERRED merge) | ~2× generation unless run concurrently (vLLM `MAXSEQS 2`: aggregate throughput unmeasured on this workload); the merge must drop the 1-3 false claims per review | one RedHat + one Q4 review of W2-08 (both exist) → a merge pass → blind grade of the merged review |
 | **L3** | Protocol checklist for the 3 never-found classes | quality, no GPU cost | #1, #4, #18 missed by all 5 arms (MEASURED) | dp-forge change, outside this repo; may lengthen step A | add "trace every persisted write to its reader" and "check what the test double records vs what the test asserts" to the review protocol, then re-run one arm |
 | **L4** | Memory clock within the 210 W cap | speed | mclk 875 MHz in 100% of samples; top state 1250 MHz (MEASURED); bandwidth-bound decode (INFERRED) | system power setting (user's call); the cap stays 210 W | same arm, cap unchanged, mclk allowed to its top state; read decode with the clock trace beside it (benchmark-results rule 16) |
-| **L5** | Cactus δ ladder | speed | δ 0.3: +51% decode, protocol skip, no loop (MEASURED, n = 1). δ 0.5: loops in all 3 runs, 4 of 6 onsets on 1.9.1 before the fade start (MEASURED). Mechanism: [17:45 analysis §5](2026-10-31-1745-reasoning-replay-sharp-template-cactus-loops.md) | quality and loop risk; δ 0.3 ≈ δ 0.5 under the cap where loops live | only on the template winner of L7: δ 0.5 + `CACTUS_CAP_R=0.8` + fade 0→4096 vs δ 0 (plan P3) |
+| **L5** | Cactus δ ladder | speed | δ 0.3: +51% decode, protocol skip, no loop (MEASURED, n = 1). δ 0.5: +65% decode, **2.4× wall**, 49% of tokens in 7 loops (one hit the 64k cap), **16/38 blind grade** (−5 at the Δ ≥ 5 threshold) (MEASURED). Mechanism: [17:45 analysis §5](2026-10-31-1745-reasoning-replay-sharp-template-cactus-loops.md) | quality and loop risk; δ 0.3 ≈ δ 0.5 under the cap where loops live; **δ 0.5 is paid twice — wall and findings** | only on the template winner of L7: δ 0.5 + `CACTUS_CAP_R=0.8` + fade 0→4096 vs δ 0 (plan P3) |
 | **L6** | Long-context retrieval probe for the KV dtype | quality assurance for L1 | no data on our stack above ~130k (research) | **no tool owns this** (rule 6 gap) | add a needle/MRCR probe (e.g. `capture_engine.py needle`) at 64k / 128k / 190k, A/B fp8 vs bf16 (vLLM) and q8_0 vs f16 (llama.cpp), accept at ≥95% recovery |
-| **L7** | Replay rule + terseness A/B at δ 0 | quality **and** speed | keep-all replays 2.3× context; older thinking is needed for ~2-3 pp of identifiers, mostly the findings ledger (MEASURED + judge). sharp: −35-38% work, +2 findings (n.s.), weaker severity calibration | new template files (copies; current ones stay restorable) | plan P1: sly2 as shipped vs `sharp-sly2` (vs scoped terseness), n = 2, blind grade |
+| **L7** | Replay rule + terseness A/B at δ 0 | quality **and** speed | keep-all replays 2.3× context; older thinking is needed for ~2-3 pp of identifiers, mostly the findings ledger (MEASURED + judge). sharp: −35-38% work, +2 findings (n.s.), weaker severity calibration | new template files (copies; current ones stay restorable) | plan P1: sly2 as shipped vs `sharp-sly2` (vs scoped terseness), n = 2, blind grade. **Result (1 run, 2026-10-31 20:05):** `sharp-sly2` (k = 1, δ 0) hit the 1 h cap still probing — 1.65× keep-all wall, 1.4× tokens, 2.5× thinking/tool call, re-derived 8.5% of identifiers (MEASURED). **Not a speed winner; no review written (quarantined, rule 18).** keep-all (sharp) remains the best single arm (21/38, 2182 s). |
 | **L8** | Loop guard | speed | a looped block costs up to 64k tokens (~13-19 min) | over-filtering of code/tables; an abort makes Claude Code retry | plan P4: replay dedup + warning in the template, warn-only `loop_warning` in `capture_proxy.py`, repetition-gated δ upstream |
 | **L9** | Findings ledger written to a file during step A | quality under k = 1 | all 6 judged dependencies on old thinking were the ledger (INFERRED, judge) | dp-forge RUNBOOK change, outside this repo | plan P2, on the L7 winner |
 | — | Thinking-budget cap | speed | 50-62% of thinking sits in the top 10% of messages (MEASURED) | those are likely the analysis moments; the best-graded arm (Q4) had the heaviest tail (62%) | **not recommended** without an A/B |
@@ -233,4 +278,8 @@ two methods differ, so cross-engine ratios are approximate.
     `bench/runs/2026-10-31-agentic-thinking-volume/`.
   - The reusable parts (thinking per tool call, compaction count and seconds, distinct files read) belong in `bench/lib/report.py`'s
     agentic kind. That extension is proposed, not done.
-- The δ 0.5 arm was still running when this was written. Its results go to `campaigns/2026-10-31-redhat191-sharp-w208-blind/analysis.md`.
+- The δ 0.5 arm is done: +65% decode, 2.4× wall, 49% of tokens in 7 loops (one hit the 64k cap), 16/38 blind grade (−5 at the Δ ≥ 5 threshold) —
+  see `campaigns/2026-10-31-redhat191-sharp-w208-blind/analysis.md`.
+- The `sharp-sly2` (k = 1) replay arm is done: 1.65× keep-all wall, 1.4× tokens, 2.5× thinking/tool call, 0 exact loops, no review written
+  (hit the 1 h cap — quarantined, rule 18); keep-all (sharp) remains the best single arm — see
+  `campaigns/2026-10-31-redhat191-sharpsly2-w208-blind/analysis.md`.

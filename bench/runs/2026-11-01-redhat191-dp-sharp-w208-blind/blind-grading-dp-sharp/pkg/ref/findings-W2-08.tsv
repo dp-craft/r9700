@@ -1,0 +1,20 @@
+brief	n	sev	item	problem (first 300 chars)
+W2-08	1	high	D3, D4 (C3, C8)	 edited goals can never be confirmed from the screen. `w` returns `edit`, and applyResolve writes goals.json but not confirmed.json. The flow resumes, resolve-confirm pauses again (its output is missing), and the C8 re-pause guard sends the person to the operator; a third pause → exit 4 
+W2-08	2	high	D2, D3	 the walk duplicates every goal. The initial state's goals are `input.goals.goals`, and keep/replace append to them, so T3 yields `[G-1, G-2, G-1, G-2']`: T3's exact value fails, and ir refuses the duplicate ids 
+W2-08	3	high	D4, TESTS	 T3 cannot pass. The fake's plan has a single `{ exit: 0 }` entry, but D4 spawns twice (irSet, then irValidate). The second call reads `plan[1]` = undefined → TypeError → exit 1, irValidate is not ok, and applyResolve throws. irValidate is also EXTRA: `ir set` parses the whole document before it
+W2-08	4	high	TESTS	 T3 asserts G-2's source in calls.jsonl, but irSet passes the value as `--value @<tmp>` and deletes the temp file in a `finally`; the fake records argv only 
+W2-08	5	high	TESTS	 `'../src/screens/resolve-confirm.js'` from tools/dpf/tests/screens/ resolves to tools/dpf/tests/src/… 
+W2-08	6	high	D2, D4	 the import lines fail simple-import-sort (an error): the specifiers are unsorted, and node:fs comes after the relative imports 
+W2-08	7	med	D2, D3	 the screen is a prose state machine (four phases, two flags, index arithmetic) with no code. M9 cannot run on prose, and #2 hides there 
+W2-08	8	med	D3	 `r` then Enter replaces the text with `''`. GoalEntrySchema refuses it, ir refuses the write, and applyResolve throws in the middle of the flow 
+W2-08	9	med	D3	 dropping every goal leaves `goals: []`, which `.min(1)` refuses, so applyResolve throws 
+W2-08	10	med	D4	 applyResolve has 4 params. That is only a warn, and STEP 5's `--quiet` hides it 
+W2-08	11	med	ResolveConfirmInput (C11 item 6)	 nobody turns ledger residue rows into `cuts`. The row gives W2-08 "the cut lines from `residue` rows"; the brief takes `cuts: string[]` from "the flow", and W2-13 does not name it 
+W2-08	12	med	TESTS	 T1 and T2 assert order and containment only: a missing `blast:` line, a wrong goal line or a dropped diffLines line passes. `a`, `c` and `q` have no unit test, though the row lists "`a` → result accept" 
+W2-08	13	med	STEPS	 STEPS 2 says "Write T1-T4 … T1-T4 MUST fail", but TESTS defines T1-T3 and the FINAL REPORT lists T1…T3 
+W2-08	14	low	D2	 `ResolveConfirmInput.record` is never read by the screen (EXTRA); applyResolve takes the record itself 
+W2-08	15	low	D2, D3	 `goalsChanged` / `nonGoalsChanged` are never read (D4 compares with JSON.stringify), and `d` does not set them 
+W2-08	16	low	D3	 walk-summary `q` → "phase 'main' (abort)" does not say what happens to the partial walk; with #2's state it stays in the lists 
+W2-08	17	low	FILES, S1	 the paths are package-relative (`src/screens/…`), but the header says "run every command from the repo root" and STEPS use `tools/dpf/…` 
+W2-08	18	low	PATTERN	 runScreen is the loop, not a screen; the sibling to copy is W2-05's clarifyScreen 
+W2-08	19	low	DO NOT	 line 2 is the old text, with no lint-forced helper exception 

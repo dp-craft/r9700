@@ -703,7 +703,7 @@ LLAMASWAP_SERVER_KEYS = ("free_mib_floor",)       # the llama-swap row's config 
 AGENTIC_KEYS = ("kind", "slug", "date", "title", "notes", "engine", "port", "repo", "base", "worktree",
                 "served_model", "server", "env", "claude", "prompt", "resume_prompt", "install", "rewrite",
                 "symlinks", "done_when", "collect", "tmp_dirs", "cap_s", "max_resumes", "reps", "server_info",
-                "post", "capture_requests", "remove_worktree", "stop_when", "arms")
+                "post", "capture_requests", "remove_worktree", "stop_when", "arms", "reuse_server")
 AGENTIC_ARM_KEYS = ("name", "profile", "image", "env", "server")
 ARM_RE = re.compile(r"[a-z0-9][a-z0-9._-]*")
 WT_PLACEHOLDERS = ("arm", "rep", "port", "server_port", "arm_dir")          # allowed inside "worktree"
@@ -966,8 +966,9 @@ def validate_agentic(spec):
     if spec["engine"] not in AGENTIC_ENGINES:
         sys.exit('agentic spec: engine must be "vllm" or "llama-swap" (the engines the agentic driver launches)')
     ls = spec["engine"] == "llama-swap"
-    if not ls and "server" not in spec:
-        sys.exit("agentic spec missing required key: server")
+    reuse = bool(spec.get("reuse_server"))
+    if not ls and not reuse and "server" not in spec:
+        sys.exit("agentic spec missing required key: server (or set reuse_server=true to run against an already-running server)")
     if not isinstance(spec["slug"], str) or not re.fullmatch(r"[A-Za-z0-9._-]+", spec["slug"]):
         sys.exit(f"agentic spec: slug must match [A-Za-z0-9._-]+: {spec['slug']!r}")
     if not _is_int(spec["port"], 1) or spec["port"] > 65534:
@@ -981,6 +982,11 @@ def validate_agentic(spec):
     for k in ("capture_requests", "remove_worktree"):
         if k in spec and not isinstance(spec[k], bool):
             sys.exit(f"agentic spec: {k} must be true or false")
+    if "reuse_server" in spec and not isinstance(spec["reuse_server"], bool):
+        sys.exit("agentic spec: reuse_server must be true or false")
+    if spec.get("reuse_server") and spec.get("capture_requests"):
+        sys.exit("agentic spec: reuse_server and capture_requests are mutually exclusive -- the capture proxy puts the "
+                 "server on port+1, but a user-managed server is fixed on the client port")
     if ls and spec.get("capture_requests"):
         sys.exit("agentic spec: capture_requests is vllm-only -- under engine llama-swap the router's port is fixed, "
                  "and the capture proxy needs the server on port+1")
@@ -1077,6 +1083,10 @@ def validate_agentic(spec):
             if vonly:
                 sys.exit(f"{where}: vllm-only key(s) {vonly} under engine llama-swap -- model, build, flags and env "
                          "are the llama-swap row's (served_model); an arm takes only name (+ server.free_mib_floor)")
+        elif reuse:
+            # user-managed server: profile/image/env are ignored (the server is already running, on the client port);
+            # an arm takes only name (env is carried but inert -- the server does not read per-arm env).
+            pass
         else:
             if "profile" not in a:
                 sys.exit(f"{where}: missing profile")
@@ -1094,7 +1104,7 @@ def validate_agentic(spec):
     if len(names) != len(set(names)):
         sys.exit("agentic spec: arm names must be unique")
     for a in agentic_arms(spec):
-        if not ls and "maxlen" not in a["server"]:
+        if not ls and not reuse and "maxlen" not in a["server"]:
             sys.exit(f"arm {a['name']!r}: server.maxlen is required (campaign-wide in `server` or per arm)")
 
     # --- claude settings
@@ -1195,8 +1205,13 @@ def _heredoc_tag(prefix, *bodies):
 
 
 # Engine-specific run.sh fragments, selected at emit time (@@KEY@@ in AGENTIC_RUNSH), so each run.sh carries only
-# its own engine's code. Everything else (GPU floor, served-name check, worktree, session loop, collect) is shared.
-AGENTIC_ENGINE_SH = {
+# its own engine's code. Everything else (served-name check, worktree, session loop, collect) is shared.
+#
+# SERVER_ACQUIRE is the server acquisition step: GPU-exclusive floor + (vllm/llama-swap) print + start. With
+# reuse_server=true it is replaced by the "reuse" fragment: the user already has the server running, so the driver
+# only verifies it (served-name check, shared), and does NOT boot, stop or unload it (iron rule 14 -- no gpu_exclusive,
+# no kill of a process the driver does not own). The GPU sampler still runs to measure usage during the arm.
+_AGENTIC_ENGINE_COMMON = {
     "vllm": {
         "SERVER_KIND": "vllm server",
         "ENGINE_HDR": r'''#   * Teardown is trap-protected (Ctrl-C/TERM): sampler, proxy, docker logs, serve_vllm stop, port-free check.
@@ -1204,11 +1219,6 @@ AGENTIC_ENGINE_SH = {
 #     Tool paths (stub testing): SERVE_VLLM GPU_EXCLUSIVE VRAM_SAMPLER CAPTURE_PROXY CLAUDE_BIN DOCKER CURL SS.''',
         "SERVE_TOOL": 'SERVE_VLLM="${SERVE_VLLM:-$EB/vllm/serve_vllm.sh}"',
         "SERVE": "SERVE_VLLM",
-        "SRV_ENV": r'''  # 4. server: provenance (print) then start, fresh container per (rep, arm)
-  local SRV_ENV=(PROFILE="$A_PROFILE" SERVED_NAME="$SERVED" MAXLEN="$A_MAXLEN" MAXSEQS="$A_MAXSEQS" KV_DTYPE="$A_KV"
-                 GPU_UTIL="$A_GPU_UTIL" WATCHDOG_MIB="$A_WD" FREE_MIB_FLOOR="$A_FLOOR" PORT="$SPORT")
-  local img="${IMAGE:-$A_IMAGE}"; [ -n "$img" ] && SRV_ENV+=(IMAGE="$img")
-  SRV_ENV+=(${A_ENV[@]+"${A_ENV[@]}"})''',
         "PORT_FREE_FN": r'''port_free_check() {
   local p i held out ports=("$SPORT"); [ "$CAPTURE" = 1 ] && ports+=("$PORT")
   R_PORTFREE=yes
@@ -1221,10 +1231,6 @@ AGENTIC_ENGINE_SH = {
     [ "$held" = 0 ] || { R_PORTFREE=no; log "WARNING port $p still held after teardown"; }
   done
 }''',
-        "SERVER_DOWN": r'''  "$DOCKER" logs "vllm-$SPORT" > "$ARM_DIR/server-container.log" 2>&1
-  env PORT="$SPORT" "$SERVE_VLLM" stop > "$ARM_DIR/server-stop.txt" 2>&1
-  port_free_check
-  echo "port_free=$R_PORTFREE" >> "$ARM_DIR/server-stop.txt"''',
     },
     "llama-swap": {
         "SERVER_KIND": "llama-server via llama-swap",
@@ -1234,26 +1240,107 @@ AGENTIC_ENGINE_SH = {
 #     Tool paths (stub testing): SERVE_LLAMASWAP GPU_EXCLUSIVE VRAM_SAMPLER CLAUDE_BIN CURL.''',
         "SERVE_TOOL": 'SERVE_LLAMASWAP="${SERVE_LLAMASWAP:-$EB/serve_llamaswap.sh}"',
         "SERVE": "SERVE_LLAMASWAP",
-        "SRV_ENV": r'''  # 4. server: provenance (print) then start = preload the llama-swap row (gpu_exclusive unloaded everything, so this
-  #    is a fresh llama-server per (rep, arm)); its upstream log streams into server-container.log until stop
-  local SRV_ENV=(MODEL="$SERVED" PORT="$SPORT" LOG_OUT="$ARM_DIR/server-container.log")''',
         "PORT_FREE_FN": r'''unload_check() {  # the router keeps its port by design: port_free records serve_llamaswap.sh stop's verdict
   R_PORTFREE=unloaded=no
   grep -qx 'unloaded=yes' "$ARM_DIR/server-stop.txt" 2>/dev/null && R_PORTFREE=unloaded=yes
   [ "$R_PORTFREE" = unloaded=yes ] || log "WARNING llama-swap did not confirm the unload of $SERVED (see $ARM_DIR/server-stop.txt)"
 }''',
+    },
+    "reuse": {
+        "SERVER_KIND": "user-managed vllm server (reuse_server)",
+        "ENGINE_HDR": r'''#   * reuse_server=true: the server is ALREADY RUNNING (user-managed, :@@PORT@@). The driver does NOT boot, stop or
+#     unload it -- no GPU-exclusive, no kill of a process the driver does not own (iron rule 14). It verifies the
+#     served name (shared check) and samples the GPU (VRAM sampler) for the arm's memory column; teardown stops only
+#     the sampler/proxy, leaving the server untouched. summary.tsv's port_free column reads 'reused'.
+#   * Knobs: ONLY='armglob,..' REPS=N CAP_S=sec MAX_RESUMES=N RUN_DIR=dir.
+#     Tool paths (stub testing): SERVE_VLLM VRAM_SAMPLER CAPTURE_PROXY CLAUDE_BIN CURL.''',
+        "SERVE_TOOL": 'SERVE_VLLM="${SERVE_VLLM:-$EB/vllm/serve_vllm.sh}"',
+        "SERVE": "SERVE_VLLM",
+        "PORT_FREE_FN": r'''reuse_check() {  # the driver never stops the server: port_free is 'reused' by definition
+  R_PORTFREE=reused
+}''',
+    },
+}
+
+AGENTIC_ENGINE_SH = {
+    "vllm": {
+        **_AGENTIC_ENGINE_COMMON["vllm"],
+        "LOOP_DESC": ("boots a FRESH vllm server (no prefix-cache carry-over between sessions),"),
+        "SERVER_ACQUIRE": r'''  # 3. GPU exclusive (iron rule 14)
+  local gout rc
+  gout=$("$GPU_EXCLUSIVE" "$A_FLOOR" 2>&1); rc=$?
+  printf '%s\n' "$gout" > "$ARM_DIR/gpu_exclusive.txt"
+  if [ "$rc" -ne 0 ]; then end_arm gpu_busy "$(printf '%s' "$gout" | tr '\t\n' '  ')"; return 0; fi
+  # 4. server: provenance (print) then start, fresh container per (rep, arm)
+  local SRV_ENV=(PROFILE="$A_PROFILE" SERVED_NAME="$SERVED" MAXLEN="$A_MAXLEN" MAXSEQS="$A_MAXSEQS" KV_DTYPE="$A_KV"
+                 GPU_UTIL="$A_GPU_UTIL" WATCHDOG_MIB="$A_WD" FREE_MIB_FLOOR="$A_FLOOR" PORT="$SPORT")
+  local img="${IMAGE:-$A_IMAGE}"; [ -n "$img" ] && SRV_ENV+=(IMAGE="$img")
+  SRV_ENV+=(${A_ENV[@]+"${A_ENV[@]}"})
+  log "booting: ${SRV_ENV[*]}"
+  TD_ACTIVE=1
+  env "${SRV_ENV[@]}" "$SERVE_VLLM" print > "$ARM_DIR/server.txt" 2>&1
+  if ! env "${SRV_ENV[@]}" "$SERVE_VLLM" start > "$ARM_DIR/server-start.txt" 2>&1; then
+    detail=$(tail -n 3 "$ARM_DIR/server-start.txt" | tr '\t\n' '  ')
+    teardown; end_arm server_fail "$detail"; return 0
+  fi
+''',
+        "SERVER_DOWN": r'''  "$DOCKER" logs "vllm-$SPORT" > "$ARM_DIR/server-container.log" 2>&1
+  env PORT="$SPORT" "$SERVE_VLLM" stop > "$ARM_DIR/server-stop.txt" 2>&1
+  port_free_check
+  echo "port_free=$R_PORTFREE" >> "$ARM_DIR/server-stop.txt"''',
+    },
+    "llama-swap": {
+        **_AGENTIC_ENGINE_COMMON["llama-swap"],
+        "LOOP_DESC": ("preloads the llama-swap row (a fresh llama-server, no prefix-cache carry-over between sessions),"),
+        "SERVER_ACQUIRE": r'''  # 3. GPU exclusive (iron rule 14)
+  local gout rc
+  gout=$("$GPU_EXCLUSIVE" "$A_FLOOR" 2>&1); rc=$?
+  printf '%s\n' "$gout" > "$ARM_DIR/gpu_exclusive.txt"
+  if [ "$rc" -ne 0 ]; then end_arm gpu_busy "$(printf '%s' "$gout" | tr '\t\n' '  ')"; return 0; fi
+  # 4. server: provenance (print) then start = preload the llama-swap row (gpu_exclusive unloaded everything, so this
+  #    is a fresh llama-server per (rep, arm)); its upstream log streams into server-container.log until stop
+  local SRV_ENV=(MODEL="$SERVED" PORT="$SPORT" LOG_OUT="$ARM_DIR/server-container.log")
+  log "preloading llama-swap row: ${SERVED}"
+  TD_ACTIVE=1
+  env "${SRV_ENV[@]}" "$SERVE_LLAMASWAP" print > "$ARM_DIR/server.txt" 2>&1
+  if ! env "${SRV_ENV[@]}" "$SERVE_LLAMASWAP" start > "$ARM_DIR/server-start.txt" 2>&1; then
+    detail=$(tail -n 3 "$ARM_DIR/server-start.txt" | tr '\t\n' '  ')
+    teardown; end_arm server_fail "$detail"; return 0
+  fi
+''',
         "SERVER_DOWN": r'''  # server-container.log was written by serve_llamaswap.sh's log follower (start .. stop)
   env PORT="$SPORT" MODEL="$SERVED" "$SERVE_LLAMASWAP" stop > "$ARM_DIR/server-stop.txt" 2>&1
   unload_check
   echo "port_free=$R_PORTFREE" >> "$ARM_DIR/server-stop.txt"''',
     },
+    "reuse": {
+        **_AGENTIC_ENGINE_COMMON["reuse"],
+        "LOOP_DESC": ("reuses the ALREADY-RUNNING user-managed server on :@@PORT@@ (no boot/stop/unload; the same prefix cache "
+                      "is shared across arms),"),
+        "SERVER_ACQUIRE": r'''  # 3. server: already running (reuse_server) -- verify it serves the right name, do NOT boot, stop or unload it
+  #     (no GPU exclusive: the user's server owns the GPU; we must not unload or kill it)
+  local SRV_ENV=(PORT="$SPORT")
+  local img="(user's running server; reuse_server=true)"
+  TD_ACTIVE=1
+  log "reusing user-managed server on :$SPORT (no boot/stop; no GPU exclusive)"
+  { printf '# reuse_server=true -- server managed by the user, not by this driver\n'
+    printf '#   IMAGE=reused (user-managed)\n#   PORT=%s SERVED=%s\n' "$SPORT" "$SERVED"; } > "$ARM_DIR/server.txt" 2>&1
+  if ! "$CURL" -sf -m 10 "http://127.0.0.1:$SPORT/v1/models" > "$ARM_DIR/served-models-live.txt" 2>&1; then
+    detail="server on :$SPORT is not responding (reuse_server=true) -- is it up?"
+    teardown; end_arm server_fail "$detail"; return 0
+  fi
+''',
+        "SERVER_DOWN": r'''  # reuse_server: leave the user's server alone (no stop, no unload). The GPU sampler was stopped above.
+  reuse_check
+  echo "port_free=reused (user-managed server left untouched)" > "$ARM_DIR/server-stop.txt"''',
+    },
 }
 
 AGENTIC_RUNSH = r'''#!/usr/bin/env bash
 # GENERATED by bench/gen_campaign.py -- AGENTIC campaign '@@SLUG@@'. Rerun to continue; edit the spec and regenerate.
-# Loop: reps outer, arms inner. EVERY (rep, arm) boots a FRESH @@SERVER_KIND@@ (no prefix-cache carry-over between
-# sessions), creates a fresh git worktree at the base commit, runs `claude -p` (same session resumed until
-# done_when / cap / max_resumes), then tears down and collects. Behaviour baked in (no hand-editing needed):
+# Loop: reps outer, arms inner. EVERY (rep, arm) @@LOOP_DESC@@ creates a fresh git worktree at the base
+# commit, runs `claude -p` (same session resumed until done_when / cap / max_resumes), then tears down and collects.
+# Behaviour baked in (no hand-editing needed):
 #   * CONTINUE-ON-FAILURE: wt_exists | gpu_busy | server_fail | served_name_mismatch | wt_fail | prep_fail |
 #     proxy_fail are recorded in failures.txt and the run moves on. They leave NO marker, so a rerun retries them.
 #   * <run>/started/rep<R>.<arm> is written when the session loop begins; <run>/done/... only for the RESULT
@@ -1431,19 +1518,7 @@ run_one() {
   mkdir -p "$ARM_DIR"
   # 2. worktree path already taken: never touch it
   if [ -e "$WT" ]; then end_arm wt_exists "worktree path exists, not touched: $WT"; return 0; fi
-  # 3. GPU exclusive (iron rule 14)
-  local gout rc
-  gout=$("$GPU_EXCLUSIVE" "$A_FLOOR" 2>&1); rc=$?
-  printf '%s\n' "$gout" > "$ARM_DIR/gpu_exclusive.txt"
-  if [ "$rc" -ne 0 ]; then end_arm gpu_busy "$(printf '%s' "$gout" | tr '\t\n' '  ')"; return 0; fi
-@@SRV_ENV@@
-  log "booting: ${SRV_ENV[*]}"
-  TD_ACTIVE=1
-  env "${SRV_ENV[@]}" "$@@SERVE@@" print > "$ARM_DIR/server.txt" 2>&1
-  if ! env "${SRV_ENV[@]}" "$@@SERVE@@" start > "$ARM_DIR/server-start.txt" 2>&1; then
-    detail=$(tail -n 3 "$ARM_DIR/server-start.txt" | tr '\t\n' '  ')
-    teardown; end_arm server_fail "$detail"; return 0
-  fi
+@@SERVER_ACQUIRE@@
   # 5. the served name must be exactly the one the claude settings use
   if ! "$CURL" -sf -m 10 "http://127.0.0.1:$SPORT/v1/models" 2>/dev/null | pyh models "$SERVED" > "$ARM_DIR/served-models.txt" 2>&1; then
     detail="server on :$SPORT serves [$(tr '\n' ' ' < "$ARM_DIR/served-models.txt")] not '$SERVED'"
@@ -1565,10 +1640,15 @@ def emit_agentic_runsh(spec):
     if spec.get("stop_when"):
         cfg["stop_when"] = spec["stop_when"]
     cfg_json = json.dumps(cfg, indent=1, ensure_ascii=False)
+    reuse = bool(spec.get("reuse_server"))
     cases = []
     for a in arms:
         sv = a["server"]
         cases.append(f"    {sh_quote(a['name'])})")
+        if reuse:  # user-managed server: the server block is ignored; the arm carries only its env
+            cases.append(f"      A_ENV=({' '.join(sh_quote(f'{k}={v}') for k, v in a['env'].items())}); "
+                         f"A_ENV_STR={sh_quote(env_assign(a['env']))} ;;")
+            continue
         if spec["engine"] == "llama-swap":       # the row's config owns the rest; A_ENV stays empty
             cases.append(f"      A_FLOOR={sh_quote(sv['free_mib_floor'])} ;;")
             continue
@@ -1581,6 +1661,7 @@ def emit_agentic_runsh(spec):
     notes = spec.get("notes")
     note_lines = "\n".join(f"# NOTE: {l}" for l in ([notes] if isinstance(notes, str) else (notes or [])))
     sw = spec.get("stop_when")
+    engine_frag = "reuse" if reuse else spec["engine"]
     helper_tag = _heredoc_tag("GC_HELPER_EOF", agentic_helper(sw))
     cfg_tag = _heredoc_tag("GC_CFG_EOF", cfg_json)
     vals = {
@@ -1601,8 +1682,16 @@ def emit_agentic_runsh(spec):
         "ARM_CASES": "\n".join(cases), "HTAG": helper_tag, "CTAG": cfg_tag,
         "HELPER": agentic_helper(sw).rstrip("\n"), "CFGJSON": cfg_json,
     **(AGENTIC_STOP_SH if sw else AGENTIC_STOP_OFF),
-        **AGENTIC_ENGINE_SH[spec["engine"]],
     }
+    # some engine fragments carry @@PORT@@ inside their values (e.g. reuse's LOOP_DESC/ENGINE_HDR); the template
+    # pass only substitutes placeholders in the template, not the inserted values, so pre-substitute those here.
+    # Only the fragment values are pre-substituted, so a literal @@WT@@ runtime placeholder in the cfg_json or
+    # helper (which are NOT fragments) is never touched.
+    engine = dict(AGENTIC_ENGINE_SH[engine_frag])
+    for k, v in engine.items():
+        if isinstance(v, str) and "@@" in v:
+            engine[k] = re.sub(r"@@(\w+)@@", lambda m: vals[m.group(1)], v)
+    vals.update(engine)
     return re.sub(r"@@(\w+)@@", lambda m: vals[m.group(1)], AGENTIC_RUNSH)
 
 
@@ -1618,7 +1707,23 @@ def emit_agentic_readme(spec):
     arms = agentic_arms(spec)
     base = _resolve_base(spec)
     served, port = spec["served_model"], spec["port"]
-    if spec["engine"] == "llama-swap":
+    if spec.get("reuse_server"):
+        boot = (f"reuses the **already-running** user-managed server on :{port} (the driver does **not** boot, stop or "
+                f"unload it, and does not run `gpu_exclusive.sh`)")
+        engine = (f"- Engine **user-managed vllm** (reuse_server): the server is **already running** on :{port} (served "
+                  f"model\n  `{served}`; must match the claude settings' model names, checked against `/v1/models` "
+                  f"before each arm). The driver does **not** boot, stop or unload it\n  (iron rule 14): it never runs "
+                  f"`gpu_exclusive.sh` and never kills a process it does not own. Each arm's `server.txt` notes the "
+                  f"reuse; the GPU sampler records VRAM/GTT\n  during the arm. `summary.tsv`'s `port_free` column reads "
+                  f"`reused` (the server is left running after every arm).")
+        prov = ("- The server's exact template/δ/KV come from the running container (the user manages it); `server.txt` "
+                "records\n  `reuse_server=true` and the live `/v1/models` response. The `server` block is ignored in "
+                "reuse mode.")
+        arms_tbl = f"| arm | served model | port |\n|-----|--------------|-----:|\n" + \
+                   "\n".join(f"| `{a['name']}` | `{served}` | {port} |" for a in arms)
+        per_boot = f"Per arm, the driver verifies the server is up and serves `{served}` (shared `/v1/models` check); it " \
+                   "does not touch the GPU otherwise."
+    elif spec["engine"] == "llama-swap":
         boot = (f"loads the llama-swap row `{served}` **fresh** (`gpu_exclusive.sh` unloads every model first, so the "
                 "prefix cache never carries over)")
         engine = ("- Engine **llama-swap** via `bench/engine-bench/serve_llamaswap.sh`: the server is the llama-swap row "
