@@ -87,6 +87,17 @@ def _first(m, *names):
     return None
 
 
+def _computed_tok(m, prev=None):
+    """Count of prefilled tokens that actually went through KV compute = uncached prefill (what the
+    'comp' column should show). sly / standard vLLM expose the per-request kv-computed counter; radiance
+    doesn't, so its own `radiance:prefill_tokens_total` is the source. Delta when `prev`, cumulative
+    otherwise; None only when neither engine's counter exists (legacy -> caller may widen to full prompt)."""
+    if prev is None:
+        return m.get("vllm:request_prefill_kv_computed_tokens_sum", m.get("radiance:prefill_tokens_total"))
+    d = _diff(m, prev, "vllm:request_prefill_kv_computed_tokens_sum")
+    return d if d is not None else _diff(m, prev, "radiance:prefill_tokens_total")
+
+
 def _diff(m, prev, name):
     """Counter delta between polls (m - prev), None if either is missing or the counter
     reset (m < prev — a server restart, since counters are monotonic). Returning None on
@@ -120,6 +131,27 @@ def _ratio(a, b):
     if a is not None and b is not None and b > 0:
         return a / b
     return None
+
+
+def _decode_wall(per):
+    """Wall-time spent generating this window: out_tok / decode t/s. Window-scoped; None with no decode."""
+    out = per.get("out_tok")
+    decode_tps = per.get("decode_tps")
+    if out is None or not decode_tps:
+        return None
+    return out / decode_tps
+
+
+def _full_wall(per):
+    """True total request wall-time, window-scoped and None-safe: ttft + prefilled compute (comp / prefill t/s)
+    + decode. This is the whole request — unlike gen_t/e2e, which stops after the first token. Returns None if any
+    term is missing (no data rather than a fabricated number)."""
+    ttft = per.get("ttft_s")
+    decode_t = _decode_wall(per)                        # out_tok / decode t/s
+    pf_time = _ratio(per.get("computed_tok"), per.get("prefill_tps"))   # prefilled compute this window
+    if ttft is None or decode_t is None or pf_time is None:
+        return None
+    return ttft + decode_t + pf_time
 
 
 def _ttft_base(m):
@@ -242,26 +274,40 @@ def collect(m, prev, prev_t, g, log_lines):
     """One snapshot: per-call (diffed), session (cumulative), state, GPU, log. All None-safe."""
     t = time.time()
     per = {}
-    # The radiance fork of vLLM drops the standard per-request prefill histogram (it emits its own
-    # radiance:* scheduler metrics instead). Detect it here so prefill can fall back to the gauge
-    # (radiance:prefill_tokens_per_second) — sly / standard vLLM keep the histogram and are unaffected.
-    is_radiance = "radiance:prefill_tokens_total" in m
-    rad_pf = _first(m, "radiance:prefill_tokens_per_second") if is_radiance else None
+    # Prefill time and computed-token sources are engine-specific (sly vs radiance); both resolve from the
+    # metrics each exposes. Comp never widens to full prompt; prefill t/s is a real number on sly, reconstructed
+    # from radiance's own throughput gauge where it has no prefill-time metric (see main()).
     if prev is not None and prev_t is not None and t > prev_t:
         in_tok = _diff(m, prev, "vllm:request_prompt_tokens_sum")
         out_tok = _diff(m, prev, "vllm:request_generation_tokens_sum")
-        computed_tok = _diff(m, prev, "vllm:request_prefill_kv_computed_tokens_sum")
+        # comp = prefilled tokens that actually went through compute (uncached). Radiance has no per-request
+        # kv-computed counter, so it uses radiance:prefill_tokens_total instead of silently widening to full
+        # prompt. Legacy engines with neither fall back to in_tok only.
+        computed_tok = _computed_tok(m, prev)
         if computed_tok is None:
-            computed_tok = in_tok  # old vLLM: no per-request computed-token metric
+            computed_tok = in_tok  # legacy engine: no per-request prefill accounting at all -> full prompt
         ttft_base = _ttft_base(m)
         ttft = _avg_diff(m, prev, ttft_base) if ttft_base else None
         n_req = _diff(m, prev, ttft_base + "_count") if ttft_base else None
         decode_t = _diff(m, prev, "vllm:request_decode_time_seconds_sum")
+        # sly/standard carries a real per-request/cumulative prefill-time metric -> the window's true seconds.
+        # radiance has none: reconstruct it from the engine's own throughput gauge (t = tokens / rate), so the
+        # window is weighted here for the cumulative mean below and prefill_tps reduces to the gauge itself.
+        # NOTE: the GPU sample passed in as `g` stays untouched here — this block uses pf_rate, never g, so snap's
+        # "gpu" field still carries main's normalized tuple/None (a stray float would crash render/_row downstream).
         prefill_t = _diff(m, prev, "vllm:request_prefill_time_seconds_sum")
-        # Effective prefill TPS: per-request histogram delta when present (sly / standard vLLM);
-        # otherwise the radiance gauge. prefill_w is the weight the 5-min avg uses (None above would
-        # make every radiance sample skipped), so it carries whatever basis we divided by.
-        prefill_tps = _ratio(computed_tok, prefill_t) if prefill_t is not None else rad_pf
+        if prefill_t is None:
+            # radiance exposes no per-request/cumulative prefill-time metric: take its instantaneous throughput
+            # gauge (tok/s) directly and reconstruct the window's seconds as t = tokens / rate.
+            pf_rate = m.get("radiance:prefill_tokens_per_second")
+            if pf_rate is not None and computed_tok:
+                prefill_t = computed_tok / pf_rate
+            else:
+                prefill_t = None
+        # Per-request/cumulative prefill TPS = computed prefilled tokens / prefill time this window. sly -> a real
+        # mean; radiance -> the engine's instantaneous prefill tok/s (the honest number its gauge gives). No gauge
+        # fallback: an instantaneous value is not a per-window mean and would decay to 0 while idle.
+        prefill_tps = _ratio(computed_tok, prefill_t)
         e2e = _avg_diff(m, prev, "vllm:e2e_request_latency_seconds")
         per = {
             "in_tok": in_tok,
@@ -273,8 +319,6 @@ def collect(m, prev, prev_t, g, log_lines):
             "prefill_t": prefill_t,
             "decode_t": decode_t,
             "prefill_tps": prefill_tps,
-            "prefill_from": "histogram" if prefill_t is not None else ("radiance" if is_radiance else None),
-            "prefill_w": prefill_t if prefill_t is not None else rad_pf,
             "decode_tps": _ratio(out_tok, decode_t),
         }
 
@@ -282,12 +326,17 @@ def collect(m, prev, prev_t, g, log_lines):
     ttft_base = _ttft_base(m)
     session_in = m.get("vllm:request_prompt_tokens_sum")
     session_out = m.get("vllm:request_generation_tokens_sum")
-    cached_tok = m.get("vllm:prompt_tokens_cached_total")
-    comp_tok = (session_in - cached_tok) if (session_in is not None and cached_tok is not None) else None
+    cached_tok = m.get("vllm:prompt_tokens_cached_total")   # sly only; radiance tracks cache differently
+    # comp = truly prefilled (uncached) tokens. sly/standard: prompt − cache; radiance has no cache metric, so
+    # use its computed-prefill counter directly. In both cases the "really computed" number, never full prompt.
+    comp_tok = (session_in - cached_tok) if cached_tok is not None else _computed_tok(m)
     hist_prefill_sum = m.get("vllm:request_prefill_time_seconds_sum")
-    # Same per-request-histogram vs radiance-gauge fallback as the per-call block, but cumulative.
-    session_prefill_tps = (_ratio(comp_tok, hist_prefill_sum)
-                           if hist_prefill_sum is not None else (rad_pf if is_radiance else None))
+    # Server-row prefill is the cumulative average since start: whole computed tokens / whole prefill time. sly/
+    # standard carries the cumulative metric here, so this is a real mean on it; radiance has none -> n/a until
+    # main() fills it from throughput×tokens (the accumulated window reconstruction), where comp total / that
+    # sum is a true mean that stays > 0 once any call prefilled. No gauge fallback — an instantaneous value would
+    # decay to 0 while idle.
+    session_prefill_tps = _ratio(comp_tok, hist_prefill_sum)
     itl = _avg(m, "vllm:inter_token_latency_seconds")
     queue = _avg(m, "vllm:request_queue_time_seconds")
     session = {
@@ -298,7 +347,6 @@ def collect(m, prev, prev_t, g, log_lines):
         "n_req": m.get(ttft_base + "_count") if ttft_base else None,
         "ttft_s": _avg(m, ttft_base) if ttft_base else None,
         "prefill_tps": session_prefill_tps,
-        "prefill_from": "histogram" if hist_prefill_sum is not None else ("radiance" if is_radiance else None),
         "decode_tps": _ratio(session_out, m.get("vllm:request_decode_time_seconds_sum")),
         "e2e_s": _avg(m, "vllm:e2e_request_latency_seconds"),
         "itl_ms": (itl * 1000) if itl is not None else None,
@@ -515,6 +563,18 @@ def _window_sum(window, key):
     return total if found else None
 
 
+def session_prefill_from_accum(session, pf_time_acc):
+    """The server-line prefill mean for an engine with no cumulative prefill-time metric (radiance).
+
+    Recomputed from a lifetime-summed prefill time: whole computed tokens / that sum = true mean since start.
+    Returns the existing value unchanged when it is already set (sly carries its real histogram), or None while
+    nothing has accumulated — so it stays n/a until at least one call with throughput prefilled, then stays > 0.
+    """
+    if session.get("prefill_tps") is not None:
+        return session["prefill_tps"]
+    return _ratio(session.get("comp_tok"), pf_time_acc) if pf_time_acc and pf_time_acc > 0 else None
+
+
 def _is_idle(per):
     """True when no request moved in the poll (n_req / in_tok / out_tok all 0/None).
     The single source for the "active" check in main() (history rows) and the
@@ -598,7 +658,7 @@ def render(a, snap, window, history, log_lines, log_stale, cur_avg, prev_avg):
         ("polls (requests)", polls_lines),
         ("avg (last 5 min)", [
             f"TTFT {_f(cur_avg['ttft'], '.2f')} s {_trend(cur_avg['ttft'], prev_avg['ttft'])}   "
-            f"prefill {_f(cur_avg['prefill'], '.0f')} tok/s{(' (rad)' if cur_avg.get('prefill_from') == 'radiance' else '')} {_trend(cur_avg['prefill'], prev_avg['prefill'])}   "
+            f"prefill {_f(cur_avg['prefill'], '.0f')} tok/s {_trend(cur_avg['prefill'], prev_avg['prefill'])}   "
             f"decode {_f(cur_avg['decode'], '.1f')} tok/s {_trend(cur_avg['decode'], prev_avg['decode'])}   "
             f"req {_f(cur_avg['n_req'], '.0f')}   comp {_f(cur_avg['comp'], '.0f')} tok   out {_f(cur_avg['out'], '.0f')} tok",
         ]),
@@ -623,31 +683,27 @@ def render(a, snap, window, history, log_lines, log_stale, cur_avg, prev_avg):
 
 def _session_rows(session):
     """Columnar session table: header + one value row. Units live in the headers
-    (TTFT(s) / gap(ms) / full(s) ...) so the values stay bare numbers.
+    (TTFT(s) / gap(ms) / gen_t(s) ...) so the values stay bare numbers.
     Columns: req | in (total prompt tokens) | cached (read from the prefix cache) |
     comp (prompt tokens actually computed/prefilled) | out (generated) | TTFT |
-    prefill/decode TPS | gap (inter-token latency) | queue | full (full round-trip)."""
+    prefill/decode TPS | gap (inter-token latency) | queue | gen_t (generation-phase latency, ttft+decode).
+
+    Note: gen_t here is the server's own e2e since start — generation only. The per-request 'polls' table adds a
+    separate full_t column that also folds in prefilled compute (see _full_wall); this summary block stays on what
+    the server measured."""
     cols = [("req", 6), ("in", 10), ("cached", 10), ("comp", 10), ("out", 8),
             ("TTFT(s)", 8), ("prefill(t/s)", 12), ("decode(t/s)", 12),
-            ("gap(ms)", 8), ("queue(ms)", 8), ("full(s)", 9)]
+            ("gap(ms)", 8), ("queue(ms)", 8), ("gen_t(s)", 9)]
     vals = [(session.get("n_req"), ".0f"), (session.get("in_tok"), ".0f"),
             (session.get("cached_tok"), ".0f"), (session.get("comp_tok"), ".0f"),
             (session.get("out_tok"), ".0f"), (session.get("ttft_s"), ".2f"),
             (session.get("prefill_tps"), ".0f"), (session.get("decode_tps"), ".1f"),
             (session.get("itl_ms"), ".1f"), (session.get("queue_ms"), ".3f"),
             (session.get("e2e_s"), ".2f")]
-    # The prefill column is index 6; annotate it when sourced from the radiance gauge (a windowed
-    # scheduler throughput, not a per-request histogram) so it isn't misread.
-    rad = session.get("prefill_from") == "radiance"
-    cells = []
-    for i, ((v, spec), (_, w)) in enumerate(zip(vals, cols)):
-        cell = _fmt(v, w, spec)
-        if rad and i == 6:
-            cell = _fmt(_f(session.get("prefill_tps"), ".0f") + " (rad)", w, "")
-        cells.append(cell)
+    # No source labelling in the table — an n/a prefill/comp column just means that metric is absent from this engine.
     return [
         " ".join(c.rjust(w) for c, w in cols),
-        " ".join(cells),
+        " ".join(_fmt(v, w, spec) for (v, spec), (_, w) in zip(vals, cols)),
     ]
 
 
@@ -659,9 +715,12 @@ def _history_rows(history):
     Columns: time | n (request count) | in_tok (TOTAL prompt tokens of the requests
     that completed in that window — not a rate; big for long-context/agentic requests) |
     comp (non-cached prompt tokens, what was actually prefilled) | out_tok (generated) |
-    ttft (first token) | prefill/decode TPS | full (full round-trip time) | KV% | GPU%."""
+    ttft (first token) | prefill(=per-window prefill tok/s; sly = computed tokens / real prefill-time, radiance =
+    the engine's own throughput gauge via t=tokens/rate) | decode TPS | gen_t (generation-phase latency, ttft +
+    decode, server-reported e2e) | full_t (total request wall-time: gen_t + the prefilled-compute term comp/prefill;
+    None-safe when any window term is absent) | KV% | GPU%."""
     rows = [
-        f"{'time':>8} {'n':>4} {'in_tok':>8} {'comp':>8} {'out_tok':>8} {'ttft':>7} {'prefill':>8} {'decode':>8} {'full':>7} {'KV%':>5} {'GPU%':>5}",
+        f"{'time':>8} {'n':>4} {'in_tok':>8} {'comp':>8} {'out_tok':>8} {'ttft':>7} {'prefill':>8} {'decode':>8} {'gen_t':>7} {'full_t':>8} {'KV%':>5} {'GPU%':>5}",
     ]
     # newest first: reverse the history (it's a deque, oldest-first); drop idle rows.
     for h in reversed(list(history)):
@@ -675,9 +734,10 @@ def _history_rows(history):
             f"{_fmt(per.get('computed_tok'), 8, '.0f')} "
             f"{_fmt(per.get('out_tok'), 8, '.0f')} "
             f"{_fmt(per.get('ttft_s'), 7, '.2f')} "
-            f"{_fmt(_f(per.get('prefill_tps'), '.0f') + (' (rad)' if per.get('prefill_from') == 'radiance' else ''), 8, '')} "
+            f"{_fmt(per.get('prefill_tps'), 8, '.0f')} "
             f"{_fmt(per.get('decode_tps'), 8, '.1f')} "
-            f"{_fmt(per.get('e2e_s'), 7, '.2f')} "
+            f"{_fmt(per.get('e2e_s'), 7, '.2f')} "   # gen_t: generation-phase latency (ttft + decode), server-reported
+            f"{_fmt(_full_wall(per), 8, '.2f')} "     # full_t: total request wall-time incl. the prefilled compute
             f"{_fmt_color(state.get('kv_pct'), 5, '.1f', 50, 80)} "
             f"{_fmt_color(g[8] if g else None, 5, '.0f', 50, 80)}")
     return rows
@@ -694,7 +754,6 @@ def _row(snap):
         "n_requests": per.get("n_req"),
         "ttft_s": per.get("ttft_s"),
         "prefill_tps": per.get("prefill_tps"),
-        "prefill_from": per.get("prefill_from"),
         "decode_tps": per.get("decode_tps"),
         "kv_usage": state.get("kv"),
         "running": state.get("running"),
@@ -729,8 +788,8 @@ def main():
                "blocks:\n"
                "  GPU               VRAM/GTT + 5 colored bars (GPU use / power / VRAM / edge temp / mem temp) + fan + clocks; red over 80/90 C\n"
                "  cache/queue/spec  KV % (colored), prefix-cache % cached + block hit rate, spec acceptance (accepted/draft tokens), running/waiting\n"
-               "  server            cumulative since server start (uptime shown in the title; req, in/cached/comp/out, TTFT, prefill/decode TPS, gap = inter-token latency, queue, full)\n"
-               "  polls (requests)  live row (in-flight elapsed + progress tokens + GPU % + W + KV %) + past rows newest first (in_tok = total prompt tokens of completed requests, not a rate); idle/0 rows dropped\n"
+               "  server            cumulative since server start (uptime shown in the title; req, in/cached/comp/out, TTFT, prefill/decode TPS, gap = inter-token latency, queue, gen_t = generation latency)\n"
+               "  polls (requests)  live row (in-flight elapsed + progress tokens + GPU % + W + KV %) + past rows newest first (in_tok = total prompt tokens of completed requests, not a rate); idle/0 rows dropped; each row shows gen_t (generation latency) and full_t (total time incl. prefilled compute)\n"
                "  avg (last 5 min)  weighted-average TTFT/prefill/decode (TPS by time, TTFT by requests; trend arrows) + window req/comp/out totals\n"
                "  log               parsed table of the last 5 loggers.py/metrics.py entries (stale mtime > 120 s -> flagged)")
     ap.add_argument("--port", type=int, default=8000, help="server port (default 8000)")
@@ -752,6 +811,10 @@ def main():
     window = []  # rolling (ts, per) list, pruned to the last 5 min
     history = deque(maxlen=a.history) if a.history > 0 else None
     prev_avg = {"ttft": None, "prefill": None, "decode": None, "n_req": None, "comp": None, "out": None}
+    # Lifetime prefill time since start (seconds), accumulated per window. sly carries a real histogram so this is
+    # unused for it; radiance has none, so it reconstructs each window's prefill time from throughput×tokens
+    # (t = tokens ÷ its gauge) here and main() below turns comp total / that sum into a true since-start mean.
+    pf_time_acc = 0.0
     flight_start = None  # time.time() when running went 0->>0 (in-flight request elapsed base)
     flight_base = None   # itl_count when running went 0->>0 (progress token base)
     out = open(a.out, "a") if a.out else None
@@ -761,6 +824,11 @@ def main():
             t = time.time()
             m = parse_prom(fetch_metrics(url))
             g = None if a.no_gpu else gpu()
+            # Normalise the GPU sample to a tuple-or-None once, at the source: read_amd() can return a bare float on
+            # a rocm-smi race, which would crash every consumer (render's unpack, _row's g[0]). Treat any non-tuple as
+            # "no rocm-smi" so the monitor stays up for its real job — the prefill/comp numbers.
+            if not isinstance(g, tuple):
+                g = None
             log_lines = tail_log(a.log, 12)
 
             if not m:
@@ -801,16 +869,23 @@ def main():
                 if not _is_idle(snap["per"]):
                     history.append(snap)
 
+            # Server-line prefill mean. sly carries a real cumulative prefill-time histogram so collect() set it;
+            # radiance has none — accumulate each window's reconstructed prefill time (t = tokens / gauge) since start
+            # and fold comp total / that sum in, giving a true mean that stays > 0 once any call prefilled. This is the
+            # single "prefill" value shown; the instantaneous gauge lives inside per-row prefill_tps, not a separate column.
+            if snap["per"].get("prefill_t") is not None:
+                pf_time_acc += snap["per"]["prefill_t"]
+            snap["session"]["prefill_tps"] = session_prefill_from_accum(snap["session"], pf_time_acc)
+
             # 5-min weighted averages (TPS by time, TTFT by requests) + trend vs previous poll
             cur_avg = {
                 "ttft": _window_avg(window, "ttft_s", "n_req"),
-                "prefill": _window_avg(window, "prefill_tps", "prefill_w"),
+                "prefill": _window_avg(window, "prefill_tps", "prefill_t"),
                 "decode": _window_avg(window, "decode_tps", "decode_t"),
                 "n_req": _window_sum(window, "n_req"),
                 "comp": _window_sum(window, "computed_tok"),
                 "out": _window_sum(window, "out_tok"),
             }
-            cur_avg["prefill_from"] = snap["per"].get("prefill_from")
             render(a, snap, window, history, log_lines, log_stale(a.log), cur_avg, prev_avg)
             prev_avg = cur_avg
 
