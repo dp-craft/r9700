@@ -31,13 +31,15 @@ It runs the `gpu_exclusive.sh` floor first but has no VRAM watchdog and writes n
 which crashed the desktop once, so close Chrome if VRAM gets tight. `EXTRA_ARGS="--gpu-headroom-mib 2048"` is recommended
 only, and unmeasured (see `known-issues.md`).
 
-35B starters on port 8000, one at a time. `ornith_rad_mtp.sh` is the fastest. Its Claude config, and `ornith_sly_dflash.sh`'s, is
-`claude --settings ~/.config/claude/local_vllm_direct/settings-redhat.json`; both serve under that file's model name.
-`qwen35_sly_dflash.sh` uses `settings-35b.json`.
+`ornith_rad_mtp.sh` is the fastest 35B. Its Claude config is
+`claude --settings ~/.config/claude/local_vllm_direct/settings-redhat.json`; it serves under that file's model name.
+
+The slower Sly starters are archived and use the same port, so run one at a time. `qwen35_sly_dflash.sh` uses
+`settings-35b.json`. `ornith_sly_dflash.sh` needs its checkpoints fetched first (commands in its header).
 
 ```bash
-./ornith_sly_dflash.sh start|stop|status|logs   # Ornith 1.5 MXFP4 + DFlash K=3 on Sly
-./qwen35_sly_dflash.sh start|stop|status|logs   # Qwen3.5-35B MXFP4 + DFlash K=7, triton_unfused, on Sly
+bench/engine-bench/vllm/archive/ornith_sly_dflash.sh start|stop|status|logs   # Ornith 1.5 MXFP4 + DFlash K=3 on Sly
+bench/engine-bench/vllm/archive/qwen35_sly_dflash.sh start|stop|status|logs   # Qwen3.5-35B MXFP4 + DFlash K=7, triton_unfused, on Sly
 ```
 
 ## Observe a running server (no GPU, read-only)

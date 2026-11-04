@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # qwen35_sly_dflash.sh — start/stop the vLLM server for amd/Qwen3.5-35B-A3B-MXFP4 + z-lab DFlash drafter
 # (profile sly-amd/qwen35-35b-a3b-mxfp4-dflash, Sly 1.9.1), then run claude against it.
-#   qwen35_sly_dflash.sh start|stop|status|logs        then: claude --settings bench/engine-bench/vllm/settings/settings-35b.json
+# ARCHIVED 2026-11-04: slower than ornith_rad_mtp.sh at the repo root.
+#   bench/engine-bench/vllm/archive/qwen35_sly_dflash.sh start|stop|status|logs        then: claude --settings bench/engine-bench/vllm/settings/settings-35b.json
 # Settings = same as the 27b (settings-redhat.json): port 8000, MAX_CONTEXT 262000 / MAX_OUTPUT 64000 /
 # AUTO_COMPACT 220000, Cactus delta 0, util 0.93, one seq, fp8 KV. Chat template = the model's own
 # chat_template.jinja (profile default -- NOT the 27b's Qwen3.8 dp-sharp artifact; override with
@@ -14,8 +15,8 @@
 # `start` runs gpu_exclusive.sh (unloads llama-swap, refuses below FREE_MIB_FLOOR).
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SERVE="$HERE/bench/engine-bench/vllm/serve_vllm.sh"
-SETTINGS="$HERE/bench/engine-bench/vllm/settings/settings-35b.json"
+SERVE="$HERE/../serve_vllm.sh"
+SETTINGS="$HERE/../settings/settings-35b.json"
 : "${PROFILE:=sly-amd/qwen35-35b-a3b-mxfp4-dflash}"
 
 read -r MAXLEN PORT MODEL < <(python3 - "$SETTINGS" <<'EOF'

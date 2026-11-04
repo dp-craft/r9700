@@ -7,7 +7,7 @@
 # WHAT IT DOES (in order):
 #   1. STOPS whatever vLLM container is on port 8000 -- that is likely the 27b server (qwen38-27b-redhat-
 #      mxfp4-dflash) which powers the interactive Claude session. Your session will go down. The 27b server
-#      comes back with the old launcher (vllm.sh) after this, the 35b one with qwen35_sly_dflash.sh.
+#      comes back with the old launcher (vllm.sh) after this, the 35b one with bench/engine-bench/vllm/archive/qwen35_sly_dflash.sh.
 #   2. Fetches the two PINNED checkpoints (resumable; ~25 GB + 772 MB, nice 19 / idle IO):
 #        amd/Qwen3.5-35B-A3B-MXFP4@2e19c657  z-lab/Qwen3.5-35B-A3B-DFlash@52cb554b (exact-release drafter)
 #   3. Boots profile sly-amd/qwen35-35b-a3b-mxfp4-dflash (Sly 1.9.1, same engine layer as the 27b):
@@ -106,7 +106,7 @@ curl -s -m 5 "http://127.0.0.1:$PORT/metrics" | grep -E 'spec_decode_num_(draft|
 echo
 if [ "$FAILURES" -eq 0 ]; then
   echo "ALL CHECKS PASSED -- the 35b + DFlash setup is validated. Interactive use:"
-  echo "  $HERE/qwen35_sly_dflash.sh start"
+  echo "  $HERE/bench/engine-bench/vllm/archive/qwen35_sly_dflash.sh start"
   echo "  headless tasks:"
   echo "  $HERE/.claude/skills/local-agent/scripts/local-agent.sh \"your brief\""
 else

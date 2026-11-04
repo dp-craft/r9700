@@ -136,12 +136,12 @@ radiance --model /models/ornith-1.5-35b-a3b-w4a8.rad --host 127.0.0.1 --port 800
   --temp 1.0 --top-p 0.95 --top-k 20 --presence-penalty 1.5
 ```
 
-Other 35B starters, both on Sly and both slower:
+Other 35B starters, both on Sly, slower and archived. The Ornith Sly checkpoints were deleted after the run; the fetch commands are in that script's header:
 
 | Script | Serves | Decode t/s at 10k / 50k / 100k |
 |---|---|---:|
-| `./ornith_sly_dflash.sh start` | Ornith 1.5 MXFP4 + official DFlash K=3 | 95.2 / 71.0 / 66.5 |
-| `./qwen35_sly_dflash.sh start` | Qwen3.5-35B MXFP4 + z-lab DFlash K=7, `triton_unfused` | 110.2 / 92.9 / 67.3 |
+| `bench/engine-bench/vllm/archive/ornith_sly_dflash.sh start` | Ornith 1.5 MXFP4 + official DFlash K=3 | 95.2 / 71.0 / 66.5 |
+| `bench/engine-bench/vllm/archive/qwen35_sly_dflash.sh start` | Qwen3.5-35B MXFP4 + z-lab DFlash K=7, `triton_unfused` | 110.2 / 92.9 / 67.3 |
 
 The `sly-amd` profile's default backend is still `EMULATION`; `qwen35_sly_dflash.sh` passes the override. The Ornith scripts take their port and served name from `~/.config/claude/local_vllm_direct/settings-redhat.json`, so `claude --settings` on that file works unchanged. Claude shows the 27B's name while Ornith answers.
 

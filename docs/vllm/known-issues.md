@@ -53,7 +53,7 @@ an issue lives in `settings.md`; a fix that was version/env-specific lives in `h
   override. No AMD or vLLM source recommends it, but a community checkpoint card does for gfx12 (CLAIMED). The log says it
   runs BF16 activations instead of the checkpoint's quantized ones (quality effect unmeasured).
 - **version seen:** sly 1.9.1 (vLLM 0.32.0), 2026-11-04.
-- **workaround:** `qwen35_sly_dflash.sh` passes `--moe-backend triton_unfused`: 110.2 / 92.9 / 67.3 tok/s at 10k / 50k / 100k
+- **workaround:** `bench/engine-bench/vllm/archive/qwen35_sly_dflash.sh` passes `--moe-backend triton_unfused`: 110.2 / 92.9 / 67.3 tok/s at 10k / 50k / 100k
   against 16.6 / 15.4 / 15.8 (MEASURED, DFlash K=7).
 - **trap:** arms without DFlash logged `Capturing CUDA graphs (FULL): 0it`, so they ran with no full-model graph.
   Their decode (`nospec` 6.2, `nospec-unfused` 8.7, `mtp-k4` 16.8 tok/s at 10k) does not measure backend cost. The cause
@@ -69,7 +69,7 @@ an issue lives in `settings.md`; a fix that was version/env-specific lives in `h
 - **status:** **live**. Only `EMULATION` is left, not tested because it ran the Qwen 35B at about 16 tok/s. A failed load leaves
   the container up, so the launcher waits until `WAIT` runs out.
 - **version seen:** sly 1.9.1 (vLLM 0.32.0), 2026-11-04.
-- **workaround:** use `ornith_sly_dflash.sh` (DFlash K=3), or `ornith_rad_mtp.sh` for MTP. Native Radiance is not affected: its
+- **workaround:** use `ornith_rad_mtp.sh` for MTP. DFlash K=3 does load on Sly (`bench/engine-bench/vllm/archive/ornith_sly_dflash.sh`; its checkpoints were deleted, fetch commands in its header). Native Radiance is not affected: its
   image has no vLLM, and it measured MTP K=3 at 219.8 tok/s.
 - **not the same as:** vLLM's comment `TRITON_UNFUSED has bug with MTP support` (`oracle/mxfp4.py`:403, :442), whose symptom nobody
   documents ([#49446](https://github.com/vllm-project/vllm/issues/49446), open).

@@ -61,7 +61,7 @@ Chance estimates are judgement (`INFERRED`), not measurements.
 | **Amd MXFP4 + `triton_unfused` + DFlash** | Present locally | 110 / 93 / 67 t/s (`MEASURED`) | Under 5% |
 | `Qwen/Qwen3.5-35B-A3B-GPTQ-Int4` + the MiniCPM-style settings | sha `3af5ca29`, 24.46 GB, not booted here | None for this model. Sly's int4 MoE config alone: "1.2-1.7x per MoE call, ~+8 % end-to-end" (`CLAIMED`) | Under 5% |
 | MiniCPM-V 4.7 W4A16 | Described by Sly; no separate W4A16 repo found | 169.4 t/s at 64k (`CLAIMED`); no coding evaluation | Under 5% |
-| Ornith on vLLM (corrected: this report's search missed `Capicua25x/Ornith-1.5-35B-A3B-MXFP4-Quark-RDNA4` and `ornith-ai/Ornith-1.5-35B-A3B-DFlash`) | Both fetched | 95 / 71 / 67 t/s at 10k / 50k / 100k with DFlash K=3 (`MEASURED`, `docs/analysis/2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md`) | Not reached |
+| Ornith on vLLM (corrected: this report's search missed `Capicua25x/Ornith-1.5-35B-A3B-MXFP4-Quark-RDNA4` and `ornith-ai/Ornith-1.5-35B-A3B-DFlash`) | Fetched for the test, deleted afterwards | 95 / 71 / 67 t/s at 10k / 50k / 100k with DFlash K=3 (`MEASURED`, `docs/analysis/2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md`) | Not reached |
 | Native Radiance `.rad` Qwen3.6 FP8 | 34.63 GiB, built for 2 GPUs | None published | About 0% on one card |
 | **Native Radiance `.rad` Ornith 1.5 w4a8** (added by the correction; not in the original table) | `keptn/ornith-1.5-35b-a3b-w4a8@cfed0f8f`, 19.74 GiB, official single-card config | 219.8 / 205.0 / 174.5 t/s at 10k / 50k / 100k (`MEASURED`) | Reached at 10k and 50k |
 | hipfire | `hipfire-models/qwen3.6-35b-a3b` | 48.5 t/s plain decode on R9700 (`CLAIMED`) | Under 5% |

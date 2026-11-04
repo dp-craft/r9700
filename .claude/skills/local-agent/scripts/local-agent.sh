@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# local-agent: run one self-contained task headless on the local vLLM model server
-# (settings: <repo>/bench/engine-bench/vllm/settings/settings-35b.json -- amd/Qwen3.5-35B-A3B-MXFP4 + DFlash,
-# start it with qwen35_sly_dflash.sh at the repo root) and print only the final result.
+# local-agent: run one self-contained task headless on whichever model the local server is running
+# (fastest: ornith_rad_mtp.sh at the repo root) and print only the final result.
 # usage: local-agent.sh "task" [extra claude args, e.g. --agent tools-code-logic-writer --max-turns 40]
 # With --agent <name>, the session runs as .claude/agents/<name>.md (its rules + tools) and may
 # also run tests / typecheck / npm scripts.
@@ -10,9 +9,8 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../../../.." && pwd)"
 
-# The model server + settings come from LOCAL_AGENT_SETTINGS (default the 35b vLLM settings).
-# Point it at another settings file (e.g. the 27b's ~/.config/claude/local_vllm_direct/settings-redhat.json)
-# to run on that server; the reachability check is derived from that file's ANTHROPIC_BASE_URL.
+# Port and Claude env come from LOCAL_AGENT_SETTINGS (default the 35b vLLM settings); the model name comes from
+# the server, because port 8000 is shared and each starter serves its own name.
 SETTINGS="${LOCAL_AGENT_SETTINGS:-$REPO/bench/engine-bench/vllm/settings/settings-35b.json}"
 
 if [ $# -lt 1 ] || [ -z "$1" ]; then
@@ -22,19 +20,19 @@ fi
 task="$1"; shift
 
 BASE_URL="$(jq -r '.env.ANTHROPIC_BASE_URL // empty' "$SETTINGS" 2>/dev/null)"
-if [ -n "$BASE_URL" ] && ! curl -s -m 3 -o /dev/null "$BASE_URL/v1/models"; then
-  echo "LOCAL AGENT ERROR: model server not reachable at $BASE_URL (start it first)" >&2
-  exit 1
-fi
-# Identity check: port 8000 is shared with the 27b server (settings-redhat.json). If the wrong server is up,
-# the task would silently run on the wrong model -- refuse instead (reachability alone is not enough here).
+RUN_SETTINGS="$SETTINGS"
 if [ -n "$BASE_URL" ]; then
-  WANT_MODEL="$(jq -r '.env.ANTHROPIC_MODEL // empty' "$SETTINGS" 2>/dev/null)"
-  GOT_MODEL="$(curl -s -m 3 "$BASE_URL/v1/models" | jq -r '.data[0].id // empty' 2>/dev/null)"
-  if [ -n "$WANT_MODEL" ] && [ -n "$GOT_MODEL" ] && [ "$GOT_MODEL" != "$WANT_MODEL" ]; then
-    echo "LOCAL AGENT ERROR: $BASE_URL serves '$GOT_MODEL' but settings want '$WANT_MODEL' -- wrong model up on this port (start qwen35_sly_dflash.sh first)" >&2
+  GOT_MODEL="$(curl -s -m 3 "$BASE_URL/v1/models" | jq -r '.data[0].id // empty' 2>/dev/null || true)"
+  if [ -z "$GOT_MODEL" ]; then
+    echo "LOCAL AGENT ERROR: no model server at $BASE_URL (start one first, fastest: ornith_rad_mtp.sh)" >&2
     exit 1
   fi
+  # Point every env entry naming the settings' model at the running model.
+  WANT_MODEL="$(jq -r '.env.ANTHROPIC_MODEL // empty' "$SETTINGS")"
+  RUN_SETTINGS="$(mktemp)"
+  trap 'rm -f "$RUN_SETTINGS"' EXIT
+  jq --arg want "$WANT_MODEL" --arg got "$GOT_MODEL" \
+    '.env |= with_entries(if .value == $want then .value = $got else . end)' "$SETTINGS" > "$RUN_SETTINGS"
 fi
 
 allowed="Read,Grep,Glob,Edit,Write,Bash(git diff:*),Bash(git status:*),Bash(ls:*)"
@@ -45,7 +43,7 @@ for arg in "$@"; do
   fi
 done
 
-RAW="$(claude --settings "$SETTINGS" \
+RAW="$(claude --settings "$RUN_SETTINGS" \
   -p "$task" --output-format json --max-turns "${MAX_TURNS:-20}" \
   --permission-mode acceptEdits \
   --allowedTools "$allowed" \

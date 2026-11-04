@@ -1,19 +1,19 @@
 ---
 name: local-agent
-description: Delegate a simple, self-contained task (boilerplate, renames, small tests, summarizing or grepping files, mechanical edits) to the local Qwen3.5-35B-A3B model running behind the vLLM server (start it with qwen35_sly_dflash.sh at the repo root). Use when the user says "delegate to local", "use local", "local agent", or for mechanical tasks that don't need deep reasoning.
+description: Delegate a simple, self-contained task (boilerplate, renames, small tests, summarizing or grepping files, mechanical edits) to whichever local model is running on port 8000 (fastest: start ornith_rad_mtp.sh at the repo root). Use when the user says "delegate to local", "use local", "local agent", or for mechanical tasks that don't need deep reasoning.
 allowed-tools: Bash(/home/dev/work/dp-craft/amd/.claude/skills/local-agent/scripts/local-agent.sh:*)
 compatibility:
   tools:
     - claude (Claude Code CLI)
     - jq
-    - vLLM on 127.0.0.1:8000 (profile sly-amd/qwen35-35b-a3b-mxfp4-dflash)
+    - a local model server on 127.0.0.1:8000 (ornith_rad_mtp.sh, or any other starter on that port)
 ---
 
 # Local Agent Skill
 
-Runs a headless Claude Code session against the local vLLM model (amd/Qwen3.5-35B-A3B-MXFP4 + z-lab DFlash
-drafter) and returns only its final answer. The script verifies the server serves the settings file's model
-before running (port 8000 is shared with the 27b server -- a wrong-model-up refusal is a clear error).
+Runs a headless Claude Code session against whichever model the server on port 8000 reports and returns only
+its final answer. Ornith on `ornith_rad_mtp.sh` is the fastest. Ornith reports the 27b's name, so the name does
+not show which model answered; check the running starter with `<script> status` if it matters.
 
 ## Steps
 
@@ -25,7 +25,7 @@ before running (port 8000 is shared with the 27b server -- a wrong-model-up refu
    /home/dev/work/dp-craft/amd/.claude/skills/local-agent/scripts/local-agent.sh "<brief>"
    ```
    - It runs in the current working directory; `cd` into the right folder in the same command if needed.
-   - The server must be up: `qwen35_sly_dflash.sh start` (repo root) first.
+   - A server must be up first: `ornith_rad_mtp.sh start` (repo root). Any other starter on port 8000 also works.
    - For tasks likely to exceed ~2 min, use `run_in_background` and continue with other work.
    - Extra claude flags can follow the brief, e.g. `--max-turns 40`.
    - `--agent <name>` runs the session as `.claude/agents/<name>.md` (its rules + tools); use it for
@@ -39,4 +39,4 @@ before running (port 8000 is shared with the 27b server -- a wrong-model-up refu
   (plus the `--agent` extras above).
   Anything else is denied (headless mode cannot prompt). Edits are auto-accepted.
 - One model in VRAM, concurrency 1 — local tasks run serially; don't launch several in parallel.
-- Output starting with `LOCAL AGENT ERROR:` means the run failed (server down, wrong model up, max turns hit, ...).
+- Output starting with `LOCAL AGENT ERROR:` means the run failed (server down, max turns hit, ...).
