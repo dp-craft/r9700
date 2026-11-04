@@ -242,6 +242,11 @@ def collect(m, prev, prev_t, g, log_lines):
     """One snapshot: per-call (diffed), session (cumulative), state, GPU, log. All None-safe."""
     t = time.time()
     per = {}
+    # The radiance fork of vLLM drops the standard per-request prefill histogram (it emits its own
+    # radiance:* scheduler metrics instead). Detect it here so prefill can fall back to the gauge
+    # (radiance:prefill_tokens_per_second) — sly / standard vLLM keep the histogram and are unaffected.
+    is_radiance = "radiance:prefill_tokens_total" in m
+    rad_pf = _first(m, "radiance:prefill_tokens_per_second") if is_radiance else None
     if prev is not None and prev_t is not None and t > prev_t:
         in_tok = _diff(m, prev, "vllm:request_prompt_tokens_sum")
         out_tok = _diff(m, prev, "vllm:request_generation_tokens_sum")
@@ -253,6 +258,10 @@ def collect(m, prev, prev_t, g, log_lines):
         n_req = _diff(m, prev, ttft_base + "_count") if ttft_base else None
         decode_t = _diff(m, prev, "vllm:request_decode_time_seconds_sum")
         prefill_t = _diff(m, prev, "vllm:request_prefill_time_seconds_sum")
+        # Effective prefill TPS: per-request histogram delta when present (sly / standard vLLM);
+        # otherwise the radiance gauge. prefill_w is the weight the 5-min avg uses (None above would
+        # make every radiance sample skipped), so it carries whatever basis we divided by.
+        prefill_tps = _ratio(computed_tok, prefill_t) if prefill_t is not None else rad_pf
         e2e = _avg_diff(m, prev, "vllm:e2e_request_latency_seconds")
         per = {
             "in_tok": in_tok,
@@ -263,7 +272,9 @@ def collect(m, prev, prev_t, g, log_lines):
             "e2e_s": e2e,
             "prefill_t": prefill_t,
             "decode_t": decode_t,
-            "prefill_tps": _ratio(computed_tok, prefill_t),
+            "prefill_tps": prefill_tps,
+            "prefill_from": "histogram" if prefill_t is not None else ("radiance" if is_radiance else None),
+            "prefill_w": prefill_t if prefill_t is not None else rad_pf,
             "decode_tps": _ratio(out_tok, decode_t),
         }
 
@@ -273,6 +284,10 @@ def collect(m, prev, prev_t, g, log_lines):
     session_out = m.get("vllm:request_generation_tokens_sum")
     cached_tok = m.get("vllm:prompt_tokens_cached_total")
     comp_tok = (session_in - cached_tok) if (session_in is not None and cached_tok is not None) else None
+    hist_prefill_sum = m.get("vllm:request_prefill_time_seconds_sum")
+    # Same per-request-histogram vs radiance-gauge fallback as the per-call block, but cumulative.
+    session_prefill_tps = (_ratio(comp_tok, hist_prefill_sum)
+                           if hist_prefill_sum is not None else (rad_pf if is_radiance else None))
     itl = _avg(m, "vllm:inter_token_latency_seconds")
     queue = _avg(m, "vllm:request_queue_time_seconds")
     session = {
@@ -282,7 +297,8 @@ def collect(m, prev, prev_t, g, log_lines):
         "comp_tok": comp_tok,
         "n_req": m.get(ttft_base + "_count") if ttft_base else None,
         "ttft_s": _avg(m, ttft_base) if ttft_base else None,
-        "prefill_tps": _ratio(comp_tok, m.get("vllm:request_prefill_time_seconds_sum")),
+        "prefill_tps": session_prefill_tps,
+        "prefill_from": "histogram" if hist_prefill_sum is not None else ("radiance" if is_radiance else None),
         "decode_tps": _ratio(session_out, m.get("vllm:request_decode_time_seconds_sum")),
         "e2e_s": _avg(m, "vllm:e2e_request_latency_seconds"),
         "itl_ms": (itl * 1000) if itl is not None else None,
@@ -582,7 +598,7 @@ def render(a, snap, window, history, log_lines, log_stale, cur_avg, prev_avg):
         ("polls (requests)", polls_lines),
         ("avg (last 5 min)", [
             f"TTFT {_f(cur_avg['ttft'], '.2f')} s {_trend(cur_avg['ttft'], prev_avg['ttft'])}   "
-            f"prefill {_f(cur_avg['prefill'], '.0f')} tok/s {_trend(cur_avg['prefill'], prev_avg['prefill'])}   "
+            f"prefill {_f(cur_avg['prefill'], '.0f')} tok/s{(' (rad)' if cur_avg.get('prefill_from') == 'radiance' else '')} {_trend(cur_avg['prefill'], prev_avg['prefill'])}   "
             f"decode {_f(cur_avg['decode'], '.1f')} tok/s {_trend(cur_avg['decode'], prev_avg['decode'])}   "
             f"req {_f(cur_avg['n_req'], '.0f')}   comp {_f(cur_avg['comp'], '.0f')} tok   out {_f(cur_avg['out'], '.0f')} tok",
         ]),
@@ -620,9 +636,18 @@ def _session_rows(session):
             (session.get("prefill_tps"), ".0f"), (session.get("decode_tps"), ".1f"),
             (session.get("itl_ms"), ".1f"), (session.get("queue_ms"), ".3f"),
             (session.get("e2e_s"), ".2f")]
+    # The prefill column is index 6; annotate it when sourced from the radiance gauge (a windowed
+    # scheduler throughput, not a per-request histogram) so it isn't misread.
+    rad = session.get("prefill_from") == "radiance"
+    cells = []
+    for i, ((v, spec), (_, w)) in enumerate(zip(vals, cols)):
+        cell = _fmt(v, w, spec)
+        if rad and i == 6:
+            cell = _fmt(_f(session.get("prefill_tps"), ".0f") + " (rad)", w, "")
+        cells.append(cell)
     return [
         " ".join(c.rjust(w) for c, w in cols),
-        " ".join(_fmt(v, w, spec) for (v, spec), (_, w) in zip(vals, cols)),
+        " ".join(cells),
     ]
 
 
@@ -650,7 +675,7 @@ def _history_rows(history):
             f"{_fmt(per.get('computed_tok'), 8, '.0f')} "
             f"{_fmt(per.get('out_tok'), 8, '.0f')} "
             f"{_fmt(per.get('ttft_s'), 7, '.2f')} "
-            f"{_fmt(per.get('prefill_tps'), 8, '.0f')} "
+            f"{_fmt(_f(per.get('prefill_tps'), '.0f') + (' (rad)' if per.get('prefill_from') == 'radiance' else ''), 8, '')} "
             f"{_fmt(per.get('decode_tps'), 8, '.1f')} "
             f"{_fmt(per.get('e2e_s'), 7, '.2f')} "
             f"{_fmt_color(state.get('kv_pct'), 5, '.1f', 50, 80)} "
@@ -669,6 +694,7 @@ def _row(snap):
         "n_requests": per.get("n_req"),
         "ttft_s": per.get("ttft_s"),
         "prefill_tps": per.get("prefill_tps"),
+        "prefill_from": per.get("prefill_from"),
         "decode_tps": per.get("decode_tps"),
         "kv_usage": state.get("kv"),
         "running": state.get("running"),
@@ -778,12 +804,13 @@ def main():
             # 5-min weighted averages (TPS by time, TTFT by requests) + trend vs previous poll
             cur_avg = {
                 "ttft": _window_avg(window, "ttft_s", "n_req"),
-                "prefill": _window_avg(window, "prefill_tps", "prefill_t"),
+                "prefill": _window_avg(window, "prefill_tps", "prefill_w"),
                 "decode": _window_avg(window, "decode_tps", "decode_t"),
                 "n_req": _window_sum(window, "n_req"),
                 "comp": _window_sum(window, "computed_tok"),
                 "out": _window_sum(window, "out_tok"),
             }
+            cur_avg["prefill_from"] = snap["per"].get("prefill_from")
             render(a, snap, window, history, log_lines, log_stale(a.log), cur_avg, prev_avg)
             prev_avg = cur_avg
 
