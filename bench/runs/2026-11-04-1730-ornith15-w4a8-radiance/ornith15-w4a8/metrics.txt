@@ -1,0 +1,409 @@
+# HELP vllm:num_requests_running Number of requests currently running on GPU.
+# TYPE vllm:num_requests_running gauge
+vllm:num_requests_running{model_name="qwen35moe",engine="0"} 0
+# HELP vllm:num_requests_waiting Number of requests waiting to be processed.
+# TYPE vllm:num_requests_waiting gauge
+vllm:num_requests_waiting{model_name="qwen35moe",engine="0"} 0
+# HELP vllm:gpu_cache_usage_perc GPU KV-cache usage. 1 means 100 percent usage.
+# TYPE vllm:gpu_cache_usage_perc gauge
+vllm:gpu_cache_usage_perc{model_name="qwen35moe",engine="0"} 0.48893868923187256
+# HELP vllm:kv_cache_usage_perc KV-cache usage. 1 means 100 percent usage.
+# TYPE vllm:kv_cache_usage_perc gauge
+vllm:kv_cache_usage_perc{model_name="qwen35moe",engine="0"} 0.48893868923187256
+# HELP radiance:kv_cache_max_tokens Tokens of context the KV cache holds with every block it lends the experts taken back.
+# TYPE radiance:kv_cache_max_tokens gauge
+radiance:kv_cache_max_tokens{model_name="qwen35moe",engine="0"} 992288
+# HELP radiance:kv_cache_max_bytes VRAM the KV cache holds with every block it lends the experts taken back, one card.
+# TYPE radiance:kv_cache_max_bytes gauge
+radiance:kv_cache_max_bytes{model_name="qwen35moe",engine="0"} 12207357952
+# HELP radiance:kv_resident_blocks Blocks of every streamed KV group the device ring holds; 0 when no group streams.
+# TYPE radiance:kv_resident_blocks gauge
+radiance:kv_resident_blocks{model_name="qwen35moe",engine="0"} 0
+# HELP radiance:kv_stream_misses_total Blocks copied into a streamed KV group's ring from the host mirror.
+# TYPE radiance:kv_stream_misses_total counter
+radiance:kv_stream_misses_total{model_name="qwen35moe",engine="0"} 0
+# HELP radiance:kv_stream_bytes_total Bytes a streamed KV group's resolve moved, by direction.
+# TYPE radiance:kv_stream_bytes_total counter
+radiance:kv_stream_bytes_total{model_name="qwen35moe",engine="0",dir="in"} 0
+# HELP vllm:gpu_prefix_cache_hit_rate GPU prefix cache block hit rate.
+# TYPE vllm:gpu_prefix_cache_hit_rate gauge
+vllm:gpu_prefix_cache_hit_rate{model_name="qwen35moe",engine="0"} 0
+# HELP vllm:prompt_tokens_total Number of prefill tokens processed.
+# TYPE vllm:prompt_tokens_total counter
+vllm:prompt_tokens_total{model_name="qwen35moe",engine="0"} 482772
+# HELP vllm:generation_tokens_total Number of generation tokens processed.
+# TYPE vllm:generation_tokens_total counter
+vllm:generation_tokens_total{model_name="qwen35moe",engine="0"} 2545
+# HELP vllm:num_preemptions_total Cumulative number of preemptions from the engine.
+# TYPE vllm:num_preemptions_total counter
+vllm:num_preemptions_total{model_name="qwen35moe",engine="0"} 0
+# HELP radiance:preempt_forced_total Preempted prefill waits that ended by reclaiming cache blocks and forcing a lowest-priority running victim (--preempt-wait-ms).
+# TYPE radiance:preempt_forced_total counter
+radiance:preempt_forced_total{model_name="qwen35moe",engine="0"} 0
+# HELP vllm:request_success_total Count of successfully processed requests.
+# TYPE vllm:request_success_total counter
+vllm:request_success_total{model_name="qwen35moe",engine="0",finished_reason="stop"} 1
+vllm:request_success_total{model_name="qwen35moe",engine="0",finished_reason="length"} 10
+vllm:request_success_total{model_name="qwen35moe",engine="0",finished_reason="tool_calls"} 1
+vllm:request_success_total{model_name="qwen35moe",engine="0",finished_reason="abort"} 0
+vllm:request_success_total{model_name="qwen35moe",engine="0",finished_reason="error"} 0
+# HELP vllm:time_to_first_token_seconds Histogram of time to first token in seconds.
+# TYPE vllm:time_to_first_token_seconds histogram
+vllm:time_to_first_token_seconds_bucket{model_name="qwen35moe",engine="0",le="0.001"} 0
+vllm:time_to_first_token_seconds_bucket{model_name="qwen35moe",engine="0",le="0.0050000000000000001"} 0
+vllm:time_to_first_token_seconds_bucket{model_name="qwen35moe",engine="0",le="0.01"} 0
+vllm:time_to_first_token_seconds_bucket{model_name="qwen35moe",engine="0",le="0.02"} 0
+vllm:time_to_first_token_seconds_bucket{model_name="qwen35moe",engine="0",le="0.040000000000000001"} 1
+vllm:time_to_first_token_seconds_bucket{model_name="qwen35moe",engine="0",le="0.059999999999999998"} 1
+vllm:time_to_first_token_seconds_bucket{model_name="qwen35moe",engine="0",le="0.080000000000000002"} 2
+vllm:time_to_first_token_seconds_bucket{model_name="qwen35moe",engine="0",le="0.10000000000000001"} 2
+vllm:time_to_first_token_seconds_bucket{model_name="qwen35moe",engine="0",le="0.25"} 2
+vllm:time_to_first_token_seconds_bucket{model_name="qwen35moe",engine="0",le="0.5"} 2
+vllm:time_to_first_token_seconds_bucket{model_name="qwen35moe",engine="0",le="0.75"} 2
+vllm:time_to_first_token_seconds_bucket{model_name="qwen35moe",engine="0",le="1"} 5
+vllm:time_to_first_token_seconds_bucket{model_name="qwen35moe",engine="0",le="2.5"} 6
+vllm:time_to_first_token_seconds_bucket{model_name="qwen35moe",engine="0",le="5"} 6
+vllm:time_to_first_token_seconds_bucket{model_name="qwen35moe",engine="0",le="7.5"} 9
+vllm:time_to_first_token_seconds_bucket{model_name="qwen35moe",engine="0",le="10"} 9
+vllm:time_to_first_token_seconds_bucket{model_name="qwen35moe",engine="0",le="20"} 12
+vllm:time_to_first_token_seconds_bucket{model_name="qwen35moe",engine="0",le="40"} 12
+vllm:time_to_first_token_seconds_bucket{model_name="qwen35moe",engine="0",le="80"} 12
+vllm:time_to_first_token_seconds_bucket{model_name="qwen35moe",engine="0",le="160"} 12
+vllm:time_to_first_token_seconds_bucket{model_name="qwen35moe",engine="0",le="640"} 12
+vllm:time_to_first_token_seconds_bucket{model_name="qwen35moe",engine="0",le="2560"} 12
+vllm:time_to_first_token_seconds_bucket{model_name="qwen35moe",engine="0",le="+Inf"} 12
+vllm:time_to_first_token_seconds_sum{model_name="qwen35moe",engine="0"} 77.178463644999994
+vllm:time_to_first_token_seconds_count{model_name="qwen35moe",engine="0"} 12
+# HELP vllm:time_per_output_token_seconds Histogram of time per output token in seconds.
+# TYPE vllm:time_per_output_token_seconds histogram
+vllm:time_per_output_token_seconds_bucket{model_name="qwen35moe",engine="0",le="0.01"} 12
+vllm:time_per_output_token_seconds_bucket{model_name="qwen35moe",engine="0",le="0.025000000000000001"} 12
+vllm:time_per_output_token_seconds_bucket{model_name="qwen35moe",engine="0",le="0.050000000000000003"} 12
+vllm:time_per_output_token_seconds_bucket{model_name="qwen35moe",engine="0",le="0.074999999999999997"} 12
+vllm:time_per_output_token_seconds_bucket{model_name="qwen35moe",engine="0",le="0.10000000000000001"} 12
+vllm:time_per_output_token_seconds_bucket{model_name="qwen35moe",engine="0",le="0.14999999999999999"} 12
+vllm:time_per_output_token_seconds_bucket{model_name="qwen35moe",engine="0",le="0.20000000000000001"} 12
+vllm:time_per_output_token_seconds_bucket{model_name="qwen35moe",engine="0",le="0.29999999999999999"} 12
+vllm:time_per_output_token_seconds_bucket{model_name="qwen35moe",engine="0",le="0.40000000000000002"} 12
+vllm:time_per_output_token_seconds_bucket{model_name="qwen35moe",engine="0",le="0.5"} 12
+vllm:time_per_output_token_seconds_bucket{model_name="qwen35moe",engine="0",le="0.75"} 12
+vllm:time_per_output_token_seconds_bucket{model_name="qwen35moe",engine="0",le="1"} 12
+vllm:time_per_output_token_seconds_bucket{model_name="qwen35moe",engine="0",le="2.5"} 12
+vllm:time_per_output_token_seconds_bucket{model_name="qwen35moe",engine="0",le="5"} 12
+vllm:time_per_output_token_seconds_bucket{model_name="qwen35moe",engine="0",le="7.5"} 12
+vllm:time_per_output_token_seconds_bucket{model_name="qwen35moe",engine="0",le="10"} 12
+vllm:time_per_output_token_seconds_bucket{model_name="qwen35moe",engine="0",le="20"} 12
+vllm:time_per_output_token_seconds_bucket{model_name="qwen35moe",engine="0",le="40"} 12
+vllm:time_per_output_token_seconds_bucket{model_name="qwen35moe",engine="0",le="80"} 12
+vllm:time_per_output_token_seconds_bucket{model_name="qwen35moe",engine="0",le="+Inf"} 12
+vllm:time_per_output_token_seconds_sum{model_name="qwen35moe",engine="0"} 0.057429553737758925
+vllm:time_per_output_token_seconds_count{model_name="qwen35moe",engine="0"} 12
+# HELP vllm:inter_token_latency_seconds Histogram of inter-token latency in seconds.
+# TYPE vllm:inter_token_latency_seconds histogram
+vllm:inter_token_latency_seconds_bucket{model_name="qwen35moe",engine="0",le="0.01"} 12
+vllm:inter_token_latency_seconds_bucket{model_name="qwen35moe",engine="0",le="0.025000000000000001"} 12
+vllm:inter_token_latency_seconds_bucket{model_name="qwen35moe",engine="0",le="0.050000000000000003"} 12
+vllm:inter_token_latency_seconds_bucket{model_name="qwen35moe",engine="0",le="0.074999999999999997"} 12
+vllm:inter_token_latency_seconds_bucket{model_name="qwen35moe",engine="0",le="0.10000000000000001"} 12
+vllm:inter_token_latency_seconds_bucket{model_name="qwen35moe",engine="0",le="0.14999999999999999"} 12
+vllm:inter_token_latency_seconds_bucket{model_name="qwen35moe",engine="0",le="0.20000000000000001"} 12
+vllm:inter_token_latency_seconds_bucket{model_name="qwen35moe",engine="0",le="0.29999999999999999"} 12
+vllm:inter_token_latency_seconds_bucket{model_name="qwen35moe",engine="0",le="0.40000000000000002"} 12
+vllm:inter_token_latency_seconds_bucket{model_name="qwen35moe",engine="0",le="0.5"} 12
+vllm:inter_token_latency_seconds_bucket{model_name="qwen35moe",engine="0",le="0.75"} 12
+vllm:inter_token_latency_seconds_bucket{model_name="qwen35moe",engine="0",le="1"} 12
+vllm:inter_token_latency_seconds_bucket{model_name="qwen35moe",engine="0",le="2.5"} 12
+vllm:inter_token_latency_seconds_bucket{model_name="qwen35moe",engine="0",le="5"} 12
+vllm:inter_token_latency_seconds_bucket{model_name="qwen35moe",engine="0",le="7.5"} 12
+vllm:inter_token_latency_seconds_bucket{model_name="qwen35moe",engine="0",le="10"} 12
+vllm:inter_token_latency_seconds_bucket{model_name="qwen35moe",engine="0",le="20"} 12
+vllm:inter_token_latency_seconds_bucket{model_name="qwen35moe",engine="0",le="40"} 12
+vllm:inter_token_latency_seconds_bucket{model_name="qwen35moe",engine="0",le="80"} 12
+vllm:inter_token_latency_seconds_bucket{model_name="qwen35moe",engine="0",le="+Inf"} 12
+vllm:inter_token_latency_seconds_sum{model_name="qwen35moe",engine="0"} 0.057429553737758925
+vllm:inter_token_latency_seconds_count{model_name="qwen35moe",engine="0"} 12
+# HELP vllm:e2e_request_latency_seconds Histogram of end to end request latency in seconds.
+# TYPE vllm:e2e_request_latency_seconds histogram
+vllm:e2e_request_latency_seconds_bucket{model_name="qwen35moe",engine="0",le="0.29999999999999999"} 1
+vllm:e2e_request_latency_seconds_bucket{model_name="qwen35moe",engine="0",le="0.5"} 1
+vllm:e2e_request_latency_seconds_bucket{model_name="qwen35moe",engine="0",le="0.80000000000000004"} 2
+vllm:e2e_request_latency_seconds_bucket{model_name="qwen35moe",engine="0",le="1"} 2
+vllm:e2e_request_latency_seconds_bucket{model_name="qwen35moe",engine="0",le="1.5"} 3
+vllm:e2e_request_latency_seconds_bucket{model_name="qwen35moe",engine="0",le="2"} 6
+vllm:e2e_request_latency_seconds_bucket{model_name="qwen35moe",engine="0",le="2.5"} 6
+vllm:e2e_request_latency_seconds_bucket{model_name="qwen35moe",engine="0",le="5"} 6
+vllm:e2e_request_latency_seconds_bucket{model_name="qwen35moe",engine="0",le="10"} 9
+vllm:e2e_request_latency_seconds_bucket{model_name="qwen35moe",engine="0",le="15"} 9
+vllm:e2e_request_latency_seconds_bucket{model_name="qwen35moe",engine="0",le="20"} 11
+vllm:e2e_request_latency_seconds_bucket{model_name="qwen35moe",engine="0",le="30"} 12
+vllm:e2e_request_latency_seconds_bucket{model_name="qwen35moe",engine="0",le="40"} 12
+vllm:e2e_request_latency_seconds_bucket{model_name="qwen35moe",engine="0",le="50"} 12
+vllm:e2e_request_latency_seconds_bucket{model_name="qwen35moe",engine="0",le="60"} 12
+vllm:e2e_request_latency_seconds_bucket{model_name="qwen35moe",engine="0",le="120"} 12
+vllm:e2e_request_latency_seconds_bucket{model_name="qwen35moe",engine="0",le="240"} 12
+vllm:e2e_request_latency_seconds_bucket{model_name="qwen35moe",engine="0",le="480"} 12
+vllm:e2e_request_latency_seconds_bucket{model_name="qwen35moe",engine="0",le="960"} 12
+vllm:e2e_request_latency_seconds_bucket{model_name="qwen35moe",engine="0",le="1920"} 12
+vllm:e2e_request_latency_seconds_bucket{model_name="qwen35moe",engine="0",le="7680"} 12
+vllm:e2e_request_latency_seconds_bucket{model_name="qwen35moe",engine="0",le="+Inf"} 12
+vllm:e2e_request_latency_seconds_sum{model_name="qwen35moe",engine="0"} 89.680904322000004
+vllm:e2e_request_latency_seconds_count{model_name="qwen35moe",engine="0"} 12
+# HELP vllm:request_decode_time_seconds Histogram of time spent in the decode phase, in seconds.
+# TYPE vllm:request_decode_time_seconds histogram
+vllm:request_decode_time_seconds_bucket{model_name="qwen35moe",engine="0",le="0.29999999999999999"} 2
+vllm:request_decode_time_seconds_bucket{model_name="qwen35moe",engine="0",le="0.5"} 2
+vllm:request_decode_time_seconds_bucket{model_name="qwen35moe",engine="0",le="0.80000000000000004"} 3
+vllm:request_decode_time_seconds_bucket{model_name="qwen35moe",engine="0",le="1"} 3
+vllm:request_decode_time_seconds_bucket{model_name="qwen35moe",engine="0",le="1.5"} 11
+vllm:request_decode_time_seconds_bucket{model_name="qwen35moe",engine="0",le="2"} 12
+vllm:request_decode_time_seconds_bucket{model_name="qwen35moe",engine="0",le="2.5"} 12
+vllm:request_decode_time_seconds_bucket{model_name="qwen35moe",engine="0",le="5"} 12
+vllm:request_decode_time_seconds_bucket{model_name="qwen35moe",engine="0",le="10"} 12
+vllm:request_decode_time_seconds_bucket{model_name="qwen35moe",engine="0",le="15"} 12
+vllm:request_decode_time_seconds_bucket{model_name="qwen35moe",engine="0",le="20"} 12
+vllm:request_decode_time_seconds_bucket{model_name="qwen35moe",engine="0",le="30"} 12
+vllm:request_decode_time_seconds_bucket{model_name="qwen35moe",engine="0",le="40"} 12
+vllm:request_decode_time_seconds_bucket{model_name="qwen35moe",engine="0",le="50"} 12
+vllm:request_decode_time_seconds_bucket{model_name="qwen35moe",engine="0",le="60"} 12
+vllm:request_decode_time_seconds_bucket{model_name="qwen35moe",engine="0",le="120"} 12
+vllm:request_decode_time_seconds_bucket{model_name="qwen35moe",engine="0",le="240"} 12
+vllm:request_decode_time_seconds_bucket{model_name="qwen35moe",engine="0",le="480"} 12
+vllm:request_decode_time_seconds_bucket{model_name="qwen35moe",engine="0",le="960"} 12
+vllm:request_decode_time_seconds_bucket{model_name="qwen35moe",engine="0",le="1920"} 12
+vllm:request_decode_time_seconds_bucket{model_name="qwen35moe",engine="0",le="7680"} 12
+vllm:request_decode_time_seconds_bucket{model_name="qwen35moe",engine="0",le="+Inf"} 12
+vllm:request_decode_time_seconds_sum{model_name="qwen35moe",engine="0"} 12.476474704000003
+vllm:request_decode_time_seconds_count{model_name="qwen35moe",engine="0"} 12
+# HELP vllm:request_prompt_tokens Number of prefill tokens processed.
+# TYPE vllm:request_prompt_tokens histogram
+vllm:request_prompt_tokens_bucket{model_name="qwen35moe",engine="0",le="1"} 0
+vllm:request_prompt_tokens_bucket{model_name="qwen35moe",engine="0",le="2"} 0
+vllm:request_prompt_tokens_bucket{model_name="qwen35moe",engine="0",le="5"} 0
+vllm:request_prompt_tokens_bucket{model_name="qwen35moe",engine="0",le="10"} 0
+vllm:request_prompt_tokens_bucket{model_name="qwen35moe",engine="0",le="20"} 0
+vllm:request_prompt_tokens_bucket{model_name="qwen35moe",engine="0",le="50"} 1
+vllm:request_prompt_tokens_bucket{model_name="qwen35moe",engine="0",le="100"} 1
+vllm:request_prompt_tokens_bucket{model_name="qwen35moe",engine="0",le="200"} 1
+vllm:request_prompt_tokens_bucket{model_name="qwen35moe",engine="0",le="500"} 2
+vllm:request_prompt_tokens_bucket{model_name="qwen35moe",engine="0",le="1000"} 2
+vllm:request_prompt_tokens_bucket{model_name="qwen35moe",engine="0",le="2000"} 2
+vllm:request_prompt_tokens_bucket{model_name="qwen35moe",engine="0",le="5000"} 2
+vllm:request_prompt_tokens_bucket{model_name="qwen35moe",engine="0",le="10000"} 2
+vllm:request_prompt_tokens_bucket{model_name="qwen35moe",engine="0",le="20000"} 6
+vllm:request_prompt_tokens_bucket{model_name="qwen35moe",engine="0",le="50000"} 9
+vllm:request_prompt_tokens_bucket{model_name="qwen35moe",engine="0",le="100000"} 12
+vllm:request_prompt_tokens_bucket{model_name="qwen35moe",engine="0",le="200000"} 12
+vllm:request_prompt_tokens_bucket{model_name="qwen35moe",engine="0",le="+Inf"} 12
+vllm:request_prompt_tokens_sum{model_name="qwen35moe",engine="0"} 482772
+vllm:request_prompt_tokens_count{model_name="qwen35moe",engine="0"} 12
+# HELP vllm:request_generation_tokens Number of generation tokens processed.
+# TYPE vllm:request_generation_tokens histogram
+vllm:request_generation_tokens_bucket{model_name="qwen35moe",engine="0",le="1"} 0
+vllm:request_generation_tokens_bucket{model_name="qwen35moe",engine="0",le="2"} 0
+vllm:request_generation_tokens_bucket{model_name="qwen35moe",engine="0",le="5"} 0
+vllm:request_generation_tokens_bucket{model_name="qwen35moe",engine="0",le="10"} 0
+vllm:request_generation_tokens_bucket{model_name="qwen35moe",engine="0",le="20"} 1
+vllm:request_generation_tokens_bucket{model_name="qwen35moe",engine="0",le="50"} 1
+vllm:request_generation_tokens_bucket{model_name="qwen35moe",engine="0",le="100"} 2
+vllm:request_generation_tokens_bucket{model_name="qwen35moe",engine="0",le="200"} 3
+vllm:request_generation_tokens_bucket{model_name="qwen35moe",engine="0",le="500"} 12
+vllm:request_generation_tokens_bucket{model_name="qwen35moe",engine="0",le="1000"} 12
+vllm:request_generation_tokens_bucket{model_name="qwen35moe",engine="0",le="2000"} 12
+vllm:request_generation_tokens_bucket{model_name="qwen35moe",engine="0",le="5000"} 12
+vllm:request_generation_tokens_bucket{model_name="qwen35moe",engine="0",le="10000"} 12
+vllm:request_generation_tokens_bucket{model_name="qwen35moe",engine="0",le="20000"} 12
+vllm:request_generation_tokens_bucket{model_name="qwen35moe",engine="0",le="50000"} 12
+vllm:request_generation_tokens_bucket{model_name="qwen35moe",engine="0",le="100000"} 12
+vllm:request_generation_tokens_bucket{model_name="qwen35moe",engine="0",le="200000"} 12
+vllm:request_generation_tokens_bucket{model_name="qwen35moe",engine="0",le="+Inf"} 12
+vllm:request_generation_tokens_sum{model_name="qwen35moe",engine="0"} 2545
+vllm:request_generation_tokens_count{model_name="qwen35moe",engine="0"} 12
+# HELP vllm:request_params_n Histogram of the n request parameter.
+# TYPE vllm:request_params_n histogram
+vllm:request_params_n_bucket{model_name="qwen35moe",engine="0",le="1"} 12
+vllm:request_params_n_bucket{model_name="qwen35moe",engine="0",le="2"} 12
+vllm:request_params_n_bucket{model_name="qwen35moe",engine="0",le="5"} 12
+vllm:request_params_n_bucket{model_name="qwen35moe",engine="0",le="10"} 12
+vllm:request_params_n_bucket{model_name="qwen35moe",engine="0",le="20"} 12
+vllm:request_params_n_bucket{model_name="qwen35moe",engine="0",le="+Inf"} 12
+vllm:request_params_n_sum{model_name="qwen35moe",engine="0"} 12
+vllm:request_params_n_count{model_name="qwen35moe",engine="0"} 12
+# HELP vllm:request_params_max_tokens Histogram of the max_tokens request parameter.
+# TYPE vllm:request_params_max_tokens histogram
+vllm:request_params_max_tokens_bucket{model_name="qwen35moe",engine="0",le="1"} 0
+vllm:request_params_max_tokens_bucket{model_name="qwen35moe",engine="0",le="2"} 0
+vllm:request_params_max_tokens_bucket{model_name="qwen35moe",engine="0",le="5"} 0
+vllm:request_params_max_tokens_bucket{model_name="qwen35moe",engine="0",le="10"} 0
+vllm:request_params_max_tokens_bucket{model_name="qwen35moe",engine="0",le="20"} 1
+vllm:request_params_max_tokens_bucket{model_name="qwen35moe",engine="0",le="50"} 1
+vllm:request_params_max_tokens_bucket{model_name="qwen35moe",engine="0",le="100"} 1
+vllm:request_params_max_tokens_bucket{model_name="qwen35moe",engine="0",le="200"} 1
+vllm:request_params_max_tokens_bucket{model_name="qwen35moe",engine="0",le="500"} 10
+vllm:request_params_max_tokens_bucket{model_name="qwen35moe",engine="0",le="1000"} 10
+vllm:request_params_max_tokens_bucket{model_name="qwen35moe",engine="0",le="2000"} 10
+vllm:request_params_max_tokens_bucket{model_name="qwen35moe",engine="0",le="5000"} 12
+vllm:request_params_max_tokens_bucket{model_name="qwen35moe",engine="0",le="10000"} 12
+vllm:request_params_max_tokens_bucket{model_name="qwen35moe",engine="0",le="20000"} 12
+vllm:request_params_max_tokens_bucket{model_name="qwen35moe",engine="0",le="50000"} 12
+vllm:request_params_max_tokens_bucket{model_name="qwen35moe",engine="0",le="100000"} 12
+vllm:request_params_max_tokens_bucket{model_name="qwen35moe",engine="0",le="200000"} 12
+vllm:request_params_max_tokens_bucket{model_name="qwen35moe",engine="0",le="+Inf"} 12
+vllm:request_params_max_tokens_sum{model_name="qwen35moe",engine="0"} 8320
+vllm:request_params_max_tokens_count{model_name="qwen35moe",engine="0"} 12
+# HELP radiance:prefill_tokens_per_second Prefill throughput over the scheduler's recent window.
+# TYPE radiance:prefill_tokens_per_second gauge
+radiance:prefill_tokens_per_second{model_name="qwen35moe",engine="0"} 352.656494140625
+# HELP radiance:decode_tokens_per_second Decode throughput over the scheduler's recent window.
+# TYPE radiance:decode_tokens_per_second gauge
+radiance:decode_tokens_per_second{model_name="qwen35moe",engine="0"} 159.77877807617188
+# HELP radiance:decode_step_seconds_best Fastest single-sequence decode window this process has run, in seconds per step: the mean of 32 consecutive single-stream steps. With speculation a step emits 1 + accepted tokens. Resets on restart.
+# TYPE radiance:decode_step_seconds_best gauge
+radiance:decode_step_seconds_best{model_name="qwen35moe",engine="0"} 0.010858107000000001
+# HELP radiance:decode_step_seconds_recent Most recent single-sequence decode window, in seconds per step (see _best). Holds its value while no single-stream window completes.
+# TYPE radiance:decode_step_seconds_recent gauge
+radiance:decode_step_seconds_recent{model_name="qwen35moe",engine="0"} 0.010858107000000001
+# HELP radiance:engine_steps_total Scheduler steps executed. One forward pass of the model, plus whatever draft rounds followed it; with speculation a step emits more than one token.
+# TYPE radiance:engine_steps_total counter
+radiance:engine_steps_total{model_name="qwen35moe",engine="0"} 1255
+# HELP radiance:engine_steps_prefill_total Scheduler steps carrying only prefill chunks.
+# TYPE radiance:engine_steps_prefill_total counter
+radiance:engine_steps_prefill_total{model_name="qwen35moe",engine="0"} 241
+# HELP radiance:engine_steps_mixed_total Scheduler steps carrying both a prefill chunk and a decode row.
+# TYPE radiance:engine_steps_mixed_total counter
+radiance:engine_steps_mixed_total{model_name="qwen35moe",engine="0"} 0
+# HELP radiance:engine_steps_decode_total Scheduler steps carrying only decode rows.
+# TYPE radiance:engine_steps_decode_total counter
+radiance:engine_steps_decode_total{model_name="qwen35moe",engine="0"} 1014
+# HELP radiance:engine_steps_ahead_total Steps whose forward pass was issued behind the step before, ahead of its commit.
+# TYPE radiance:engine_steps_ahead_total counter
+radiance:engine_steps_ahead_total{model_name="qwen35moe",engine="0"} 1010
+# HELP radiance:engine_prefill_chunks_capped_total Prefill chunks held back so decode rows and waiting requests got into the step (--busy-prefill-chunk).
+# TYPE radiance:engine_prefill_chunks_capped_total counter
+radiance:engine_prefill_chunks_capped_total{model_name="qwen35moe",engine="0"} 0
+# HELP radiance:engine_steps_held_total Decode-only steps run after a prefill chunk while other sequences decode (--prefill-interleave).
+# TYPE radiance:engine_steps_held_total counter
+radiance:engine_steps_held_total{model_name="qwen35moe",engine="0"} 0
+# HELP radiance:decode_rows_unspeculated_total Decode rows that took no draft, for any reason.
+# TYPE radiance:decode_rows_unspeculated_total counter
+radiance:decode_rows_unspeculated_total{model_name="qwen35moe",engine="0"} 0
+# HELP radiance:engine_step_seconds_total Seconds spent inside a scheduler step, all shapes.
+# TYPE radiance:engine_step_seconds_total counter
+radiance:engine_step_seconds_total{model_name="qwen35moe",engine="0"} 89.620227359000012
+# HELP radiance:engine_step_seconds_decode_total Seconds spent inside a scheduler step carrying only decode rows.
+# TYPE radiance:engine_step_seconds_decode_total counter
+radiance:engine_step_seconds_decode_total{model_name="qwen35moe",engine="0"} 12.338466003000001
+# HELP radiance:prefill_tokens_total Prompt tokens the engine has computed, exact.
+# TYPE radiance:prefill_tokens_total counter
+radiance:prefill_tokens_total{model_name="qwen35moe",engine="0"} 482772
+# HELP radiance:decode_tokens_total Tokens the engine has generated, exact, counted when the step commits rather than when the request finishes.
+# TYPE radiance:decode_tokens_total counter
+radiance:decode_tokens_total{model_name="qwen35moe",engine="0"} 2536
+# HELP radiance:draft_tokens_total Speculative tokens proposed.
+# TYPE radiance:draft_tokens_total counter
+radiance:draft_tokens_total{model_name="qwen35moe",engine="0"} 3042
+# HELP radiance:draft_accepted_total Speculative tokens accepted; the pair the acceptance ratio is computed from.
+# TYPE radiance:draft_accepted_total counter
+radiance:draft_accepted_total{model_name="qwen35moe",engine="0"} 1522
+# HELP radiance:draft_refills_total Prefix hits ended a drafter window early so a windowed block drafter has context.
+# TYPE radiance:draft_refills_total counter
+radiance:draft_refills_total{model_name="qwen35moe",engine="0"} 0
+# HELP radiance:draft_refill_tokens_total Cached prompt tokens those hits gave back to be recomputed.
+# TYPE radiance:draft_refill_tokens_total counter
+radiance:draft_refill_tokens_total{model_name="qwen35moe",engine="0"} 0
+# HELP radiance:lookup_proposals_total Prompt-lookup proposals made, with prompt lookup the only drafter.
+# TYPE radiance:lookup_proposals_total counter
+radiance:lookup_proposals_total{model_name="qwen35moe",engine="0"} 0
+# HELP radiance:lookup_held_total Prompt-lookup proposals held back unverified: not expected to pay for their verify rows at the measured step cost.
+# TYPE radiance:lookup_held_total counter
+radiance:lookup_held_total{model_name="qwen35moe",engine="0"} 0
+# HELP radiance:lookup_held_drafts_total Drafts in the held-back proposals.
+# TYPE radiance:lookup_held_drafts_total counter
+radiance:lookup_held_drafts_total{model_name="qwen35moe",engine="0"} 0
+# HELP radiance:lookup_held_hits_total Of the held-back proposals scored against the text that followed, the drafts that came true: what verifying them would have accepted.
+# TYPE radiance:lookup_held_hits_total counter
+radiance:lookup_held_hits_total{model_name="qwen35moe",engine="0"} 0
+# HELP radiance:linear_prefix_cache_hit_rate Fraction of prompt tokens served from a linear-state checkpoint (spec 7.3).
+# TYPE radiance:linear_prefix_cache_hit_rate gauge
+radiance:linear_prefix_cache_hit_rate{model_name="qwen35moe",engine="0"} 0
+# HELP radiance:attn_cached_tokens_total Prompt tokens served from the paged attention prefix cache.
+# TYPE radiance:attn_cached_tokens_total counter
+radiance:attn_cached_tokens_total{model_name="qwen35moe",engine="0"} 0
+# HELP radiance:linear_cached_tokens_total Prompt tokens served from a linear-state checkpoint.
+# TYPE radiance:linear_cached_tokens_total counter
+radiance:linear_cached_tokens_total{model_name="qwen35moe",engine="0"} 0
+# HELP radiance:linear_checkpoints_written_total Linear-state checkpoints written.
+# TYPE radiance:linear_checkpoints_written_total counter
+radiance:linear_checkpoints_written_total{model_name="qwen35moe",engine="0"} 229
+# HELP radiance:prefix_cache_evictions_total Prefix-cache entries evicted (attention blocks).
+# TYPE radiance:prefix_cache_evictions_total counter
+radiance:prefix_cache_evictions_total{model_name="qwen35moe",engine="0"} 0
+# HELP radiance:prefix_cache_ckpt_evictions_total Prefix-cache linear-state checkpoints evicted.
+# TYPE radiance:prefix_cache_ckpt_evictions_total counter
+radiance:prefix_cache_ckpt_evictions_total{model_name="qwen35moe",engine="0"} 168
+# HELP radiance:prefix_cache_expired_total Prefix-cache entries no request used for --prefix-cache-ttl, taken out.
+# TYPE radiance:prefix_cache_expired_total counter
+radiance:prefix_cache_expired_total{model_name="qwen35moe",engine="0"} 0
+# HELP radiance:prefix_cache_ckpt_expired_total Prefix-cache linear-state checkpoints taken out by --prefix-cache-ttl.
+# TYPE radiance:prefix_cache_ckpt_expired_total counter
+radiance:prefix_cache_ckpt_expired_total{model_name="qwen35moe",engine="0"} 0
+# HELP radiance:prefix_cache_ckpt_evictions_by_reason_total Linear-state checkpoints evicted, by reason: released by --checkpoint-policy, or the least recently used of a store retention left full.
+# TYPE radiance:prefix_cache_ckpt_evictions_by_reason_total counter
+radiance:prefix_cache_ckpt_evictions_by_reason_total{model_name="qwen35moe",engine="0",reason="retention"} 168
+radiance:prefix_cache_ckpt_evictions_by_reason_total{model_name="qwen35moe",engine="0",reason="store_full"} 0
+# HELP radiance:prefix_cache_released_total Prefix-cache entries and linear-state snapshots a client released on purpose (DELETE /sessions).
+# TYPE radiance:prefix_cache_released_total counter
+radiance:prefix_cache_released_total{model_name="qwen35moe",engine="0",what="entries"} 0
+radiance:prefix_cache_released_total{model_name="qwen35moe",engine="0",what="snapshots"} 0
+# HELP radiance:prefix_cache_ckpt_refused_total Checkpoints not written because every snapshot slot was in use by a restore in the same step.
+# TYPE radiance:prefix_cache_ckpt_refused_total counter
+radiance:prefix_cache_ckpt_refused_total{model_name="qwen35moe",engine="0"} 0
+# HELP radiance:prefix_hit_cuts_total Admissions whose prefix hit was cut, by reason: reused nothing for want of a snapshot at or below the hit, for a windowed group no window snapshot covers, or for blocks that could not be adopted; or resumed at a snapshot more than one checkpoint interval below the hit.
+# TYPE radiance:prefix_hit_cuts_total counter
+radiance:prefix_hit_cuts_total{model_name="qwen35moe",engine="0",reason="no_snapshot"} 0
+radiance:prefix_hit_cuts_total{model_name="qwen35moe",engine="0",reason="windowed_group"} 0
+radiance:prefix_hit_cuts_total{model_name="qwen35moe",engine="0",reason="adopt_failed"} 0
+radiance:prefix_hit_cuts_total{model_name="qwen35moe",engine="0",reason="resumed_below"} 0
+# HELP radiance:prefix_restore_cuts_total Restores from the host tier the pool could not hold whole, even after giving up the VRAM copies of other stored conversations; each came back only in part, on a model with recurrent state up to the deepest snapshot the room reaches.
+# TYPE radiance:prefix_restore_cuts_total counter
+radiance:prefix_restore_cuts_total{model_name="qwen35moe",engine="0"} 0
+# HELP radiance:prefix_hit_cut_tokens_total Prompt tokens the attention cache held and admission computed again, because the hit resumed at a snapshot below it or reused nothing.
+# TYPE radiance:prefix_hit_cut_tokens_total counter
+radiance:prefix_hit_cut_tokens_total{model_name="qwen35moe",engine="0"} 0
+# HELP radiance:draft_acceptance_ratio Fraction of speculative draft tokens accepted.
+# TYPE radiance:draft_acceptance_ratio gauge
+radiance:draft_acceptance_ratio{model_name="qwen35moe",engine="0"} 0.50032871961593628
+# HELP radiance:draft_position_acceptance_ratio Conditional acceptance at each draft position, given every earlier one was taken.
+# TYPE radiance:draft_position_acceptance_ratio gauge
+radiance:draft_position_acceptance_ratio{model_name="qwen35moe",engine="0",position="0"} 0.75443786982248517
+radiance:draft_position_acceptance_ratio{model_name="qwen35moe",engine="0",position="1"} 0.62222222222222223
+radiance:draft_position_acceptance_ratio{model_name="qwen35moe",engine="0",position="2"} 0.59033613445378152
+# HELP radiance:draft_position_reached_total Verifies that evaluated each draft position.
+# TYPE radiance:draft_position_reached_total counter
+radiance:draft_position_reached_total{model_name="qwen35moe",engine="0",position="0"} 1014
+radiance:draft_position_reached_total{model_name="qwen35moe",engine="0",position="1"} 765
+radiance:draft_position_reached_total{model_name="qwen35moe",engine="0",position="2"} 476
+# HELP radiance:draft_position_accepted_total Verifies that accepted each draft position.
+# TYPE radiance:draft_position_accepted_total counter
+radiance:draft_position_accepted_total{model_name="qwen35moe",engine="0",position="0"} 765
+radiance:draft_position_accepted_total{model_name="qwen35moe",engine="0",position="1"} 476
+radiance:draft_position_accepted_total{model_name="qwen35moe",engine="0",position="2"} 281
+# HELP radiance:num_requests_preempted Requests currently preempted and awaiting recompute.
+# TYPE radiance:num_requests_preempted gauge
+radiance:num_requests_preempted{model_name="qwen35moe",engine="0"} 0
+# HELP radiance:http_queue_depth Requests admitted by the HTTP layer and not yet finished.
+# TYPE radiance:http_queue_depth gauge
+radiance:http_queue_depth{model_name="qwen35moe",engine="0"} 0
+# HELP radiance:http_admission_rejected_total Requests refused with 429 because the admission queue was full.
+# TYPE radiance:http_admission_rejected_total counter
+radiance:http_admission_rejected_total{model_name="qwen35moe",engine="0"} 0
+# HELP radiance:client_disconnect_total Streams cancelled because the client went away.
+# TYPE radiance:client_disconnect_total counter
+radiance:client_disconnect_total{model_name="qwen35moe",engine="0"} 0
+# HELP radiance:stream_overflow_total Requests failed because the HTTP reader could not drain the sink.
+# TYPE radiance:stream_overflow_total counter
+radiance:stream_overflow_total{model_name="qwen35moe",engine="0"} 0
+# HELP radiance:http_responses_total HTTP responses by status class.
+# TYPE radiance:http_responses_total counter
+radiance:http_responses_total{model_name="qwen35moe",engine="0",class="2xx"} 14
+radiance:http_responses_total{model_name="qwen35moe",engine="0",class="4xx"} 0
+radiance:http_responses_total{model_name="qwen35moe",engine="0",class="5xx"} 0

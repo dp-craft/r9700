@@ -1,0 +1,3 @@
+GPU exclusive: 31981 MiB free (used 643 MiB), floor 30000 MiB.
+up after 45s on port 8000: stilldeadcode/radiance:1.16.0, served as qwen38-27b-redhat-mxfp4-dflash
+ready: claude --settings /home/dev/.config/claude/local_vllm_direct/settings-redhat.json

@@ -22,6 +22,22 @@ an issue cross-links to `known-issues.md`. `HIP_FORCE_DEV_KERNARG=0` is **not** 
   the NVFP4 load peak crashed the desktop at 0.90 (see `known-issues.md`, NVFP4 load-peak OOM).
 - **version measured:** 0.90 (sly-radiance 1.6.0), 0.93 (sly-official 1.8.1).
 
+## `--gpu-headroom-mib` (native Radiance only)
+- **what-for:** the VRAM native Radiance leaves unclaimed. Default 96.
+- **how-to-use:** recommended only, not required: `EXTRA_ARGS="--gpu-headroom-mib 2048" ./ornith_rad_mtp.sh start`. The
+  alternative is to keep the default and close Chrome if VRAM gets tight.
+- **side-effect:** at 96 only about 232 MiB stayed free and the desktop crashed (see `known-issues.md`). 2048 should cost
+  about 1.9 GiB of KV: about 3.1 sessions at 262k instead of 3.8 (INFERRED, because all weights stay resident).
+- **version measured:** 96 on radiance 1.16.0. **2048 is not measured.**
+
+## `--moe-backend triton_unfused` (MXFP4 MoE on Sly)
+- **what-for:** replaces the `EMULATION` backend vLLM picks for `amd/Qwen3.5-35B-A3B-MXFP4`.
+- **how-to-use:** `EXTRA_ARGS="--moe-backend triton_unfused"`. It is not the `sly-amd` profile default; `qwen35_sly_dflash.sh` and
+  `ornith_sly_dflash.sh` pass it. It cannot load with `method: mtp` on a checkpoint whose MTP layer is unquantized.
+- **side-effect:** decode rises from 16.6 to 110.2 tok/s at 10k and KV capacity from 305,666 to 448,702 tokens; prefill drops
+  14–21% (MEASURED, DFlash K=7). It runs BF16 activations, and no AMD or vLLM source recommends it. See `known-issues.md`.
+- **version measured:** sly 1.9.1 (vLLM 0.32.0), short replies only.
+
 ## fp8 KV (`--kv-cache-dtype fp8`)
 - **what-for:** halve KV-cache memory vs f16.
 - **how-to-use:** `KV_DTYPE=fp8` → `--kv-cache-dtype fp8` in the profile.
@@ -65,7 +81,8 @@ an issue cross-links to `known-issues.md`. `HIP_FORCE_DEV_KERNARG=0` is **not** 
   - `RADIANCE_MXFP4_WIDE_MAX_M=192 RADIANCE_ADAPTIVE_WIDTH=perseq` — wide adaptive-width GEMM
   - `RADIANCE_LMHEAD_INT4=1` / `RADIANCE_LMHEAD_FP8=1` — lm_head quant
   - `RADIANCE_FUSED_NORM_QUANT=1` — fused norm+quant
-  - `RADIANCE_KV_GROUP_SIZE=8` — KV group size
+  - `RADIANCE_KV_GROUP_SIZE=8` — KV group size. The 35B MoE cannot boot at 262000 with 5 and DFlash K=7 (MEASURED, 1.9.1);
+    `sly-amd` uses 2 (305,666 KV tokens on `EMULATION`, 448,702 on `triton_unfused`). A value of 1 gave 348,641 on `EMULATION`.
   - `RADIANCE_EMBED_INT8=1 RADIANCE_EMBED_BITS=4` — INT8/4-bit embeddings
   - `RADIANCE_MXFP4_SANITIZE=0` (sly-official)
   - `RADIANCE_CACTUS_DELTA` — **0** (sly-radiance: bit-exact stock acceptance) vs **0.5** (sly-official:

@@ -1,0 +1,37 @@
+== gs1-k7 [KV_GROUP_SIZE=1 SPEC_K=7] rc=0 boot_s=253
+INFO 11-04 14:44:41 [mxfp4.py:709] Using 'EMULATION' Mxfp4 MoE backend.
+INFO 11-04 14:46:06 [model_runner.py:433] Model loading took 20.0 GiB memory and 86.109900 seconds
+INFO 11-04 14:46:24 [monitor.py:91] [backbone] Initial profiling/warmup run took 15.77 s
+INFO 11-04 14:46:33 [model_runner.py:1136] Graph capturing finished in 7 secs, took 1.90 GiB
+INFO 11-04 14:46:33 [gpu_worker.py:759] Available KV cache memory: 4.93 GiB
+INFO 11-04 14:46:33 [kv_cache_utils.py:2337] GPU KV cache size: 348,641 tokens, Maximum concurrency for 262,000 tokens per request: 1.33x
+INFO 11-04 14:46:49 [model_runner.py:1136] Graph capturing finished in 3 secs, took 1.76 GiB
+smoke_s=16.206547660 http=200
+usage {'prompt_tokens': 24, 'total_tokens': 424, 'completion_tokens': 400, 'prompt_tokens_details': {'cached_tokens': 0, 'created_cache_tokens': 0, 'multimodal_tokens': None}, 'completion_tokens_details': {'reasoning_tokens': 71}}
+finish length
+reply '\n\nHere\'s a Python function that merges overlapping intervals, along with a short explanation:\n\n```python\ndef merge_intervals(intervals):\n    """\n    Merge overl'
+vllm:spec_decode_num_drafts_total{engine="0",model_name="qwen35-35b-a3b-mxfp4-dflash"} 87.0
+vllm:spec_decode_num_draft_tokens_total{engine="0",model_name="qwen35-35b-a3b-mxfp4-dflash"} 609.0
+vllm:spec_decode_num_accepted_tokens_total{engine="0",model_name="qwen35-35b-a3b-mxfp4-dflash"} 313.0
+vllm:kv_cache_usage_perc{engine="0",model_name="qwen35-35b-a3b-mxfp4-dflash"} 0.0
+fault_lines=3
+peak_vram_used=31934 peak_gtt_used=82 (csv units)
+== gs2-k7 [KV_GROUP_SIZE=2 SPEC_K=7] rc=0 boot_s=245
+INFO 11-04 14:49:15 [mxfp4.py:709] Using 'EMULATION' Mxfp4 MoE backend.
+INFO 11-04 14:50:37 [model_runner.py:433] Model loading took 20.0 GiB memory and 82.779321 seconds
+INFO 11-04 14:50:56 [monitor.py:91] [backbone] Initial profiling/warmup run took 17.32 s
+INFO 11-04 14:51:00 [model_runner.py:1136] Graph capturing finished in 2 secs, took 1.90 GiB
+INFO 11-04 14:51:00 [gpu_worker.py:759] Available KV cache memory: 4.93 GiB
+INFO 11-04 14:51:00 [kv_cache_utils.py:2337] GPU KV cache size: 305,666 tokens, Maximum concurrency for 262,000 tokens per request: 1.17x
+INFO 11-04 14:51:08 [model_runner.py:1136] Graph capturing finished in 3 secs, took 1.76 GiB
+smoke_s=15.522529606 http=200
+usage {'prompt_tokens': 24, 'total_tokens': 424, 'completion_tokens': 400, 'prompt_tokens_details': {'cached_tokens': 0, 'created_cache_tokens': 0, 'multimodal_tokens': None}, 'completion_tokens_details': {'reasoning_tokens': 71}}
+finish length
+reply '\n\nHere\'s a Python function that merges overlapping intervals, along with a short explanation:\n\n```python\ndef merge_intervals(intervals):\n    """\n    Merge overl'
+vllm:spec_decode_num_drafts_total{engine="0",model_name="qwen35-35b-a3b-mxfp4-dflash"} 87.0
+vllm:spec_decode_num_draft_tokens_total{engine="0",model_name="qwen35-35b-a3b-mxfp4-dflash"} 609.0
+vllm:spec_decode_num_accepted_tokens_total{engine="0",model_name="qwen35-35b-a3b-mxfp4-dflash"} 313.0
+vllm:kv_cache_usage_perc{engine="0",model_name="qwen35-35b-a3b-mxfp4-dflash"} 0.0
+fault_lines=3
+peak_vram_used=30762 peak_gtt_used=168 (csv units)
+SWEEP DONE

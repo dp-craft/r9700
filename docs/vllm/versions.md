@@ -12,6 +12,9 @@ that actually ran.
 | radiance (native R4D) | `stilldeadcode/vllm-radiance:0.9.3` (vLLM 0.27.1 + libr4d) | 0.27.1 | 0.6.2 (provenance discrepancy inside tag 0.9.3) | 7.14 userspace (in-image) / 10.0.0 host | `RedHatAI/Qwen3.8-27B-INT4@bf08f3db` (W4A16) | R4D + MTP, fp8 KV (R5), TRITON_ATTN (host 0.29.0 venv), ctx 114688 | peak **28,706 MiB** (R4 MTP8); KV pool 138,416 tok @114688 (MTP3) | **dead image** (not migrated to the new data-root); MEASURED 2026-09 |
 | radiance (native `.rad`) | `stilldeadcode/radiance:1.11.0` | n/a (native radiance, not vLLM) | 1.11.0 | n/a | a `.rad` checkpoint (not an HF checkpoint) | native `.rad` load path | n/a | **native `.rad` path** — the only engine that loads `.rad` (sly loads HF only); citation: the `.rad`-vs-HF distinction (known-issues.md) |
 | **sly-redhat** (RedHat image since 2026-10-30; was 1.8.1) | `ghcr.io/slybase/vllm-sly-radiance:1.9.1-rocm10.1` @ `sha256:9744caf31e96…abc8` | 0.32.0 (image reports) | 1.9.1 | 10.1 | `RedHatAI/Qwen3.8-27B-MXFP4@16a86728` (compressed-tensors MXFP4) + DFlash2 `syvai/…@4d30ec73` k=7 | sly-official engine layer (MXFP4 W4A8, fp8 KV, R4D_HYBRID, FULL_DECODE_ONLY graphs), Cactus 0.5 + 1.9.x fade (4096→16384 out tok) and cap (defaults), template `qwen3.8-froggeric-v22.5-sly2`, ctx 262000 | **30,852 MiB** used after boot; KV pool 370,702 tok @262000 (= 1.8.1) | MEASURED: smoke test + depth probe at ctx 110000 (decode = 1.8.1 within n=2 noise; DFlash2 k=7 122.72/86.34/86.24 tok/s at 10k/50k/100k) + one real Claude Code session (W2-08); citation below |
+| radiance (native `.rad`), Ornith 1.5 | `stilldeadcode/radiance:1.16.0` @ `sha256:b1017ce0e615…` | n/a (native radiance, not vLLM) | 1.16.0 | not recorded | `keptn/ornith-1.5-35b-a3b-w4a8@cfed0f8f` (19.74 GiB `.rad`), MTP K=3 | creator's single-card config, fp8 KV, ctx 262144, 8 seqs, default 96 MiB headroom | **32,511 MiB peak**, 113 MiB min free, 339 MiB GTT; KV 992,288 tok | MEASURED: 219.8/205.0/174.5 tok/s decode, 13,059/8,029/5,301 tok/s prefill at 10k/50k/100k. **Not desktop-safe as measured** (known-issues.md); coding quality untested; citation below |
+| **sly-amd** | `ghcr.io/slybase/vllm-sly-radiance:1.9.1-rocm10.1` @ `sha256:9744caf31e96…abc8` | 0.32.0 | 1.9.1 | 10.1 | `amd/Qwen3.5-35B-A3B-MXFP4@2e19c657` + DFlash `z-lab/…@52cb554b` k=7 | `EMULATION` MoE backend by default; `--moe-backend triton_unfused` via `EXTRA_ARGS` (BF16 activations); `RADIANCE_KV_GROUP_SIZE=2`, fp8 KV, ctx 262000 | 31,597 MiB peak (`EMULATION`), 31,327 MiB (`triton_unfused`) | MEASURED: `EMULATION` 16.6/15.4/15.8 tok/s, `triton_unfused` 110.2/92.9/67.3 tok/s at 10k/50k/100k; short replies only; citation below |
+| **sly-amd profile**, Ornith 1.5 | `ghcr.io/slybase/vllm-sly-radiance:1.9.1-rocm10.1` @ `sha256:9744caf31e96…abc8` | 0.32.0 | 1.9.1 | 10.1 | `Capicua25x/Ornith-1.5-35B-A3B-MXFP4-Quark-RDNA4@9e488f46` + DFlash `ornith-ai/Ornith-1.5-35B-A3B-DFlash@942d20fe` k=3 | `--moe-backend triton_unfused`, fp8 KV, ctx 262144, 8 seqs, batched 2048, `presence_penalty` 1.5 | 31,510 MiB peak, 1,114 MiB min free, 78 MiB GTT; KV 612,807 tok | MEASURED: 95.2/71.0/66.5 tok/s decode, 3,802/3,122/2,604 tok/s prefill at 10k/50k/100k. MTP fails at load (known-issues.md); coding quality untested; citation below |
 
 ## Citation notes (provenance per row)
 
@@ -38,6 +41,11 @@ that actually ran.
   `profiles/sly-redhat/_engine.env` (rollback) and `docs/analysis/2026-10-30-0900-vllm-redhat-mxfp4-depth-transposed.md`.
 - **`.rad` native** (row 4): the `.rad`-vs-HF-checkpoint loading distinction is documented in
   `known-issues.md` (sly loads HF only, radiance loads `.rad`).
+- **Radiance 1.16.0 + Ornith 1.5, sly-amd (Qwen and Ornith), and the sly-redhat rerun (2026-11-04):**
+  `docs/analysis/2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md`; raw data in
+  `bench/runs/2026-11-04-1730-ornith15-w4a8-radiance/`, `bench/runs/2026-11-04-1557-35b-perf-10k-50k-100k/`,
+  `bench/runs/2026-11-04-1802-ornith15-sly-dflash/` and `bench/runs/2026-11-04-1740-27b-sly-baseline/`. The sly-redhat rerun used ctx 262000 and the `dp-sharp`
+  template: 86.9/96.0/82.5 tok/s at 10k/50k/100k, 31,197 MiB peak. It adds to the ctx 110000 row and does not replace it.
 
 ## How to add a row
 
