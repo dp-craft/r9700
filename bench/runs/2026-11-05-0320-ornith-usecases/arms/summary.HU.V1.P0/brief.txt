@@ -1,0 +1,22 @@
+Summarize the report /tmp/claude-1001/-home-dev-work-dp-craft-amd/bf832afa-1002-41d9-a4b8-4b201a1bc43c/scratchpad/uc/runs/summary.HU.V1.P0/report.md in English.
+Write /tmp/claude-1001/-home-dev-work-dp-craft-amd/bf832afa-1002-41d9-a4b8-4b201a1bc43c/scratchpad/uc/runs/summary.HU.V1.P0/out/summary.txt in this format:
+GOAL: <one sentence>
+RESULT: <the main conclusion, max 2 sentences>
+KEY: <number with unit> | <what it is, naming the model or configuration it belongs to>
+  (exactly 5 KEY lines)
+CAVEAT: <the most important limitation stated by the report>
+OPEN: <one question the report leaves unanswered, or none>
+
+HOW
+1. Read the whole report. If Read says it is too large, read it in chunks with offset and limit=400 until the end.
+2. Take RESULT from the report's own summary and conclusion, not from one table.
+3. Keep the report's certainty: if it says untested, inferred, not significant or a tie, say so too. Never call something best or proven when the report does not.
+4. Before using a number, read its table row and column. Name the model or configuration from that same row. Never move a number from one configuration to another.
+5. Choose KEY numbers that decide the conclusion, not context such as dates or file sizes.
+
+RULES
+- Use only what the files say. No outside knowledge. Never guess a number, name or path: if you cannot find it, write none.
+- Copy numbers, names and paths exactly as printed.
+- Output files are plain text in exactly the format above: no markdown, no comments, no extra lines.
+- Think briefly. Do not draft the output in your reasoning; write it once with the Write tool.
+Then reply with only: DONE

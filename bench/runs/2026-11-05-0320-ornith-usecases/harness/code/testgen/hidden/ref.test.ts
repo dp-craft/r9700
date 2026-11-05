@@ -1,0 +1,15 @@
+import { expect, test } from "vitest";
+import { bump, compare, maxVersion, parse, satisfiesCaret, SemVerError } from "../src/semver";
+test("anchor", () => expect(() => parse("1.2.3 junk")).toThrow());
+test("err type", () => expect(() => parse("x")).toThrow(SemVerError));
+test("pre split", () => expect(parse("1.0.0-a.1").pre).toEqual(["a", "1"]));
+test("num vs alpha", () => { expect(compare("1.0.0-1", "1.0.0-a")).toBe(-1); expect(compare("1.0.0-a", "1.0.0-1")).toBe(1); });
+test("numeric ident", () => expect(compare("1.0.0-9", "1.0.0-10")).toBe(-1));
+test("release vs pre", () => { expect(compare("1.0.0", "1.0.0-a")).toBe(1); expect(compare("1.0.0-a", "1.0.0")).toBe(-1); });
+test("pre length", () => expect(compare("1.0.0-a", "1.0.0-a.1")).toBe(-1));
+test("caret below", () => expect(satisfiesCaret("1.2.2", "1.2.3")).toBe(false));
+test("caret pre", () => { expect(satisfiesCaret("1.3.0-a", "1.2.3")).toBe(false); });
+test("caret zero minor", () => expect(satisfiesCaret("0.3.0", "0.2.3")).toBe(false));
+test("caret zero patch", () => expect(satisfiesCaret("0.0.4", "0.0.3")).toBe(false));
+test("bump", () => { expect(bump("1.2.3", "major")).toBe("2.0.0"); expect(bump("1.2.3", "minor")).toBe("1.3.0"); });
+test("max", () => expect(maxVersion(["1.0.0", "2.0.0", "1.5.0"])).toBe("2.0.0"));

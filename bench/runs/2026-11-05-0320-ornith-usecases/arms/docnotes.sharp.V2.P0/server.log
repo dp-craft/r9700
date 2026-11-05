@@ -1,0 +1,4 @@
+I req msg_bdf9055fa712ca7a911c8208 done from 127.0.0.1:45508 finish=tool_calls prompt=3663 (cache 2048) gen=126 reason=11 ttft=0.16s 203.7 tok/s 0.78s
+I req msg_720eb2793892f30d9ef785db done from 127.0.0.1:45508 finish=tool_calls prompt=13838 (cache 2048) gen=257 reason=26 ttft=1.13s 201.8 tok/s 2.40s
+I req msg_8ff120092410df70742bb01a done from 127.0.0.1:45508 finish=tool_calls prompt=15007 (cache 12288) gen=5310 reason=4538 ttft=0.34s 164.4 tok/s 32.64s
+I req msg_4e83460a9f8860d0c501ffe7 done from 127.0.0.1:45508 finish=stop prompt=20425 (cache 14336) gen=16 reason=11 ttft=0.73s 114.6 tok/s 0.86s

@@ -1,0 +1,3 @@
+The document was split successfully: all 9 `## ` sections plus the intro were extracted into `NN-<slug>.md` files (00-intro through 09-provenance), `manifest.json` maps each file to its byte ranges, `doc_apply.py` wrote the files with nothing left unassigned, and `doc_check.py` printed **PASS** (349 lines preserved, none lost/altered/added/duplicated). `README.md` was written after the PASS with one line per file in document order.
+
+DONE

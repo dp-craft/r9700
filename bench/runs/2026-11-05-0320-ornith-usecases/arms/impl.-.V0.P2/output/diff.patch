@@ -1,0 +1,191 @@
+diff --git a/src/logfmt.ts b/src/logfmt.ts
+new file mode 100644
+index 0000000..8bdcba9
+--- /dev/null
++++ b/src/logfmt.ts
+@@ -0,0 +1,185 @@
++/**
++ * logfmt parsing and formatting.
++ *
++ * logfmt (log format) is a simple key=value style used by many logging
++ * systems. A line is a sequence of pairs separated by whitespace.
++ */
++
++/** Error thrown on malformed input, carrying the 0-based column of the fault. */
++export class LogfmtError extends Error {
++  column: number;
++
++  constructor(message: string, column: number) {
++    super(message);
++    this.name = 'LogfmtError';
++    this.column = column;
++  }
++}
++
++const SPACE = ' ';
++const TAB = '\t';
++const QUOTE = '"';
++const BACKSLASH = '\\';
++const EQUALS = '=';
++
++function isSeparator(c: string | undefined): boolean {
++  return c === SPACE || c === TAB;
++}
++
++/**
++ * Parse a single logfmt line into a record.
++ *
++ * Keys keep their first-seen insertion order; a repeated key keeps its
++ * original position but takes the latest value.
++ */
++export function parse(line: string): Record<string, string | true> {
++  const fields = new Map<string, string | true>();
++  const n = line.length;
++  let i = 0;
++
++  while (i < n) {
++    // Skip the separators between pairs.
++    while (i < n && isSeparator(line[i])) i++;
++    if (i >= n) break;
++
++    // Read the key: runs until '=', space, tab, or end of line.
++    const keyStart = i;
++    while (i < n && line[i] !== EQUALS && !isSeparator(line[i])) i++;
++    const key = line.slice(keyStart, i);
++
++    if (key.length === 0) {
++      // A pair starting with '=' has an empty key.
++      throw new LogfmtError('empty key', i);
++    }
++
++    if (i >= n || isSeparator(line[i])) {
++      // No '=': the bare key maps to true.
++      fields.set(key, true);
++      continue;
++    }
++
++    // line[i] === '='
++    i++; // consume '='
++
++    if (i < n && line[i] === QUOTE) {
++      fields.set(key, parseQuoted(line, i));
++    } else {
++      // Bare value: runs until the next separator.
++      const valueStart = i;
++      while (i < n && !isSeparator(line[i])) i++;
++      fields.set(key, line.slice(valueStart, i));
++    }
++  }
++
++  const out: Record<string, string | true> = {};
++  for (const [key, value] of fields) out[key] = value;
++  return out;
++}
++
++/**
++ * Parse a quoted value starting at the opening quote (line[i] === '"').
++ * Returns the decoded value and advances i past the closing quote.
++ */
++function parseQuoted(line: string, i: number): string {
++  const n = line.length;
++  const quotePos = i; // position of the opening quote, for error reporting.
++  i++; // consume opening quote.
++
++  let value = '';
++  while (i < n) {
++    const c = line[i];
++    if (c === QUOTE) {
++      i++; // consume closing quote.
++      break;
++    }
++    if (c === BACKSLASH) {
++      if (i + 1 >= n) {
++        // A trailing backslash never closes the quote.
++        throw new LogfmtError('unterminated quote', quotePos);
++      }
++      const next = line[i + 1];
++      if (next === QUOTE) {
++        value += QUOTE;
++        i += 2;
++      } else if (next === BACKSLASH) {
++        value += BACKSLASH;
++        i += 2;
++      } else if (next === 'n') {
++        value += '\n';
++        i += 2;
++      } else {
++        throw new LogfmtError('unknown escape', i);
++      }
++    } else {
++      value += c;
++      i++;
++    }
++  }
++
++  if (i >= n) {
++    // Reached end of line without a closing quote.
++    throw new LogfmtError('unterminated quote', quotePos);
++  }
++
++  // Nothing but separators may follow a closing quote.
++  if (!isSeparator(line[i])) {
++    throw new LogfmtError('trailing character after quote', i);
++  }
++
++  return value;
++}
++
++/** Whether a value must be quoted when formatted. */
++function needsQuoting(value: string): boolean {
++  return (
++    value.length === 0 ||
++    value.includes(SPACE) ||
++    value.includes(TAB) ||
++    value.includes(QUOTE) ||
++    value.includes(BACKSLASH) ||
++    value.includes(EQUALS) ||
++    value.includes('\n')
++  );
++}
++
++/** Encode a value for inclusion inside a quoted string. */
++function encodeValue(value: string): string {
++  let out = '';
++  for (const c of value) {
++    if (c === QUOTE) out += '\\' + QUOTE;
++    else if (c === BACKSLASH) out += '\\' + BACKSLASH;
++    else if (c === '\n') out += '\\n';
++    else out += c;
++  }
++  return out;
++}
++
++/** Whether a key is valid for formatting. */
++function isValidKey(key: string): boolean {
++  return (
++    key.length > 0 &&
++    !key.includes(SPACE) &&
++    !key.includes(TAB) &&
++    !key.includes(EQUALS) &&
++    !key.includes(QUOTE)
++  );
++}
++
++/**
++ * Format a record back into a logfmt line. Pairs are joined with a single
++ * space in insertion order.
++ */
++export function format(fields: Record<string, string | true>): string {
++  const parts: string[] = [];
++  for (const [key, value] of Object.entries(fields)) {
++    if (!isValidKey(key)) {
++      throw new LogfmtError('invalid key', -1);
++    }
++    if (value === true) {
++      parts.push(key);
++    } else {
++      parts.push(needsQuoting(value) ? key + '=' + encodeValue(value) : key + '=' + value);
++    }
++  }
++  return parts.join(' ');
++}

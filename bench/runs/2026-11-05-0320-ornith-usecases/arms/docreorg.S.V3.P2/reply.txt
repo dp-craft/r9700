@@ -1,0 +1,3 @@
+PASS — 0 lost or altered, 0 added or duplicated across all 255 nonblank lines. The three target files are written and verified. No README.md is needed (TOPICS.txt lists only the three topic files, and the check ignores README anyway).
+
+DONE

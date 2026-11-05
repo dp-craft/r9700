@@ -1,0 +1,23 @@
+{
+ "arm": "codeinv.S.V1.P0",
+ "profile": "read",
+ "wall_s": 14.1,
+ "turns": 8,
+ "gen": 2531,
+ "reason": 1529,
+ "prompt_first": 3380,
+ "prompt_peak": 15463,
+ "drops": 0,
+ "rate": 189.7,
+ "peak_vram": 32265.0,
+ "peak_gtt": 162.0,
+ "score": 1.0,
+ "detail": {
+  "defs": 11,
+  "recall": 1.0,
+  "line_exact": 11,
+  "extra": 0,
+  "no_purpose": 0,
+  "score": 1.0
+ }
+}

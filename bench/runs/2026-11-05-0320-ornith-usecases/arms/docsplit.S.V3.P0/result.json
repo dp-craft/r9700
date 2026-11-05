@@ -1,0 +1,124 @@
+{
+ "arm": "docsplit.S.V3.P0",
+ "profile": "data",
+ "wall_s": 38.7,
+ "turns": 8,
+ "gen": 6358,
+ "reason": 4243,
+ "prompt_first": 5004,
+ "prompt_peak": 11729,
+ "drops": 0,
+ "rate": 168.0,
+ "peak_vram": 32324.0,
+ "peak_gtt": 129.0,
+ "score": 1.0,
+ "detail": {
+  "score": 1.0,
+  "zero_loss": true,
+  "clean": true,
+  "src_lines": 166,
+  "out_lines": 166,
+  "out_files": 12,
+  "exact_lines": 166,
+  "recall": 1.0,
+  "precision": 1.0,
+  "lost_lines": 0,
+  "lost_table_rows": 0,
+  "altered_lines": 0,
+  "altered_with_number_change": 0,
+  "added_lines": 0,
+  "duplicated_lines": 0,
+  "numbers_missing": 0,
+  "numbers_invented": 0,
+  "fences_odd": [],
+  "placement": 1.0,
+  "sections": 12,
+  "sections_right": 12,
+  "sections_intact": 12,
+  "source_tokens": 6029,
+  "examples": {
+   "lost": [],
+   "altered": [],
+   "added": []
+  },
+  "section_detail": [
+   {
+    "heading": "(preamble)",
+    "file": "00-intro.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Summary",
+    "file": "01-summary.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Legend \u2014 every knob & label used in this run",
+    "file": "02-legend.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Results \u2014 single-stream depth curve (concurrency 1, f16 K",
+    "file": "03-results-single-stream.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Results \u2014 q8_0 confirmatory point (200K, MTP=1, MEASURED)",
+    "file": "04-results-q8-0-confirmatory.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Results \u2014 parallel at the ceiling (MTP off, agentic-32K s",
+    "file": "05-results-parallel.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## KV decision (the \u22645% rule) \u2014 q8_0 REJECTED, hard",
+    "file": "06-kv-decision.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## What moved the needle (deltas)",
+    "file": "07-what-moved-the-needle.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Consequences & root causes (ultrathink)",
+    "file": "08-consequences-and-root-causes.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Recommended config",
+    "file": "09-recommended-config.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Methodology & caveats",
+    "file": "10-methodology-and-caveats.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## External / prior comparison (CLAIMED / prior-MEASURED \u2014 k",
+    "file": "11-external-prior-comparison.md",
+    "right": true,
+    "intact": true
+   }
+  ],
+  "one_file_per_section": true,
+  "files_in_doc_order": true,
+  "readme_links": 12,
+  "readme_links_bad": 0,
+  "readme_missing": 0
+ }
+}

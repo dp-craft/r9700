@@ -1,0 +1,119 @@
+F-106|defect|blocking|WAVE-3-LLM-VALIDATION-RUNBOOK.md, tools/scripts/dpf/common.sh
+F-02|risk|low|prompts/packs/ts-react/atoms/conditional-artifact-triggers.md, .claude/commands/speckit.plan.md
+F-31|defect|med|src/doctor/inputs.ts, flow-map.json, flow-map-stale.json, manifests/plan.json
+F-144|defect|low|docs/test/2026-09-11-w4-t1-baseline.md
+F-39|gap|med|src/telemetry/project.ts
+F-93|note|low|manifests/tasks.json
+F-98|defect|med|park.ts, residue.ts
+F-185|gap|med|tools/spec-pipeline/prompts/stages/tasks/author.md, claude-artifacts/dpf/task-complexity.md, attempt-1/prompt.md
+F-86|defect|high|src/driver/report.ts, src/driver/run.ts
+F-66|defect|low|ledger.jsonl
+F-112|defect|med|WAVE-3-LLM-VALIDATION-RUNBOOK.md
+F-80|defect|med|src/diagnose/classify.ts, src/wiring/stage-executor.ts
+F-77|defect|high|residue.md, src/wiring/loop-ports.ts, row-defect-step.ts, goal-change-step.ts, load-bearing-step.ts, loop-step.ts, lints/render-report.ts
+F-42|gap|med|src/doctor/placement-drift.ts, src/wiring/stage-executor.ts, profile/schema.ts, wiring/env.ts
+F-10|gap|med|tools/spec-pipeline/tests/fixtures/rubric-reference.json, specs/050-knowledge-research-oracle/auto-fixes.md, WAVE-1-STATUS.md
+F-118|defect|low|tools/scripts/dpf/create-new-feature.sh, .specify/scripts/bash/create-new-feature.sh, .specify/templates/spec-template.md, .claude/commands/dpf.specify.md
+F-89|risk|med|src/ir/anchor.ts, src/wiring/loop-ports.ts
+F-145|risk|low|docs/test/2026-09-11-w4-t1-baseline.md
+F-50|risk|low|tools/scripts/dp-forge.ts, .dp-forge-sync.json, package.json, RUNNER-GUIDE.md
+F-154|defect|med|manifests/tasks.json
+F-16|defect|high|src/transport/http.ts, src/transport/direct.ts, spec-pipeline.config.json
+F-140|defect|med|src/wiring/loop-ports.ts, loop-step.ts
+F-161|defect|low|bundler.ts
+F-156|defect|med|src/evidence/excerpts.ts, noun-search.ts, docs/test/2026-09-11-w4-t11-rerun.md
+F-170|risk|low|src/wiring/loop-ports.ts, src/stage-runner/run-stage.ts
+F-187|gap|med|ResultsGridContainer.tsx, hooks/useCompareSplit.ts, lib/perplexity.ts, current-state.md, resolution.json, spec.md
+F-04|gap|med|none
+F-95|defect|med|tools/scripts/tests/sh/git-autocommit.test.sh, tools/scripts/tests/sh/_runner.sh
+F-56|note|low|WAVE-3-STATUS.md
+F-199|risk|med|none
+F-212|gap|low|.claude/agents/code-reviewer.md, review-chain.md
+F-67|defect|med|src/loop/run.ts, src/stages/critic.ts
+F-152|defect|med|tools/scripts/snapshot-freshness-check.ts, src/stages/spec-resolve.ts
+F-193|defect|low|report.md, state.json
+F-55|defect|high|manifests/plan.json, src/contracts/manifest.ts, src/driver/inputs.ts
+F-159|risk|low|halt-evidence.test.ts, loop-ports.ts
+F-20|defect|med|tools/spec-pipeline/spec-pipeline.config.json
+F-60|defect|med|src/evidence/bundler.ts, ledger.jsonl
+F-190|defect|low|plan.md, CompareStripContainer.tsx
+F-111|risk|med|tools/spec-pipeline/src/wiring/env.ts, tools/spec-pipeline/src/diagnose/escalate.ts, tools/spec-pipeline/src/emit/stage-outputs.ts
+F-209|defect|low|deterministic-prepass.ts
+F-125|risk|low|opencode.json
+F-45|defect|low|tools/spec-pipeline/src/cli/index.ts, tests/cli/main-module.test.ts
+F-34|gap|med|src/driver/steps.ts
+F-49|risk|low|WAVE-3-STATUS.md
+F-38|gap|med|none
+F-68|note|low|src/profile/schema.ts, src/profile/paths.ts, manifests/plan.json
+F-13|gap|med|src/driver/run.ts, src/rubric/identity.ts
+F-24|defect|med|none
+F-79|defect|med|src/diagnose/classify.ts
+F-162|defect|low|check-prerequisites.sh, dpf-feature-dir.test.ts
+F-155|gap|low|docs/test/2026-09-11-w4-t1-restart.md
+F-51|defect|high|src/driver/gate-source.ts, .gitignore
+F-85|defect|med|src/wiring/loop-ports.ts, src/driver/steps.ts
+F-97|risk|med|.dependency-cruiser.cjs, package.json
+F-192|defect|med|none
+F-119|gap|med|.claude/commands/dpf.plan.md, .specify/memory/constitution.md, .claude/commands/dpf.constitution.md, README.md
+F-12|defect|med|contracts/findings.ts
+F-196|gap|low|tasks.md
+F-63|defect|med|src/decoding/digest.ts, src/wiring/loop-ports.ts
+F-153|gap|low|src/evidence/bundler.ts
+F-54|note|low|none
+F-208|defect|med|tools/task-dag/src/nav/resolve.ts
+F-15|risk|med|src/decoding/digest.ts, src/wiring/env.ts, src/transport/types.ts
+F-71|defect|med|src/wiring/loop-ports.ts, specs/902-r40/requirements.json
+F-143|defect|low|src/decoding/hint.ts, docs/test/2026-09-11-w4-t1-baseline.md
+F-44|defect|low|tools/spec-pipeline/src/emit/spec-md.ts, tests/emit/spec-md-parity.test.ts, tests/replay/acceptance.test.ts
+F-178|defect|med|docs/plans/2026-09-01-0045-speckit-small-model-pipeline/wave-4-onboarding.md, docs/test/2026-09-11-w4-o5-calibration.md
+F-35|gap|low|none
+F-171|defect|med|docs/test/2026-09-11-w4-exit-criterion.md
+F-81|gap|low|.dependency-cruiser.cjs, tools/scripts/__tests__/spec-pipeline-lints-subpath.seam.test.ts
+F-40|gap|med|manifests/specify.json, manifests/plan.json, tests/cli/installability.test.ts
+F-21|defect|high|M-1.json, M-2.json, ab.ts
+F-52|defect|low|src/diagnose/evidence.ts, src/stage-runner/run-stage.ts, tests/diagnose/diagnose.test.ts
+F-116|defect|med|tools/spec-pipeline/src/judge/schema.ts, manifests/plan.json, manifests/specify.json, specs/900-t3-live-radar2/plan.md, specs/900-t3-live-radar2/decisions.json
+F-74|note|low|WAVE-3-STATUS.md, reference/038-prompt-lab-layout-unify.plan-reference.json
+F-151|note|low|docs/test/2026-09-11-w4-t11-resolve-replay.md, docs/research/2026-09-11-spec-resolve-seat.md
+F-62|defect|med|src/knowledge/snapshot.ts
+F-179|defect|low|src/stage-runner/run-stage.ts, errors.json
+F-78|defect|med|src/knowledge/select.ts, src/knowledge/provenance.ts, src/knowledge/snapshot.ts, src/knowledge/command.ts, src/evidence/bundler.ts
+F-58|note|low|none
+F-183|defect|high|driver/run.ts, config/config.ts, ledger.jsonl
+F-82|note|low|WAVE-3-STATUS.md, reference/038-prompt-lab-layout-unify.plan-reference.json
+F-29|defect|med|src/wiring/inputs.ts, specs/t1-13-radar/flows/flow-map.md
+F-94|defect|low|tools/speckit-orchestrator/src/runner-loop/committer.ts
+F-105|defect|low|WAVE-3-LLM-VALIDATION-RUNBOOK.md
+F-124|gap|low|ledger.jsonl, residue.md
+F-101|defect|med|rubric/command.ts, WAVE-3-LLM-VALIDATION-RUNBOOK.md
+F-103|defect|low|runner.preload.stress.test.ts, target-full.test.ts
+F-14|note|low|README.md
+F-123|gap|low|tools/spec-pipeline/src/doctor/knowledge.ts
+F-168|defect|low|tools/scripts/snapshot-freshness-check.ts
+F-72|risk|med|reference.speckit.profile.json, wave1-bench.speckit.profile.json, tools/scripts/dpf/setup-plan.sh
+F-207|gap|med|tools/task-dag/src/seed/grammar.ts, tools/task-dag/src/seed/seed.ts, tools/task-dag/src/nav/resolve.ts
+F-164|defect|low|docs/test/2026-09-11-w4-t1-restart2.md
+F-92|defect|med|src/doctor/placement-drift.ts, tests/drift/manifest-drift.test.ts
+F-206|gap|low|tools/task-dag/src/cli/commands/nav.ts
+F-147|risk|low|src/telemetry/project.ts, docs/test/2026-09-11-w4-t1-baseline.md
+F-113|defect|med|WAVE-3-LLM-VALIDATION-RUNBOOK.md, speckit.specify.md, speckit.plan.md, .claude/commands/dpf.specify.md, .claude/commands/dpf.clarify.md, .claude/commands/dpf.plan.md
+F-127|gap|low|tools/scripts/dpf/common.sh
+F-172|risk|low|src/stage-runner/run-stage.ts, wave-4-onboarding.md
+F-195|defect|low|none
+F-100|defect|med|WAVE-3-LLM-VALIDATION-RUNBOOK.md
+F-107|defect|med|build-snapshot-index.ts, generated_snapshot-index.json
+F-120|risk|low|tools/scripts/dp-forge.ts
+F-36|note|low|doc/_meta/index-full.json, index-compact.json, manifest.json, index-shards/B001.jsonl
+F-73|gap|low|tools/spec-pipeline/src/doctor/run.ts
+F-41|defect|med|src/driver/run.ts
+F-186|defect|low|tools/task-dag/src/cli/commands/validate.ts
+F-202|defect|med|RightColumnContainer.tsx, PromptLabShellContainer.tsx, ResultsGridContainer.tsx
+F-76|risk|med|runner.config.json, tools/task-dag/src/nav/knowledge.ts, resolve.ts, nav.ts
+F-37|gap|low|manifests/specify.json, manifests/plan.json
+F-139|note|low|docs/inherited/reviews/spec-pipeline-w0-3-fault-tolerance-2026-09-03.md
+F-191|defect|med|plan-placement.ts, tsconfig.json
+F-210|gap|low|tools/speckit-orchestrator/src/runner-loop/deterministic-prepass.ts, tools/speckit-orchestrator/src/runner-loop/phase-prepass.ts
+F-141|defect|low|tools/scripts/project-index.ts
+F-189|defect|med|method-gates.ts, wave1-bench.speckit.profile.json
+F-84|defect|med|tools/spec-pipeline/src/driver/gate-source.ts
+F-203|defect|low|tools/speckit-orchestrator/src/runner-loop/phase-prepass.ts, tools/speckit-orchestrator/src/runner-loop/deterministic-prepass.ts, tools/speckit-orchestrator/src/dag-source.ts

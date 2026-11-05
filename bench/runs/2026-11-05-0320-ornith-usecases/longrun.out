@@ -1,0 +1,42 @@
+{"event": "ok", "arm": "docsplit.S.V3.P0", "wall": 38.7, "gen": 6358, "score": 1.0, "zero_loss": true, "clean": true, "t_min": 0.7}
+{"event": "ok", "arm": "docsplit.S.V0.P0", "wall": 480.5, "gen": 69235, "score": 1.0, "zero_loss": true, "clean": true, "t_min": 8.7}
+{"event": "quarantine", "arm": "docsplit.S.V1.P0", "cap": 600, "t_min": 18.8}
+{"event": "ok", "arm": "docreorg.S.V3.P0", "wall": 124.5, "gen": 18560, "score": 1.0, "zero_loss": true, "clean": true, "t_min": 22.7}
+{"event": "ok", "arm": "docsplit.P.V3.P0", "wall": 44.1, "gen": 6487, "score": 1.0, "zero_loss": true, "clean": true, "t_min": 23.4}
+{"event": "server", "extra": "--temp 0.6 --presence-penalty 0", "restart_s": 49, "t_min": 24.2}
+{"event": "ok", "arm": "impl.-.V0.P2", "wall": 98.9, "gen": 14236, "score": 0.686, "zero_loss": null, "clean": null, "t_min": 26.0}
+{"event": "ok", "arm": "testgen.-.V0.P2", "wall": 39.4, "gen": 6499, "score": 0.938, "zero_loss": null, "clean": null, "t_min": 26.9}
+{"event": "ok", "arm": "edit.-.V0.P2", "wall": 46.8, "gen": 7691, "score": 1.0, "zero_loss": null, "clean": null, "t_min": 27.7}
+{"event": "ok", "arm": "bugfix.-.V0.P2", "wall": 27.7, "gen": 4499, "score": 1.0, "zero_loss": null, "clean": null, "t_min": 28.2}
+{"event": "ok", "arm": "bugs.S.V1.P2", "wall": 126.5, "gen": 19969, "score": 0.653, "zero_loss": null, "clean": null, "t_min": 30.3}
+{"event": "ok", "arm": "log.S.V2.P2", "wall": 67.4, "gen": 11365, "score": 0.897, "zero_loss": null, "clean": null, "t_min": 31.5}
+{"event": "ok", "arm": "docreorg.S.V3.P2", "wall": 98.4, "gen": 15655, "score": 1.0, "zero_loss": true, "clean": true, "t_min": 33.2}
+{"event": "quarantine", "arm": "docsplit.S.V1.P2", "cap": 720, "t_min": 45.2}
+{"event": "quarantine", "arm": "docreorg.S.V1.P2", "cap": 720, "t_min": 50.9}
+{"event": "server", "extra": "", "restart_s": 42, "t_min": 51.8}
+{"event": "ok", "arm": "log.M.V2.P0", "wall": 99.0, "gen": 15020, "score": 1.0, "zero_loss": null, "clean": null, "t_min": 53.4}
+{"event": "ok", "arm": "json.M.V3.P0", "wall": 14.1, "gen": 2200, "score": 1.0, "zero_loss": null, "clean": null, "t_min": 53.7}
+{"event": "ok", "arm": "summary.M.V1.P0", "wall": 71.3, "gen": 9943, "score": 1.0, "zero_loss": null, "clean": null, "t_min": 54.9}
+{"event": "ok", "arm": "codeinv.M.V0.P0", "wall": 49.1, "gen": 6643, "score": 1.0, "zero_loss": null, "clean": null, "t_min": 55.8}
+{"event": "ok", "arm": "summary.HU.V1.P0", "wall": 35.4, "gen": 4963, "score": 1.0, "zero_loss": null, "clean": null, "t_min": 56.4}
+{"event": "ok", "arm": "codeinv.L.V0.P0", "wall": 76.0, "gen": 6702, "score": 0.995, "zero_loss": null, "clean": null, "t_min": 57.7}
+{"event": "ok", "arm": "summary.L.V1.P0", "wall": 50.8, "gen": 5745, "score": 1.0, "zero_loss": null, "clean": null, "t_min": 58.6}
+{"event": "ok", "arm": "json.L.V3.P0", "wall": 18.9, "gen": 3150, "score": 1.0, "zero_loss": null, "clean": null, "t_min": 59.0}
+{"event": "ok", "arm": "log.L.V2.P0", "wall": 137.8, "gen": 19939, "score": 0.798, "zero_loss": null, "clean": null, "t_min": 61.3}
+{"event": "ok", "arm": "docsplit.M.V3.P0", "wall": 34.8, "gen": 5837, "score": 1.0, "zero_loss": true, "clean": true, "t_min": 61.9}
+{"event": "ok", "arm": "docsplit.L.V3.P0", "wall": 51.1, "gen": 8241, "score": 1.0, "zero_loss": true, "clean": true, "t_min": 62.8}
+{"event": "ok", "arm": "docsplit.L.V3.P0.r2", "wall": 54.2, "gen": 8949, "score": 1.0, "zero_loss": true, "clean": true, "t_min": 63.7}
+{"event": "ok", "arm": "docsplit.L.V3.P0.r3", "wall": 76.0, "gen": 11495, "score": 1.0, "zero_loss": true, "clean": true, "t_min": 65.0}
+{"event": "ok", "arm": "docreorg.M.V3.P0", "wall": 95.1, "gen": 14183, "score": 1.0, "zero_loss": true, "clean": true, "t_min": 66.7}
+{"event": "ok", "arm": "docreorg.L.V3.P0", "wall": 248.8, "gen": 32894, "score": 0.7727, "zero_loss": true, "clean": true, "t_min": 70.8}
+{"event": "ok", "arm": "docreorg.L.V3.P0.r2", "wall": 220.5, "gen": 29824, "score": 0.8636, "zero_loss": true, "clean": true, "t_min": 74.6}
+{"event": "ok", "arm": "docreorg.L.V3.P0.r3", "wall": 277.7, "gen": 36796, "score": 0.9545, "zero_loss": true, "clean": true, "t_min": 79.2}
+{"event": "ok", "arm": "docnotes.buildcmp.V2.P0", "wall": 46.7, "gen": 7373, "score": 1.0, "zero_loss": null, "clean": null, "t_min": 80.0}
+{"event": "ok", "arm": "docnotes.sharp.V2.P0", "wall": 37.2, "gen": 5709, "score": 0.952, "zero_loss": null, "clean": null, "t_min": 80.7}
+{"event": "ok", "arm": "docnotes.depth.V2.P0", "wall": 152.2, "gen": 22017, "score": 0.881, "zero_loss": null, "clean": null, "t_min": 83.3}
+{"event": "ok", "arm": "docnotes.hardest.V2.P0", "wall": 96.7, "gen": 11962, "score": 1.0, "zero_loss": null, "clean": null, "t_min": 84.9}
+{"event": "quarantine", "arm": "classify.M.V2.P0", "cap": 840, "t_min": 99.0}
+{"event": "ok", "arm": "bugs.M.V1.P0", "wall": 759.2, "gen": 103914, "score": 0.579, "zero_loss": null, "clean": null, "t_min": 111.8}
+{"event": "ok", "arm": "classify.S.V2.P0.r2", "wall": 170.0, "gen": 22939, "score": 0.85, "zero_loss": null, "clean": null, "t_min": 114.7}
+{"event": "ok", "arm": "impl.-.V0.P0.r2", "wall": 148.2, "gen": 19285, "score": 0.743, "zero_loss": null, "clean": null, "t_min": 117.2}
+{"event": "end", "t_min": 117.2}

@@ -1,0 +1,25 @@
+{
+ "arm": "testgen.-.V1.P0",
+ "profile": "code",
+ "wall_s": 62.2,
+ "turns": 13,
+ "gen": 12636,
+ "reason": 7996,
+ "prompt_first": 4705,
+ "prompt_peak": 19924,
+ "drops": 0,
+ "rate": 221.4,
+ "peak_vram": 32304.0,
+ "peak_gtt": 150.0,
+ "score": 1.0,
+ "detail": {
+  "tests": 44,
+  "pass_on_original": true,
+  "src_unchanged": true,
+  "tsc_errors": 0,
+  "mutants_killed": 16,
+  "mutants": 16,
+  "survived": [],
+  "score": 1.0
+ }
+}

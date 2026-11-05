@@ -1,0 +1,9 @@
+GOAL: Benchmarks a deep-context 35B model (Qwen3.6-35B-A3B) over Vulkan on an AMD R9700 to its native 262144-token ceiling, testing the depth curve, multi-token prediction versus depth, q8_0 KV, and parallel serving at 32K prompts.
+RESULT: f16 KV runs cleanly to 200K with no OOM (VRAM is not the binding limit — the RoPE cap is), so Vulkan + f16 is the only sane config; MTP's decode gain grows with depth (+14% at 8K to +35% at 200K) but is a net loss for deep-prefill/short-decode requests and should stay off, while q8_0 KV is rejected at depth because its penalty scales with context.
+KEY: 1254 tok/s | prefill throughput at 200K for Qwen3.6-35B-A3B f16 KV MTP-off (deep-mtp0-cr200000), down from 3077 tok/s at 8K
+KEY: +35.1% | MTP decode speedup on the same config (f16, deep-mtp1 vs deep-mtp0) at 200K — a gain that grows with depth but is still a net loss for short decodes
+KEY: +16.7 s | MTP wall-time cost over a 256-token generation at 200K (158→175 s, f16 Qwen3.6-35B-A3B) — the reported −17 s wall net loss
+KEY: −39.8% | q8_0 prefill throughput penalty vs f16 at 200K for MTP=1 (deep-mtp1q8-cr200000: 677 vs deep-mtp1-cr200000 f16: 1125 tok/s) -> rejected
+KEY: 49.4 s | TTFT p95 across 4x32K parallel prompts (deep-par-np4, MTP off), doubled from ~24 s at np2 for ~0 aggregate-throughput gain
+CAVEAT: The f16 no-OOM/fits claim is served-path evidence only — VRAM was not re-sampled this run (no gpu_samples) — and the q8_0 rejection rests on a single confirmatory point at 200K rather than a full matrix.
+OPEN: Whether a future Mesa/llama.cpp build narrows the Vulkan q8_0 KV kernel penalty, hinted by the ROCm path's smaller −7.5% decode penalty but needing a rebuild to confirm.

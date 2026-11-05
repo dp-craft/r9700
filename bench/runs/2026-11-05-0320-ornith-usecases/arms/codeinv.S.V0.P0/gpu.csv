@@ -1,0 +1,7 @@
+unix_ts,vram_used_mib,vram_total_mib,gtt_used_mib,power_w,temp_c,mem_temp_c,sclk_mhz,mclk_mhz,gpu_busy_pct,fan_pct
+1793845820.2,32264,32624,240,22.0,65.0,75.0,6.0,96.0,2.0,58.0
+1793845822.3,32268,32624,240,209.0,65.0,77.0,2205.0,1258.0,100.0,58.0
+1793845824.4,32268,32624,240,219.0,66.0,80.0,3260.0,1258.0,100.0,57.0
+1793845826.5,32263,32624,238,219.0,66.0,80.0,3283.0,1258.0,100.0,56.0
+1793845828.6,32265,32624,240,199.0,66.0,80.0,3152.0,1258.0,100.0,55.0
+# load_vram_used_mib=32264 peak_vram_used_mib=32268 peak_gtt_used_mib=240 avg_power_w=173.6 peak_power_w=219.0 peak_temp_c=66.0 peak_mem_temp_c=80.0 avg_sclk_mhz=2381.2 peak_sclk_mhz=3283.0 avg_mclk_mhz=1025.6 peak_mclk_mhz=1258.0 avg_gpu_busy_pct=80.4 peak_gpu_busy_pct=100.0 peak_fan_pct=58.0 samples=5

@@ -1,0 +1,12 @@
+DOC: 2026-10-31-redhat-sharp-w208-blind.analysis.md
+TOPIC: What swapping only the sharp (terse) chat template does to RedHat Qwen3.8-27B-MXFP4 δ 0's blind W2-08 review quality.
+VERDICT: The sharp template cut step-A work about a third with no measured quality loss, but its +2 Opus findings over the δ 0 baseline falls below the pre-registered significance zone so the gain is not proven (n = 1). Q4_K_XL vs RedHat with the template equal is a tie.
+CONFIG: RedHatAI/Qwen3.8-27B-MXFP4 (DFlash2 draft k=7, δ0); vLLM 0.32.0 (Sly 1.8.1) + stop_when; sharp chat template; gpu-memory-utilization 0.93, fp8 KV
+PATHS: bench/runs/2026-10-31-redhat-sharp-w208-blind/pre-launch-provenance.txt, bench/runs/2026-10-31-redhat-sharp-w208-blind/, bench/runs/2026-10-31-redhat-sharp-w208-blind/rep1/redhat-d0-sharp/server.txt, bench/runs/2026-10-30-0947-dpf-brief-ab/, campaigns/2026-10-31-q4kxl-sharp-w208-blind/analysis.md, campaigns/2026-10-31-redhat-sharp-w208-blind/sharp-chat_template.jinja
+FACT|179|+2 (11 vs 9)|Opus findings found by sharp vs δ 0 in step A
+FACT|180|+2 (22 vs 20)|Severity-weighted Opus coverage, sharp vs δ 0
+FACT|184|-38 %|Thinking chars cut in step A, sharp vs δ 0
+FACT|185|-35 %|Tool calls cut in step A, sharp vs δ 0
+FACT|186|about -28 %|Server-generated tokens cut in step A, sharp vs δ 0
+INCIDENT|152|First grading pass used a stale fixture; pass deleted and repeated with correct file.
+OPEN|Whether a second rep of RedHat + sharp keeps ~9/19 Opus findings and 4/6 highs, i.e., whether the +2 gain and "no loss" are real rather than noise (n = 1).

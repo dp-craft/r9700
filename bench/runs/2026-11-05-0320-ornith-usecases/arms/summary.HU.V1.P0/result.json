@@ -1,0 +1,24 @@
+{
+ "arm": "summary.HU.V1.P0",
+ "profile": "read",
+ "wall_s": 35.4,
+ "turns": 5,
+ "gen": 4963,
+ "reason": 4106,
+ "prompt_first": 3487,
+ "prompt_peak": 16166,
+ "drops": 0,
+ "rate": 142.5,
+ "peak_vram": 32527.0,
+ "peak_gtt": 129.0,
+ "score": 1.0,
+ "detail": {
+  "format_ok": true,
+  "keys": 5,
+  "numbers": 21,
+  "numbers_absent": 0,
+  "absent": [],
+  "chars": 1588,
+  "score": 1.0
+ }
+}

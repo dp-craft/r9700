@@ -1,0 +1,12 @@
+Split the document /tmp/claude-1001/-home-dev-work-dp-craft-amd/bf832afa-1002-41d9-a4b8-4b201a1bc43c/scratchpad/uc/runs-haiku/docsplit.S.V1.haiku/doc.md into smaller files, one per top-level section (a line starting with "## ").
+Write the files in /tmp/claude-1001/-home-dev-work-dp-craft-amd/bf832afa-1002-41d9-a4b8-4b201a1bc43c/scratchpad/uc/runs-haiku/docsplit.S.V1.haiku/out/, named NN-<short-slug>.md with NN = 01, 02, ... in document order. Anything before the first "## " line goes to out/00-intro.md.
+Also write out/README.md with one line per file, in order: - [<section heading>](<file name>)
+Then reply with only: DONE
+
+RULES
+- The content must not change. Every line of the source ends up in the output exactly once, character for character: every number, table row, path, code block, comment and punctuation mark.
+- Do not summarize, shorten, reword, translate, correct, renumber or reformat anything. Keep heading levels. Keep wrong-looking or odd text as it is.
+- Add nothing except what the task asks for.
+- Read the whole document first. If Read says it is too large, read it in chunks with offset and limit=400 until the end.
+- Do not draft the output in your reasoning; copy each file once with the Write tool.
+

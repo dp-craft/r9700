@@ -1,0 +1,15 @@
+Write tests for src/semver.ts in tests/semver.test.ts, using vitest (import from "vitest", and from "../src/semver").
+
+HOW
+1. Read src/semver.ts. Do not edit it.
+2. For each exported function, list its behaviours from the code and comments: normal cases, boundaries, each branch, each error.
+3. Write one small test per behaviour, with exact expected values. Compare both directions where order matters.
+4. Run: npx vitest run --reporter=dot --no-color
+5. Run: npx tsc --noEmit
+
+RULES
+- Change only what the task names. No refactors, new dependencies or new files beyond those it asks for.
+- Follow the style of the surrounding code.
+- Run the commands below and fix what fails. Never report success without running them.
+- Think briefly: decide, write and test, instead of drafting the code in your reasoning.
+Then reply with only: DONE

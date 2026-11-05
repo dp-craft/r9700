@@ -1,0 +1,342 @@
+diff --git a/src/logfmt.ts b/src/logfmt.ts
+new file mode 100644
+index 0000000..cb6ae48
+--- /dev/null
++++ b/src/logfmt.ts
+@@ -0,0 +1,183 @@
++export class LogfmtError extends Error {
++  column: number;
++
++  constructor(message: string, column: number) {
++    super(message);
++    this.name = "LogfmtError";
++    this.column = column;
++  }
++}
++
++function isSep(c: string | undefined): boolean {
++  return c === " " || c === "\t";
++}
++
++// Parse a single line into key/value pairs. The scanner walks the string by
++// index so that errors can report the exact 0-based column. No regexes.
++export function parse(line: string): Record<string, string | true> {
++  const result: Record<string, string | true> = {};
++  const len = line.length;
++  let i = 0;
++
++  while (i < len) {
++    // Skip the one-or-more spaces/tabs that separate pairs.
++    while (i < len && isSep(line[i])) {
++      i += 1;
++    }
++    if (i >= len) {
++      break;
++    }
++
++    const start = i;
++
++    // A pair beginning with '=' has no key.
++    if (line[i] === "=") {
++      throw new LogfmtError("empty key", i);
++    }
++
++    // Read the key: run of characters up to '=', a separator, or end of line.
++    while (i < len && line[i] !== "=" && !isSep(line[i])) {
++      i += 1;
++    }
++    const key = line.slice(start, i);
++
++    if (i >= len || isSep(line[i])) {
++      // Bare key with no '='.
++      result[key] = true;
++      continue;
++    }
++
++    // line[i] === '=': read the value that follows.
++    i += 1;
++    if (i < len && line[i] === '"') {
++      const quoted = parseQuoted(line, i, len);
++      result[key] = quoted.value;
++      i = quoted.end;
++    } else {
++      // Bare value: run up to the next separator or end of line. It may hold '='.
++      const valueStart = i;
++      while (i < len && !isSep(line[i])) {
++        i += 1;
++      }
++      result[key] = line.slice(valueStart, i);
++    }
++  }
++
++  return result;
++}
++
++// Parse a quoted value starting at the opening quote index. Returns the decoded
++// value and the index just past the closing quote so the caller can advance.
++function parseQuoted(
++  line: string,
++  quoteIndex: number,
++  len: number
++): { value: string; end: number } {
++  let out = "";
++  let k = quoteIndex + 1;
++  let closed = false;
++
++  while (k < len) {
++    const c = line[k];
++    if (c === "\\") {
++      const esc = line[k + 1];
++      if (esc === '"') {
++        out += '"';
++        k += 2;
++      } else if (esc === "\\") {
++        out += "\\";
++        k += 2;
++      } else if (esc === "n") {
++        out += "\n";
++        k += 2;
++      } else {
++        throw new LogfmtError(`unknown escape \\${esc ?? ""}`, k);
++      }
++    } else if (c === '"') {
++      closed = true;
++      k += 1; // move past the closing quote
++      break;
++    } else {
++      out += c;
++      k += 1;
++    }
++  }
++
++  if (!closed) {
++    throw new LogfmtError("unterminated quote", quoteIndex);
++  }
++
++  // The character right after the closing quote must be a separator or end.
++  const next = line[k];
++  if (next !== undefined && !isSep(next)) {
++    throw new LogfmtError("junk after quoted value", k);
++  }
++
++  return { value: out, end: k };
++}
++
++// Escape a value for output: wrap in quotes and encode ", \\, and newline.
++function formatValue(value: string): string {
++  let out = '"';
++  for (let p = 0; p < value.length; p += 1) {
++    const c = value[p];
++    if (c === "\\") {
++      out += "\\\\";
++    } else if (c === '"') {
++      out += '\\"';
++    } else if (c === "\n") {
++      out += "\\n";
++    } else {
++      out += c;
++    }
++  }
++  return out + '"';
++}
++
++function needsQuote(value: string): boolean {
++  if (value === "") {
++    return true;
++  }
++  for (let p = 0; p < value.length; p += 1) {
++    const c = value[p];
++    if (
++      c === " " ||
++      c === "\t" ||
++      c === '"' ||
++      c === "\\" ||
++      c === "=" ||
++      c === "\n"
++    ) {
++      return true;
++    }
++  }
++  return false;
++}
++
++function validateKey(key: string): void {
++  if (key === "") {
++    throw new LogfmtError("empty key", -1);
++  }
++  for (let p = 0; p < key.length; p += 1) {
++    const c = key[p];
++    if (c === " " || c === "\t" || c === "=" || c === '"') {
++      throw new LogfmtError("invalid key", -1);
++    }
++  }
++}
++
++// Join fields into a logfmt line in insertion order.
++export function format(fields: Record<string, string | true>): string {
++  const parts: string[] = [];
++  const keys = Object.keys(fields);
++  for (const key of keys) {
++    validateKey(key);
++    const value = fields[key];
++    if (value === true) {
++      parts.push(key);
++    } else if (typeof value === "string") {
++      parts.push(key + "=" + (needsQuote(value) ? formatValue(value) : value));
++    }
++  }
++  return parts.join(" ");
++}
+diff --git a/tests/logfmt.test.ts b/tests/logfmt.test.ts
+new file mode 100644
+index 0000000..e2b0a42
+--- /dev/null
++++ b/tests/logfmt.test.ts
+@@ -0,0 +1,147 @@
++import { expect, test } from "vitest";
++import { parse, format, LogfmtError } from "../src/logfmt";
++
++// Catch a thrown LogfmtError and assert its exact column.
++function expectColumn(fn: () => unknown, column: number): void {
++  try {
++    fn();
++  } catch (err) {
++    if (err instanceof LogfmtError) {
++      expect(err.column).toBe(column);
++      return;
++    }
++    throw err;
++  }
++  throw new Error("expected a LogfmtError to be thrown");
++}
++
++test("LogfmtError carries a numeric column and is an Error", () => {
++  const err = new LogfmtError("boom", 7);
++  expect(err).toBeInstanceOf(Error);
++  expect(err).toBeInstanceOf(LogfmtError);
++  expect(err.column).toBe(7);
++});
++
++// --- parse: basic value shapes --------------------------------------------
++
++test("bare key gives true", () => {
++  expect(parse("c")).toEqual({ c: true });
++});
++
++test("key= gives empty string", () => {
++  expect(parse("a=")).toEqual({ a: "" });
++});
++
++test("bare value runs until next separator and may contain =", () => {
++  expect(parse("a=x y")).toEqual({ a: "x", y: true });
++  expect(parse("a=b=c")).toEqual({ a: "b=c" });
++});
++
++test("quoted value with escapes", () => {
++  // a="he said \"hi\"" -> he said "hi"
++  expect(parse('a="he said \\"hi\\""')).toEqual({ a: 'he said "hi"' });
++  // a="back\\slash" -> back\slash
++  expect(parse('a="back\\\\slash"')).toEqual({ a: "back\\slash" });
++  // a="line\nbreak" -> line<newline>break
++  expect(parse('a="line\nbreak"')).toEqual({ a: "line\nbreak" });
++});
++
++test("repeated key keeps last value and first-seen order", () => {
++  const out = parse("a=1 a=2 b=3");
++  expect(out).toEqual({ a: "2", b: "3" });
++  expect(Object.keys(out)).toEqual(["a", "b"]);
++});
++
++test("empty and all-whitespace lines give {}", () => {
++  expect(parse("")).toEqual({});
++  expect(parse("   \t  ")).toEqual({});
++});
++
++// --- parse: error columns --------------------------------------------------
++
++test("error: empty key reports the = ", () => {
++  expectColumn(() => parse('=x'), 0);
++});
++
++test("error: empty key on a later pair reports that =", () => {
++  expectColumn(() => parse("a=1 =b"), 4);
++});
++
++test("error: unterminated quote reports the opening quote", () => {
++  expectColumn(() => parse('a="abc'), 2);
++  expectColumn(() => parse('a="'), 2);
++});
++
++test("error: unknown escape reports the backslash", () => {
++  // a="\t" : the value is backslash, t -> unknown escape at index 3
++  expectColumn(() => parse('a="\\t"'), 3);
++});
++
++test("error: junk right after a quoted value reports that character", () => {
++  // a="x"y : 'y' sits at index 5
++  expectColumn(() => parse('a="x"y'), 5);
++});
++
++// --- format: value quoting -------------------------------------------------
++
++test("format: true is the bare key", () => {
++  expect(format({ c: true })).toBe("c");
++});
++
++test("format: bare value stays bare", () => {
++  expect(format({ a: "abc" })).toBe("a=abc");
++});
++
++test("format: empty, space, = values are quoted", () => {
++  expect(format({ a: "" })).toBe('a=""');
++  expect(format({ a: "x y" })).toBe('a="x y"');
++  expect(format({ a: "x=y" })).toBe('a="x=y"');
++});
++
++test("format: tab inside a quoted value is written literally", () => {
++  expect(format({ a: "x\ty" })).toBe('a="x\ty"');
++});
++
++test("format: quote, backslash and newline are escaped in quotes", () => {
++  // value x"y -> "x\\"y"
++  expect(format({ a: 'x"y' })).toBe('a="x\\"y"');
++  // value a\b -> "a\\\\b" (backslash escaped)
++  expect(format({ a: "a\\b" })).toBe('a="a\\\\b"');
++  // value x\ny -> "x\\ny"
++  expect(format({ a: "x\ny" })).toBe('a="x\\ny"');
++});
++
++test("format: joins with one space in insertion order", () => {
++  expect(format({ a: "1", b: "2", c: true })).toBe("a=1 b=2 c");
++});
++
++// --- format: invalid keys --------------------------------------------------
++
++test("format: empty key throws with column -1", () => {
++  expectColumn(() => format({ "": "x" }), -1);
++});
++
++test("format: key with space, tab, = and quote throws with column -1", () => {
++  expectColumn(() => format({ "a b": "x" }), -1);
++  expectColumn(() => format({ "a\tb": "x" }), -1);
++  expectColumn(() => format({ "a=b": "x" }), -1);
++  expectColumn(() => format({ 'a"b': "x" }), -1);
++});
++
++// --- roundtrip: parse(format(x)) === x -------------------------------------
++
++test("roundtrip: normal fields", () => {
++  const x: Record<string, string | true> = {
++    a: "1",
++    b: "x y",
++    c: true,
++    d: "",
++    e: "a=b",
++  };
++  expect(parse(format(x))).toEqual(x);
++});
++
++test("roundtrip: values with special characters and a literal tab", () => {
++  const x = { q: 'he said "hi"', bs: "back\\slash", nl: "line\nbreak", tab: "x\ty" };
++  expect(parse(format(x))).toEqual(x);
++});

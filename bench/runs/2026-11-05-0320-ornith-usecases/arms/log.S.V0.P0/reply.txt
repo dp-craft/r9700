@@ -1,0 +1,3 @@
+The report has been written to `out/report.txt` with 16 distinct problems grouped by message type (sorted by first-occurrence line number), each with correct occurrence counts and log levels. The file uses the required `CLASS|line|count|level|message` format with no pipe characters inside messages.
+
+DONE

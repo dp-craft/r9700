@@ -1,0 +1,22 @@
+{
+ "2026-07-14-hardest-tasks-27b-vs-35b.analysis.md": {
+  "Q": "Haiku-high-deep",
+  "P": "Ornith-deep",
+  "R": "Ornith-fresh-V2"
+ },
+ "2026-10-30-0900-vllm-redhat-mxfp4-depth-transposed.md": {
+  "Q": "Haiku-high-deep",
+  "R": "Ornith-deep",
+  "P": "Ornith-fresh-V2"
+ },
+ "2026-10-31-redhat-sharp-w208-blind.analysis.md": {
+  "Q": "Haiku-high-deep",
+  "R": "Ornith-deep",
+  "P": "Ornith-fresh-V2"
+ },
+ "2026-09-15-stew675-buildcmp.analysis.md": {
+  "P": "Haiku-high-deep",
+  "Q": "Ornith-deep",
+  "R": "Ornith-fresh-V2"
+ }
+}

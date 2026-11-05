@@ -1,0 +1,69 @@
+diff --git a/movstats.py b/movstats.py
+index da66908..9baaad9 100644
+--- a/movstats.py
++++ b/movstats.py
+@@ -4,21 +4,19 @@
+ def _median(window):
+     s = sorted(window)
+     mid = len(s) // 2
+-    return s[mid]
++    if len(s) % 2 == 1:
++        return s[mid]
++    return (s[mid - 1] + s[mid]) / 2
+ 
+ 
+-def rolling_median(values, window, _cache={}):
++def rolling_median(values, window):
+     """Median of each full window. Returns one number per window, oldest first."""
+     if window < 1:
+         raise ValueError("window must be >= 1")
+-    key = window
+-    if key in _cache:
+-        return _cache[key]
+-    out = []
+-    for i in range(len(values) - window):
+-        out.append(_median(values[i : i + window]))
+-    _cache[key] = out
+-    return out
++    return [
++        _median(values[i : i + window])
++        for i in range(len(values) - window + 1)
++    ]
+ 
+ 
+ def rolling_max(values, window):
+diff --git a/tests/test_movstats.py b/tests/test_movstats.py
+index 5a9a6bb..86d46eb 100644
+--- a/tests/test_movstats.py
++++ b/tests/test_movstats.py
+@@ -7,3 +7,30 @@ def test_rolling_max():
+ 
+ def test_rolling_median_reported():
+     assert rolling_median([1, 2, 3, 4], 2) == [1.5, 2.5, 3.5]
++
++
++def test_rolling_median_second_series_is_not_cached():
++    # Symptom 2: a different series with the same window must not reuse the
++    # first series' cached numbers.
++    assert rolling_median([1, 2], 2) == [1.5]
++    assert rolling_median([10, 20], 2) == [15.0]
++
++
++def test_rolling_median_window_one():
++    # Window of 1: median of a single element is the element itself.
++    assert rolling_median([5, 3, 8], 1) == [5, 3, 8]
++
++
++def test_rolling_median_odd_window():
++    # Odd window: middle element of sorted [1, 2, 3].
++    assert rolling_median([1, 3, 2], 3) == [2]
++
++
++def test_rolling_median_last_window_included():
++    # The final full window must be present (off-by-one fix).
++    assert rolling_median([1, 2, 3, 4], 2)[-1] == 3.5
++
++
++def test_rolling_median_shorter_than_window():
++    # Input shorter than the window yields no full windows.
++    assert rolling_median([1, 2], 3) == []

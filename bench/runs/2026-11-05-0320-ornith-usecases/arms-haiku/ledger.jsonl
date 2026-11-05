@@ -1,0 +1,17 @@
+{"arm":"bugfix.-.V0.haiku","duration_ms":109866,"subagent_tokens":65660,"tool_uses":14,"effort":"max"}
+{"arm":"testgen.-.V0.haiku","duration_ms":515177,"subagent_tokens":164162,"tool_uses":22,"effort":"max"}
+{"arm":"impl.-.V0.haiku","duration_ms":400478,"subagent_tokens":122659,"tool_uses":19,"effort":"max"}
+{"arm":"edit.-.V0.haiku","duration_ms":174430,"subagent_tokens":80402,"tool_uses":21,"effort":"max"}
+{"arm":"bugs.S.V1.haiku","duration_ms":386590,"subagent_tokens":160133,"tool_uses":4,"effort":"max"}
+{"arm":"classify.S.V2.haiku","duration_ms":188353,"subagent_tokens":116652,"tool_uses":6,"effort":"max"}
+{"arm":"log.S.V2.haiku","duration_ms":325451,"subagent_tokens":129587,"tool_uses":8,"effort":"max"}
+{"arm":"json.S.V3.haiku","duration_ms":67778,"subagent_tokens":63586,"tool_uses":5,"effort":"max"}
+{"arm":"docsplit.S.V3.haiku","duration_ms":141535,"subagent_tokens":80260,"tool_uses":10,"effort":"max"}
+{"arm":"docsplit.S.V1.haiku","duration_ms":242381,"subagent_tokens":128612,"tool_uses":30,"effort":"max"}
+{"arm":"docreorg.S.V3.haiku","duration_ms":143287,"subagent_tokens":89882,"tool_uses":14,"effort":"max"}
+{"arm":"summary.S.V1.haiku","duration_ms":149471,"subagent_tokens":90298,"tool_uses":3,"effort":"max"}
+{"arm":"codeinv.S.V0.haiku","duration_ms":65691,"subagent_tokens":73641,"tool_uses":6,"effort":"max"}
+{"arm":"classify.M.V2.haiku","duration_ms":485937,"subagent_tokens":242576,"tool_uses":17,"effort":"max"}
+{"arm":"log.L.V2.haiku","duration_ms":186611,"subagent_tokens":98500,"tool_uses":10,"effort":"max"}
+{"arm":"bugs.M.V1.haiku","duration_ms":949907,"subagent_tokens":232606,"tool_uses":8,"effort":"max"}
+{"arm":"summary.L.V1.haiku","duration_ms":178379,"subagent_tokens":151756,"tool_uses":7,"effort":"max"}

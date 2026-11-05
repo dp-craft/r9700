@@ -1,0 +1,14 @@
+The reorganization is complete and verified. Summary of what was done:
+
+- Identified all 22 `## ` sections in `doc.md` (826 lines) via line-numbered grep.
+- Classified each by reading its content into three reports per `TOPICS.txt`:
+  - **topic-a.md** — backend/perf optimum: §1 TL;DR, §2 deltas, §3 sweeps, §4 exact configs, §5 cross-runtime, §6 status, §7 reproducing.
+  - **topic-b.md** — W2-08 blind-review quality benchmark: summary, results per Opus finding, review-quality coverage, "what differs Q4 vs RedHat", methodology & caveats, legend.
+  - **topic-c.md** — analysis of why "thought less" + headroom: summary, two consequences/root-causes sections, measured results, levers, KV-cache analysis, methodology & caveats, legend, recommended next step.
+- Ordered each file starting from its summary/conclusion and wrote `manifest.json` with 1-based inclusive source ranges.
+- `doc_apply.py`: wrote 3 files, **0 lines unassigned**.
+- `doc_check.py`: **PASS** — 695 content lines, 0 lost/altered/added/duplicated.
+
+Only the three target files plus the required manifest were written; no README was created.
+
+DONE

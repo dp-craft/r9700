@@ -1,0 +1,7 @@
+Both required checks pass:
+- `npx vitest run --reporter=dot --no-color` → **1 passed**
+- `npx tsc --noEmit` → no output (strict, `noUncheckedIndexedAccess` clean)
+
+The implementation is a hand-written index-tracking scanner in `src/logfmt.ts` — no regexes, no `any`, undefined-guarded indexing. The one fix needed: keys terminate on space/tab/**`=**`, while bare values keep running past `=`. LogfmtError carries exact 0-based columns (and `-1` for bad keys), matching all four error cases in SPEC.md.
+
+DONE

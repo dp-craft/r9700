@@ -1,0 +1,18 @@
+{
+ "S": {
+  "C": "Haiku-V1",
+  "A": "Ornith-V0",
+  "B": "Ornith-V1",
+  "D": "Ornith-V2"
+ },
+ "M": {
+  "A": "Ornith-V1"
+ },
+ "L": {
+  "B": "Haiku-V1",
+  "A": "Ornith-V1"
+ },
+ "HU": {
+  "A": "Ornith-V1"
+ }
+}

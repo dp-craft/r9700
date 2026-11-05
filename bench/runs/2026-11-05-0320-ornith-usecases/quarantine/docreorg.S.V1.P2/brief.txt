@@ -1,0 +1,12 @@
+The document /tmp/claude-1001/-home-dev-work-dp-craft-amd/bf832afa-1002-41d9-a4b8-4b201a1bc43c/scratchpad/uc/runs/docreorg.S.V1.P2/doc.md is a mix of sections from different reports, in random order. /tmp/claude-1001/-home-dev-work-dp-craft-amd/bf832afa-1002-41d9-a4b8-4b201a1bc43c/scratchpad/uc/runs/docreorg.S.V1.P2/TOPICS.txt lists the target files and what each is about.
+Reorganize it: put each section (a "## " line and everything up to the next "## " line) into the target file it belongs to, in /tmp/claude-1001/-home-dev-work-dp-craft-amd/bf832afa-1002-41d9-a4b8-4b201a1bc43c/scratchpad/uc/runs/docreorg.S.V1.P2/out/. Within a file, order the sections so the report reads logically, starting with its summary or conclusion when it has one.
+Write only the target files named in TOPICS.txt.
+Then reply with only: DONE
+
+RULES
+- The content must not change. Every line of the source ends up in the output exactly once, character for character: every number, table row, path, code block, comment and punctuation mark.
+- Do not summarize, shorten, reword, translate, correct, renumber or reformat anything. Keep heading levels. Keep wrong-looking or odd text as it is.
+- Add nothing except what the task asks for.
+- Read the whole document first. If Read says it is too large, read it in chunks with offset and limit=400 until the end.
+- Do not draft the output in your reasoning; copy each file once with the Write tool.
+

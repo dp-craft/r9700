@@ -1,0 +1,85 @@
+{
+ "score": 1.0,
+ "zero_loss": true,
+ "clean": true,
+ "src_lines": 283,
+ "out_lines": 283,
+ "out_files": 8,
+ "exact_lines": 283,
+ "recall": 1.0,
+ "precision": 1.0,
+ "lost_lines": 0,
+ "lost_table_rows": 0,
+ "altered_lines": 0,
+ "altered_with_number_change": 0,
+ "added_lines": 0,
+ "duplicated_lines": 0,
+ "numbers_missing": 0,
+ "numbers_invented": 0,
+ "fences_odd": [],
+ "placement": 1.0,
+ "sections": 8,
+ "sections_right": 8,
+ "sections_intact": 8,
+ "source_tokens": 8591,
+ "examples": {
+  "lost": [],
+  "altered": [],
+  "added": []
+ },
+ "section_detail": [
+  {
+   "heading": "(preamble)",
+   "file": "00-intro.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## What this repo is",
+   "file": "01-what-this-repo-is.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Hardware / software fixpoints (cite these, don't re-deriv",
+   "file": "02-hardware-software-fixpoints.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Repo map — what goes where",
+   "file": "03-repo-map.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Iron rules",
+   "file": "04-iron-rules.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Tools — the deterministic layer (use these, never hand-ro",
+   "file": "05-tools-the-deterministic-layer.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## New-model benchmarking — Ornith-1.0-35B & Gemma-4-31B (20",
+   "file": "06-new-model-benchmarking.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Where to find things (quick answers)",
+   "file": "07-where-to-find-things.md",
+   "right": true,
+   "intact": true
+  }
+ ],
+ "one_file_per_section": true,
+ "files_in_doc_order": true,
+ "readme_links": 8,
+ "readme_links_bad": 0,
+ "readme_missing": 0
+}

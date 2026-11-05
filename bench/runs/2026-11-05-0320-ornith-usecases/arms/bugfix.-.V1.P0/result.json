@@ -1,0 +1,26 @@
+{
+ "arm": "bugfix.-.V1.P0",
+ "profile": "code",
+ "wall_s": 24.1,
+ "turns": 14,
+ "gen": 4693,
+ "reason": 2962,
+ "prompt_first": 4675,
+ "prompt_peak": 10479,
+ "drops": 0,
+ "rate": 210.9,
+ "peak_vram": 32443.0,
+ "peak_gtt": 268.0,
+ "score": 0.909,
+ "detail": {
+  "hidden_pass": 10,
+  "hidden_fail": 1,
+  "hidden_error": 0,
+  "hidden_total": 11,
+  "own_pass": 2,
+  "own_fail": 0,
+  "diff": " 1 file changed, 5 insertions(+), 3 deletions(-)",
+  "score": 0.909,
+  "max_unchanged": true
+ }
+}

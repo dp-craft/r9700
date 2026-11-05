@@ -1,0 +1,112 @@
+{
+ "arm": "docsplit.M.V3.P0",
+ "profile": "data",
+ "wall_s": 34.8,
+ "turns": 10,
+ "gen": 5837,
+ "reason": 3631,
+ "prompt_first": 5004,
+ "prompt_peak": 11546,
+ "drops": 0,
+ "rate": 172.1,
+ "peak_vram": 32525.0,
+ "peak_gtt": 129.0,
+ "score": 1.0,
+ "detail": {
+  "score": 1.0,
+  "zero_loss": true,
+  "clean": true,
+  "src_lines": 349,
+  "out_lines": 349,
+  "out_files": 10,
+  "exact_lines": 349,
+  "recall": 1.0,
+  "precision": 1.0,
+  "lost_lines": 0,
+  "lost_table_rows": 0,
+  "altered_lines": 0,
+  "altered_with_number_change": 0,
+  "added_lines": 0,
+  "duplicated_lines": 0,
+  "numbers_missing": 0,
+  "numbers_invented": 0,
+  "fences_odd": [],
+  "placement": 1.0,
+  "sections": 10,
+  "sections_right": 10,
+  "sections_intact": 10,
+  "source_tokens": 20211,
+  "examples": {
+   "lost": [],
+   "altered": [],
+   "added": []
+  },
+  "section_detail": [
+   {
+    "heading": "(preamble)",
+    "file": "00-intro.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## 1. Reading guide",
+    "file": "01-reading-guide.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## 2. What was compared",
+    "file": "02-what-was-compared.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## 3. Measurements",
+    "file": "03-measurements.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## 4. Quality \u2014 the LLM-judge verdicts",
+    "file": "04-quality-the-llm-judge-verdicts.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## 5. Key findings",
+    "file": "05-key-findings.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## 6. Model scorecard",
+    "file": "06-model-scorecard.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## 7. Recommendations",
+    "file": "07-recommendations.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## 8. Detailed analysis",
+    "file": "08-detailed-analysis.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Provenance",
+    "file": "09-provenance.md",
+    "right": true,
+    "intact": true
+   }
+  ],
+  "one_file_per_section": true,
+  "files_in_doc_order": true,
+  "readme_links": 10,
+  "readme_links_bad": 0,
+  "readme_missing": 0
+ }
+}

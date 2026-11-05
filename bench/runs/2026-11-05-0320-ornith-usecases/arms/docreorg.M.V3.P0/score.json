@@ -1,0 +1,154 @@
+{
+ "score": 1.0,
+ "zero_loss": true,
+ "clean": true,
+ "src_lines": 337,
+ "out_lines": 337,
+ "out_files": 3,
+ "exact_lines": 337,
+ "recall": 1.0,
+ "precision": 1.0,
+ "lost_lines": 0,
+ "lost_table_rows": 0,
+ "altered_lines": 0,
+ "altered_with_number_change": 0,
+ "added_lines": 0,
+ "duplicated_lines": 0,
+ "numbers_missing": 0,
+ "numbers_invented": 0,
+ "fences_odd": [],
+ "placement": 1.0,
+ "sections": 20,
+ "sections_right": 20,
+ "sections_intact": 20,
+ "source_tokens": 15092,
+ "examples": {
+  "lost": [],
+  "altered": [],
+  "added": []
+ },
+ "section_detail": [
+  {
+   "heading": "## Conflicts & unknowns",
+   "file": "topic-c.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Summary",
+   "file": "topic-b.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Summary",
+   "file": "topic-c.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Actionable for this repo",
+   "file": "topic-b.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Key findings",
+   "file": "topic-b.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Summary",
+   "file": "topic-a.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Legend — knobs & labels in this run",
+   "file": "topic-a.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Conflicts & unknowns",
+   "file": "topic-b.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Key findings",
+   "file": "topic-c.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Methodology & caveats",
+   "file": "topic-a.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Detail",
+   "file": "topic-b.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Results (all MEASURED; memory columns mandatory)",
+   "file": "topic-a.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Actionable for this repo",
+   "file": "topic-c.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Detail",
+   "file": "topic-c.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Recommended config (frozen substrate → Campaign 2 input)",
+   "file": "topic-a.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Consequences & root causes (ultrathink)",
+   "file": "topic-a.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Sources",
+   "file": "topic-b.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## KV decision — q8_0 REJECTED (≤5% rule, decisively)",
+   "file": "topic-a.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Sources",
+   "file": "topic-c.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## What moved the needle",
+   "file": "topic-a.md",
+   "right": true,
+   "intact": true
+  }
+ ],
+ "unknown_files": [],
+ "original_order_agreement": 0.897
+}
