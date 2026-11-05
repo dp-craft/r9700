@@ -16,8 +16,10 @@ Run:  python3 bench/lib/test_monitor.py -v
 Every assertion is a hand-computed expected value (from the captured numbers), so a
 regression in any formula fails the suite. No server / GPU is needed.
 """
+import calendar
 import contextlib
 import io
+import json
 import os
 import re
 import signal
@@ -28,6 +30,7 @@ import tempfile
 import time
 import types
 import unittest
+import unittest.mock
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import monitor  # noqa: E402
@@ -677,8 +680,8 @@ class TestIdleAndAvg(unittest.TestCase):
 
 # --------------------------------------------------------------------------- render
 class TestTables(unittest.TestCase):
-    HEADER = ["time", "req", "in", "comp", "out", "TTFT(s)", "prefill(t/s)", "decode(t/s)", "total(s)",
-              "kv_end", "gpu_end"]
+    HEADER = ["time", "req", "in", "comp", "out", "TTFT(s)", "prefill(t/s)", "decode(t/s)", "full(s)",
+              "KV(%)", "GPU(%)"]
 
     def _entry(self, per, kv_pct=70.0, g=GPU10):
         return {"ts": time.time(), "per": per, "state": {"kv_pct": kv_pct}, "gpu": g}
@@ -713,7 +716,7 @@ class TestTables(unittest.TestCase):
             self.assertEqual(len(rows), 2)
             self.assertEqual(monitor._visible_len(rows[0]), monitor._visible_len(rows[1]))
         rows = monitor._session_rows(session)
-        for col in ("req", "cached", "comp", "gap(ms)", "queue(ms)", "total(s)"):
+        for col in ("req", "cached", "comp", "gap(ms)", "queue(ms)", "full(s)"):
             self.assertIn(col, rows[0])
         self.assertNotIn("gen_t", rows[0])
         self.assertIn("14.13", rows[1])
@@ -737,6 +740,139 @@ class TestTables(unittest.TestCase):
         self.assertEqual(row_g["busy_pct"], 65.0)
 
 
+# The request behind the reported 986762 t/s row: the poll deltas said 4096 tokens in ~4 ms.
+REQ_DONE = ("2026-11-05T07:38:40.123456789Z I req msg_a done from 127.0.0.1:38422 finish=tool_calls "
+            "prompt=65906 (cache 63488) gen=4046 reason=3580 ttft=0.68s 198.5 tok/s 21.06s")
+REQ_NEXT = ("2026-11-05T07:38:41.000000000Z I req msg_b done from 127.0.0.1:38422 finish=stop "
+            "prompt=70000 (cache 70000) gen=5 reason=1 ttft=0.09s 150.0 tok/s 0.12s")
+REQ_CHAT = ("2026-11-05T07:38:40.200000000Z I req msg_b chat stream from 127.0.0.1:38422 model=m msgs=8 tools=4 "
+            "prompt=70000 tok n=1 max_tokens=64000")
+
+
+class TestRequestLog(unittest.TestCase):
+    def test_parse_real_line(self):
+        (rid, ts, per), = monitor.parse_requests(REQ_CHAT + "\nINFO: 172.17.0.1 POST\n" + REQ_DONE)
+        self.assertEqual(rid, "msg_a")
+        self.assertEqual(time.strftime("%H:%M:%S", time.gmtime(ts)), "07:38:40")
+        self.assertEqual((per["in_tok"], per["cached_tok"], per["computed_tok"], per["out_tok"]), (65906, 63488, 2418, 4046))
+        self.assertTrue(approx(per["prefill_tps"], 2418 / 0.68))
+        self.assertEqual((per["ttft_s"], per["decode_tps"], per["e2e_s"], per["n_req"]), (0.68, 198.5, 21.06, 1))
+
+    def test_nothing_computed_has_no_rate(self):
+        (_, _, per), = monitor.parse_requests(REQ_NEXT)
+        self.assertEqual(per["computed_tok"], 0)
+        self.assertIsNone(per["prefill_tps"])
+
+    def test_streams_sorted_by_time(self):
+        self.assertEqual([r[0] for r in monitor.parse_requests(REQ_NEXT + "\n" + REQ_DONE)], ["msg_a", "msg_b"])
+
+    def test_fetch(self):
+        done = types.SimpleNamespace(returncode=0, stdout="out\n", stderr="err\n")
+        with unittest.mock.patch.object(subprocess, "run", return_value=done) as run:
+            self.assertEqual(monitor.fetch_request_log("radiance-8000"), "out\nerr\n")
+        self.assertIn("radiance-8000", run.call_args[0][0])
+        failed = types.SimpleNamespace(returncode=1, stdout="", stderr="No such container")
+        with unittest.mock.patch.object(subprocess, "run", return_value=failed):
+            self.assertIsNone(monitor.fetch_request_log("x"))
+        for exc in (FileNotFoundError("docker"), subprocess.TimeoutExpired("docker", 3)):
+            with unittest.mock.patch.object(subprocess, "run", side_effect=exc):
+                self.assertIsNone(monitor.fetch_request_log("x"))
+
+    def _rows(self, text, seen=None, pending=None):
+        snap = monitor.collect(RAD_CUR, RAD_PREV, time.time() - 2, None, [])
+        with unittest.mock.patch.object(monitor, "fetch_request_log", return_value=text):
+            return (snap,) + monitor._finished_rows(snap, pending or {}, seen, "radiance-8000")
+
+    def test_first_read_gives_no_rows(self):
+        snap, rows, _, seen = self._rows(REQ_DONE)
+        self.assertEqual(rows, [])
+        self.assertEqual(seen, {"msg_a"})
+        self.assertEqual(snap["requests"], [])
+
+    def test_impossible_poll_delta_never_reaches_a_row(self):
+        snap = monitor.collect(RAD_CUR, RAD_PREV, time.time() - 2, None, [])
+        snap["per"].update(computed_tok=4096, prefill_t=0.00415, prefill_tps=986762.0)
+        with unittest.mock.patch.object(monitor, "fetch_request_log", return_value=REQ_DONE):
+            rows, _, _ = monitor._finished_rows(snap, {}, set(), "radiance-8000")
+        self.assertEqual(rows[0]["per"]["computed_tok"], 2418)
+        self.assertTrue(approx(rows[0]["per"]["prefill_tps"], 2418 / 0.68))
+
+    def test_two_requests_in_one_poll_get_their_own_rows(self):
+        snap, rows, _, seen = self._rows(REQ_DONE + "\n" + REQ_NEXT, seen=set())
+        self.assertEqual([r["per"]["in_tok"] for r in rows], [65906, 70000])
+        self.assertEqual([r["per"]["e2e_s"] for r in rows], [21.06, 0.12])
+        self.assertEqual(rows[0]["ts"] + 1, rows[1]["ts"])
+        self.assertEqual(len(snap["requests"]), 2)
+        self.assertEqual(seen, {"msg_a", "msg_b"})
+
+    def test_request_shown_once(self):
+        _, rows, _, seen = self._rows(REQ_DONE, seen={"msg_a"})
+        self.assertEqual(rows, [])
+        self.assertEqual(seen, {"msg_a"})
+
+    def test_log_failure_keeps_rows_without_prefill(self):
+        snap, rows, pending, _ = self._rows(None)
+        self.assertTrue(snap["request_log_failed"])
+        self.assertEqual(pending, {})
+        per = rows[0]["per"]
+        self.assertIsNone(per["computed_tok"])
+        self.assertIsNone(per["prefill_tps"])
+        self.assertEqual(per["e2e_s"], 20.0)
+
+    def test_other_engines_never_call_docker(self):
+        snap = monitor.collect(METRICS_CURRENT, METRICS_PREV, time.time() - 2, None, [])
+        with unittest.mock.patch.object(monitor, "fetch_request_log", side_effect=AssertionError):
+            rows, _, _ = monitor._finished_rows(snap, {}, None, "radiance-8000")
+        self.assertTrue(approx(rows[0]["per"]["prefill_tps"], 17302 / (162.62987626999893 - 155.0)))
+        self.assertNotIn("requests", snap)
+
+    def test_jsonl(self):
+        snap, _, _, _ = self._rows(REQ_DONE, seen=set())
+        row = monitor._row(snap)
+        self.assertIsNone(row["prefill_tps"])
+        self.assertEqual(row["requests"][0]["computed_tok"], 2418)
+        json.dumps(row)
+        snap, _, _, _ = self._rows(REQ_DONE, seen={"msg_a"})
+        self.assertNotIn("requests", monitor._row(snap))
+        other = monitor.collect(METRICS_CURRENT, METRICS_PREV, time.time() - 2, None, [])
+        self.assertTrue(approx(monitor._row(other)["prefill_tps"], 17302 / (162.62987626999893 - 155.0)))
+
+    def test_log_tail(self):
+        text = ("2026-11-05T07:00:03.000000000Z I gbnf: compiled\n"
+                "2026-11-05T07:00:01.000000000Z \n"
+                "\n"
+                "2026-11-05T07:00:02.000000000Z I req msg_a chat stream from 127.0.0.1:1 model=m msgs=8 prompt=5 tok\n"
+                "2026-11-05T07:00:04.000000000Z W " + "x" * 300 + "\n")
+        tail = monitor.container_log_tail(text)
+        local = lambda sec: time.strftime("%H:%M:%S", time.localtime(calendar.timegm((2026, 11, 5, 7, 0, sec))))
+        self.assertEqual(tail[0], f"{local(2)} I req msg_a chat stream msgs=8 prompt=5 tok")
+        self.assertEqual(tail[1], f"{local(3)} I gbnf: compiled")
+        self.assertEqual(len(tail), 3)
+        self.assertEqual(len(tail[2]), monitor.LOG_TAIL_WIDTH)
+        many = "\n".join(f"2026-11-05T07:00:{i:02d}.000000000Z I line {i}" for i in range(9))
+        self.assertTrue(monitor.container_log_tail(many)[-1].endswith("I line 8"))
+        self.assertEqual(len(monitor.container_log_tail(many)), 5)
+        self.assertEqual(monitor.container_log_tail(""), [])
+
+    def test_finished_rows_sets_the_log_tail(self):
+        snap, _, _, _ = self._rows(REQ_DONE, seen=set())
+        self.assertIn("I req msg_a done finish=tool_calls", snap["log_tail"][0])
+        snap, _, _, _ = self._rows(None)
+        self.assertNotIn("log_tail", snap)
+
+    def test_recomputed_is_radiance_only(self):
+        cur = dict(RAD_CUR, **{"radiance:prefix_hit_cut_tokens_total": 22256.0})
+        self.assertEqual(monitor.collect(cur, None, None, None, [])["state"]["prefix_recomputed"], 22256.0)
+        self.assertIsNone(monitor.collect(METRICS_CURRENT, None, None, None, [])["state"]["prefix_recomputed"])
+
+    def test_block_hit_uses_the_radiance_gauge(self):
+        cur = dict(RAD_CUR, **{"vllm:gpu_prefix_cache_hit_rate": 0.9})
+        self.assertEqual(monitor.collect(cur, None, None, None, [])["state"]["prefix_block"], 0.9)
+        both = dict(METRICS_CURRENT, **{"vllm:gpu_prefix_cache_hit_rate": 0.1})
+        self.assertTrue(approx(monitor.collect(both, None, None, None, [])["state"]["prefix_block"], 6924720 / 7257022))
+        self.assertIsNone(monitor.collect(RAD_CUR, None, None, None, [])["state"]["prefix_block"])
+
+
 class TestRender(unittest.TestCase):
     def _render(self, g):
         snap = monitor.collect(RAD_CUR, RAD_PREV, time.time() - 2, g, [])
@@ -747,6 +883,43 @@ class TestRender(unittest.TestCase):
         with contextlib.redirect_stdout(buf):
             monitor.render(types.SimpleNamespace(port=8000), snap, history, LOG_LINES, False, none, none)
         return strip(buf.getvalue()).splitlines()
+
+    def test_render_flags_a_failed_request_log(self):
+        snap = monitor.collect(RAD_CUR, RAD_PREV, time.time() - 2, None, [])
+        snap["request_log_failed"] = True
+        none = dict.fromkeys(("ttft", "prefill", "decode", "n_req", "comp", "out"))
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            monitor.render(types.SimpleNamespace(port=8000, container="radiance-8000"), snap, [], [], False, none, none)
+        self.assertIn("docker logs radiance-8000 failed", strip(buf.getvalue()))
+
+    def _text(self, snap, log_lines=(), stale=False):
+        none = dict.fromkeys(("ttft", "prefill", "decode", "n_req", "comp", "out"))
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            monitor.render(types.SimpleNamespace(port=8000, container="radiance-8000"), snap, [], list(log_lines), stale, none, none)
+        return strip(buf.getvalue())
+
+    def test_render_container_log_block(self):
+        snap = monitor.collect(RAD_CUR, RAD_PREV, time.time() - 2, None, [])
+        snap["log_tail"] = ["09:00:00 I gbnf: compiled", "09:00:01 " + "x" * (monitor.LOG_TAIL_WIDTH - 9)]
+        text = self._text(snap)
+        self.assertIn("log  (docker logs radiance-8000)", text)
+        self.assertIn("I gbnf: compiled", text)
+        self.assertNotIn("log stale", text)
+        box = [l for l in text.splitlines() if l and l[0] in "┌│└"]
+        self.assertEqual({len(l) for l in box}, {len(box[0])})
+
+    def test_render_vllm_log_block_unchanged(self):
+        snap = monitor.collect(METRICS_CURRENT, METRICS_PREV, time.time() - 2, None, LOG_LINES)
+        self.assertIn("log  (last 5 entries)", self._text(snap, LOG_LINES))
+        self.assertIn("log stale", self._text(snap, LOG_LINES, stale=True))
+
+    def test_render_recomputed_only_when_reported(self):
+        cur = dict(RAD_CUR, **{"radiance:prefix_hit_cut_tokens_total": 22256.0, "vllm:num_requests_running": 1.0})
+        self.assertIn("recomputed 22.3k tok", self._text(monitor.collect(cur, RAD_PREV, time.time() - 2, None, [])))
+        sly = monitor.collect(METRICS_CURRENT, METRICS_PREV, time.time() - 2, None, [])
+        self.assertNotIn("recomputed", self._text(sly))
 
     def test_render_radiance_snapshot(self):
         no_fan = GPU10[:9] + (None,)  # a passive card reports no fan
@@ -762,7 +935,7 @@ class TestRender(unittest.TestCase):
                 self.assertNotIn("polls (requests)", text)
                 i = next(i for i, l in enumerate(lines) if "elapsed" in l)
                 self.assertNotIn("req ", lines[i])
-                header = next(l for l in lines if "gpu_end" in l)
+                header = next(l for l in lines if "GPU(%)" in l)
                 content_width = lambda line: len(line[3:].rstrip(" │"))  # after the "│  " box prefix
                 self.assertEqual(content_width(lines[i + 1]), content_width(header))
 

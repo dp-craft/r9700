@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """monitor.py — live view of a running vLLM server (per-call metrics + GPU + log).
 
-Read-only: polls the server's /metrics + rocm-smi + the log, shows a live table, and
+Read-only: polls the server's /metrics + rocm-smi + the log (on radiance also `docker logs`), shows a live table, and
 optionally records the session to JSONL (one row per poll, with --out). Zero-install
 (Python stdlib + rocm-smi).
 Reuses vram_sampler.read_amd() for the GPU (iron rule 7 — measure, don't calculate). The
@@ -11,6 +11,18 @@ Per-poll metrics come from diffing the engine's counters between polls. A reques
 at different moments (computed tokens during prefill, TTFT at first token, the rest at the end),
 so _fold_request folds the early deltas into the poll where the request finishes: one row per
 finished poll. Prefill TPS = COMPUTED tokens / prefill time; prefix-cached tokens are not counted.
+
+radiance rows do not use those deltas: its computed tokens tick when a prefill chunk is issued (~2 ms)
+and the time when the chunk commits, and requests share polls, so a poll delta can show 4096 tokens in
+4 ms (~1M t/s). Its rows come from the "I req ... done" line of `docker logs <container>` instead
+(--container, default radiance-<port>): one exact row per request, comp = prompt - cache, prefill =
+comp / TTFT. TTFT holds no decode time on radiance, as each request's first token comes from its last
+prefill step. Requests waiting behind another one read low, as TTFT includes the wait. If `docker logs`
+fails the rows fall back to per-poll deltas with comp/prefill shown n/a, and the block title says so.
+The same read fills the log block with radiance's last lines; --log is not read there, as radiance
+writes neither that file nor the vLLM lines this tool parses from it.
+The server line and the 5-min average stay on the counters: tokens and time add up over a longer window.
+
 The vLLM metric names are also exposed by radiance (a native engine), which lacks some of them:
 _computed_tok, _prefill_seconds and _cached_tok resolve each value per engine. A rolling 5-min
 window gives the weighted average (TPS weighted by TIME — Σ tokens / Σ time, TTFT weighted by
@@ -21,20 +33,23 @@ Log-derived values (the authoritative per-interval TPS): the vLLM loggers.py lin
 the spec-decoding line ("Mean acceptance length: N, average draft acceptance rate: P%").
 
 Usage:
-    python3 monitor.py [--port 8000] [--interval 2] [--log PATH] [--out JSONL] [--no-gpu] [--once] [--history 15]
+    python3 monitor.py [--port 8000] [--interval 2] [--log PATH] [--container NAME] [--out JSONL] [--no-gpu] [--once] [--history 15]
     (see --help for the same, with usage examples)
 
   --once     single snapshot, then exit (for a quick check)
   --out      append one JSONL row per poll (the session record)
-  --log      the engine log to tail (default bench/.servers/<port>.log)
+  --log      the engine log to tail (default bench/.servers/<port>.log; not read on radiance)
+  --container  the radiance container whose log gives the request rows (default radiance-<port>; needs docker access)
   --history  number of past request rows under the current poll (default 15; 0 hides the past rows — the current poll row always shows)
 
-It does NOT touch the server (no requests, no kill) — it only reads /metrics + rocm-smi + the log.
+It does NOT touch the server (no requests, no kill) — it only reads /metrics + rocm-smi + the logs.
 """
 import argparse
+import calendar
 import json
 import os
 import re
+import subprocess
 import time
 import urllib.request
 from collections import deque
@@ -51,7 +66,7 @@ def fetch_metrics(url):
         return None
 
 
-GAUGE_MAX = {"vllm:kv_cache_usage_perc"}  # per-engine fractions; take max, not sum
+GAUGE_MAX = {"vllm:kv_cache_usage_perc", "vllm:gpu_prefix_cache_hit_rate"}  # per-engine fractions; take max, not sum
 
 
 def parse_prom(text):
@@ -79,6 +94,11 @@ def parse_prom(text):
         else:
             d[name] = d.get(name, 0) + val
     return d
+
+
+def _is_radiance(m):
+    """True for the radiance engine, whose rows come from its request log."""
+    return "radiance:prefill_tokens_total" in m
 
 
 def _first(m, *names):
@@ -187,6 +207,61 @@ def log_throughput(log_lines):
 def log_spec(log_lines):
     """The metrics.py spec-decoding line: (mean acceptance length, Avg draft acceptance rate %)."""
     return _last_log_values(log_lines, "acc", "accR")
+
+
+REQUEST_LOG_TAIL = 200  # container log lines read per poll; far more than one poll of requests writes
+LOG_TAIL_WIDTH = 110  # log block line width, about the widest other block's
+REQUEST_DONE = re.compile(r"^(\S+) I req (\S+) done .*?\bprompt=(\d+) \(cache (\d+)\) gen=(\d+) "
+                          r".*?\bttft=([\d.]+)s ([\d.]+) tok/s ([\d.]+)s")
+
+
+def fetch_request_log(container):
+    """Recent timestamped lines of the container's log (stdout + stderr); None if `docker logs` fails."""
+    try:
+        r = subprocess.run(["docker", "logs", "--timestamps", "--tail", str(REQUEST_LOG_TAIL), container],
+                           capture_output=True, text=True, errors="replace", timeout=3)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return r.stdout + r.stderr if r.returncode == 0 else None
+
+
+def _log_stamp(stamp):
+    """Epoch seconds of a `docker logs --timestamps` stamp (UTC, sub-second part dropped)."""
+    return calendar.timegm(time.strptime(stamp[:19], "%Y-%m-%dT%H:%M:%S"))
+
+
+def container_log_tail(text, n=5):
+    """The container log's last n non-empty lines, oldest first, as local 'HH:MM:SS text' cut to fit the box.
+    The client address and model name go first, as every request line repeats them."""
+    lines = sorted((l.split(" ", 1) for l in text.splitlines() if " " in l and l.split(" ", 1)[1].strip()),
+                   key=lambda l: l[0][:19])
+    return [f"{time.strftime('%H:%M:%S', time.localtime(_log_stamp(stamp)))} "
+            f"{re.sub(r' from [^ ]+| model=[^ ]+', '', line)}"[:LOG_TAIL_WIDTH]
+            for stamp, line in lines[-n:]]
+
+
+def parse_requests(text):
+    """Finished requests in a radiance log, oldest first: (request id, finish time, row)."""
+    found = []
+    for line in text.splitlines():
+        r = REQUEST_DONE.match(line)
+        if not r:
+            continue
+        in_tok, cached, out_tok = int(r[3]), int(r[4]), int(r[5])
+        ttft = float(r[6])
+        computed = in_tok - cached
+        found.append((r[2], _log_stamp(r[1]), {
+            "in_tok": in_tok,
+            "cached_tok": cached,
+            "computed_tok": computed,
+            "out_tok": out_tok,
+            "n_req": 1,
+            "ttft_s": ttft,
+            "e2e_s": float(r[8]),
+            "prefill_tps": _ratio(computed or None, ttft),  # nothing computed -> no rate
+            "decode_tps": float(r[7]),
+        }))
+    return sorted(found, key=lambda f: f[1])
 
 
 LOG_INTERVAL_S = 10.0  # vLLM loggers.py default interval (10s between log lines)
@@ -319,13 +394,17 @@ def collect(m, prev, prev_t, g, log_lines):
     spec_rate = _ratio(sa, sd)
     log_pp, log_gen = log_throughput(log_lines)
     log_spec_len, log_spec_rate = log_spec(log_lines)
+    block_hit = _ratio(ph, pq)
+    if block_hit is None:
+        block_hit = m.get("vllm:gpu_prefix_cache_hit_rate")  # radiance has the rate, not the hit/query counters
     state = {
         "kv": kv,
         "kv_pct": (kv * 100) if kv is not None else None,
-        "prefix_block": _ratio(ph, pq),
+        "prefix_block": block_hit,
         "prefix_tok": _ratio(cached_tok, prompt_total),
         "prefix_tok_n": cached_tok,
         "prefix_tok_d": prompt_total,
+        "prefix_recomputed": m.get("radiance:prefix_hit_cut_tokens_total"),
         "spec": spec_rate,
         "spec_accepted": sa,
         "spec_draft": sd,
@@ -340,7 +419,7 @@ def collect(m, prev, prev_t, g, log_lines):
         "flight_gen": None,
     }
 
-    return {"ts": t, "per": per, "session": session, "state": state, "gpu": g}
+    return {"ts": t, "per": per, "session": session, "state": state, "gpu": g, "radiance": _is_radiance(m)}
 
 
 def _f(x, spec=""):
@@ -534,6 +613,29 @@ def _fold_request(pending, per):
     return (merged, {}) if per.get("in_tok") else (None, merged)
 
 
+def _finished_rows(snap, pending, seen, container):
+    """This poll's finished-request rows: (rows, pending, seen). `seen` holds the request ids in the last
+    log read; None until the first read, whose requests predate this session and give no rows. On radiance
+    the rows come from the request log and snap gets "requests"; if that log cannot be read the poll deltas
+    still give the row, without comp/prefill, which only the log has right (see the module docstring).
+    The read also gives snap "log_tail", the log block's lines."""
+    if snap["radiance"]:
+        text = fetch_request_log(container)
+        if text is not None:
+            snap["log_tail"] = container_log_tail(text)
+            requests = parse_requests(text)
+            new = [] if seen is None else [r for r in requests if r[0] not in seen]
+            snap["requests"] = [per for _, _, per in new]
+            return [dict(snap, ts=ts, per=per) for _, ts, per in new], {}, {r[0] for r in requests}
+        snap["request_log_failed"] = True
+    row, pending = _fold_request(pending, snap["per"])
+    if row is None:
+        return [], pending, seen
+    if snap["radiance"]:
+        row = dict(row, computed_tok=None, prefill_tps=None)
+    return [dict(snap, per=row)], pending, seen
+
+
 def _is_server_idle(state):
     """True when nothing is running or waiting. KV stays above 0 while the prefix cache is retained."""
     return state.get("running") == 0 and state.get("waiting") == 0
@@ -592,10 +694,14 @@ def render(a, snap, history, log_lines, log_is_stale, cur_avg, prev_avg):
         # log spec values are only shown when present (they're absent when spec decode is off)
         if state.get("log_spec_len") is not None and state.get("log_spec_rate") is not None:
             spec_line += f"   (log: len {_f(state.get('log_spec_len'), '.2f')}   rate {_with_unit(state.get('log_spec_rate'), '.1f', '%')})"
+        prefix_line = f"prefix    {_with_unit(pt * 100 if pt is not None else None, '.1f', '%')} cached " \
+                      f"({_human(state.get('prefix_tok_n'))}/{_human(state.get('prefix_tok_d'))} tok)   block hit {_with_unit(pb * 100 if pb is not None else None, '.1f', '%')}"
+        # radiance only: tokens the attention cache held but no checkpoint let it skip
+        if state.get("prefix_recomputed") is not None:
+            prefix_line += f"   recomputed {_human(state.get('prefix_recomputed'))} tok"
         cache_lines = [
             f"KV        {_percent(state.get('kv_pct'), '.1f')}",
-            f"prefix    {_with_unit(pt * 100 if pt is not None else None, '.1f', '%')} cached "
-            f"({_human(state.get('prefix_tok_n'))}/{_human(state.get('prefix_tok_d'))} tok)   block hit {_with_unit(pb * 100 if pb is not None else None, '.1f', '%')}",
+            prefix_line,
             spec_line,
             f"queue     running {_f(state.get('running'), '.0f')}   waiting {_f(state.get('waiting'), '.0f')}",
         ]
@@ -625,6 +731,9 @@ def render(a, snap, history, log_lines, log_is_stale, cur_avg, prev_avg):
         gpu_block = ("GPU  (rocm-smi)", ["(no rocm-smi)"])
 
     # finished-requests block: live row + separator + rows, newest first
+    requests_title = "finished requests"
+    if snap.get("request_log_failed"):
+        requests_title += f"  (docker logs {a.container} failed: rows per poll, comp/prefill n/a)"
     request_rows = _history_rows(history if history is not None else [])
     live_lines = [_live_row(snap), "─" * _visible_len(request_rows[0])]
 
@@ -632,10 +741,12 @@ def render(a, snap, history, log_lines, log_is_stale, cur_avg, prev_avg):
         gpu_block,
         ("cache / queue / spec", cache_lines),
         (server_title, _session_rows(session)),
-        ("finished requests", live_lines + request_rows),
+        (requests_title, live_lines + request_rows),
         ("avg (last 5 min)", [_avg_line(cur_avg, prev_avg)]),
     ]
-    if log_lines:
+    if snap.get("log_tail"):
+        blocks.append((f"log  (docker logs {a.container})", snap["log_tail"]))
+    elif log_lines:
         if log_is_stale:
             blocks.append(("log", ["(log stale — not the current server)"]))
         else:
@@ -658,10 +769,10 @@ def _session_rows(session):
     the headers so the values stay bare numbers.
     Columns: req | in (total prompt tokens) | cached (read from the prefix cache) |
     comp (prompt tokens actually computed/prefilled) | out (generated) | TTFT |
-    prefill/decode TPS | gap (inter-token latency) | queue | total (mean request time, e2e)."""
+    prefill/decode TPS | gap (inter-token latency) | queue | full (mean full round trip, e2e)."""
     cols = [("req", 6), ("in", 10), ("cached", 10), ("comp", 10), ("out", 8),
             ("TTFT(s)", 8), ("prefill(t/s)", 12), ("decode(t/s)", 12),
-            ("gap(ms)", 8), ("queue(ms)", 9), ("total(s)", 9)]
+            ("gap(ms)", 8), ("queue(ms)", 9), ("full(s)", 9)]
     vals = [(session.get("n_req"), ".0f"), (session.get("in_tok"), ".0f"),
             (session.get("cached_tok"), ".0f"), (session.get("comp_tok"), ".0f"),
             (session.get("out_tok"), ".0f"), (session.get("ttft_s"), ".2f"),
@@ -675,14 +786,14 @@ def _session_rows(session):
 
 
 def _history_rows(history):
-    """Fixed-width table of finished requests, newest first (history is oldest-first; a row is a
-    _fold_request result, so requests finishing in the same poll share it).
+    """Fixed-width table of finished requests, newest first (history is oldest-first; a row is one request
+    on radiance, else a _fold_request result, so requests finishing in the same poll share it).
     Columns: time | req (request count) | in (prompt tokens, not a rate; big for long-context/agentic requests) |
     comp (non-cached prompt tokens, what was actually prefilled) | out (generated) | TTFT (includes prefill) |
-    prefill TPS | decode TPS | total (full request time, e2e = TTFT + decode) |
-    kv_end, gpu_end (sampled at the poll's end, not over the request)."""
+    prefill TPS | decode TPS | full (full round trip, request start to last token, e2e = TTFT + decode) |
+    KV(%) (KV cache usage, retained prefix cache included), GPU(%) (both sampled at the poll's end, not over the request)."""
     rows = [
-        f"{'time':>8} {'req':>4} {'in':>8} {'comp':>8} {'out':>8} {'TTFT(s)':>8} {'prefill(t/s)':>12} {'decode(t/s)':>12} {'total(s)':>9} {'kv_end':>6} {'gpu_end':>7}",
+        f"{'time':>8} {'req':>4} {'in':>8} {'comp':>8} {'out':>8} {'TTFT(s)':>8} {'prefill(t/s)':>12} {'decode(t/s)':>12} {'full(s)':>9} {'KV(%)':>6} {'GPU(%)':>7}",
     ]
     for h in reversed(list(history)):
         per, state, g = h["per"], h["state"], h["gpu"]
@@ -702,7 +813,8 @@ def _history_rows(history):
 
 
 def _row(snap):
-    """One JSONL session row. Values are per-poll; the session_ keys are cumulative since server start."""
+    """One JSONL session row. Values are per-poll; the session_ keys are cumulative since server start, and
+    "requests" lists radiance's requests finished in this poll. A radiance poll has no valid prefill_tps."""
     per, session, state, g = snap["per"], snap["session"], snap["state"], snap["gpu"]
     row = {
         "ts": snap["ts"],
@@ -711,7 +823,7 @@ def _row(snap):
         "computed_tokens": per.get("computed_tok"),
         "n_requests": per.get("n_req"),
         "ttft_s": per.get("ttft_s"),
-        "prefill_tps": per.get("prefill_tps"),
+        "prefill_tps": None if snap.get("radiance") else per.get("prefill_tps"),
         "decode_tps": per.get("decode_tps"),
         "kv_usage": state.get("kv"),
         "running": state.get("running"),
@@ -728,6 +840,8 @@ def _row(snap):
         "session_itl_ms": session.get("itl_ms"),
         "session_queue_ms": session.get("queue_ms"),
     }
+    if snap.get("requests"):
+        row["requests"] = snap["requests"]
     if g is not None:
         row.update({"vram_used_mib": g[0], "vram_total_mib": g[1], "gtt_mib": g[2],
                     "power_w": g[3], "temp_c": g[4], "mem_temp_c": g[5],
@@ -742,7 +856,7 @@ def _default_log_path(port):
 
 def main():
     ap = argparse.ArgumentParser(
-        description="live vLLM server monitor — read-only: polls /metrics + rocm-smi + the log, never touches the server",
+        description="live vLLM server monitor — read-only: polls /metrics + rocm-smi + the logs, never touches the server",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="examples:\n"
                "  monitor.py --port 8000                       live table, polls every 2 s (Ctrl-C to quit)\n"
@@ -751,14 +865,22 @@ def main():
                "  bench/engine-bench/claude/monitor.sh         same, with PORT/paths from _lib.sh\n\n"
                "blocks:\n"
                "  GPU               VRAM/GTT + 5 colored bars (GPU use / power / VRAM / edge temp / mem temp) + fan + clocks; red over 80/90 C\n"
-               "  cache/queue/spec  KV % (colored), prefix-cache % cached + block hit rate, spec acceptance (accepted/draft tokens), running/waiting\n"
-               "  server            cumulative since server start (uptime shown in the title; req, in/cached/comp/out, TTFT, prefill/decode TPS, gap = inter-token latency, queue, total = mean request time)\n"
-               "  finished requests live row (elapsed + progress tokens + GPU % + W + KV %) + one row per poll where a request finished, newest first (in = total prompt tokens, not a rate; total = full request time, TTFT + decode; kv_end/gpu_end = sampled at the poll's end)\n"
+               "  cache/queue/spec  KV % (colored), prefix-cache % cached + block hit rate (radiance: + recomputed = tokens the attention cache held but no linear checkpoint let it skip, since server start), spec acceptance (accepted/draft tokens), running/waiting\n"
+               "  server            cumulative since server start (uptime shown in the title; req, in/cached/comp/out, TTFT, prefill/decode TPS, gap = inter-token latency, queue, full = mean full round trip)\n"
+               "  finished requests live row (elapsed + progress tokens + GPU % + W + KV %) + one row per poll where a request finished, on radiance one row per request, newest first (in = total prompt tokens, not a rate; full = full round trip, request start to last token, TTFT + decode; KV(%) = KV cache usage, GPU(%) = GPU busy, both sampled at the poll's end)\n"
                "  avg (last 5 min)  weighted-average TTFT/prefill/decode (TPS by time, TTFT by requests; trend arrows) + window req/comp/out totals\n"
-               "  log               parsed table of the last 5 loggers.py/metrics.py entries (stale mtime > 120 s -> flagged)")
+               "  log               parsed table of the last 5 loggers.py/metrics.py entries (stale mtime > 120 s -> flagged); on radiance the last 5 `docker logs` lines\n\n"
+               "radiance request rows:\n"
+               "  read from the \"I req ... done\" lines of `docker logs --tail 200 <container>` each poll, so they need docker access\n"
+               "  (default container radiance-<port>, see --container); poll deltas cannot split comp and prefill time per request.\n"
+               "  comp = prompt - cache (tokens reused via a linear-state checkpoint), prefill = comp / TTFT, no decode time in it;\n"
+               "  requests waiting behind another one read low, and rows start from the requests finishing after the monitor starts.\n"
+               "  if `docker logs` fails: rows per poll, comp/prefill n/a, no log block, and the block title says so.")
     ap.add_argument("--port", type=int, default=8000, help="server port (default 8000)")
     ap.add_argument("--interval", type=float, default=2.0, help="poll interval in seconds (default 2.0)")
-    ap.add_argument("--log", default=None, help="engine log to tail (default bench/.servers/<port>.log)")
+    ap.add_argument("--log", default=None, help="engine log to tail (default bench/.servers/<port>.log; not read on radiance, see below)")
+    ap.add_argument("--container", default=None,
+                    help="radiance container whose log gives the request rows (default radiance-<port>; needs docker access)")
     ap.add_argument("--out", default=None,
                     help="append one JSONL row per poll — the session record")
     ap.add_argument("--no-gpu", action="store_true", help="skip rocm-smi (GPU block shows 'no rocm-smi')")
@@ -770,10 +892,13 @@ def main():
     url = f"http://127.0.0.1:{a.port}/metrics"
     if a.log is None:
         a.log = _default_log_path(a.port)
+    if a.container is None:
+        a.container = f"radiance-{a.port}"
 
     prev, prev_t = None, None
     window = []  # rolling (ts, per) list, pruned to the last 5 min
     pending = {}  # deltas of the request in progress (see _fold_request)
+    seen = None  # request ids in the last request-log read (see _finished_rows)
     history = deque(maxlen=a.history) if a.history > 0 else None
     prev_avg = {"ttft": None, "prefill": None, "decode": None, "n_req": None, "comp": None, "out": None}
     flight_start = None  # time.time() when running went 0->>0 (in-flight request elapsed base)
@@ -785,7 +910,7 @@ def main():
             t = time.time()
             m = parse_prom(fetch_metrics(url))
             g = None if a.no_gpu else gpu()
-            log_lines = tail_log(a.log, 12)
+            log_lines = [] if _is_radiance(m) else tail_log(a.log, 12)
 
             if not m:
                 print(f"\n[monitor] {time.strftime('%H:%M:%S')} — server not reachable at {url}")
@@ -816,9 +941,9 @@ def main():
             if snap["per"]:
                 window.append((snap["ts"], snap["per"]))
             window = [(ts, p) for ts, p in window if snap["ts"] - ts <= 300]
-            row, pending = _fold_request(pending, snap["per"])
-            if row is not None and history is not None:
-                history.append(dict(snap, per=row))
+            rows, pending, seen = _finished_rows(snap, pending, seen, a.container)
+            if history is not None:
+                history.extend(rows)
 
             cur_avg = _avg_snapshot(window)
             render(a, snap, history, log_lines, log_stale(a.log), cur_avg, prev_avg)
