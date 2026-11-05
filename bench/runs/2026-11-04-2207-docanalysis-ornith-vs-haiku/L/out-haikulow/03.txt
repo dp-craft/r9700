@@ -1,0 +1,15 @@
+DOC: 2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md
+TOPIC: Ornith 1.5 35B w4a8 on native Radiance versus Sly engines and the Qwen3.8-27B and Qwen3.5-35B arms, measuring prefill and decode at 10k, 50k and 100k depth.
+VERDICT: Ornith 1.5 on native Radiance with MTP K=3 is the fastest measured 35B on one card at 210 W, about 2.1 to 2.5 times the 27B on Sly. The gap comes from engine step time rather than drafting, and coding quality was not tested.
+CONFIG: keptn/ornith-1.5-35b-a3b-w4a8 on stilldeadcode/radiance:1.16.0 (native Radiance); --tp 1 --max-num-seqs 8 --max-model-len 262144 --kv-cache-dtype fp8 --num-speculative-tokens 3 (MTP K=3) --max-num-batched-tokens 2048; temp 1.0 top_p 0.95 top_k 20 presence_penalty 1.5; power cap 210 W; comparison arms on vllm-sly-radiance 1.9.1 (DFlash2 K=7 for 27B, DFlash K=7 for Qwen3.5-35B, DFlash K=3 for Ornith on Sly).
+PATHS: bench/runs/2026-11-04-1730-ornith15-w4a8-radiance/, bench/runs/2026-11-04-1740-27b-sly-baseline/, bench/runs/2026-11-04-1557-35b-perf-10k-50k-100k/, bench/runs/2026-11-04-1802-ornith15-sly-dflash/, campaigns/2026-07-19-ornith-vs-gemma/analysis.md
+FACT|16|219.8 t/s decode, Ornith 1.5 w4a8 on Radiance at 10k
+FACT|40|13,059 t/s prefill, Ornith 1.5 w4a8 on Radiance at 10k
+FACT|47|86.9 t/s decode, Qwen3.8-27B on Sly DFlash2 at 10k
+FACT|43|95.2 t/s decode, Ornith 1.5 MXFP4 on Sly DFlash K=3 at 10k
+FACT|28|50.0% MTP K=3 draft acceptance (1522/3042), Ornith on Radiance
+INCIDENT|110|Chrome and GNOME Shell crashed about 7 min after probe at default 96 MiB headroom
+INCIDENT|46|MTP failed to load on Sly triton_unfused, triton and aiter backends
+INCIDENT|106|Sly no-drafter and MTP arms ran with 0 CUDA graphs captured, so baseline is unfair
+INCIDENT|164|Ornith DFlash K=7 arm stopped on request, quarantined as INTERRUPTED
+OPEN: Why no full CUDA graph was captured on the Sly no-drafter and MTP arms (line 106); split of engine versus model step cost is unresolved (line 107).

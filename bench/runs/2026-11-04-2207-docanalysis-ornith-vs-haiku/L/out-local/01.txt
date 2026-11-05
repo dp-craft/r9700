@@ -1,0 +1,13 @@
+DOC: 2026-07-14-hardest-tasks-27b-vs-35b.analysis.md
+TOPIC: 128k-token benchmark of the Qwen3.6-27B quant ladder, the reasoning budget (4096/16384/unlimited), and the 35B-A3B sampling sweep on an AMD R9700.
+VERDICT: The quant ladder is a bounded null with no resolvable gap; the reasoning budget above ~4k does not help the dense 27B, but the MoE 35B genuinely benefits from a bigger budget. Qwen's whole coding recipe (temp 0.6) is best on every metric and presence_penalty mainly costs decode via a fixed host tax.
+CONFIG: Qwen3.6-27B-MTP at Q4_K_M / UD-Q4_K_XL / Q5_K_M / Q6_K, plus Qwen3.6-35B-A3B; llama.cpp Vulkan b9950, MTP on, ctx 163840, -ub 2048 -b 4096 -fa on, KV f16
+PATHS: bench/runs/2026-07-16-0927-mtp-sampler-probe/
+FACT|104|80.9 TS%|best quant-cell quality on the dense ladder (Q6_K)
+FACT|177|+0.3 pts|reasoning budget gain over the dense 27B, a tight null
+FACT|57|-4.3 pts|35B MoE quality delta from 4096 to 16384 budget (significant)
+FACT|202|77.5 TS%|temp 0.6 Qwen recipe is the best sampling point on the 35B
+FACT|425|1551-2841 MiB|GPU-to-host RAM (GTT) spill in all 14 cells
+INCIDENT|185|first rep discarded after GPU junction hit 104 C and throttling, data re-collected after intake cleared
+INCIDENT|796|overnight block cut short by UPS power event; partial reference rows quarantined and not used
+OPEN: What drives the GTT spill when VRAM headroom exists on a no-swap host?

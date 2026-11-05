@@ -1,0 +1,54 @@
+{
+ "notes": {
+  "2026-07-14-hardest-tasks-27b-vs-35b.analysis.md": {
+   "A": "Haiku-high-deep",
+   "B": "Ornith-deep",
+   "C": "Haiku-low-deep"
+  },
+  "2026-10-30-0900-vllm-redhat-mxfp4-depth-transposed.md": {
+   "A": "Ornith-deep",
+   "B": "Haiku-low-deep",
+   "C": "Haiku-high-deep"
+  },
+  "2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md": {
+   "A": "Haiku-high-deep",
+   "B": "Ornith-shallow",
+   "C": "Haiku-low-shallow",
+   "D": "Ornith-deep",
+   "E": "Haiku-low-deep",
+   "F": "Haiku-high-shallow"
+  },
+  "2026-10-31-redhat-sharp-w208-blind.analysis.md": {
+   "A": "Haiku-high-shallow",
+   "B": "Haiku-high-deep",
+   "C": "Ornith-shallow",
+   "D": "Haiku-low-shallow",
+   "E": "Haiku-low-deep",
+   "F": "Ornith-deep"
+  },
+  "2026-10-23-0023-vllm-gpu-fault-solved-hip-kernarg.md": {
+   "A": "Haiku-low-shallow",
+   "B": "Haiku-low-deep",
+   "C": "Haiku-high-deep",
+   "D": "Ornith-shallow",
+   "E": "Haiku-high-shallow",
+   "F": "Ornith-deep"
+  },
+  "2026-09-15-stew675-buildcmp.analysis.md": {
+   "A": "Haiku-high-shallow",
+   "B": "Haiku-high-deep",
+   "C": "Haiku-low-deep",
+   "D": "Ornith-deep",
+   "E": "Ornith-shallow",
+   "F": "Haiku-low-shallow"
+  }
+ },
+ "synth": {
+  "P": "Haiku-low-deep",
+  "Q": "Haiku-low-shallow",
+  "R": "Haiku-high-shallow",
+  "S": "Haiku-high-deep",
+  "T": "Ornith-deep",
+  "U": "Ornith-shallow"
+ }
+}

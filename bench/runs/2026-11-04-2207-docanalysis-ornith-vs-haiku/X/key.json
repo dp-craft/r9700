@@ -1,0 +1,182 @@
+{
+ "order": [
+  "2026-07-14-hardest-tasks-27b-vs-35b.analysis.md",
+  "2026-10-30-0900-vllm-redhat-mxfp4-depth-transposed.md",
+  "2026-07-16-0927-mtp-sampler-tax.md",
+  "2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md",
+  "2026-10-31-redhat-sharp-w208-blind.analysis.md",
+  "2026-10-23-0023-vllm-gpu-fault-solved-hip-kernarg.md",
+  "2026-09-15-stew675-buildcmp.analysis.md"
+ ],
+ "docs": {
+  "2026-07-14-hardest-tasks-27b-vs-35b.analysis.md": {
+   "src": "campaigns/2026-07-14-hardest-tasks-27b-vs-35b/analysis.md",
+   "needles": [
+    {
+     "id": "thermal1",
+     "line": 185,
+     "re": "intake filter|junction",
+     "thermal": true,
+     "frac": 0.189
+    },
+    {
+     "id": "debug",
+     "line": 493,
+     "re": "debug build",
+     "thermal": false,
+     "frac": 0.504
+    },
+    {
+     "id": "ups",
+     "line": 796,
+     "re": "ups",
+     "thermal": false,
+     "frac": 0.814
+    }
+   ],
+   "paths": [
+    "bench/runs/2026-07-16-0927-mtp-sampler-probe",
+    "bench/runs/2026-07-16-0927-mtp-sampler-probe/depth_probe.sh"
+   ],
+   "lines": 978
+  },
+  "2026-10-30-0900-vllm-redhat-mxfp4-depth-transposed.md": {
+   "src": "docs/analysis/2026-10-30-0900-vllm-redhat-mxfp4-depth-transposed.md",
+   "needles": [
+    {
+     "id": "update",
+     "line": 166,
+     "re": "system update|restarted the container",
+     "thermal": false,
+     "frac": 0.447
+    }
+   ],
+   "paths": [
+    "bench/runs/2026-10-30-sly191-d0-depth.log",
+    "bench/runs/2026-10-30-sly191-d0-power-state.log",
+    "bench/runs/2026-10-30-sly191-depth-reruns.log",
+    "bench/runs/2026-10-30-vllm-",
+    "bench/runs/2026-10-30-vllm-heretic-sly-depth",
+    "bench/runs/2026-10-30-vllm-redhat-radiance-depth",
+    "bench/runs/2026-10-30-vllm-redhat-sly-depth",
+    "bench/runs/2026-10-30-vllm-redhat-sly-depth/failures.txt",
+    "bench/runs/2026-10-30-vllm-redhat-sly-dflash-depth",
+    "bench/runs/2026-10-30-vllm-redhat-sly-mtp-depth",
+    "bench/runs/2026-10-30-vllm-redhat-sly191",
+    "bench/runs/2026-10-30-vllm-redhat-sly191-",
+    "bench/runs/2026-10-30-vllm-redhat-sly191-d0-",
+    "bench/runs/2026-10-30-vllm-redhat-sly191-d0-dflash-depth",
+    "bench/runs/2026-10-30-vllm-redhat-sly191-d0-mtp-depth",
+    "bench/runs/2026-10-30-vllm-redhat-sly191-depth",
+    "bench/runs/2026-10-30-vllm-redhat-sly191-dflash-depth",
+    "bench/runs/2026-10-30-vllm-redhat-sly191-mtp-depth",
+    "campaigns/...run.sh",
+    "campaigns/2026-10-30-vllm-",
+    "campaigns/2026-10-30-vllm-heretic-sly-depth/run.sh",
+    "campaigns/2026-10-30-vllm-redhat-radiance-depth/run.sh",
+    "campaigns/2026-10-30-vllm-redhat-sly-mtp-depth/run.sh",
+    "campaigns/2026-10-30-vllm-redhat-sly191-d0-",
+    "campaigns/2026-10-30-vllm-redhat-sly191-d0-dflash-depth/analysis.md",
+    "campaigns/2026-10-30-vllm-redhat-sly191-d0-dflash-depth/run.sh",
+    "campaigns/2026-10-30-vllm-redhat-sly191-d0-mtp-depth/run.sh",
+    "campaigns/2026-10-30-vllm-redhat-sly191-depth/run.sh"
+   ],
+   "lines": 371
+  },
+  "2026-07-16-0927-mtp-sampler-tax.md": {
+   "src": "docs/analysis/2026-07-16-0927-mtp-sampler-tax.md",
+   "needles": [
+    {
+     "id": "thermal2",
+     "line": 104,
+     "re": "fan controller|chassis fan|fan",
+     "thermal": true,
+     "frac": 0.471
+    }
+   ],
+   "paths": [
+    "bench/runs/2026-07-16-0927-mtp-sampler-probe",
+    "bench/runs/2026-07-16-0927-mtp-sampler-probe/results.jsonl",
+    "bench/runs/2026-07-16-1111-spec-draft-pmin-mtp",
+    "bench/runs/2026-07-16-1111-spec-draft-pmin-mtp/analysis.md",
+    "campaigns/2026-07-14-hardest-tasks-27b-vs-35b/analysis.md",
+    "campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/outputs.jsonl"
+   ],
+   "lines": 221
+  },
+  "2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md": {
+   "src": "docs/analysis/2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md",
+   "needles": [
+    {
+     "id": "thermal3",
+     "line": 120,
+     "re": "hotspot|room temperature|34",
+     "thermal": true,
+     "frac": 0.67
+    }
+   ],
+   "paths": [
+    "bench/runs/2026-11-04-1557-35b-perf-10k-50k-100k",
+    "bench/runs/2026-11-04-1730-ornith15-w4a8-radiance",
+    "bench/runs/2026-11-04-1740-27b-sly-baseline",
+    "bench/runs/2026-11-04-1740-27b-sly-baseline/comparison/charts/depth_decode.svg",
+    "bench/runs/2026-11-04-1740-27b-sly-baseline/comparison/charts/depth_prefill.svg",
+    "bench/runs/2026-11-04-1802-ornith15-sly-dflash",
+    "campaigns/2026-07-19-ornith-vs-gemma/analysis.md"
+   ],
+   "lines": 179
+  },
+  "2026-10-31-redhat-sharp-w208-blind.analysis.md": {
+   "src": "campaigns/2026-10-31-redhat-sharp-w208-blind/analysis.md",
+   "needles": [
+    {
+     "id": "fixture",
+     "line": 152,
+     "re": "stale|fixture",
+     "thermal": false,
+     "frac": 0.495
+    }
+   ],
+   "paths": [
+    "bench/runs/2026-10-30-0947-dpf-brief-ab",
+    "bench/runs/2026-10-31-redhat-sharp-w208-blind",
+    "bench/runs/2026-10-31-redhat-sharp-w208-blind/pre-launch-provenance.txt",
+    "bench/runs/2026-10-31-redhat-sharp-w208-blind/rep1/redhat-d0-sharp/server.txt",
+    "campaigns/2026-10-31-q4kxl-sharp-w208-blind/analysis.md",
+    "campaigns/2026-10-31-redhat-sharp-w208-blind/run.sh",
+    "campaigns/2026-10-31-redhat-sharp-w208-blind/sharp-chat_template.jinja"
+   ],
+   "lines": 307
+  },
+  "2026-10-23-0023-vllm-gpu-fault-solved-hip-kernarg.md": {
+   "src": "docs/analysis/2026-10-23-0023-vllm-gpu-fault-solved-hip-kernarg.md",
+   "needles": [
+    {
+     "id": "thermal4",
+     "line": 64,
+     "re": "pump|cooler|overheat",
+     "thermal": true,
+     "frac": 0.604
+    }
+   ],
+   "paths": [],
+   "lines": 106
+  },
+  "2026-09-15-stew675-buildcmp.analysis.md": {
+   "src": "campaigns/2026-09-15-stew675-buildcmp/analysis.md",
+   "needles": [
+    {
+     "id": "disk",
+     "line": 66,
+     "re": "disk",
+     "thermal": false,
+     "frac": 0.504
+    }
+   ],
+   "paths": [
+    "bench/runs/2026-09-15-1029-buildcmp-stew675"
+   ],
+   "lines": 131
+  }
+ }
+}

@@ -1,0 +1,1 @@
+{"models": ["qwen38-27b-redhat-mxfp4-dflash"], "requests": 29, "output_tokens": 71356, "input_uncached": 229301, "cache_read": 2675456, "cache_create": 0, "ctx_first": 3819, "ctx_peak": 183962, "compactions": 2, "tools": {"Read": 12, "Grep": 7, "Write": 8, "Glob": 2}}

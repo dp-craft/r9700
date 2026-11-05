@@ -1,0 +1,1 @@
+{"models": ["claude-haiku-5-5"], "requests": 18, "output_tokens": 30990, "input_uncached": 36, "cache_read": 2403816, "cache_create": 186268, "ctx_first": 43851, "ctx_peak": 204997, "compactions": 0, "tools": {"Read": 11, "Write": 7}}

@@ -1,0 +1,6 @@
+01 /tmp/claude-1001/-home-dev-work-dp-craft-amd/bf832afa-1002-41d9-a4b8-4b201a1bc43c/scratchpad/f/L/docs/2026-07-14-hardest-tasks-27b-vs-35b.analysis.md
+02 /tmp/claude-1001/-home-dev-work-dp-craft-amd/bf832afa-1002-41d9-a4b8-4b201a1bc43c/scratchpad/f/L/docs/2026-10-30-0900-vllm-redhat-mxfp4-depth-transposed.md
+03 /tmp/claude-1001/-home-dev-work-dp-craft-amd/bf832afa-1002-41d9-a4b8-4b201a1bc43c/scratchpad/f/L/docs/2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md
+04 /tmp/claude-1001/-home-dev-work-dp-craft-amd/bf832afa-1002-41d9-a4b8-4b201a1bc43c/scratchpad/f/L/docs/2026-10-31-redhat-sharp-w208-blind.analysis.md
+05 /tmp/claude-1001/-home-dev-work-dp-craft-amd/bf832afa-1002-41d9-a4b8-4b201a1bc43c/scratchpad/f/L/docs/2026-10-23-0023-vllm-gpu-fault-solved-hip-kernarg.md
+06 /tmp/claude-1001/-home-dev-work-dp-craft-amd/bf832afa-1002-41d9-a4b8-4b201a1bc43c/scratchpad/f/L/docs/2026-09-15-stew675-buildcmp.analysis.md

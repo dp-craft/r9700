@@ -10,6 +10,8 @@
 # VRAM: leaves about 232 MiB free (MEASURED), which crashed the desktop once; close Chrome if VRAM gets tight.
 # EXTRA_ARGS="--gpu-headroom-mib 2048" is recommended only (docs/vllm/known-issues.md).
 # For precise coding the creator suggests --temp 0.6 --presence-penalty 0 (EXTRA_ARGS=... appended last, later flag wins).
+# Thinking stays on (operator's rule; added to the compose flags): explicit default, and reasoning_effort none/minimal is
+# remapped. A request's own chat_template_kwargs {"enable_thinking":false} still wins; no server flag blocks that.
 # Fetch: bench/engine-bench/vllm/fetch_model.sh keptn/ornith-1.5-35b-a3b-w4a8 cfed0f8f07d0ef8d0c7dcf4d29a07eeb6a402472
 # serve_vllm.sh does not cover this: it builds vLLM arguments, native Radiance has its own CLI.
 set -euo pipefail
@@ -44,7 +46,8 @@ case "${1:-start}" in
       --model /models/ornith-1.5-35b-a3b-w4a8.rad --host 127.0.0.1 --port "$PORT" --served-model-name "$MODEL" \
       --tp 1 --max-num-seqs 8 --max-model-len 262144 --kv-cache-dtype fp8 \
       --num-speculative-tokens 3 --max-num-batched-tokens 2048 \
-      --temp 1.0 --top-p 0.95 --top-k 20 --presence-penalty 1.5 ${EXTRA_ARGS:-} >/dev/null
+      --temp 1.0 --top-p 0.95 --top-k 20 --presence-penalty 1.5 \
+      --chat-template-kwargs '{"enable_thinking":true}' --reasoning-effort-map none=high,minimal=high ${EXTRA_ARGS:-} >/dev/null
     for ((i = 0; i < WAIT; i += 5)); do
       if curl -sf -m 3 "http://127.0.0.1:$PORT/v1/models" >/dev/null; then
         echo "up after ${i}s on port $PORT: $IMAGE, served as $MODEL"

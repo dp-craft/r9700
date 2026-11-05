@@ -1,0 +1,17 @@
+DOC: 2026-10-30-0900-vllm-redhat-mxfp4-depth-transposed.md
+TOPIC: Depth probes (10k/50k/100k, plus 150k on the delta-0 rerun) of RedHatAI Qwen3.8-27B-MXFP4 on Sly 1.8.1, Sly 1.9.1 and vllm-radiance 0.9.3, comparing no speculation, own MTP head, and DFlash2 drafter.
+VERDICT: DFlash2 is the fastest speculative method at every depth, but its acceptance falls with depth; the Sly 1.9.1 rerun shows no decode change beyond n=2 noise. vllm-radiance 0.9.3 decodes at roughly 4.9 tok/s and is far slower than Sly.
+CONFIG: Qwen3.8-27B MXFP4 (RedHatAI, rev 16a86728) and Heretic reference; vLLM via Sly radiance images 1.8.1-rocm10.1 and 1.9.1-rocm10.1 (vLLM 0.32.0), and stilldeadcode/vllm-radiance 0.9.3; MTP k=4 own head; DFlash2 k=7 drafter (syvai W4A16); Cactus delta 0.5 (delta 0 on the rerun); fp8 KV; ctx 110000 (ctx 262000 on delta-0 rerun); conc 1; max_tokens 256; 2 reps per probe.
+PATHS: bench/runs/2026-10-30-vllm-<slug>-depth/results.jsonl, campaigns/2026-10-30-vllm-redhat-sly191-d0-dflash-depth/analysis.md, bench/runs/2026-10-30-vllm-redhat-sly-depth/, bench/runs/2026-10-30-vllm-redhat-sly-mtp-depth/, bench/runs/2026-10-30-vllm-redhat-sly-dflash-depth/, bench/runs/2026-10-30-vllm-heretic-sly-depth/, bench/runs/2026-10-30-vllm-redhat-sly191-depth/, bench/runs/2026-10-30-vllm-redhat-sly191-mtp-depth/, bench/runs/2026-10-30-vllm-redhat-sly191-dflash-depth/, bench/runs/2026-10-30-vllm-redhat-sly191-d0-mtp-depth/, bench/runs/2026-10-30-vllm-redhat-sly191-d0-dflash-depth/, bench/runs/2026-10-30-vllm-redhat-radiance-depth/, bench/runs/2026-10-30-sly191-depth-reruns.log, bench/runs/2026-10-30-sly191-d0-power-state.log, bench/runs/2026-10-30-sly191-d0-depth.log, bench/runs/2026-10-30-vllm-redhat-sly-depth/failures.txt, campaigns/2026-10-30-vllm-redhat-sly-mtp-depth/run.sh, campaigns/2026-10-30-vllm-heretic-sly-depth/run.sh, campaigns/2026-10-30-vllm-redhat-sly191-depth/run.sh, campaigns/2026-10-30-vllm-redhat-sly191-d0-dflash-depth/run.sh, campaigns/2026-10-30-vllm-redhat-sly191-d0-mtp-depth/run.sh, campaigns/2026-10-30-vllm-redhat-radiance-depth/run.sh
+FACT|16|122.27 tok/s|RedHat Sly 1.8.1 DFlash2 k=7 decode per stream at 10k, p50
+FACT|19|0.3671|DFlash2 acceptance rate at 50k, down from 0.5494 at 10k
+FACT|22|1.00/1.02/0.99|Sly 1.9.1 over 1.8.1 DFlash2 decode ratio at 10k/50k/100k
+FACT|16|4.93 tok/s|RedHat radiance 0.9.3 no-spec decode per stream at 10k, p50
+FACT|25|1.29/1.30/0.93|DFlash2 accept-length ratio, delta 0.5 over delta 0, at 10k/50k/100k
+INCIDENT|160|MTP first boot at default watchdog 256 killed; rerun with WATCHDOG_MIB=32.
+INCIDENT|166|Scheduled system update restarted the container; that pass rerun from scratch.
+INCIDENT|305|Sly 1.8.1 RedHat boot killed by watchdog (VRAM nearly full); rerun passed.
+INCIDENT|307|MTP and DFlash first attempts returned 404 (served-name bug); runs quarantined and rerun.
+INCIDENT|308|pkill -f matched own shell, killed the DFlash chain (exit 144); no data affected.
+INCIDENT|312|Delta-0 MTP first boot killed by watchdog; retry boot passed, probes rerun.
+OPEN: Why does vllm-radiance 0.9.3 decode at only about 4.9 tok/s, and is the cause upstream or the eager/template config? (line 306 says not investigated)

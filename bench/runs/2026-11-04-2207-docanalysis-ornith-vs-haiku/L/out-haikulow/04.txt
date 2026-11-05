@@ -1,0 +1,14 @@
+DOC: 2026-10-31-redhat-sharp-w208-blind.analysis.md
+TOPIC: Blind quality review (W2-08 step A) of RedHat Qwen3.8-27B-MXFP4 with the sharp chat template, compared with the delta-0 baseline, Q4_K_XL and heretic, graded in one blind pass by one Opus grader.
+VERDICT: Swapping only the chat template to sharp cut RedHat's work by about a third with no measurable quality loss, but the +2 finding gain is below the pre-registered threshold and not demonstrated at n=1. With the template held equal, Q4_K_XL and RedHat are a tie on quality.
+CONFIG: RedHatAI/Qwen3.8-27B-MXFP4 + syvai/Qwen3.8-27B-DFlash2-W4A16 (k=7, delta 0) on ghcr.io/slybase/vllm-sly-radiance:1.8.1-rocm10.1 (vLLM 0.32.0); fp8 KV; window 262000; sharp chat template (v22.5 plus TERSENESS directive); Claude Code 2.1.312; power cap 210 W. Comparisons: RedHat froggeric v22.5 template; Q4_K_XL llama.cpp b11448 Vulkan with MTP, q8_0 KV, 260000; heretic Sly 1.8.1 DFlash2 delta 0.5.
+PATHS: bench/runs/2026-10-31-redhat-sharp-w208-blind/, bench/runs/2026-10-31-redhat-sharp-w208-blind/rep1/redhat-d0-sharp/server.txt, bench/runs/2026-10-30-0947-dpf-brief-ab/, campaigns/2026-10-31-redhat-sharp-w208-blind/, campaigns/2026-10-31-redhat-sharp-w208-blind/run.sh, campaigns/2026-10-31-q4kxl-sharp-w208-blind/analysis.md
+FACT|41|11/19 Opus findings found, RedHat + sharp (blind 4-way)
+FACT|49|304k thinking chars in step A, RedHat + sharp (vs 489k)
+FACT|51|~144.4k generated tokens in step A, RedHat + sharp
+FACT|48|2,820 s step A wall time, RedHat + sharp
+FACT|52|32,057 MiB peak VRAM, RedHat + sharp
+INCIDENT|152|Stale prompt fixture used for first pass; pass deleted and repeated
+INCIDENT|282|Step-A session SIGINTed at Opus-read boundary (stopped, rc 137), kept as result
+INCIDENT|293|Baseline probe dirs collected after boundary; may hold post-boundary files
+OPEN: Whether the +2 Opus-finding gain from the sharp template is noise; a second rep was recommended but not run (line 201, 235-238).

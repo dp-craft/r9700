@@ -1,0 +1,6 @@
+Q1|2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md
+Q1|2026-10-23-0023-vllm-gpu-fault-solved-hip-kernarg.md
+Q2|none
+CONFLICT|2026-09-15-stew675-buildcmp.analysis.md:103|2026-10-23-0023-vllm-gpu-fault-solved-hip-kernarg.md:87|Report 04 recommends a ROCm llama-bench command without HIP_FORCE_DEV_KERNARG=0; report 03 says every ROCm engine should set it and retest llama.cpp.
+CONFLICT|2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md:118|2026-10-23-0023-vllm-gpu-fault-solved-hip-kernarg.md:21|Report 01 calls the 27B on Sly stable as configured; report 03 saw about 12 of 21 Sly boots fault without the kernarg fix (older 1.5.1 and 1.6.0 images).
+RECOMMEND|Use Ornith 1.5 35B w4a8 on native Radiance 1.16.0 with MTP K=3, which measured 219.8 t/s decode at 10k in report 01, but its coding quality is untested. Radiance's default 96 MiB headroom crashed the desktop once, so use --gpu-headroom-mib 2048 or close Chrome. Report 01 names the 27B on Sly as the stable fallback at about 87 t/s decode, and ROCm runs should set HIP_FORCE_DEV_KERNARG=0 per report 03.

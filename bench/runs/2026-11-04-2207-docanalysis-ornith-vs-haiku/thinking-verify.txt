@@ -1,0 +1,6 @@
+default                              prompt=71 gen=591 reasoning_tokens=405
+reasoning_effort=none (now mapped)   prompt=71 gen=591 reasoning_tokens=405
+reasoning_effort=minimal (mapped)    prompt=71 gen=591 reasoning_tokens=405
+reasoning_effort=high                prompt=71 gen=591 reasoning_tokens=405
+reasoning_effort=xhigh               prompt=71 gen=591 reasoning_tokens=405
+request enable_thinking=false        prompt=73 gen=26 reasoning_tokens=0
