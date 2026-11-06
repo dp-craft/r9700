@@ -1,5 +1,0 @@
-call=0
-ts=2026-11-02T09:24:18Z
-tool=Read
-line=33713
-input={"file_path": "/home/dev/work/dippe/dpf-bench-r191-dp-sharp-d0-r2/docs/plans/2026-10-28-2239-dpf-tui-f0-f1/review/27b-fix/opus/W2-08.md"}

@@ -1,7 +1,0 @@
-drafter_bytes=771819680
-ornith-k3-s8 boot_rc=0
-ornith-k3-s8 10000 probe_rc=0 rows=4
-ornith-k3-s8 50000 probe_rc=0 rows=8
-ornith-k3-s8 100000 probe_rc=0 rows=12
-ornith-k7-s8 STOPPED by user request, quarantined as ornith-k7-s8-INTERRUPTED
-DONE

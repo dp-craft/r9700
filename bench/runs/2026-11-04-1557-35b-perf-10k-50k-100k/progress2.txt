@@ -1,9 +1,0 @@
-mtp-k4 boot_rc=0
-mtp-k4 10000 probe_rc=0 rows=4
-mtp-k4 50000 probe_rc=0 rows=8
-mtp-k4 100000 probe_rc=0 rows=12
-nospec boot_rc=0
-nospec 10000 probe_rc=0 rows=4
-nospec 50000 probe_rc=0 rows=8
-nospec 100000 probe_rc=0 rows=12
-DONE

@@ -1,9 +1,0 @@
-GOAL: Measure how the 27B quant level, the reasoning budget and the 35B-A3B sampling settings affect TypeScript coding quality and speed on the hardest tasks at a ~132.9k-token prompt on the AMD Radeon AI PRO R9700.
-RESULT: On the 27B, neither the quant ladder nor the 4096-to-16384 reasoning budget made a resolvable quality difference, so the report infers that quant should be chosen on speed and VRAM headroom. The one actionable result is on sampling: Qwen's 35B-A3B coding recipe (temp 0.6, top_p 0.95, top_k 20, min_p 0, presence_penalty 0) beat the whole general-mode preset significantly, and the 35B-A3B reaches a full answer faster than the 27B Q4_K_M without a resolvable quality difference.
-KEY: −15.4 pts | mean paired TS% change of the 35B-A3B general-mode preset (a3b-d128-f16-rb16384-qwen-gen: temp 1.0, presence_penalty 1.5) vs the coding recipe (a3b-d128-f16-rb16384), t=−3.41, significant as a whole; temp and presence_penalty alone are not
-KEY: 60.9 s | full-answer time of the 35B-A3B at budget 4096 (a3b-d128-f16-rb4096), against 156.9 s for the 27B Q4_K_M at budget 4096 (un-d128-f16-rb4096)
-KEY: −8.5 pts | mean paired TS% change of the 27B UD-Q4_K_XL (xl-d128-f16-rb4096) vs Q4_K_M (un-d128-f16-rb4096), the largest quant-ladder change, t=−1.98, not significant
-KEY: +0.3 pts | paired TS% change of the 27B Q4_K_M from budget 4096 to 16384 (un-d128-f16-rb16384 vs un-d128-f16-rb4096), t=0.37, not significant
-KEY: −4.3 pts | paired TS% change of the 35B-A3B at budget 4096 (a3b-d128-f16-rb4096) vs budget 16384 (a3b-d128-f16-rb16384), t=−5.45, significant (p≈0.005; Bonferroni 0.065, marginal)
-CAVEAT: Underpowering: 5 tasks with rep sd 9.8 pts resolve only ≳12 pts, so the quant and budget nulls are unresolved, not proven absent.
-OPEN: What causes the 1551–2841 MiB GTT spill seen in all 14 cells?

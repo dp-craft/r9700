@@ -1,9 +1,0 @@
-Implementation complete. The `src/logfmt.ts` file exports `parse`, `format`, and the `LogfmtError` class, covering every bullet in SPEC.md:
-
-- `LogfmtError extends Error` with numeric `column` from `(message, column)`.
-- `parse`: space/tab-delimited pairs; bare `key`→`true`, `key=`→`""`, bare values run to next separator (allowing `=`), quoted values decode `\" \\ \n`; last value wins via a `Map`, first-seen insertion order preserved; empty/whitespace line → `{}`. Errors throw at the correct column for empty key (`=`), unterminated quote (opening `"`), unknown escape (backslash), and char after closing quote.
-- `format`: space-joined, insertion order; `true`→bare key; quotes values that are empty or contain space/tab/`"`/`\`/`=(`/newline), encoding `\`, `"`, newline while leaving a literal tab intact; invalid keys throw with column `-1`.
-
-I adjusted for this repo's `tsconfig.json` (`strict` + `noUncheckedIndexedAccess: true`) so every index access is safe. Note: I could not execute vitest/tsc to auto-verify, because all command execution here requires approval that wasn't granted — verification was by manual review and the smoke test expectation passes mentally.
-
-DONE

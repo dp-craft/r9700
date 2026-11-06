@@ -1,7 +1,0 @@
-13:57:00 [w208] booting /home/dev/work/dippe/dp-forge/vllm.sh with CACTUS_DELTA=0
-13:59:38 [w208] RADIANCE_CACTUS_DELTA=0
-13:59:38 [w208] claude call 1 (resume 4457f2c5-eacd-4e5c-bea1-92a85557e9b6, left 3600s, W2-08 lines 0)
-14:59:38 [w208] call 1 rc=137 session=4457f2c5-eacd-4e5c-bea1-92a85557e9b6 W2-08 lines 0
-14:59:38 [w208] cap reached
-14:59:44 [w208] main checkout untouched
-14:59:44 [w208] done: wall_s=3600 continuation_calls=2 session=4457f2c5-eacd-4e5c-bea1-92a85557e9b6 w2_08_lines=0 (plus the 4.5 min capture, session-0)

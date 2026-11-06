@@ -1,9 +1,0 @@
-The fix is complete. All three root causes in `movstats.py` are addressed:
-
-1. **`_median`** now averages the two middle elements for even-length windows (`(s[mid-1] + s[mid]) / 2`) instead of returning the upper-middle element — this produces `1.5, 2.5, 3.5` for the reported case.
-2. **The window range** is now `len(values) - window + 1`, matching `rolling_max`, so it emits one median per full window instead of one too few.
-3. **The window-only `_cache`** (and its mutable-default-argument) is removed, so a different series with the same window no longer returns stale numbers.
-
-The public signature `rolling_median(values, window)` is preserved and `rolling_max` is unchanged.
-
-DONE

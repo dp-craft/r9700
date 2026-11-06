@@ -1,3 +1,0 @@
-Done. All 22 sections were correctly split by byte range into the three target files (`topic-a.md`, `topic-b.md`, `topic-c.md`), each starting with its summary and ordered logically; `doc_check.py` prints **PASS**.
-
-DONE

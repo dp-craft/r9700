@@ -1,5 +1,0 @@
-NAME      TYPE      SIZE USED PRIO
-/dev/sdb6 partition 4.7G   1G   -1
-               total        used        free      shared  buff/cache   available
-Mem:           30979       11721        7679          21       19116       19258
-Swap:           4767        1052        3715

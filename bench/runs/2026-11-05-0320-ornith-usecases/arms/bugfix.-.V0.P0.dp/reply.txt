@@ -1,9 +1,0 @@
-All three root causes in `movstats.py` are fixed, and `rolling_max` is untouched:
-
-- **Even-window median** — `_median` now averages the two middle elements (`(s[mid-1] + s[mid]) / 2`) instead of returning just one; this makes `rolling_median([1,2,3,4], 2)` yield `[1.5, 2.5, 3.5]`.
-- **Off-by-one range** — loop now uses `range(len(values) - window + 1)`, matching `rolling_max`, so the last full window is included (produces 3 results, not 2).
-- **Mutable-default-argument cache** — removed entirely; `_cache={}` was keyed only on `window` and shared across calls, which is why a later series with the same window returned the *old* series' numbers. The public signature `rolling_median(values, window)` still works.
-
-Verification commands were blocked by an environment approval prompt (execution is gated here), so I confirmed correctness by reasoning against `tests/test_movstats.py::test_rolling_median_reported` and the stale-series symptom rather than by running pytest.
-
-DONE

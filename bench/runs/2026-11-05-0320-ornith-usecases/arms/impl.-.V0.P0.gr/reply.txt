@@ -1,9 +1,0 @@
-Implementation complete. Created `src/logfmt.ts` exporting `parse`, `format`, and the `LogfmtError` class exactly per SPEC.md:
-
-- **LogfmtError**: `extends Error` with public numeric `column`.
-- **parse**: space/tab-delimited pairs; bare key→`true`, `key=`→`""`, bare value runs until whitespace (may contain `=`), quoted values decode `\"`/`\\`/`\n`; last-write-wins with first-seen insertion order; throws at the correct 0-based column for empty key, unterminated quote, unknown escape, and trailing char after a closing quote.
-- **format**: single-space join in insertion order; quotes values containing space/tab/`"`/`\`/`=`/newline (escaping only `"`, `\`, newline); rejects invalid keys with column -1. Round-trips `parse(format(x)) === x`, including literal tabs inside quoted values.
-
-I verified logic by careful static trace against every spec bullet and error case (couldn't execute — sandbox gates all node/tsc invocations behind self-ungranted approval), and confirmed the repo tree is clean with only the new `src/logfmt.ts`.
-
-DONE

@@ -1,6 +1,0 @@
-dflash-k7 boot_rc=0
-dflash-k7 10000 probe_rc=0 rows=4
-dflash-k7 50000 probe_rc=0 rows=8
-dflash-k7 100000 probe_rc=0 rows=12
-mtp-k4 boot_rc=1
-DONE

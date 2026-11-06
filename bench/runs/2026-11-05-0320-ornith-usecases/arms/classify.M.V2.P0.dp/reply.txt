@@ -1,6 +1,0 @@
-Validation passes:
-- **a.** Item count in `items.txt` (`^=== ITEM`) = 160; lines in `labels.txt` matching `^[0-9]+\|` = 160. Counts match, numbering is sequential 001–160 with no duplicates or gaps.
-- **b.** All 160 lines end with a valid label word (`benchmark-report`, `research`, `feature-spec`, `task-list`, `code-review`, `skill`, `agent-definition`, `plan`).
-- **c.** The borderline items (041 "Technical Research" synthesis vs benchmark, 059/063 spec-pipeline inventories, 097/119 meta-only analysis docs, 138 empirical run findings, 149 status snapshot) were reread and tested against their definitions; no changes needed.
-
-DONE

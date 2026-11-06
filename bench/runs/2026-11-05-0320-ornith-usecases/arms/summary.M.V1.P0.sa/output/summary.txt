@@ -1,9 +1,0 @@
-GOAL: Validate whether three transferred runner-simplify commits changed anything and benchmark five local models against production Claude on two workloads (90 phase-1 task-runs + T010).
-RESULT: The harness change is outcome-neutral — no regression, no improvement, within the only model measured on both arms. Between-block variance dominates every model/arm difference, so any single-block or single-sample ranking is unsafe; the report recommends two complementary local defaults (Brian6145/27B-Q4_K_M for statement-driven work, unsloth/35B-A3B-UD-Q4_K_M for contract/test-bearing work) and flags ThinkingCap-27B-Q6_K_L as operationally best but bottom-tier on quality because it silently overwrote four working translations in 4 of 5 samples while passing all seven gates.
-KEY: +78% between-block wall shift (block1 318 s → block2 566 s, true-green dropping) — Brian6145/27B-Q4_K_M T010 arm B, §3.4
-KEY: 68.7 t/s dense decode vs ~150 t/s MoE (a 2.2× gap, prefill 2.5–3.5× slower) — all five local models with MTP active, §3.3
-KEY: 1456 s wall, lowest of any local arm (1.0–1.22 attempts/task) — bartowski/ThinkingCap-27B-Q6_K_L q8_0, yet judged 3·4·2 bottom tier, §3.1/§6
-KEY: 5 failures across 90 phase-1 task-runs (local arms), 100% on two tasks T031 and T022 — all local models, §3.6
-KEY: 4,335,421 input tokens = 64% of that sample's cost (147,538 gen / 1600 s wall, also 81%/52%) — unsloth/35B-A3B-UD-Q4_K_M sample 1 task T022, §3.6
-CAVEAT: Between-sample/between-block variance (up to ±78% wall, a 4.6× generated-token swing) is larger than any measured model or arm difference, so no ranking built on one block or one sample is trustworthy in either direction.
-OPEN: Whether deleting the deleted 0.6→0.8 temperature ladder from the sampling ladder costs escape diversity at depth — but it can only be settled by a fixture that reliably reaches attempt ≥3 (n=1 today).

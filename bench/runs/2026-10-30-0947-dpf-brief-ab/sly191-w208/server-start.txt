@@ -1,4 +1,0 @@
-GPU exclusive: 31417 MiB free (used 1207 MiB), floor 30000 MiB.
-starting vllm-8000 on 127.0.0.1:8000 (sly-redhat/redhat-mxfp4-dflash, ghcr.io/slybase/vllm-sly-radiance:1.9.1-rocm10.1) — first boot compiles, up to 1200s
-up after 397s — model: qwen38-27b-redhat-mxfp4-dflash — vllm: {"version":"0.32.0"} — cmdline: /home/dev/work/dp-craft/amd/bench/.servers/8000.cmdline
-ready: claude --settings /home/dev/.config/claude/local_vllm_direct/settings-redhat.json

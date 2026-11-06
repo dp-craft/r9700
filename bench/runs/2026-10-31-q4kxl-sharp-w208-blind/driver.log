@@ -1,4 +1,0 @@
-11:17:46 [rep1/q4kxl-sharp] booting: MODEL=qwen38-27b-q4kxl-q8-mtp-kvq8-mtp-sharp-planning PORT=9292 LOG_OUT=/home/dev/work/dp-craft/amd/bench/runs/2026-10-31-q4kxl-sharp-w208-blind/rep1/q4kxl-sharp/server-container.log
-11:18:12 [rep1/q4kxl-sharp] claude call 0 (left 9000s)
-12:21:22 [rep1/q4kxl-sharp] call 0 rc=137 session=f62dadb7-afe2-4e6c-a2b8-261265315a47
-12:21:22 [rep1/q4kxl-sharp] status=stopped wall_s=3790 calls=1 resumes=0 session=f62dadb7-afe2-4e6c-a2b8-261265315a47 done_line=-

@@ -1,2 +1,0 @@
-llama-swap /unload -> HTTP 200
-GPU exclusive: 31755 MiB free (used 869 MiB), floor 30000 MiB.

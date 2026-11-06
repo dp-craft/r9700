@@ -1,3 +1,0 @@
-GPU exclusive: 31902 MiB free (used 722 MiB), floor 30000 MiB.
-up after 45s on port 8000: stilldeadcode/radiance:1.16.0
-served=qwen35moe

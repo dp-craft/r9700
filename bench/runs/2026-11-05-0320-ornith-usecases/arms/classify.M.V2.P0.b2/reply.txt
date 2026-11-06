@@ -1,8 +1,0 @@
-All validation checks pass:
-- **(a)** `=== ITEM` count in items.txt = 160; `^[0-9]+\|` count in labels.txt = 160 — they match, and the numbers are exactly 1–160 (each once, no duplicates, none missing).
-- **(b)** All 160 lines match the strict format with an allowed label word.
-- **(c)** Re-tested the hesitated items against their definitions (runbook→plan by steps; measurement plan→plan; shared contract→plan by decisions/ownership; status readout→plan since research explicitly excludes "our measurements"; deterministic run docs split by purpose: 61/110/138 diagnose defects → code-review, 133 reports measured success → benchmark-report).
-
-The file is written correctly and nothing changed during validation.
-
-DONE

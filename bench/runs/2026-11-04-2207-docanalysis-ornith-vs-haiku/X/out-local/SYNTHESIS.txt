@@ -1,7 +1,0 @@
-Q1|docs/2026-07-14-hardest-tasks-27b-vs-35b.analysis.md
-Q1|docs/2026-07-16-0927-mtp-sampler-tax.md
-Q1|docs/2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md
-Q1|docs/2026-10-23-0023-vllm-gpu-fault-solved-hip-kernarg.md
-Q2|bench/runs/2026-07-16-0927-mtp-sampler-probe|docs/2026-07-14-hardest-tasks-27b-vs-35b.analysis.md,docs/2026-07-16-0927-mtp-sampler-tax.md
-CONFLICT|none
-RECOMMEND|For a local coding agent use MXFP4 Qwen3.8-27B with the DFlash2/MTP drafter on vLLM Sly radiance and set HIP_FORCE_DEV_KERNARG=0 for stability; it decodes around 120 tok/s at 10k, is cost-neutral in quality against Qwen's coding preset, but keep presence_penalty 0 because it taxes decode by a fixed ~2 ms/token regardless of drafts (reports 02, 06). For maximum 35B A3B throughput switch to native Radiance with Ornith-1.5-35B-A3B and its own MTP, which decodes about 220 t/s — roughly twice the 27B on Sly — accepting that draft inference only loads on Radiance itself (report 04). Regardless of engine run Qwen with temp 0.6 and presence_penalty 0, since sampling hygiene dominates quant and best-of-N reruns over precision is worth more than chasing a quant that shows no quality difference (reports 01, 05).

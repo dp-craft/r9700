@@ -1,8 +1,0 @@
-Validation complete. Both checks pass:
-
-- **(a) Count verification** — each class's distinctive fixed-part count matches my reported counts exactly (mamba dtype=1, speculative tokens=2, GELU=1, sparse_attn=1, weight-load=11, multimodal=1, padding layers=2, KV cache group=2, sampling params=1, Triton JIT=4, watchdog=1, client stream=1, memory fault=1, segfault=1, KV pool=1, core died=1).
-- **(b) Extra scan** (abort|fatal|died|timeout|exhausted|evicted|core dumped) — the only additional hit was line 446, an INFO route-registration for `/inference/v1/abort_requests` (not a failure, correctly excluded); all other keywords map to classes already captured.
-
-No changes needed.
-
-DONE

@@ -1,3 +1,0 @@
-All validations pass — every singleton fixed part occurs exactly once, the four JIT kernels total 4 (one each), and the multi-occurrence counts (2/2/2/5/5/1) match the grep results. No missed classes from the step-b scan. The report is written correctly.
-
-DONE

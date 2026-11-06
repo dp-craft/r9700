@@ -1,9 +1,0 @@
-Done. Reorganized all 20 sections of `doc.md` into the three topic files named in TOPICS.txt, moving bytes via ranges (no retyping):
-
-- **topic-a.md** — serving-substrate benchmark: Summary → Legend → Methodology → Results → KV q8_0 rejection → Consequences/root causes → What moved the needle → Recommended config.
-- **topic-b.md** — llama.cpp `--spec-draft-p-min`/MTP path: Summary → Key findings → Detail → Conflicts → Actionable → Sources.
-- **topic-c.md** — HARD TS quality benchmark design: Summary → Key findings → Detail → Conflicts → Actionable → Sources.
-
-Each file opens with its summary. `manifest.json` written; `doc_apply.py` wrote 3 files with 0 unassigned lines; `doc_check.py` reported PASS (337/337 nonblank lines preserved, nothing lost/altered/duplicated). Only the three target files were created.
-
-DONE

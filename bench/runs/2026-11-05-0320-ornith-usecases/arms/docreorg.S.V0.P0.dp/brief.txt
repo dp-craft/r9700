@@ -1,5 +1,0 @@
-The document /tmp/claude-1001/-home-dev-work-dp-craft-amd/bf832afa-1002-41d9-a4b8-4b201a1bc43c/scratchpad/uc/runs/docreorg.S.V0.P0.dp/doc.md is a mix of sections from different reports, in random order. /tmp/claude-1001/-home-dev-work-dp-craft-amd/bf832afa-1002-41d9-a4b8-4b201a1bc43c/scratchpad/uc/runs/docreorg.S.V0.P0.dp/TOPICS.txt lists the target files and what each is about.
-Reorganize it: put each section (a "## " line and everything up to the next "## " line) into the target file it belongs to, in /tmp/claude-1001/-home-dev-work-dp-craft-amd/bf832afa-1002-41d9-a4b8-4b201a1bc43c/scratchpad/uc/runs/docreorg.S.V0.P0.dp/out/. Within a file, order the sections so the report reads logically, starting with its summary or conclusion when it has one.
-Write only the target files named in TOPICS.txt.
-Then reply with only: DONE
-

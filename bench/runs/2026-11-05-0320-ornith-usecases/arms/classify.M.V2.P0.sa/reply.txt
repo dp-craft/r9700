@@ -1,9 +1,0 @@
-Validation results:
-- **(a)** `items.txt` has 160 lines matching `^=== ITEM`; `out/labels.txt` has 160 lines matching `^[0-9]+\|`. Counts match; numbers are sequential 001–160 with no gaps or duplicates.
-- **(b)** All 160 lines match the valid-label pattern (count 160); no line uses a non-allowed label.
-
-Hesitant items re-tested against definitions: 027 (meta says "carries ONLY what is still open" → plan), 038 (feasibility study of an option → research), 050/058/078/096/124 (prescribe how work is done → plan), 112/149 (findings about the existing system → code-review), and 092/119/127 (`# Benchmark` runs with MEASURED results → benchmark-report). The skill vs agent-definition split used the `<role>` block / "You are… [identity]" opener as the signal.
-
-No changes were needed after validation.
-
-DONE

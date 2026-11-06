@@ -1,7 +1,0 @@
-Both commands pass — `vitest` reports **44 passed**, and `tsc --noEmit` produced no errors (clean exit).
-
-Summary of what I did:
-- Read `src/semver.ts` (left untouched) and enumerated every behavior per exported function: `SemVerError`, `parse` (valid parses + every error branch), `compare` (major/minor/patch ordering, numeric vs lexical, prerelease-vs-release, identifier comparison branches, length ties, base-differ-ignores-pre), `satisfiesCaret` (each caret tier `^X`, `^0.Y`, `^0.0.Z`, plus the two prerelease rejection paths), `bump` (three parts + prerelease drop), and `maxVersion` (empty/single/unordered/prerelease/numeric/equal).
-- Wrote `tests/semver.test.ts` with one small test per behavior, exact expected values, and both directions where order matters. The only correction was my own assertion: a test compared at matching x.y.z as its description stated.
-
-DONE

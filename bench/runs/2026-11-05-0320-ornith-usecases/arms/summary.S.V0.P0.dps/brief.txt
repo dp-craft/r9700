@@ -1,9 +1,0 @@
-Summarize the report /tmp/claude-1001/-home-dev-work-dp-craft-amd/bf832afa-1002-41d9-a4b8-4b201a1bc43c/scratchpad/uc/runs/summary.S.V0.P0.dps/report.md in English.
-Write /tmp/claude-1001/-home-dev-work-dp-craft-amd/bf832afa-1002-41d9-a4b8-4b201a1bc43c/scratchpad/uc/runs/summary.S.V0.P0.dps/out/summary.txt in this format:
-GOAL: <one sentence>
-RESULT: <the main conclusion, max 2 sentences>
-KEY: <number with unit> | <what it is, naming the model or configuration it belongs to>
-  (exactly 5 KEY lines)
-CAVEAT: <the most important limitation stated by the report>
-OPEN: <one question the report leaves unanswered, or none>
-Then reply with only: DONE

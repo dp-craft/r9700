@@ -1,8 +1,0 @@
-The direct `python3 -c` invocation is being sandbox-gated, but the test suite already confirms the fix. Cross-series contamination is now impossible by construction: I removed the buggy window-keyed `_cache` entirely, so each call computes fresh from its own inputs.
-
-Summary of the fixes in `movstats.py`:
-- **`_median`**: even-length windows now average the two middle elements (`[1,2] → 1.5`) instead of returning the raw middle element.
-- **Loop range**: `range(len(values) - window + 1)` so one median is emitted per full window (was dropping the last).
-- **Cache removed**: the mutable-default `_cache` keyed only on `window` was returning a prior series' numbers for any new series with the same window — the "old series' numbers" symptom.
-
-Public signature stays `rolling_median(values, window)`; `rolling_max` is untouched. DONE

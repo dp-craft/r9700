@@ -1,3 +1,0 @@
-Done. The document was split into `out/` — `00-intro.md` plus 11 section files (`01-…`–`11-…`) with content moved exactly (verified lossless, no duplication), and a `README.md` listing every file in document order.
-
-DONE

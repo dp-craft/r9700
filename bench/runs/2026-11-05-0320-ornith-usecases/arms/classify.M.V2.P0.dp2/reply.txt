@@ -1,6 +1,0 @@
-Validation passes:
-- Item count `=== ITEM` = 160; label lines = 160 (match, no missing/duplicate).
-- All 160 prefixes are unique and sequential (001–160).
-- All 160 labels match the allowed set.
-
-DONE

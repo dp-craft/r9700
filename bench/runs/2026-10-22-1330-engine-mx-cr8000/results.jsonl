@@ -1,4 +1,0 @@
-{"kind": "request", "label": "mx-cr8000", "engine": "vllm-sly-radiance-qwen38-mxfp4", "rep": 0, "stream": 0, "concurrency": 1, "prefix_mode": "unique", "error": "no tokens received"}
-{"kind": "request", "label": "mx-cr8000", "engine": "vllm-sly-radiance-qwen38-mxfp4", "rep": 1, "stream": 0, "concurrency": 1, "prefix_mode": "unique", "error": "no tokens received"}
-{"kind": "aggregate", "label": "mx-cr8000", "engine": "vllm-sly-radiance-qwen38-mxfp4", "error": "all requests failed"}
-{"kind": "gpu", "label": "mx-cr8000", "vram_used_mib_at_load": 29642, "peak_vram_mib": 30022, "peak_gtt_mib": 73, "avg_power_w": 199.6}

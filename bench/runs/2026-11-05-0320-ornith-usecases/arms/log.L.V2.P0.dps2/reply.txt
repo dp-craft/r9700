@@ -1,3 +1,0 @@
-All 21 class counts were verified by targeted greps and matched my report exactly; step-b's broader case-insensitive search (`abort|fatal|died|timeout|exhausted|evicted|core dumped`) surfaced no additional class (the only extra hit was an INFO route line, `abort_requests`, correctly skipped). No counts changed, so the file stands as written.
-
-DONE

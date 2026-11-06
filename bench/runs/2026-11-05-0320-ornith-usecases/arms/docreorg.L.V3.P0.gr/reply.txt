@@ -1,8 +1,0 @@
-All three target files are correctly assembled:
-- **topic-a.md** — the backend/perf optimum report, in numbered order §1 (TL;DR) → §7 (Reproducing).
-- **topic-b.md** — the W2-08 blind-review-quality benchmark, starting with its Summary, then results, coverage, consequences, next step, methodology, legend.
-- **topic-c.md** — the analysis of why Q4 "thought less" + headroom, starting with its Summary, root causes, deltas, measured evidence, levers, KV cache, methodology, legend.
-
-`doc_apply.py` wrote all 3 files with 0 unassigned lines; `doc_check.py` prints PASS (695 nonblank lines in = 695 out, no lost/altered/duplicated text). No README.md was required to write.
-
-DONE

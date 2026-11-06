@@ -1,8 +1,0 @@
-Validation passes:
-- **a.** `items.txt` has 40 `=== ITEM` entries; `out/labels.txt` has 40 lines matching `^[0-9]+\|`, IDs 001–040, all unique (no duplicates). Counts match.
-- **b.** All 40 lines match an allowed label exactly (no invalid labels).
-- **c.** The hesitant items were tested against the definitions: item 026 is internal measurement of existing chunker/validate code → `code-review` (research is excluded by "not our measurements"; benchmark-report requires hardware/perf); items 011/014 are diagnostic findings about existing orchestration code/config → `code-review`; items 015 and 024 drive design decisions for how work will be done → `plan`; item 025 is a measurement *test-plan* (recipe, not results) → `plan`. No label changed from these checks.
-
-No edits needed after validation.
-
-DONE
