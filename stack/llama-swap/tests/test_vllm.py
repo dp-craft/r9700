@@ -103,7 +103,9 @@ def test_deployed_config_mentions_docker_exactly_when_a_vllm_row_is_enabled():
         pytest.skip("no deployed config.yaml on this machine")
     live_rows = yaml.safe_load((LIVE_CONFIG.parent / "models.yaml").read_text())["models"]
     enabled = any("vllm" in (m.get("backends") or []) for m in live_rows)
-    assert ("docker run" in LIVE_CONFIG.read_text()) is enabled
+    text = LIVE_CONFIG.read_text()
+    # a vllm_profile row launches through serve_vllm.sh `run` (which runs the container) instead
+    assert ("docker run" in text or "serve_vllm.sh run" in text) is enabled
 
 
 # --------------------------------------------------------------------------------------------
@@ -121,7 +123,7 @@ VLLM_ROW = {
     "backends": ["vllm"],
     "np": 4,
 }
-VLLM_FID = "qwen38-27b-int4-ctx36k-mtp-vllm"
+VLLM_FID = "qwen38-27b-int4-mtp-vllm"
 VLLM_CONTAINER = f"llama-swap-{VLLM_FID}"
 
 
@@ -144,11 +146,11 @@ def test_backend_tags_stay_unique():
 
 
 def test_full_id_carries_the_vllm_tag():
-    assert generate.full_id("qwen38-27b-int4", 36864, "f16", 8, "vllm") == VLLM_FID
+    assert generate.full_id("qwen38-27b-int4", "f16", 8, "vllm") == VLLM_FID
 
 
 def test_full_id_vllm_differs_from_the_vulkan_id_of_the_same_row():
-    args = ("qwen38-27b-int4", 36864, "f16", 8)
+    args = ("qwen38-27b-int4", "f16", 8)
     assert generate.full_id(*args, "vllm") != generate.full_id(*args, "vulkan")
 
 
@@ -193,8 +195,8 @@ def test_load_models_rejects_a_row_that_is_both_hipfire_and_vllm(tmp_path):
 
 
 def test_load_models_rejects_vllm_keys_on_a_non_vllm_row(tmp_path):
-    plain = {"id": "m1", "path": "vendor/m1.gguf", "ctx": 4096, "kv": "f16",
-             "family": "QWEN27", "backends": ["vulkan"],
+    plain = {"id": "m1", "path": "vendor/m1.gguf", "kv": "f16",
+             "family": "QWEN27", "backends": ["vulkan"], "cmd": ["-c", "4096"],
              "vllm_model": "/home/dev/models/vllm/X"}
     _write_models_yaml(tmp_path, [plain])
     with pytest.raises(ValueError, match="non-vllm row"):
@@ -217,6 +219,7 @@ def test_load_models_rejects_hipfire_keys_on_a_vllm_row(tmp_path):
     ("spec_p_min", 0.4),
     ("alias", "qwen38"),
     ("chat_template_kwargs", {"reasoning_effort": "medium"}),
+    ("cmd", ["-c", "36864"]),
 ])
 def test_load_models_rejects_llamacpp_only_keys_on_a_vllm_row(tmp_path, key, value):
     """A vllm row carrying one of these has no argv to put it in, so it would be dropped in
@@ -281,11 +284,14 @@ def test_load_models_rejects_an_unknown_family_on_a_vllm_row(tmp_path):
         generate._load_models()
 
 
-def test_load_models_vllm_row_keeps_the_15_field_tuple_shape(tmp_path):
-    """No new tuple slot was added, which is why no existing caller or test had to change."""
+def test_load_models_vllm_row_keeps_the_14_field_tuple_shape(tmp_path):
+    """The tuple is the shared shape every caller unpacks: adding a slot is a breaking
+    change, so this pins the count. (13th slot = `cmd`, the llama.cpp-only argv token list;
+    14th = `vopts`, the vllm_profile-only {profile, kv_ram_gib}.)"""
     _write_models_yaml(tmp_path, [_row()])
     (row,) = generate._load_models()
-    assert len(row) == 15
+    assert len(row) == 14
+    assert row[13] is None, "an inline-docker vllm row carries no profile options"
 
 
 def test_load_models_vllm_rows_may_differ_in_ctx(tmp_path):
@@ -307,7 +313,7 @@ EXPECTED_LINES = [
     "--shm-size 4g --cap-add SYS_PTRACE --security-opt seccomp=unconfined",
     "-p 127.0.0.1:${PORT}:8000",
     "-v /home/dev/models/vllm/Qwen3.8-27B-INT4:/model:ro",
-    "-v /home/dev/work/dp-craft/amd/bench/dl/radiance-cache:/cache",
+    "-v /home/dev/work/dp-craft/amd/stack/serve/var/models/radiance-cache:/cache",
     "-e VLLM_ROCM_USE_AITER=1",
     "-e VLLM_ROCM_USE_AITER_UNIFIED_ATTENTION=1",
     "-e VLLM_ROCM_USE_AITER_MHA=0",
@@ -545,8 +551,8 @@ def test_vllm_fp8_row_emits_the_kv_cache_dtype_flag_once():
 
 
 def test_full_id_tags_fp8_so_it_cannot_collide_with_the_f16_row():
-    f16 = generate.full_id("qwen38-27b-int4", 200000, "f16", 0, "vllm")
-    fp8 = generate.full_id("qwen38-27b-int4", 200000, "fp8", 0, "vllm")
+    f16 = generate.full_id("qwen38-27b-int4", "f16", 0, "vllm")
+    fp8 = generate.full_id("qwen38-27b-int4", "fp8", 0, "vllm")
     assert "kvfp8" in fp8 and "kvfp8" not in f16 and f16 != fp8
 
 
@@ -565,8 +571,8 @@ def test_load_models_accepts_fp8_on_a_vllm_row(tmp_path):
 
 
 def test_load_models_refuses_fp8_on_a_llamacpp_row(tmp_path):
-    plain = {"id": "some-gguf", "path": "x/y.gguf", "ctx": 8192, "kv": "fp8",
-             "family": VLLM_ROW["family"], "backends": ["vulkan"]}
+    plain = {"id": "some-gguf", "path": "x/y.gguf", "kv": "fp8",
+             "family": VLLM_ROW["family"], "backends": ["vulkan"], "cmd": ["-c", "8192"]}
     _write_models_yaml(tmp_path, [plain])
     with pytest.raises(ValueError, match="vLLM-only"):
         generate._load_models()
@@ -577,7 +583,7 @@ def test_main_passes_the_row_kv_through_to_the_vllm_command(tmp_path, monkeypatc
     _reload_models(tmp_path, monkeypatch, [_row(kv="fp8")])
     generate.main()
     text = (tmp_path / "config.yaml").read_text()
-    fid = generate.full_id("qwen38-27b-int4", VLLM_ROW["ctx"], "fp8", VLLM_ROW["mtp"], "vllm")
+    fid = generate.full_id("qwen38-27b-int4", "fp8", VLLM_ROW["mtp"], "vllm")
     assert f'"{fid}":' in text
     assert "--kv-cache-dtype fp8" in text
 
@@ -592,3 +598,159 @@ def test_vllm_usage_and_metrics_flags_are_on_every_row_variant():
             assert cmd.count(f) == 1, (kw, f)
         # server args, not docker args
         assert cmd.index(f) > cmd.index("stilldeadcode/vllm-radiance:0.9.3")
+
+
+# --------------------------------------------------------------------------------------------
+# PROFILE-backed vllm rows (2026-10-22): llama-swap -> dp-craft serve_vllm.sh run
+# --------------------------------------------------------------------------------------------
+PROFILE_ROW = {"id": "qwen38-27b-mxfp4-dflash", "vllm_profile": "sly-radiance/qwen38-mxfp4-dflash",
+               "ctx": 180000, "kv": "fp8", "family": "QWEN38", "backends": ["vllm"], "np": 1,
+               "templates": ["sharp"], "kv_ram_gib": 9}
+
+
+def _prow(**over):
+    row = dict(PROFILE_ROW, **over)
+    return {k: v for k, v in row.items() if v is not None}
+
+
+def test_profile_row_loads_with_profile_options(tmp_path):
+    _write_models_yaml(tmp_path, [_prow()])
+    (row,) = generate._load_models()
+    assert row[1] == "sly-radiance/qwen38-mxfp4-dflash"
+    assert row[2] == 180000
+    assert row[8] == ["sharp"], "templates ARE allowed on a profile row (CHAT_TEMPLATE)"
+    assert row[13] == {"profile": "sly-radiance/qwen38-mxfp4-dflash", "kv_ram_gib": 9}
+
+
+@pytest.mark.parametrize("key,val", [("vllm_model", "/abs/dir"), ("mtp", 4), ("cmd", ["-c", "1"]),
+                                     ("draft", {"path": "x", "type": "dflash"}),
+                                     ("chat_template_kwargs", {"reasoning_effort": "low"})])
+def test_profile_row_refuses_keys_the_profile_owns(tmp_path, key, val):
+    _write_models_yaml(tmp_path, [_prow(**{key: val})])
+    with pytest.raises(ValueError, match="not allowed on a vllm_profile row"):
+        generate._load_models()
+
+
+def test_profile_row_refuses_an_unknown_profile(tmp_path):
+    _write_models_yaml(tmp_path, [_prow(vllm_profile="sly-radiance/does-not-exist")])
+    with pytest.raises(ValueError, match="not found"):
+        generate._load_models()
+
+
+@pytest.mark.parametrize("ram", [0, -1, "9", True])
+def test_profile_row_refuses_a_bad_ram_tier(tmp_path, ram):
+    _write_models_yaml(tmp_path, [_prow(kv_ram_gib=ram)])
+    with pytest.raises(ValueError, match="kv_ram_gib"):
+        generate._load_models()
+
+
+def test_kv_ram_gib_is_refused_off_a_profile_row(tmp_path):
+    _write_models_yaml(tmp_path, [_row(kv_ram_gib=9)])
+    with pytest.raises(ValueError, match="only supported on a vllm_profile row"):
+        generate._load_models()
+
+
+def test_profile_cmd_runs_serve_vllm_in_the_foreground_with_every_knob():
+    cmd = generate.vllm_profile_cmd_for("fid", "served", {"profile": "p/m", "kv_ram_gib": 9},
+                                        180000, 1, "fp8", "sharp")
+    toks = cmd.split()
+    assert toks[0] == "/usr/bin/env", "no shell in llama-swap: env, not VAR=x cmd"
+    assert toks[-2:] == [generate.SERVE_VLLM, "run"]
+    for t in ("PROFILE=p/m", "PORT=${PORT}", "CONTAINER_NAME=llama-swap-fid", "SERVED_NAME=served",
+              "MAXLEN=180000", "MAXSEQS=1", "KV_DTYPE=fp8", "KVCACHE=ram", "KVCACHE_RAM_GIB=9",
+              f"CHAT_TEMPLATE={generate.TEMPLATES['sharp']}"):
+        assert t in toks, t
+
+
+def test_profile_cmd_without_tier_or_template_passes_neither():
+    toks = generate.vllm_profile_cmd_for("fid", "s", {"profile": "p/m", "kv_ram_gib": None},
+                                         1000, 1, "f16").split()
+    assert "KV_DTYPE=auto" in toks
+    assert not any(t.startswith(("KVCACHE", "CHAT_TEMPLATE", "WATCHDOG_MIB")) for t in toks)
+
+
+# 2026-10-31: `watchdog_mib` (serve_vllm.sh's boot kill switch; the RedHat 1.8.1 boot dips to ~71 MiB
+# free, under the 256 MiB default) and `sampler: profile` (keep the profile's measured
+# --override-generation-config instead of the family recipe) -- both vllm_profile rows only.
+def test_profile_row_loads_watchdog_and_sampler_only_when_set(tmp_path):
+    _write_models_yaml(tmp_path, [_prow(watchdog_mib=32, sampler="profile")])
+    (row,) = generate._load_models()
+    assert row[13] == {"profile": "sly-radiance/qwen38-mxfp4-dflash", "kv_ram_gib": 9,
+                       "watchdog_mib": 32, "sampler": "profile"}
+
+
+@pytest.mark.parametrize("wd", [0, -1, "32", True, 1.5])
+def test_profile_row_refuses_a_bad_watchdog(tmp_path, wd):
+    _write_models_yaml(tmp_path, [_prow(watchdog_mib=wd)])
+    with pytest.raises(ValueError, match="watchdog_mib"):
+        generate._load_models()
+
+
+@pytest.mark.parametrize("smp", ["family", "x", True])
+def test_profile_row_refuses_an_unknown_sampler_mode(tmp_path, smp):
+    _write_models_yaml(tmp_path, [_prow(sampler=smp)])
+    with pytest.raises(ValueError, match="sampler"):
+        generate._load_models()
+
+
+@pytest.mark.parametrize("key,val", [("watchdog_mib", 32), ("sampler", "profile")])
+def test_watchdog_and_sampler_are_refused_off_a_profile_row(tmp_path, key, val):
+    _write_models_yaml(tmp_path, [_row(**{key: val})])
+    with pytest.raises(ValueError, match="only supported on a vllm_profile row"):
+        generate._load_models()
+
+
+def test_profile_cmd_passes_the_watchdog_floor():
+    toks = generate.vllm_profile_cmd_for("fid", "s", {"profile": "p/m", "kv_ram_gib": None,
+                                                      "watchdog_mib": 32}, 1000, 1, "fp8").split()
+    assert "WATCHDOG_MIB=32" in toks
+
+
+def test_sampler_profile_row_keeps_the_profile_sampler(tmp_path, monkeypatch, capsys):
+    _reload_models(tmp_path, monkeypatch, [_prow(sampler="profile", watchdog_mib=32)])
+    cfg, _ = _run_main(tmp_path, monkeypatch, capsys,
+                       json.dumps({"provider": {generate.OPENCODE_PROVIDER: {"models": {}}}}).encode())
+    cfg = cfg.decode()
+    assert "EXTRA_ARGS=--override-generation-config" not in cfg
+    assert "WATCHDOG_MIB=32" in cfg
+
+
+def test_default_profile_row_still_gets_the_family_sampler(tmp_path, monkeypatch, capsys):
+    _reload_models(tmp_path, monkeypatch, [_prow()])
+    cfg, _ = _run_main(tmp_path, monkeypatch, capsys,
+                       json.dumps({"provider": {generate.OPENCODE_PROVIDER: {"models": {}}}}).encode())
+    cfg = cfg.decode()
+    assert "EXTRA_ARGS=--override-generation-config" in cfg
+    assert "WATCHDOG_MIB" not in cfg
+
+
+def test_profile_row_main_block_has_cmdstop_usemodelname_and_joins_the_exclusive_group(
+        tmp_path, monkeypatch, capsys):
+    _reload_models(tmp_path, monkeypatch, [_prow()])
+    cfg, oc = _run_main(tmp_path, monkeypatch, capsys,
+                        json.dumps({"provider": {generate.OPENCODE_PROVIDER: {"models": {}}}}).encode())
+    cfg = cfg.decode()
+    fid = "qwen38-27b-mxfp4-dflash-kvfp8-vllm-sharp"
+    assert f'  "{fid}":' in cfg
+    assert f"    cmdStop: docker rm -f llama-swap-{fid}" in cfg
+    assert "    useModelName: qwen38-27b-mxfp4-dflash" in cfg
+    grp = cfg.split('"inference-group":')[1]
+    assert "exclusive: true" in grp.split("members:")[0]
+    assert f'      - "{fid}"' in grp
+    models = json.loads(oc)["provider"][generate.OPENCODE_PROVIDER]["models"]
+    assert models[fid]["limit"]["context"] == 180000
+
+
+def test_coding_entries_are_dropped_but_planning_and_untagged_ones_stay(
+        tmp_path, monkeypatch, capsys):
+    rows = [{"id": "q", "path": "q.gguf", "kv": "f16", "family": "QWEN38", "backends": ["vulkan", "rocm"],
+             "cmd": ["-c", "4096"]},
+            {"id": "g", "path": "g.gguf", "kv": "f16", "family": "GEM", "backends": ["vulkan"],
+             "cmd": ["-c", "4096"]}]
+    _reload_models(tmp_path, monkeypatch, rows)
+    cfg, _ = _run_main(tmp_path, monkeypatch, capsys,
+                       json.dumps({"provider": {generate.OPENCODE_PROVIDER: {"models": {}}}}).encode())
+    ids = [l.strip().strip('":') for l in cfg.decode().splitlines() if l.startswith('  "') and l.endswith('":')]
+    assert "q-planning" in ids and "q-coding" not in ids
+    assert "q-rocm" in ids, "the untagged ROCm twin is not a 'coding item'"
+    assert "g" in ids, "single-recipe rows keep their (untagged) entry"

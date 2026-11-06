@@ -42,7 +42,7 @@ OPENCODE_PROVIDER = "llama-swap"
 # Ceiling, not a fixed value: the emitted limit is min(this, ctx // 2) -- see write_opencode().
 OPENCODE_MAX_OUTPUT = 32768
 MODELS_DIR = "/home/dev/models/gguf"
-REPO = "/home/dev/work/dp-craft/amd"
+REPO = str(HERE.parents[1])   # stack/llama-swap -> repo root
 # Upgraded b10375 -> master 6fdd0ac (2026-08-27). MEASURED, mean decode tok/s over the 3 real
 # project workloads: Muse 58.6 -> 59.5, Qwen3.8 51.0 -> 51.3. No regression, and it carries four
 # fixes that hit this stack: #26879 (Muse-Glimmer tool calls after <|eom|> went UNDETECTED -- the
@@ -53,7 +53,7 @@ REPO = "/home/dev/work/dp-craft/amd"
 # Since 2026-09-11 both binaries resolve through build/latest-<backend>, promoted by
 # bench/build_llamacpp.sh (skill llamacpp-build, which benchmarks every new build against the previous
 # one first). Switching or rolling back = `build_llamacpp.sh promote <ver>`, never an edit here.
-VULKAN_BIN = f"{REPO}/build/latest-vulkan/bin/llama-server"
+VULKAN_BIN = f"{REPO}/stack/llamacpp/var/builds/latest-vulkan/bin/llama-server -b 1024 -ub 512"
 # COMMUNITY TUNING TABLE (llama.cpp Discussion #21043) CHECKED ROW BY ROW, 2026-08-27.
 # Its `Driver` column is load-bearing: 5 of its 9 rows are AMDVLK, and we run RADV. AMDVLK is a
 # DIFFERENT Vulkan driver (AMD's own, last released 2025-04-30, ~4x slower dense prefill), so its
@@ -91,7 +91,7 @@ VULKAN_BIN = f"{REPO}/build/latest-vulkan/bin/llama-server"
 # NOT retried: -DGGML_HIP_ROCWMMA_FATTN. It was REMOVED from llama.cpp upstream; issue #26220
 # records that its removal cost up to 2x prefill at depth on gfx1201, which matches what is
 # measured above. There is no build flag left to reclaim it.
-ROCM_BIN = f"{REPO}/build/latest-rocm/bin/llama-server"
+ROCM_BIN = f"{REPO}/stack/llamacpp/var/builds/latest-rocm/bin/llama-server -b 2048 -ub 1024"
 # NO LD_LIBRARY_PATH on ROCm rows: it outranks RUNPATH, so a fixed one would load another build's
 # libllama.so. Source builds find /opt/rocm via RUNPATH. The prebuilt b10375 asset does NOT bundle
 # the HIP runtime (libamdhip64.so.7 / libhipblas.so.3 / librocblas.so.5) and borrows it from the
@@ -110,7 +110,7 @@ HIPFIRE_IDLE_TIMEOUT = 0
 # llama.cpp-only row keys. A hipfire row carrying one of these would silently drop it -- there is no
 # argv to put it in -- so refuse the row instead. Mirrors the existing mtp+draft defensive posture.
 HIPFIRE_FORBIDDEN_KEYS = ("templates", "kv_unified", "np", "draft", "spec_p_min", "mtp",
-                          "chat_template_kwargs")
+                          "chat_template_kwargs", "cmd")
 # vLLM — a THIRD engine, and like hipfire NOT a llama.cpp backend. Specifically the ROCm fork
 # stilldeadcode/vllm-radiance, run from a DOCKER IMAGE rather than a local binary, so a vllm row
 # shares nothing with the vulkan/rocm rows: no ${common}, no -ngl/-fa/-c/--jinja, no sampler flags
@@ -127,7 +127,7 @@ VLLM_CONTAINER_PORT = 8000
 VLLM_MODEL_MOUNT = "/model"
 # Persistent compile/autotune cache. Without it every cold start re-pays the torch.compile,
 # inductor, triton and AITER passes -- that is most of the 230-310 s boot.
-VLLM_CACHE_HOST = f"{REPO}/bench/dl/radiance-cache"
+VLLM_CACHE_HOST = f"{REPO}/stack/serve/var/models/radiance-cache"
 VLLM_CACHE_MOUNT = "/cache"
 # MEASURED on this host (`getent group render video`): render=992, video=44. The container user is
 # not in them, so /dev/kfd and /dev/dri are unopenable without --group-add and vLLM aborts with
@@ -169,7 +169,7 @@ VLLM_CONTAINER_PREFIX = "llama-swap-"
 # `path` is listed for a sharper reason than the rest: it shares a tuple slot with `vllm_model`
 # (see _load_models), so a stray gguf path would be bind-mounted as the model directory.
 VLLM_FORBIDDEN_KEYS = ("path", "templates", "kv_unified", "draft", "spec_p_min", "alias",
-                       "chat_template_kwargs")
+                       "chat_template_kwargs", "cmd")
 # `kv` on a vllm row -> vLLM's --kv-cache-dtype. `q8_0` is deliberately absent: it is a GGUF block
 # quant that vLLM has no equivalent of, and before this map existed a vllm row carrying it only
 # renamed the id "kvq8" while the engine ran auto (f16) KV -- the silent drop the forbidden-key
@@ -178,14 +178,47 @@ VLLM_FORBIDDEN_KEYS = ("path", "templates", "kv_unified", "draft", "spec_p_min",
 # token-for-token identical -- the attention block is padded up to the mamba page -- so on a hybrid
 # it buys no window. Its speed and quality effects there are unmeasured.
 VLLM_KV_DTYPES = {"f16": None, "fp8": "fp8"}
+# PROFILE-backed vllm rows (2026-10-22). Instead of the inline docker line above, the row names a
+# dp-craft serve_vllm.sh PROFILE -- image, model, drafter and engine args exactly as the benchmarks
+# measured them -- and llama-swap runs `serve_vllm.sh run`: the container in the FOREGROUND (--rm, no
+# -d), a free-VRAM floor before boot and the boot watchdog, stopped by the same `docker rm -f`. One
+# recipe for bench and serving; nothing is copied here. MEASURED for sly-radiance/qwen38-mxfp4-dflash:
+# dp-craft campaigns/2026-10-22-vllm-sly-mxfp4-dflash{,-170k}/analysis.md.
+# The row `id` MUST equal the profile's SERVED_NAME (passed as SERVED_NAME= too, but a profile may pin
+# it), because useModelName rewrites the request's `model` to the id.
+SERVE_VLLM = f"{REPO}/stack/serve/vllm/serve_vllm.sh"
+VLLM_PROFILE_KV = {"fp8": "fp8", "f16": "auto"}   # row kv -> serve_vllm.sh KV_DTYPE
+# llama.cpp sampler flag -> vLLM SamplingParams key (2026-10-23, user decision: a vllm_profile row runs
+# the SAME recipe as its family's llama.cpp rows). Emitted as --override-generation-config via
+# serve_vllm.sh EXTRA_ARGS, which is appended after the profile's ENGINE_ARGS, so it replaces the
+# profile's own override (argparse: last one wins, whole dict). A request-body value still beats it.
+# Unknown flags RAISE: a launch flag riding in a recipe (`-rea off`, `--no-context-shift`) has no
+# sampling equivalent and must not vanish in silence.
+LLAMA_TO_VLLM_SAMPLER = {
+    "--temp": ("temperature", float), "--top-p": ("top_p", float), "--top-k": ("top_k", int),
+    "--min-p": ("min_p", float), "--presence-penalty": ("presence_penalty", float),
+    "--repeat-penalty": ("repetition_penalty", float),
+    "--repetition_penalty": ("repetition_penalty", float),   # PLAN_35's spelling
+}
+# NATIVE radiance runtime (docker image stilldeadcode/radiance, NOT vLLM): serves a single-file `.rad`
+# container (weights + tokenizer + template + DFlash2 drafter). serve_radiance.sh runs it in the
+# foreground like serve_vllm.sh; flags are the HF card's (StillDeadcode/qwen3.8-27b-mxfp4, 2026-10-23):
+# --tp 1 --max-model-len 200000 --kv-cache-dtype fp8 --max-num-seqs 8. Speculation is built in and picks
+# its own depth, so `mtp`/`draft` are refused on a radiance row.
+SERVE_RADIANCE = f"{REPO}/stack/serve/radiance/serve_radiance.sh"
+RADIANCE_KV = {"fp8": "fp8"}   # row kv -> --kv-cache-dtype; the card documents fp8 only
 LISTEN_PORT = 9292
+# Purpose-suffixed entries NOT emitted (user decision 2026-10-22: "remove qwen coding items, only
+# plannings should remain"). Only a SUFFIXED entry carries a tag, so single-recipe models (Gemma,
+# Muse, the 9B/4B rows) and ROCm twins -- whose recipe key happens to be "coding" -- are untouched.
+DROPPED_PURPOSES = {"coding"}
 HEALTHCHECK_TIMEOUT = 600
 IDLE_TTL = 0
 
 # --- sampler recipes, verbatim from MODELS_INFO.md "Recommended Sampling (Thinking Mode)" --------
-CODE_Q  = "--temp 0.6 --top-p 0.95 --top-k 20 --min-p 0"                          # Qwen coding (all)
+CODE_Q  = "--temp 1.0 --top-p 0.95 --top-k 20 --min-p 0"                          # Qwen coding (all)
 PLAN_27 = "--temp 1.0 --top-p 0.95 --top-k 20 --min-p 0"                          # Qwen 27B general
-PLAN_35 = "--temp 1.0 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 1.5"   # 35B-A3B general (pp1.5)
+PLAN_35 = "--temp 0.8 --top-p 0.80 --top-k 20 --min-p 0 --presence-penalty 1.5 --repetition_penalty 1.0"   # 35B-A3B general (pp1.5)
 GEMMA   = "--temp 1.0 --top-p 0.95 --top-k 64 --min-p 0"                          # Gemma (single recipe)
 # Muse-Glimmer: unsloth/Muse-Glimmer-30B-GGUF card gives ONE recipe (temp 1.0 / top_p 0.95 /
 # top_k 64) and names no min_p / repeat / presence penalty -> min_p 0, no penalties. Numerically
@@ -251,6 +284,14 @@ Q38_MRCR = "--temp 1.0 --top-p 0.95 --top-k 20 --min-p 0 --no-context-shift"
 # reasoning. NOT the same flag as --reasoning-format deepseek, which the module docstring bans.
 Q35_SUM = "--temp 0.7 --top-p 0.80 --top-k 20 --min-p 0 --presence-penalty 1.5 -rea off"
 
+# Qwen3.8-9B-Distill (empero-ai, arch `qwen35`: Qwen3.8 2.4T A95B distilled into Qwen3.5-9B).
+# The GGUF card (https://huggingface.co/empero-ai/Qwen3.8-9B-Distill-GGUF) publishes exactly ONE
+# recipe: temperature 0.6, top_p 0.95, top_k 20 — and states the model is a reasoning model whose
+# every answer opens with <think>. Matches neither Q38_CODE (temp 0.7/top_p 0.80) nor Q38_PLAN
+# (temp 1.0), so it is its own constant. --min-p 0 is not on the card; it pins llama.cpp's 0.05
+# default down to the 0.0 every other Qwen recipe in this file uses.
+Q38_DIST = "--temp 0.6 --top-p 0.95 --top-k 20 --min-p 0"
+
 # per-family purpose->sampler maps
 QWEN27 = {"coding": CODE_Q, "planning": PLAN_27}
 QWEN35 = {"coding": CODE_Q, "planning": PLAN_35}
@@ -259,6 +300,7 @@ QWEN38E = {"eval": Q38_MRCR}   # MRCR eval rows: ONE recipe -> one entry, no pur
 GEM    = {"coding": GEMMA}   # only one vendor recipe -> single entry, no purpose split
 MUSEP  = {"coding": MUSE}    # ditto
 QWEN35T = {"coding": Q35_SUM}  # summarization/text row: ONE recipe -> one entry, no purpose split
+QWEN38D = {"coding": Q38_DIST}  # 9B distill: ONE vendor recipe -> one entry, no purpose split
 
 # --- FIXED CHAT TEMPLATES ------------------------------------------------------------------------
 # The official Qwen 3.5/3.6/3.8 chat_template.jinja has documented functional defects (fatal crash
@@ -292,7 +334,33 @@ _FAMILY_MAP = {
     "GEM": GEM,
     "MUSEP": MUSEP,
     "QWEN35T": QWEN35T,
+    "QWEN38D": QWEN38D,
 }
+
+
+def _ctx_from_cmd(mid, cmd):
+    """The `-c` token in a llama.cpp row's `cmd` is the row's context depth -- the single
+    source of truth. It is parsed here because it also feeds sync_opencode's advertised
+    limit, so a missing or ambiguous -c would let a row lie about its window.
+
+    The -c/-np/--kv-unified MEASURED semantics (why models.yaml pairs them the way it does):
+    under SPLIT KV (-no-kvu, the default when -np is explicit) llama.cpp gives each slot
+    ctx/np depth, so the -c total is MULTIPLIED by the slot count and costs np x the KV
+    VRAM; under --kv-unified the -c IS the shared pool, any single sequence may reach the
+    full -c, and raising -np costs no extra VRAM. The Qwen3.8 rows OOM'd at 204800 with
+    np=2 on split KV -- that ceiling was a VRAM artifact of the multiplication, which is
+    why those rows run unified."""
+    msg = (f"{mid}: `cmd` must carry exactly one `-c` token (an integer -- it is parsed "
+           f"as the context depth)")
+    positions = [i for i, t in enumerate(cmd) if t == "-c"]
+    if len(positions) != 1:
+        raise ValueError(f"{msg}, found {len(positions)}")
+    i = positions[0]
+    if i + 1 >= len(cmd) or not cmd[i + 1].isdigit():
+        raise ValueError(f"{msg}, but the one at position {i} has no integer value: "
+                         f"{cmd[i + 1:i + 2]!r}")
+    return int(cmd[i + 1])
+
 
 def _load_models():
     if not _MODELS_YAML.exists():
@@ -303,9 +371,6 @@ def _load_models():
         family = _FAMILY_MAP.get(m["family"])
         if family is None:
             raise ValueError(f"Unknown family {m['family']} for model {m['id']}")
-        if m.get("spec_p_min") is not None and not (m.get("mtp") or m.get("draft")):
-            raise ValueError(f"{m['id']}: spec_p_min set but the row has no speculation "
-                             f"(`mtp` or `draft`) -- the flag would be a silent no-op")
         ctk = m.get("chat_template_kwargs")
         if ctk is not None and not isinstance(ctk, dict):
             raise ValueError(f"{m['id']}: chat_template_kwargs must be a mapping, got "
@@ -334,7 +399,71 @@ def _load_models():
         # A SECOND, independent if/elif rather than more branches on the one above: that way a
         # hipfire row carrying `vllm_model` is still caught (by this elif), and a vllm row
         # carrying `hipfire_tag` is still caught (by the elif above).
-        if "vllm" in backends:
+        vopts = None
+        if "radiance" in backends:
+            if len(backends) > 1:
+                raise ValueError(f"{m['id']}: radiance cannot share a row with "
+                                 f"{sorted(set(backends) - {'radiance'})}")
+            rf = str(m.get("radiance_model") or "")
+            if not (rf.startswith("/") and rf.endswith(".rad")):
+                raise ValueError(f"{m['id']}: a radiance row needs `radiance_model` = absolute path to a "
+                                 f".rad file, got {rf!r}")
+            offenders = [k for k in ("path", "vllm_model", "vllm_profile", "vllm_env", "mtp", "draft", "cmd",
+                                     "kv_unified", "spec_p_min", "alias", "chat_template_kwargs", "templates",
+                                     "watchdog_mib", "sampler")
+                         if m.get(k)]
+            if offenders:
+                raise ValueError(f"{m['id']}: {offenders} not allowed on a radiance row -- the .rad container "
+                                 f"carries the template and the drafter")
+            if m["kv"] not in RADIANCE_KV:
+                raise ValueError(f"{m['id']}: kv {m['kv']!r} must be one of {sorted(RADIANCE_KV)}")
+            vopts = {"radiance_file": rf}
+        elif m.get("radiance_model"):
+            raise ValueError(f"{m['id']}: `radiance_model` set on a non-radiance row")
+        if vopts:
+            pass
+        elif "vllm" in backends and m.get("vllm_profile"):
+            # PROFILE-backed vllm row: the profile owns image, model, drafter/speculation and the
+            # engine args, so the keys that would duplicate them are refused instead of ignored.
+            if len(backends) > 1:
+                raise ValueError(f"{m['id']}: vllm cannot share a row with "
+                                 f"{sorted(set(backends) - {'vllm'})}")
+            profile = m["vllm_profile"]
+            if not (pathlib.Path(SERVE_VLLM).resolve().parent / "profiles" / f"{profile}.env").is_file():
+                raise ValueError(f"{m['id']}: vllm_profile {profile!r} not found under "
+                                 f"{pathlib.Path(SERVE_VLLM).resolve().parent / 'profiles'}")
+            offenders = [k for k in ("vllm_model", "vllm_env", "mtp", "draft", "path", "cmd",
+                                     "kv_unified", "spec_p_min", "alias", "chat_template_kwargs")
+                         if m.get(k)]
+            if offenders:
+                raise ValueError(f"{m['id']}: {offenders} not allowed on a vllm_profile row -- the "
+                                 f"profile carries the model, speculation and engine args")
+            if m["kv"] not in VLLM_PROFILE_KV:
+                raise ValueError(f"{m['id']}: kv {m['kv']!r} must be one of {sorted(VLLM_PROFILE_KV)}")
+            ram = m.get("kv_ram_gib")
+            if ram is not None and (isinstance(ram, bool) or not isinstance(ram, (int, float))
+                                    or ram <= 0):
+                raise ValueError(f"{m['id']}: kv_ram_gib must be a positive number (GiB), got {ram!r}")
+            vopts = {"profile": profile, "kv_ram_gib": ram}
+            # 2026-10-31: watchdog_mib -> serve_vllm.sh WATCHDOG_MIB (boot kill switch; its 256 MiB default
+            # kills the RedHat 1.8.1 boot, which dips to ~71 MiB free -- MEASURED, claude-sly-redhat.sh).
+            # sampler: profile -> no EXTRA_ARGS override, the profile's measured --override-generation-config
+            # stays (vllm_sampler() would REPLACE it with the family recipe + the presence_penalty pin).
+            wd = m.get("watchdog_mib")
+            if wd is not None:
+                if type(wd) is not int or wd <= 0:
+                    raise ValueError(f"{m['id']}: watchdog_mib must be a positive integer (MiB), got {wd!r}")
+                vopts["watchdog_mib"] = wd
+            smp = m.get("sampler")
+            if smp is not None:
+                if smp != "profile":
+                    raise ValueError(f"{m['id']}: sampler must be 'profile' (or absent = family recipe), "
+                                     f"got {smp!r}")
+                vopts["sampler"] = smp
+        elif any(m.get(k) is not None for k in ("kv_ram_gib", "watchdog_mib", "sampler")):
+            keys = [k for k in ("kv_ram_gib", "watchdog_mib", "sampler") if m.get(k) is not None]
+            raise ValueError(f"{m['id']}: {keys} only supported on a vllm_profile row")
+        elif "vllm" in backends:
             # Same argument as hipfire: a row cannot be both, because `path` is a gguf under
             # MODELS_DIR for llama.cpp while `vllm_model` is an absolute HOST DIRECTORY that gets
             # bind-mounted into the container.
@@ -383,12 +512,32 @@ def _load_models():
             # dropped. Requiring it costs nothing, changes no existing validation, and keeps the
             # row self-describing about which model line it serves. `kv` is NOT descriptive: it
             # maps to --kv-cache-dtype through VLLM_KV_DTYPES (validated above).
-        elif m.get("vllm_model") or m.get("vllm_env"):
-            raise ValueError(f"{m['id']}: `vllm_model`/`vllm_env` set on a non-vllm row")
+        elif m.get("vllm_model") or m.get("vllm_env") or m.get("vllm_profile"):
+            raise ValueError(f"{m['id']}: `vllm_model`/`vllm_env`/`vllm_profile` set on a non-vllm row")
 
-        if m["kv"] == "fp8" and "vllm" not in backends:
+        if m["kv"] == "fp8" and "vllm" not in backends and "radiance" not in backends:
             # llama-server's -ctk/-ctv have no fp8 type; the row would fail at boot, not here.
             raise ValueError(f"{m['id']}: kv 'fp8' is vLLM-only -- llama.cpp takes f16/q8_0")
+
+        cmd = None
+        if "vllm" not in backends and "hipfire" not in backends and "radiance" not in backends:
+            # llama.cpp row: ALL engine tuning is the verbatim `cmd` token list (cmd_for
+            # appends it last). The old typed keys are refused rather than silently dropped,
+            # and the single -c token in it is the row's context depth -- it also feeds the
+            # opencode context limit, which is why it must be present and parseable.
+            moved = [k for k in ("ctx", "np", "kv_unified", "spec_p_min", "alias", "extra_cmd")
+                     if k in m]
+            if moved:
+                raise ValueError(f"{m['id']}: {moved} are no longer typed row keys -- they "
+                                 f"moved into `cmd` as argv tokens, e.g. "
+                                 f'cmd: ["-c", "131072", "-np", "1", "--kv-unified"]')
+            cmd = m.get("cmd")
+            if (not isinstance(cmd, list) or not cmd
+                    or not all(isinstance(t, str) and t.strip() for t in cmd)):
+                raise ValueError(f"{m['id']}: a llama.cpp row needs `cmd`, a non-empty list "
+                                 f"of argv strings containing exactly one `-c <int>`; "
+                                 f"got {cmd!r}")
+        ctx = m["ctx"] if cmd is None else _ctx_from_cmd(m["id"], cmd)
 
         draft = m.get("draft")
         if draft:
@@ -410,20 +559,20 @@ def _load_models():
             # an absolute host model DIRECTORY to bind-mount (vllm). The `m["hipfire_tag"]` at the
             # end is kept as a subscript on purpose -- it preserves today's KeyError for a row
             # that declares none of the three.
-            m.get("path") or m.get("vllm_model") or m["hipfire_tag"],
-            m["ctx"],
+            m.get("path") or m.get("vllm_model") or m.get("vllm_profile") or m.get("radiance_model") or m["hipfire_tag"],
+            ctx,  # hipfire/vllm rows: the typed key (descriptive / --max-model-len); llama.cpp:
+                  # the -c token parsed out of `cmd` -- the one context-depth source of truth
             m["kv"],
             m.get("mtp", False),
             family,
             m["backends"],
-            m.get("np"),  # concurrent slots, may be None -> fallback to PARALLEL dict
+            m.get("np"),  # vllm rows only -> --max-num-seqs; a llama.cpp row's -np lives in `cmd`
             m.get("templates", [""]) or [""],  # chat-template variants; [""] = gguf's embedded one
-            bool(m.get("kv_unified", False)),
             draft,  # None, or {path, type, n_max?, ngl?} -> a SEPARATE drafter gguf (see cmd_for)
-            m.get("spec_p_min"),  # None, or float -> --spec-draft-p-min (applies to mtp AND draft)
-            m.get("alias"),  # None, or str -> -a/--alias, the name the API answers to
             ctk,  # None, or dict -> --chat-template-kwargs (server-wide template defaults)
             m.get("hipfire_env") or {},  # hipfire rows only -> per-PROCESS engine config via env
+            cmd,  # llama.cpp rows only -> verbatim argv tokens appended last (see cmd_for)
+            vopts,  # vllm_profile rows only -> {profile, kv_ram_gib} (see vllm_profile_cmd_for)
         ))
 
     # hipfire has NO per-row context cap. `hipfire serve` takes no --max-seq, and memory.max_seq is
@@ -443,7 +592,11 @@ def _load_models():
 
 MODELS = _load_models()
 
-COMMON = "--host 127.0.0.1 -ngl 99 -fa on -ub 2048 -b 4096 --jinja"
+#COMMON = "--perf --host 127.0.0.1 -ngl 99 -fa on -ub 2048 -b 4096 --jinja --rope-scale 1.0"
+# No --load-mode mlock: it was a silent no-op (measured VmLck = 0 on the running server --
+# RLIMIT_MEMLOCK was 0, so the lock never engaged), and a mlocked 17.6 GiB weight copy would
+# remove that much RAM from the host's reclaimable pool on this 31 GiB box.
+COMMON = "--perf --host 127.0.0.1 -ngl 999 -fa on --jinja --rope-scale 1.0 -tb 12 -t 4"
 
 # --- RERANKERS (cross-encoders, --rerank) --------------------------------------------------------
 # A separate table on purpose: a reranker recipe shares NO field with MODELS (no sampler, no KV
@@ -495,40 +648,22 @@ EMBEDDERS = [
     ("bge-m3",                            "gpustack/bge-m3-FP16.gguf",                              8192, 8192, 8192, "cls"),
 ]
 
-# model id -> concurrent request slots (default 1). Legacy FALLBACK only: models.yaml `np` wins.
-# `ctx` in the MODELS table always means per-CONVERSATION depth, never the -c total. How that maps
-# to -c depends on the row's `kv_unified` — see cmd_for(), which documents the measured split.
-# MEASURED (b10375, Vulkan): Muse at NON-unified 4 x 131072 = 28.54 GiB of the 31.86 GiB budget, and
-# 4 concurrent requests finished in 18.7 s wall vs ~16 s for one alone — the extra 3 are close to
-# free. Under SPLIT KV, raising np costs np x the KV, so re-check VRAM before changing it; under
-# `kv_unified: true` it costs nothing extra (the slots share one -c-sized pool).
-# The Qwen3.8 rows OOM'd at ctx 204800 with np=2 on split KV — that ceiling was a VRAM artifact of
-# the multiplication, and is why both Qwen3.8 rows are now unified instead.
-PARALLEL = {
-    # Fallback for models that don't specify np in models.yaml
-    # Key follows the Muse row's id, renamed q5kxl -> q5kl with the 2026-08-27 quant swap. Dead
-    # weight today (the row states np: 2 itself) but kept in sync so it cannot fire a stale 1.
-    "muse-glimmer-30b-q5kl": 2,
-}
-
-
 # Backend -> id tag. vulkan is the untagged default. Every non-vulkan backend MUST have an entry:
 # an unmapped backend silently produces an id indistinguishable from the vulkan one.
-BACKEND_TAG = {"vulkan": "", "rocm": "rocm", "hipfire": "hf", "vllm": "vllm"}
+BACKEND_TAG = {"vulkan": "", "rocm": "rocm", "hipfire": "hf", "vllm": "vllm", "radiance": "rad"}
 
 
-def ctx_label(ctx):
-    return f"{ctx // 1024}k" if ctx % 1024 == 0 else str(ctx)
-
-
-def full_id(mid, ctx, kv, mtp, be, purpose="", tpl="", draft=None, ctk=None):
-    """Model id: <mid>-ctx<N>k[-kvq8][-mtp|-<drafter>][-rocm][-<tpl>][-eff-<level>][-<purpose>].
+def full_id(mid, kv, mtp, be, purpose="", tpl="", draft=None, ctk=None):
+    """Model id: <mid>[-kvq8|-kvfp8][-mtp|-<drafter>][-rocm|-hf|-vllm][-<tpl>][-eff-<level>][
+    -nopreserve][-<purpose>].
     Shared by config.yaml AND the opencode merge so the two never drift. Purpose
     ('coding'/'planning') is the trailing tag. The speculation and pinned-effort tags are
     load-bearing, not decoration: each changes what the row actually runs (spec source moves both
     throughput and VRAM; a pinned kwarg replaces the opencode variant menu), so two otherwise-
-    identical rows must not collide on one id."""
-    parts = [mid, f"ctx{ctx_label(ctx)}"]
+    identical rows must not collide on one id. The context depth is deliberately NOT part of
+    the id (2026-10-01): it is a `-c` token in the row's `cmd`, and a ctx-sized id segment
+    churned every id whenever the window moved."""
+    parts = [mid]
     if kv == "q8_0":
         parts.append("kvq8")
     elif kv == "fp8":
@@ -560,41 +695,27 @@ def full_id(mid, ctx, kv, mtp, be, purpose="", tpl="", draft=None, ctk=None):
     return "-".join(parts)
 
 
-def entries_for(mid, ctx, kv, mtp, purposes, be, tpl="", draft=None, ctk=None):
+def entries_for(mid, kv, mtp, purposes, be, tpl="", draft=None, ctk=None):
     """Yield (id, purpose, sampler) for a (model, backend, template). Vulkan -> one per purpose;
     ROCm -> a single 'coding' default (no purpose suffix) to keep the menu small."""
     if be == "vulkan":
         for purpose, sampler in purposes.items():
             # a single-recipe model (gemma) gets no purpose suffix
             tag = purpose if len(purposes) > 1 else ""
-            yield full_id(mid, ctx, kv, mtp, be, tag, tpl, draft, ctk), tag, sampler
+            yield full_id(mid, kv, mtp, be, tag, tpl, draft, ctk), tag, sampler
     else:
         sampler = purposes.get("coding") or next(iter(purposes.values()))
-        yield full_id(mid, ctx, kv, mtp, be, "", tpl, draft, ctk), "", sampler
+        yield full_id(mid, kv, mtp, be, "", tpl, draft, ctk), "", sampler
 
 
-def cmd_for(binref, relpath, ctx, kv, mtp, sampler, slots=1, tpl="", kv_unified=False,
-            draft=None, spec_p_min=None, alias=None, ctk=None):
-    # KV partitioning — MEASURED on this exact binary (b10375, `-c 8192 -np 2`):
-    #   -no-kvu      -> "n_slots = 2, n_ctx_slot = 4096, kv_unified = 'false'"  (-c is SPLIT by np)
-    #   --kv-unified -> "n_slots = 2, n_ctx_slot = 8192, kv_unified = 'true'"   (-c is the POOL,
-    #                   and any single sequence may reach the full -c)
-    # So unified must emit `-c ctx` and non-unified `-c ctx*slots` to give each chat `ctx` depth.
-    # Consequence: under unified KV, raising np costs ZERO extra VRAM — the tradeoff is that the
-    # concurrent chats SHARE one pool instead of owning a guaranteed slice.
-    # Note --kv-unified is only the llama.cpp default when np is auto; we always pass an explicit
-    # -np, so it is off unless requested here.
-    ctx_arg = ctx if kv_unified else ctx * slots
-    lines = [binref, f"--model {MODELS_DIR}/{relpath}"]
-    if alias:
-        # -a/--alias: the name the API answers to. llama-swap routes by ITS OWN id, so this is not
-        # load-bearing for routing here; it is set because the vendor doc marks it required and an
-        # unset alias reports the checkpoint PATH as the model name in /v1/models responses.
-        lines.append(f"-a {alias}")
-    lines += [f"-c {ctx_arg} -ctk {kv} -ctv {kv}", f"-np {slots}"]
-    if kv_unified:
-        lines.append("--kv-unified")
-    lines += ["${common}", sampler]
+def cmd_for(binref, relpath, kv, mtp, sampler, tpl="", draft=None, ctk=None, cmd_tokens=()):
+    # The engine tuning that used to be typed row keys (-c, -np, --kv-unified, -a,
+    # --spec-draft-p-min, --cache-ram, ...) now arrives as VERBATIM `cmd` tokens from
+    # models.yaml and is appended LAST here: llama-server's arg parsing is order-independent,
+    # so no block above needs reordering. The -c/-np/--kv-unified semantics are documented
+    # on _ctx_from_cmd() above.
+    lines = [binref, f"--model {MODELS_DIR}/{relpath}", f"-ctk {kv} -ctv {kv}",
+             "${common}", sampler]
     if tpl:
         lines.append(f"--chat-template-file {TEMPLATES[tpl]}")
     if ctk:
@@ -624,22 +745,15 @@ def cmd_for(binref, relpath, ctx, kv, mtp, sampler, slots=1, tpl="", kv_unified=
         if draft.get("n_max"):
             lines.append(f"--spec-draft-n-max {draft['n_max']}")
         lines.append(f"--spec-draft-ngl {draft.get('ngl', 'all')}")
-    if spec_p_min is not None:
-        # Truncate the draft at the first position where the DRAFTER's own confidence falls below
-        # this. Deliberately emitted OUTSIDE the mtp/draft branches above because llama.cpp applies
-        # --spec-draft-p-min to every --spec-type, so an MTP row can use it too.
-        # The llama.cpp default is 0.00, i.e. OFF: the drafter then emits its full n-max block every
-        # round no matter how unsure it is, and the target must verify all of it. Since the draft
-        # pass has already happened by then, p_min does not save draft time -- it shortens the
-        # TARGET's verify batch, which is the expensive half at batch size 1.
-        # MEASURED here (b10375, R9700 Vulkan, greedy, 3 real project workloads, mean tok/s):
+    if cmd_tokens:
+        # The row's `cmd` tokens, verbatim, appended LAST. NOTE for anyone re-tuning
+        # --spec-draft-p-min (Muse, MEASURED b10375 R9700 greedy, 3 workloads, mean tok/s):
         #   p_min  0.00   0.20   0.30   0.40   0.50   0.60   0.75   0.90
         #   tok/s  40.9   45.5   57.8   60.8   57.8   54.9   53.4   47.7
-        # 0.40 is the peak (+47% over the 0.00 default), reproduced at 59.5 on a repeat run.
-        # NOTE acceptance RATE is a trap as a tuning target: 0.90 reaches 97-100% acceptance and is
-        # SLOWER than 0.40 at ~70%, because a high threshold only ever drafts the trivially
-        # predictable. Tune on tok/s. Re-tune per model -- this optimum is not portable.
-        lines.append(f"--spec-draft-p-min {spec_p_min}")
+        # 0.40 is the peak (+47% over the 0.00 default). Acceptance RATE is a trap as a tuning
+        # target: 0.90 reaches ~100% acceptance and is SLOWER than 0.40 at ~70%. Tune on tok/s;
+        # the optimum is not portable across models (on the Qwen3.8 MTP line the default wins).
+        lines += list(cmd_tokens)
     return "\n      ".join(lines)
 
 
@@ -740,6 +854,66 @@ def vllm_cmd_for(fid, served, model_dir, ctx, mtp, slots, kv="f16"):
                      f"'{json.dumps(spec, separators=(',', ':'))}'")
     lines.append("--no-async-scheduling")
     return "\n      ".join(lines)
+
+
+def vllm_sampler(mid, purposes):
+    """The family recipe a llama.cpp row of this family SERVES (purposes minus DROPPED_PURPOSES, same
+    rule as entries_for), converted to a vLLM generation-config dict via LLAMA_TO_VLLM_SAMPLER."""
+    kept = [s for p, s in purposes.items() if len(purposes) == 1 or p not in DROPPED_PURPOSES]
+    if len(kept) != 1:
+        raise ValueError(f"{mid}: a vllm row serves ONE recipe, its family leaves {len(kept)}")
+    toks = kept[0].split()
+    if len(toks) % 2:
+        raise ValueError(f"{mid}: recipe {kept[0]!r} is not flag/value pairs -- not convertible")
+    out = {}
+    for flag, val in zip(toks[::2], toks[1::2]):
+        if flag not in LLAMA_TO_VLLM_SAMPLER:
+            raise ValueError(f"{mid}: sampler flag {flag!r} has no vLLM mapping "
+                             f"(LLAMA_TO_VLLM_SAMPLER) -- refusing to drop it silently")
+        key, typ = LLAMA_TO_VLLM_SAMPLER[flag]
+        out[key] = typ(val)
+    # presence_penalty PINNED to 0.1 when the recipe names none (user decision 2026-10-23, after a reasoning
+    # loop with Cactus already off: a LIGHT anti-loop penalty, quality first; the Qwen3.8 card's thinking
+    # recipe is 0.0 and high values cost quality/language mixing). presence, not repetition: VERIFIED in the
+    # vLLM 0.31 image, presence counts OUTPUT tokens only (incl. reasoning; v1/worker/gpu/sample/penalties.py
+    # output_bin_mask), repetition_penalty also counts the PROMPT (prompt_bin_mask) = penalises copying code
+    # from context; penalties run inside the spec-decode path, so DFlash/MTP stay on. Explicit rather than
+    # implied because this dict REPLACES the profile's override, which would otherwise silently fall back
+    # to the checkpoint's generation_config.json value.
+    out.setdefault("presence_penalty", 1)
+    return out
+
+
+def vllm_profile_cmd_for(fid, served, vopts, ctx, slots, kv, tpl="", sampler=None):
+    """The cmd for a PROFILE-backed vllm row: dp-craft's serve_vllm.sh in `run` (foreground) mode.
+    llama-swap tokenizes `cmd` shell-style without a shell, so the knobs ride on /usr/bin/env rather
+    than `VAR=x cmd`; ${PORT} is llama-swap's per-row port. kv_ram_gib -> Sly's KVCACHE=ram tier (a
+    GPU -> RAM prefix-cache tier in the container's /dev/shm, KVCACHE_RAM_GIB GiB).
+    sampler (vllm_sampler()) -> EXTRA_ARGS --override-generation-config. The WHOLE env token is
+    single-quoted (llama-swap eats bare quotes, same as --chat-template-kwargs in cmd_for); the JSON is
+    compact so serve_vllm.sh's whitespace split (`read -r -a`) keeps it one argv word."""
+    env = [f"PROFILE={vopts['profile']}", "PORT=${PORT}", f"CONTAINER_NAME={vllm_container(fid)}",
+           f"SERVED_NAME={served}", f"MAXLEN={ctx}", f"MAXSEQS={slots}",
+           f"KV_DTYPE={VLLM_PROFILE_KV[kv]}"]
+    if sampler:
+        env.append("'EXTRA_ARGS=--override-generation-config "
+                   f"{json.dumps(sampler, separators=(',', ':'))}'")
+    if tpl:
+        env.append(f"CHAT_TEMPLATE={TEMPLATES[tpl]}")
+    if vopts.get("kv_ram_gib"):
+        env += ["KVCACHE=ram", f"KVCACHE_RAM_GIB={vopts['kv_ram_gib']}"]
+    if vopts.get("watchdog_mib"):
+        env.append(f"WATCHDOG_MIB={vopts['watchdog_mib']}")
+    return "\n      ".join(["/usr/bin/env"] + env + [f"{SERVE_VLLM} run"])
+
+
+def radiance_cmd_for(fid, vopts, ctx, slots, kv):
+    """The cmd for a native-radiance row: serve_radiance.sh in `run` (foreground) mode. Same /usr/bin/env
+    convention as vllm_profile_cmd_for (llama-swap tokenizes `cmd` without a shell); the container name
+    is the vllm_container() one so cmdStop's `docker rm -f` is identical."""
+    env = [f"RAD_FILE={vopts['radiance_file']}", "PORT=${PORT}", f"CONTAINER_NAME={vllm_container(fid)}",
+           f"MAXLEN={ctx}", f"MAXSEQS={slots}", f"KV_DTYPE={RADIANCE_KV[kv]}"]
+    return "\n      ".join(["/usr/bin/env"] + env + [f"{SERVE_RADIANCE} run"])
 
 
 def rerank_cmd_for(relpath, ctx, ubatch, batch):
@@ -947,17 +1121,15 @@ def main():
            f'  "common": "{COMMON}"', "", "models:"]
     model_ids = []
     ids = []
-    for (mid, relpath, ctx, kv, mtp, purposes, backends, np_val, templates, kv_unified,
-         draft, spec_p_min, alias, ctk, hipfire_env) in MODELS:
-        # parallel slots: prefer model.yaml np, else fallback to legacy PARALLEL dict
-        slots = np_val if np_val is not None else PARALLEL.get(mid, 1)
+    for (mid, relpath, ctx, kv, mtp, purposes, backends, np_val, templates,
+         draft, ctk, hipfire_env, cmd, vopts) in MODELS:
         for tpl in templates:
             for be in backends:
                 if be == "hipfire":
                     # Separate engine: its own cmd builder, no ${common}, no env block, and an
                     # explicit cmdStop because `hipfire stop` talks to the daemon's control socket
                     # rather than relying on a signal to the supervised process.
-                    fid = full_id(mid, ctx, kv, mtp, be, "", tpl, draft, ctk)
+                    fid = full_id(mid, kv, mtp, be, "", tpl, draft, ctk)
                     nm = (f'{fid}  [hipfire, ctx=engine-config, '
                           f'spec=engine-config, tag={relpath}]')
                     out.append("\n".join([
@@ -974,11 +1146,41 @@ def main():
                     model_ids.append(fid)
                     ids.append((fid, ctx, None))
                     continue
+                if be == "radiance":
+                    slots = np_val if np_val is not None else 1   # --max-num-seqs
+                    fid = full_id(mid, kv, mtp, be, "", tpl, draft, ctk)
+                    nm = (f'{fid}  [radiance, file={pathlib.Path(vopts["radiance_file"]).name}, ctx={ctx}, '
+                          f'kv={kv}, np={slots}]')
+                    out.append("\n".join([
+                        f'  "{fid}":', f'    name: "{nm}"', "    cmd: |",
+                        f"      {radiance_cmd_for(fid, vopts, ctx, slots, kv)}",
+                        f"    cmdStop: docker rm -f {vllm_container(fid)}",
+                    ]))
+                    out.append("")
+                    model_ids.append(fid)
+                    ids.append((fid, ctx, None))
+                    continue
                 if be == "vllm":
                     # Separate engine, run from a docker image: its own cmd builder, no ${common},
                     # and no llama-swap `env:` block -- that would set the DOCKER CLIENT's
                     # environment, which the container never sees (the knobs ride on -e instead).
-                    fid = full_id(mid, ctx, kv, mtp, be, "", tpl, draft, ctk)
+                    slots = np_val if np_val is not None else 1   # --max-num-seqs; -np on a vllm row is typed, not a `cmd` token
+                    fid = full_id(mid, kv, mtp, be, "", tpl, draft, ctk)
+                    if vopts:
+                        ram = vopts.get("kv_ram_gib")
+                        nm = (f'{fid}  [vllm, profile={vopts["profile"]}, ctx={ctx}, kv={kv}, '
+                              f'np={slots}, ram-tier={f"{ram}GiB" if ram else "off"}'
+                              f'{f", tpl={tpl}" if tpl else ""}]')
+                        out.append("\n".join([
+                            f'  "{fid}":', f'    name: "{nm}"', "    cmd: |",
+                            f"      {vllm_profile_cmd_for(fid, mid, vopts, ctx, slots, kv, tpl, None if vopts.get('sampler') == 'profile' else vllm_sampler(mid, purposes))}",
+                            f"    cmdStop: docker rm -f {vllm_container(fid)}",
+                            f"    useModelName: {mid}",
+                        ]))
+                        out.append("")
+                        model_ids.append(fid)
+                        ids.append((fid, ctx, variants_for(tpl, purposes, ctk)))
+                        continue
                     nm = (f'{fid}  [vllm, ctx={ctx}, kv={kv}, mtp={mtp if mtp else "off"}, '
                           f'np={slots}, image={VLLM_IMAGE}]')
                     out.append("\n".join([
@@ -1002,17 +1204,20 @@ def main():
                     ids.append((fid, ctx, None))
                     continue
                 binref = "${vulkan}" if be == "vulkan" else "${rocm}"
-                for fid, tag, sampler in entries_for(mid, ctx, kv, mtp, purposes, be, tpl,
+                for fid, tag, sampler in entries_for(mid, kv, mtp, purposes, be, tpl,
                                                      draft, ctk):
+                    if tag in DROPPED_PURPOSES:
+                        continue
                     # Non-draft rows keep the existing `mtp=on|off` wording verbatim, so adding
-                    # drafter support does not churn 20 unrelated display names.
-                    nm = f'{fid}  [{be}, kv={kv}, ctx={ctx}, '
+                    # drafter support does not churn 20 unrelated display names. The ctx/np/
+                    # kv_unified info is NOT in the name: it sits in the `cmd:` line below,
+                    # where it belongs (a name duplicating argv drifts the moment the argv moves).
+                    nm = f'{fid}  [{be}, kv={kv}, '
                     nm += f'spec={draft["type"]}' if draft else f'mtp={"on" if mtp else "off"}'
-                    nm += f', np={slots}{"u" if kv_unified else ""}' if slots > 1 else ''
                     nm += f', tpl={tpl}' if tpl else ''
                     nm += f', {tag}]' if tag else ']'
                     block = [f'  "{fid}":', f'    name: "{nm}"', "    cmd: |",
-                             f"      {cmd_for(binref, relpath, ctx, kv, mtp, sampler, slots, tpl, kv_unified, draft, spec_p_min, alias, ctk)}"]
+                             f"      {cmd_for(binref, relpath, kv, mtp, sampler, tpl, draft, ctk, cmd)}"]
                     if be == "vulkan":
                         # MEASURED 2026-08-27, Qwen3.8 mean decode over 3 real workloads, and
                         # re-sampled properly after a single confirm run disagreed:
@@ -1067,9 +1272,12 @@ def main():
         out.append(f'      - "{rid}"')
     out.append("")
     # inference group
+    # exclusive: loading ANY chat model also unloads the embedder/reranker groups (user decision
+    # 2026-10-22). The vllm row reserves ~29 GiB at boot (gpu-memory-utilization 0.90); an embedder
+    # or reranker left resident beside it overcommits the card. They reload on demand in seconds.
     out.append('  "inference-group":')
     out.append("    swap: true")
-    out.append("    exclusive: false")
+    out.append("    exclusive: true")
     out.append("    members:")
     for mid in model_ids:
         out.append(f'      - "{mid}"')

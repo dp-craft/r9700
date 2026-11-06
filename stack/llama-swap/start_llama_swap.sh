@@ -29,7 +29,7 @@ export HSA_POLL_TIMEOUT=1    # Csökkentjük az időt, amíg a CPU pörögve vá
 BIN="$HOME/.local/bin/llama-swap"
 CONFIG="$HOME/.config/llama-swap/config.yaml"
 PORT=9292
-LOGDIR="$HOME/.config/llama-swap/logs"
+LOGDIR="$HOME/.config/llama-swap/var/logs"
 PIDFILE="$LOGDIR/llama-swap.pid"
 LOG="$LOGDIR/llama-swap.log"
 mkdir -p "$LOGDIR"

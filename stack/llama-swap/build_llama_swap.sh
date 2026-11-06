@@ -4,7 +4,7 @@
 # Steps:
 #   1. Ensure a Go toolchain (uses system go >= 1.27, else downloads one
 #      into .go-toolchain/ next to this script).
-#   2. Apply derive-stream-rates.patch to llama-swap/llama-swap/ (idempotent:
+#   2. Apply derive-stream-rates.patch to var/llama-swap/ (idempotent:
 #      skipped when already applied; fails if the tree is in a mixed state).
 #      The patch derives prefill/decode rates on the proxy side for backends
 #      that report token counts but no timings object (llama.cpp's Anthropic
@@ -23,11 +23,11 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SRC_DIR="$SCRIPT_DIR/llama-swap"
+SRC_DIR="$SCRIPT_DIR/var/llama-swap"
 PATCH="$SCRIPT_DIR/derive-stream-rates.patch"
 INSTALL_BIN="${HOME}/.local/bin/llama-swap"
 GO_VERSION="1.27.1"
-TOOLCHAIN_DIR="$SCRIPT_DIR/.go-toolchain"
+TOOLCHAIN_DIR="$SCRIPT_DIR/var/.go-toolchain"
 
 log() { echo ">> $*"; }
 

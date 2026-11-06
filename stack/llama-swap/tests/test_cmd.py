@@ -47,10 +47,12 @@ def write_models_yaml(tmp_path, models):
 MINIMAL_ROW = {
     "id": "m1",
     "path": "vendor/m1.gguf",
-    "ctx": 4096,
     "kv": "f16",
     "family": "QWEN27",
     "backends": ["vulkan"],
+    # A llama.cpp row's engine knobs (-c/-np/--kv-unified/-a/...) live in `cmd`; the -c
+    # token is REQUIRED and is parsed as the row's context depth.
+    "cmd": ["-c", "4096"],
 }
 
 
@@ -71,18 +73,92 @@ def test_load_models_raises_when_yaml_missing(tmp_path):
 def test_load_models_minimal_row_tuple_shape_and_defaults(tmp_path):
     write_models_yaml(tmp_path, [MINIMAL_ROW])
     (row,) = generate._load_models()
-    assert len(row) == 15
+    assert len(row) == 14
     (mid, path, ctx, kv, mtp, family, backends, np_val, templates,
-     kv_unified, draft, spec_p_min, alias, ctk, hipfire_env) = row
+     draft, ctk, hipfire_env, cmd, vopts) = row
+    assert vopts is None, "only a vllm_profile row carries profile options"
     assert hipfire_env == {}, "a llama.cpp row carries no hipfire env"
-    assert (mid, path, ctx, kv) == ("m1", "vendor/m1.gguf", 4096, "f16")
+    assert (mid, path, kv) == ("m1", "vendor/m1.gguf", "f16")
+    assert ctx == 4096                        # parsed from the `-c` token in `cmd`
     assert mtp is False
     assert family is generate.QWEN27          # the actual sampler dict, not its name
     assert backends == ["vulkan"]
-    assert np_val is None                     # -> caller falls back to the PARALLEL dict
+    assert np_val is None                     # llama.cpp rows carry -np in `cmd`, not as a key
     assert templates == [""]                  # "" = the gguf's embedded chat template
-    assert kv_unified is False
-    assert (draft, spec_p_min, alias, ctk) == (None, None, None, None)
+    assert (draft, ctk) == (None, None)
+    assert cmd == ["-c", "4096"]
+
+
+@pytest.mark.parametrize("bad", [
+    "-c 4096",        # a string, not a list
+    [],               # empty
+    ["-c", ""],       # an empty-string token
+    ["-c", 4096]      # a non-string token
+])
+def test_load_models_rejects_malformed_cmd(tmp_path, bad):
+    write_models_yaml(tmp_path, [dict(MINIMAL_ROW, cmd=bad)])
+    with pytest.raises(ValueError, match="non-empty list of argv strings"):
+        generate._load_models()
+
+
+@pytest.mark.parametrize("key, value", [
+    ("ctx", 4096),
+    ("np", 1),
+    ("kv_unified", True),
+    ("spec_p_min", 0.4),
+    ("alias", "m1"),
+    ("extra_cmd", ["--cache-ram", "8192"]),
+])
+def test_load_models_rejects_typed_keys_that_moved_into_cmd(tmp_path, key, value):
+    """The old typed engine knobs are refused with a pointer to `cmd`: accepting them would
+    emit nothing (silent no-op), and silently DROPPING them would change what the row runs."""
+    write_models_yaml(tmp_path, [dict(MINIMAL_ROW, **{key: value})])
+    with pytest.raises(ValueError, match=r"moved into `cmd`") as exc:
+        generate._load_models()
+    assert key in str(exc.value)
+
+
+def test_load_models_requires_cmd_on_a_llamacpp_row(tmp_path):
+    bad = dict(MINIMAL_ROW)
+    del bad["cmd"]
+    write_models_yaml(tmp_path, [bad])
+    with pytest.raises(ValueError, match="needs `cmd`"):
+        generate._load_models()
+
+
+@pytest.mark.parametrize("cmd, why", [
+    (["--cache-ram", "8192"], "no -c at all"),
+    (["-c", "4096", "-c", "8192"], "two -c tokens"),
+    (["-c"], "a -c with no value"),
+    (["-c", "128k"], "a non-integer -c value"),
+])
+def test_load_models_requires_exactly_one_integer_c_token(tmp_path, cmd, why):
+    write_models_yaml(tmp_path, [dict(MINIMAL_ROW, cmd=cmd)])
+    with pytest.raises(ValueError, match=r"exactly one `-c`"):
+        generate._load_models()
+
+
+def test_load_models_parses_the_c_token_into_the_ctx_slot(tmp_path):
+    write_models_yaml(tmp_path, [dict(MINIMAL_ROW, cmd=["-np", "2", "-c", "131072",
+                                                        "--kv-unified"])])
+    (row,) = generate._load_models()
+    assert row[2] == 131072                   # position of the -c token does not matter
+
+
+def test_load_models_accepts_cmd_tokens(tmp_path):
+    write_models_yaml(tmp_path, [dict(MINIMAL_ROW,
+                                      cmd=["-c", "4096", "--cache-ram", "12288"])])
+    (row,) = generate._load_models()
+    assert row[12] == ["-c", "4096", "--cache-ram", "12288"]
+
+
+def test_load_models_rejects_cmd_on_a_hipfire_row(tmp_path):
+    """hipfire has no argv to put the tokens in -- same posture as the other forbidden keys."""
+    row = dict(MINIMAL_ROW, backends=["hipfire"], hipfire_tag="reg/m1:q4",
+               cmd=["-c", "4096"])
+    write_models_yaml(tmp_path, [row])
+    with pytest.raises(ValueError, match="cmd"):
+        generate._load_models()
 
 
 def test_load_models_maps_every_known_family_to_its_sampler_dict(tmp_path):
@@ -100,34 +176,6 @@ def test_load_models_rejects_unknown_family(tmp_path):
         generate._load_models()
 
 
-def test_load_models_rejects_spec_p_min_without_speculation(tmp_path):
-    write_models_yaml(tmp_path, [dict(MINIMAL_ROW, spec_p_min=0.4)])
-    with pytest.raises(ValueError, match="spec_p_min set but the row has no speculation"):
-        generate._load_models()
-
-
-def test_load_models_accepts_spec_p_min_with_mtp(tmp_path):
-    write_models_yaml(tmp_path, [dict(MINIMAL_ROW, mtp=True, spec_p_min=0.4)])
-    (row,) = generate._load_models()
-    assert row[11] == 0.4
-
-
-def test_load_models_accepts_spec_p_min_with_draft(tmp_path):
-    write_models_yaml(tmp_path, [dict(MINIMAL_ROW,
-                                      draft={"path": "d.gguf", "type": "dflash"},
-                                      spec_p_min=0.5)])
-    (row,) = generate._load_models()
-    assert row[10] == {"path": "d.gguf", "type": "dflash"}
-    assert row[11] == 0.5
-
-
-def test_load_models_spec_p_min_zero_is_treated_as_present_and_rejected(tmp_path):
-    """0.0 is not None, so the no-speculation guard fires even though 0.0 means 'off'."""
-    write_models_yaml(tmp_path, [dict(MINIMAL_ROW, spec_p_min=0.0)])
-    with pytest.raises(ValueError, match="spec_p_min set but the row has no speculation"):
-        generate._load_models()
-
-
 def test_load_models_rejects_non_mapping_chat_template_kwargs(tmp_path):
     write_models_yaml(tmp_path, [dict(MINIMAL_ROW, chat_template_kwargs=["a", "b"])])
     with pytest.raises(ValueError, match="chat_template_kwargs must be a mapping, got list"):
@@ -138,7 +186,7 @@ def test_load_models_accepts_mapping_chat_template_kwargs(tmp_path):
     write_models_yaml(tmp_path, [dict(MINIMAL_ROW,
                                       chat_template_kwargs={"reasoning_strength": "xhigh"})])
     (row,) = generate._load_models()
-    assert row[13] == {"reasoning_strength": "xhigh"}
+    assert row[10] == {"reasoning_strength": "xhigh"}
 
 
 def test_load_models_rejects_mtp_and_draft_together(tmp_path):
@@ -158,7 +206,7 @@ def test_load_models_falsy_draft_skips_validation(tmp_path):
     """draft: {} is falsy, so neither the mtp-conflict nor the missing-keys check runs."""
     write_models_yaml(tmp_path, [dict(MINIMAL_ROW, mtp=True, draft={})])
     (row,) = generate._load_models()
-    assert row[10] == {}
+    assert row[9] == {}
     assert row[4] is True
 
 
@@ -178,13 +226,6 @@ def test_load_models_empty_templates_list_falls_back_to_embedded(tmp_path):
     write_models_yaml(tmp_path, [dict(MINIMAL_ROW, templates=[])])
     (row,) = generate._load_models()
     assert row[8] == [""]
-
-
-def test_load_models_kv_unified_is_coerced_to_bool(tmp_path):
-    write_models_yaml(tmp_path, [dict(MINIMAL_ROW, id="a", kv_unified=1),
-                                 dict(MINIMAL_ROW, id="b", kv_unified=0)])
-    a, b = generate._load_models()
-    assert a[9] is True and b[9] is False
 
 
 def test_load_models_mtp_int_is_preserved(tmp_path):
@@ -213,7 +254,7 @@ SAMPLER = "--temp 0.6 --top-p 0.95"
 
 
 def base_cmd(**kw):
-    kw = {"binref": "${vulkan}", "relpath": "v/m.gguf", "ctx": 4096, "kv": "f16",
+    kw = {"binref": "${vulkan}", "relpath": "v/m.gguf", "kv": "f16",
           "mtp": False, "sampler": SAMPLER, **kw}
     return generate.cmd_for(**kw)
 
@@ -223,17 +264,19 @@ def test_cmd_for_base_line_order_and_contents():
     assert lines_of(cmd) == [
         "${vulkan}",
         f"--model {generate.MODELS_DIR}/v/m.gguf",
-        "-c 4096 -ctk f16 -ctv f16",
-        "-np 1",
+        "-ctk f16 -ctv f16",
         "${common}",
         SAMPLER,
     ]
+    # the engine-tuning flags are NOT emitted by cmd_for anymore: they are `cmd` tokens
+    for flag in ("-c ", "-np ", "--kv-unified", "-a ", "--spec-draft-p-min"):
+        assert flag not in cmd
 
 
 def test_cmd_for_joins_lines_with_six_space_continuation():
     """The join string is load-bearing: the result is embedded under `cmd: |` in config.yaml."""
     assert "\n      " in base_cmd()
-    assert base_cmd().count("\n") == 5
+    assert base_cmd().count("\n") == 4
 
 
 def test_cmd_for_uses_models_dir_prefix_for_the_target_gguf():
@@ -244,48 +287,22 @@ def test_cmd_for_kv_quant_drives_both_ctk_and_ctv():
     assert "-ctk q8_0 -ctv q8_0" in base_cmd(kv="q8_0")
 
 
-# --------------------------------------------------------------------------------------------
-# cmd_for -- slots / kv_unified
-# --------------------------------------------------------------------------------------------
-def test_cmd_for_split_kv_multiplies_ctx_by_slots():
-    cmd = base_cmd(slots=4)
-    assert "-c 16384 -ctk f16 -ctv f16" in cmd
-    assert "-np 4" in cmd
-    assert "--kv-unified" not in cmd
+def test_cmd_for_appends_cmd_tokens_verbatim_at_the_end():
+    cmd = base_cmd(cmd_tokens=["-c", "4096", "-np", "2", "--kv-unified", "--cache-ram", "12288"])
+    assert lines_of(cmd)[-7:] == ["-c", "4096", "-np", "2", "--kv-unified",
+                                  "--cache-ram", "12288"]
 
 
-def test_cmd_for_unified_kv_keeps_ctx_as_the_shared_pool():
-    cmd = base_cmd(slots=4, kv_unified=True)
-    assert "-c 4096 -ctk f16 -ctv f16" in cmd
-    assert "-np 4" in cmd
-    assert "--kv-unified" in cmd
+def test_cmd_for_cmd_tokens_keep_the_base_order_intact():
+    """The tokens are APPENDED: every pre-existing line must stay, in the same order."""
+    cmd = base_cmd(cmd_tokens=["-c", "4096"])
+    assert lines_of(cmd)[:-2] == lines_of(base_cmd())
 
 
-def test_cmd_for_unified_flag_is_emitted_after_np_and_before_common():
-    ls = lines_of(base_cmd(slots=2, kv_unified=True))
-    assert ls.index("-np 2") < ls.index("--kv-unified") < ls.index("${common}")
-
-
-def test_cmd_for_unified_kv_at_single_slot_still_emits_the_flag():
-    assert "--kv-unified" in base_cmd(slots=1, kv_unified=True)
-
-
-# --------------------------------------------------------------------------------------------
-# cmd_for -- alias
-# --------------------------------------------------------------------------------------------
-def test_cmd_for_alias_is_emitted_between_model_and_ctx():
-    ls = lines_of(base_cmd(alias="my-alias"))
-    assert "-a my-alias" in ls
-    assert ls.index(f"--model {generate.MODELS_DIR}/v/m.gguf") < ls.index("-a my-alias")
-    assert ls.index("-a my-alias") < ls.index("-c 4096 -ctk f16 -ctv f16")
-
-
-def test_cmd_for_no_alias_emits_no_alias_flag():
-    assert "-a " not in base_cmd()
-
-
-def test_cmd_for_empty_alias_is_treated_as_absent():
-    assert "-a " not in base_cmd(alias="")
+def test_cmd_for_cmd_tokens_land_after_the_speculation_flags():
+    cmd = base_cmd(mtp=True, cmd_tokens=["-c", "4096", "--spec-draft-p-min", "0.4"])
+    ls = lines_of(cmd)
+    assert ls.index("--spec-type draft-mtp") < ls.index("-c")
 
 
 # --------------------------------------------------------------------------------------------
@@ -394,57 +411,24 @@ def test_cmd_for_mtp_and_draft_together_emit_spec_type_twice():
 
 
 # --------------------------------------------------------------------------------------------
-# cmd_for -- spec_p_min
-# --------------------------------------------------------------------------------------------
-def test_cmd_for_spec_p_min_emitted_with_mtp():
-    assert "--spec-draft-p-min 0.4" in base_cmd(mtp=True, spec_p_min=0.4)
-
-
-def test_cmd_for_spec_p_min_emitted_with_draft():
-    cmd = base_cmd(draft={"path": "d.gguf", "type": "dflash"}, spec_p_min=0.55)
-    assert "--spec-draft-p-min 0.55" in cmd
-
-
-def test_cmd_for_spec_p_min_zero_is_still_emitted():
-    """`is not None`, not truthiness -- an explicit 0.0 reaches the command line."""
-    assert "--spec-draft-p-min 0.0" in base_cmd(mtp=True, spec_p_min=0.0)
-
-
-def test_cmd_for_spec_p_min_without_speculation_is_still_emitted():
-    """CHARACTERIZATION: cmd_for has no guard; only _load_models refuses the combination."""
-    assert "--spec-draft-p-min 0.4" in base_cmd(mtp=False, spec_p_min=0.4)
-
-
-def test_cmd_for_spec_p_min_is_the_last_line():
-    ls = lines_of(base_cmd(mtp=True, spec_p_min=0.4, tpl="sharp", ctk={"a": 1}))
-    assert ls[-1] == "--spec-draft-p-min 0.4"
-
-
-def test_cmd_for_spec_p_min_none_emits_nothing():
-    assert "--spec-draft-p-min" not in base_cmd(mtp=True)
-
-
-# --------------------------------------------------------------------------------------------
 # cmd_for -- full matrix smoke
 # --------------------------------------------------------------------------------------------
 def test_cmd_for_all_flags_on_line_order():
-    cmd = generate.cmd_for("${rocm}", "v/m.gguf", 8192, "q8_0", 4, SAMPLER, slots=2,
-                           tpl="froggeric", kv_unified=True,
-                           draft=None, spec_p_min=0.4, alias="al", ctk={"k": "v"})
+    cmd = generate.cmd_for("${rocm}", "v/m.gguf", "q8_0", 4, SAMPLER, tpl="froggeric",
+                           ctk={"k": "v"},
+                           cmd_tokens=["-c", "8192", "-np", "2", "--kv-unified",
+                                       "--spec-draft-p-min", "0.4"])
     assert lines_of(cmd) == [
         "${rocm}",
         f"--model {generate.MODELS_DIR}/v/m.gguf",
-        "-a al",
-        "-c 8192 -ctk q8_0 -ctv q8_0",
-        "-np 2",
-        "--kv-unified",
+        "-ctk q8_0 -ctv q8_0",
         "${common}",
         SAMPLER,
         f"--chat-template-file {generate.TEMPLATES['froggeric']}",
         "--chat-template-kwargs '{\"k\":\"v\"}'",
         "--spec-type draft-mtp",
         "--spec-draft-n-max 4",
-        "--spec-draft-p-min 0.4",
+        "-c", "8192", "-np", "2", "--kv-unified", "--spec-draft-p-min", "0.4",
     ]
 
 
@@ -769,8 +753,8 @@ def test_load_models_accepts_hipfire_rows_with_matching_ctx(tmp_path):
 def test_load_models_allows_llamacpp_rows_to_differ_in_ctx(tmp_path):
     """The constraint is hipfire-only: llama.cpp rows carry -c per process, so they may differ."""
     write_models_yaml(tmp_path, [
-        dict(MINIMAL_ROW, id="a", ctx=131072),
-        dict(MINIMAL_ROW, id="b", ctx=225280),
+        dict(MINIMAL_ROW, id="a", cmd=["-c", "131072"]),
+        dict(MINIMAL_ROW, id="b", cmd=["-c", "225280"]),
     ])
     rows = generate._load_models()
     assert sorted(r[2] for r in rows) == [131072, 225280]
