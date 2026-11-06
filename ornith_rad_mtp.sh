@@ -4,10 +4,13 @@
 # Flags = the creator's deploy/compose/ornith-1.5-35b-a3b-w4a8-tp1.yaml (codeberg.org/StillDeadcode/radiance) verbatim.
 # Deviations from that compose file, none of them model-facing:
 #   --host 127.0.0.1 instead of :: (local only, so no API key); no restart policy (a reboot must not hold VRAM);
-#   image pinned instead of :latest (iron rule 2); --served-model-name = the usual Claude settings' ANTHROPIC_MODEL.
+#   image pinned instead of :latest (iron rule 2); --served-model-name = the usual Claude settings' ANTHROPIC_MODEL;
+#   --gpu-headroom-mib 596 instead of the default 96 (see VRAM below); --max-num-seqs 3 instead of 8 (3 parallel at most).
 # Claude: port and served name come from SETTINGS (default the 27b's settings-redhat.json), so the same config works
 # unchanged. The name is an alias: Claude and /v1/models show the 27b's name while Ornith answers.
-# VRAM: leaves about 232 MiB free (MEASURED), which crashed the desktop once; close Chrome if VRAM gets tight.
+# VRAM: Radiance claims all free VRAM minus the headroom, whatever --max-model-len is; the KV cache takes the rest.
+# The default 96 left about 232 MiB free (MEASURED), which crashed the desktop once, so the headroom is 500 MiB higher;
+# not measured yet. Close Chrome if VRAM gets tight.
 # EXTRA_ARGS="--gpu-headroom-mib 2048" is recommended only (docs/vllm/known-issues.md).
 # For precise coding the creator suggests --temp 0.6 --presence-penalty 0 (EXTRA_ARGS=... appended last, later flag wins).
 # Thinking stays on (operator's rule; added to the compose flags): explicit default, and reasoning_effort none/minimal is
@@ -44,7 +47,7 @@ case "${1:-start}" in
       --security-opt seccomp=unconfined --ulimit memlock=-1 \
       -v "$MODEL_DIR":/models:ro "$IMAGE" \
       --model /models/ornith-1.5-35b-a3b-w4a8.rad --host 127.0.0.1 --port "$PORT" --served-model-name "$MODEL" \
-      --tp 1 --max-num-seqs 8 --max-model-len 262144 --kv-cache-dtype fp8 \
+      --tp 1 --max-num-seqs 3 --max-model-len 262144 --kv-cache-dtype fp8 --gpu-headroom-mib 596 \
       --num-speculative-tokens 3 --max-num-batched-tokens 2048 \
       --temp 1.0 --top-p 0.95 --top-k 20 --presence-penalty 1.5 \
       --chat-template-kwargs '{"enable_thinking":true}' --reasoning-effort-map none=high,minimal=high ${EXTRA_ARGS:-} >/dev/null
