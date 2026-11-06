@@ -1,0 +1,2 @@
+4. Code: Exercise every requirement and edge case with a run before reporting done; run available tests and type checks, and report failures as they are.
+5. Files: Write file contents directly with the tool, never drafted in reasoning, in exactly the requested format with no extra lines.

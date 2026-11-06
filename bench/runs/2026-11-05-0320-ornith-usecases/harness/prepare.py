@@ -89,7 +89,9 @@ for z,target in (("S",6000),("M",20000),("L",60000)):
     d=mk(f"summary-{z}"); t,p=near(target); shutil.copy(p,f"{d}/report.md"); save(d,{"src":os.path.relpath(p,AMD)}); SIZES[f"summary-{z}"]=t
 d=mk("summary-HU"); p=f"{DIP}/AiChatney/docs/analysis/2026-08-08-1518-050-magyar-nyelv-adapter-teszt.md"; shutil.copy(p,f"{d}/report.md"); save(d,{"src":p}); SIZES["summary-HU"]=toks(rd(p))
 # ---- classify: real markdown heads, label from location, path hidden
+CUTOFF=float(os.environ.get("PREP_CUTOFF",0))  # keep the classify pool as it was: skip documents changed after this time
 def clean(ps):
+    ps=[p for p in ps if not CUTOFF or os.path.getmtime(p)<CUTOFF]
     return sorted(p for p in ps if not re.search(r"/(\.gate-code|\.claude/worktrees|node_modules|tmp)/",p) and os.path.getsize(p)>400)
 G={"benchmark-report":clean(glob.glob(f"{AMD}/docs/analysis/*.md")+glob.glob(f"{AMD}/campaigns/*/analysis.md")),
 "research":clean(glob.glob(f"{AMD}/docs/research/*.md")+glob.glob(f"{DIP}/AiChatney/docs/research/**/*.md",recursive=True)),

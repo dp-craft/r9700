@@ -1,0 +1,7 @@
+All three target files are written, `doc_check.py` prints PASS (0 lines lost/altered/duplicated, none unassigned), and each reads logically with its summary/conclusion first:
+
+- **topic-a.md** — the backend-tuning report (§1 TL;DR optimum → §2 deltas → §3 sweeps → §4 exact optimum → §5 cross-runtime → §6 status → §7 reproducing)
+- **topic-b.md** — W2-08 blind-review quality benchmark (Summary → Results per Opus finding → Review quality coverage → What differs → Consequences → Recommended next step → Legend → Methodology)
+- **topic-c.md** — the "why Q4 thought less / headroom" analysis (Summary → Consequences & root causes → Measured per-step results → Levers → KV-cache/L6 research → Legend → Methodology)
+
+DONE

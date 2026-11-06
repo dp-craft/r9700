@@ -35,9 +35,19 @@ OPEN: <one question the report leaves unanswered; or none>
 """
 
 
+# V5 = V2 without "Think briefly". V6 = V5, and step 2 checks hits, footnotes and caveats against the INCIDENT definition, without the "real event in a run" filter.
+CHECK = ("   Check each hit against the report and keep those that describe a real event in a run.\n",
+         "   Check each hit, and every footnote, table note and caveat, against the INCIDENT definition below; keep each that fits it, run failures or not.\n")
+
+
 def brief(v, r):
     n = os.listdir(f"{r}/docs")[0]
-    return (READ + (SEARCH if v == "V2" else PLAIN) + RULES).replace("{R}", r).replace("{N}", n)
+    b = READ + (SEARCH if v in ("V2", "V5", "V6") else PLAIN) + RULES
+    if v in ("V5", "V6"):
+        b = b.replace(" Think briefly.", "")
+    if v == "V6":
+        b = b.replace(*CHECK)
+    return b.replace("{R}", r).replace("{N}", n)
 
 
 if __name__ == "__main__":

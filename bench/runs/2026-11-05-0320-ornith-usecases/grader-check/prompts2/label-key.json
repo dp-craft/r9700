@@ -1,0 +1,22 @@
+{
+ "2026-09-15-stew675-buildcmp.analysis.md": {
+  "B": "base",
+  "C": "dp",
+  "A": "dps"
+ },
+ "2026-10-31-redhat-sharp-w208-blind.analysis.md": {
+  "B": "base",
+  "A": "dp",
+  "C": "dps"
+ },
+ "2026-10-30-0900-vllm-redhat-mxfp4-depth-transposed.md": {
+  "C": "base",
+  "A": "dp",
+  "B": "dps"
+ },
+ "2026-07-14-hardest-tasks-27b-vs-35b.analysis.md": {
+  "A": "base",
+  "C": "dp",
+  "B": "dps"
+ }
+}

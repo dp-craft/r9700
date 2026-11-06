@@ -1,0 +1,14 @@
+DOC: 2026-07-14-hardest-tasks-27b-vs-35b.analysis.md
+TOPIC: At a ~132.9k-token prompt, three axes were tested against deterministic TS% and a blind judge: the Qwen3.6-27B quant ladder, the 4096/16384/unlimited reasoning budget, and the 35B-A3B sampling sweep across 210 graded replies on one AMD R9700 box.
+VERDICT: The three axes each resolve to one answer — the quant ladder is a bounded null with no precision gain worth paying for, budget above ~4k buys nothing on the dense 27B (and one unlimited reply ran away), and the vendor's temp-0.6 coding recipe is the best sampling setting. Cleanliness (lint/types) not logic is the quality wall, presence_penalty loses decode without a clear cause, but unexplained GTT spill on a no-swap box blocks unattended use.
+CONFIG: Qwen3.6-27B-MTP (Q4_K_M / UD-Q4_K_XL / Q5_K_M / Q6_K) and Qwen3.6-35B-A3B-UD-Q4_K_M · llama.cpp Vulkan b9950 (-ub 2048 -b 4096 -fa on), MTP on, ctx 163840, reasoning budget 4096 / 16384 / unlimited; temp 0.3/0.6/1.0 and presence_penalty sweep on the 35B
+PATHS: bench/runs/2026-07-16-0927-mtp-sampler-probe/, bench/runs/2026-07-16-0927-mtp-sampler-probe/depth_probe.sh
+FACT|23|Q4_K_M 78.3, Q4_K_XL 69.8, Q5_K_M 76.5, Q6_K 80.9 TS%|Quant ladder cell means by precision — bounded null
+FACT|25|+0.3 pts, +60 s per reply|Budget 4096 to 16384 effect on 27B quality (ns)
+FACT|27|temp 0.6 → 77.5 TS%|Best 35B sampling point, the Qwen coding recipe
+FACT|29|78.1 and 72.6 vs 115.7–120.2 t/s|Decode throughput lost under presence_penalty above 0
+FACT|31|lint 0.36, types 0.47 vs tests 0.84|Strict-cleanliness wall means versus logic objectives
+INCIDENT|185|First rep discarded at a 104°C throttle; re-collected after clearing the intake filter
+INCIDENT|493|Debug-build first-pass rows discarded before these tables were produced
+INCIDENT|796|UPS power event cut the overnight block; partial rows quarantined, not used
+OPEN: What causes the 1551–2841 MiB GTT spill in all 14 cells on a box with VRAM headroom?

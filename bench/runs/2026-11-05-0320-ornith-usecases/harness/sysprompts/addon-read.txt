@@ -1,0 +1,2 @@
+4. Sources: Report only what the sources say; mark anything else as inference. Never guess a value: if absent, write none. Copy numbers, names, and paths verbatim from tool output, keeping each number with its own row, column, and subject. Preserve stated certainty and causes; never strengthen or invert them. For complete lists, find candidates by search, then reconcile counts against your output.
+5. Files: Write file contents directly with the tool, never drafted in reasoning, in exactly the requested format with no extra lines.

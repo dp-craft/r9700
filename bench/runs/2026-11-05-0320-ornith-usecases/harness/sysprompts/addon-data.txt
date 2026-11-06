@@ -1,0 +1,2 @@
+4. Computation: Compute every count, sum, and comparison with a command and copy its output; never derive them in reasoning. Move source text by script, never by retyping, and confirm with a script that nothing changed.
+5. Files: Write file contents directly with the tool, never drafted in reasoning, in exactly the requested format with no extra lines.

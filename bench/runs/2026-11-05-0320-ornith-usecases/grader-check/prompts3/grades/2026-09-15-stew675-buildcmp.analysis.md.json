@@ -1,0 +1,7 @@
+{
+  "notes": [
+    {"report": "2026-09-15-stew675-buildcmp.analysis.md", "label": "A", "verdict": 2, "config": 2, "facts_decision_relevant": 4, "facts_wrong_meaning": 1, "incidents_total": 1, "incidents_unsupported": 0, "incidents_missed": 1, "open": 2, "critical_error": "FACT|93 presents decode as 'flat within noise band' (±1.5%) across both backends, but the run is REPS=1 with no noise estimate (source lines 24 and 114), so the note gives a statistical bound the run cannot support."},
+    {"report": "2026-09-15-stew675-buildcmp.analysis.md", "label": "B", "verdict": 2, "config": 1, "facts_decision_relevant": 5, "facts_wrong_meaning": 0, "incidents_total": 1, "incidents_unsupported": 0, "incidents_missed": 1, "open": 2, "critical_error": null},
+    {"report": "2026-09-15-stew675-buildcmp.analysis.md", "label": "C", "verdict": 2, "config": 2, "facts_decision_relevant": 5, "facts_wrong_meaning": 0, "incidents_total": 1, "incidents_unsupported": 0, "incidents_missed": 1, "open": 2, "critical_error": null}
+  ]
+}

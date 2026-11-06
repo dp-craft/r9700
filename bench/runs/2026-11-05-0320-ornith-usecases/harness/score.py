@@ -5,8 +5,13 @@ task,w,kd,H=sys.argv[1:5]
 K=json.load(open(f"{kd}/key.json")) if os.path.exists(f"{kd}/key.json") else {}
 def rd(p):
     return open(p,encoding="utf8",errors="replace").read() if os.path.exists(p) else None
-def sh(c,cwd):
-    return subprocess.run(c,shell=True,cwd=cwd,capture_output=True,text=True,timeout=300)
+def sh(c,cwd,t=300):
+    # own process group: on timeout the whole group dies, so a hung test worker can't outlive the scorer
+    p=subprocess.Popen(c,shell=True,cwd=cwd,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,start_new_session=True)
+    try:
+        o,e=p.communicate(timeout=t); return subprocess.CompletedProcess(c,p.returncode,o,e)
+    except subprocess.TimeoutExpired:
+        os.killpg(p.pid,9); o,e=p.communicate(); return subprocess.CompletedProcess(c,-9,o or "",e or "")
 r={}
 if task=="log":
     t=rd(f"{w}/out/report.txt") or ""; rows=[]; dev=0
@@ -78,8 +83,17 @@ elif task in("impl","testgen","edit","bugfix"):
         return json.loads(m[0]) if m else {"numTotalTests":0,"numPassedTests":0,"success":False}
     if task=="impl":
         os.makedirs(f"{ws}/hid",exist_ok=True); shutil.copy(f"{C}/hidden/logfmt.hidden.test.ts",f"{ws}/tests/hidden.test.ts")
-        v=vitest(ws,"tests/hidden.test.ts"); own=vitest(w); ts=sh("npx tsc --noEmit",w)
-        r=dict(hidden_pass=v["numPassedTests"],hidden_total=v["numTotalTests"],own_tests=own["numTotalTests"],own_pass=own["numPassedTests"],tsc_errors=ts.stdout.count("error TS"))
+        v=vitest(ws,"tests/hidden.test.ts"); hung=[]
+        if not v["numTotalTests"]:
+            # the suite hung or crashed: run each test name alone under a short timeout, a hang counts as failed
+            src=open(f"{ws}/tests/hidden.test.ts").read(); names=re.findall(r'^\s*(?:it|test)\("([^"]+)"',src,re.M); v={"numTotalTests":len(names),"numPassedTests":0}
+            for n in sorted(set(names)):
+                p=sh(f"npx vitest run --reporter=json --no-color tests/hidden.test.ts -t {json.dumps('(^| )'+re.escape(n)+'$')}",ws,40)
+                m=re.search(r'\{.*"numTotalTests".*\}',p.stdout,re.S)
+                if p.returncode==-9 or not m: hung.append(n); continue
+                v["numPassedTests"]+=json.loads(m[0])["numPassedTests"]
+        own=vitest(w); ts=sh("npx tsc --noEmit",w)
+        r=dict(hidden_pass=v["numPassedTests"],hidden_total=v["numTotalTests"],hung=hung,own_tests=own["numTotalTests"],own_pass=own["numPassedTests"],tsc_errors=ts.stdout.count("error TS"))
         r["score"]=round(v["numPassedTests"]/max(v["numTotalTests"],1),3)
     elif task=="testgen":
         src_ok=rd(f"{w}/src/semver.ts")==rd(f"{C}/ws/src/semver.ts"); shutil.copy(f"{C}/ws/src/semver.ts",f"{ws}/src/semver.ts")

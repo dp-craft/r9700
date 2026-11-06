@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# run_arm.sh TASK SIZE VARIANT PRESET [REP]: one sequential Ornith arm through the skill's ornith.sh. Rerun skips finished arms. Failed or cut runs go to quarantine/. ARM_CAP = seconds before the session is cut.
+# run_arm.sh TASK SIZE VARIANT PRESET [REP]: one Ornith arm through the skill's ornith.sh; arms may run in parallel. Rerun skips finished arms. Failed or cut runs go to quarantine/. ARM_CAP = seconds before the session is cut. SYS_ARGS = extra claude flags, used for the system prompt test; @P@ becomes the profile. ARM_PROFILE overrides the profile. ORN overrides the wrapper (the wide allow-list test).
 RUN=/home/dev/work/dp-craft/amd/bench/runs/2026-11-05-0320-ornith-usecases; H=$RUN/harness
 UC=/tmp/claude-1001/-home-dev-work-dp-craft-amd/bf832afa-1002-41d9-a4b8-4b201a1bc43c/scratchpad/uc
-ORN=/home/dev/work/dippe/skills-agents/skills/ornith/scripts/ornith.sh
+ORN=${ORN:-/home/dev/work/dippe/skills-agents/skills/ornith/scripts/ornith.sh}
 TS=/home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/ts-harness/node_modules
 TASK=$1; SIZE=$2; V=$3; P=$4; REP=${5:-}; ARM=$TASK.$SIZE.$V.$P${REP:+.$REP}; A=$UC/runs/$ARM; M=$RUN/arms/$ARM
 [ -f "$M/result.json" ] && { echo "skip $ARM"; exit 0; }
@@ -20,6 +20,7 @@ case "$TASK" in
   *) find "$KD" -maxdepth 1 -mindepth 1 ! -name key.json -exec cp -r {} "$A/" \;;;
 esac
 [ "$V" = V3 ] && PROFILE=data
+[ -n "${ARM_PROFILE:-}" ] && PROFILE=$ARM_PROFILE
 case "$TASK" in
   docsplit|docreorg) [ "$V" = V2 ] && PROFILE=data; python3 $H/doc_briefs.py "$TASK" "$V" "$A" > "$M/brief.txt";;
   docnotes) python3 $H/notes_briefs.py "$V" "$A" > "$M/brief.txt";;
@@ -28,10 +29,11 @@ esac
 sleep 2
 python3 /home/dev/work/dp-craft/amd/bench/lib/vram_sampler.py --out "$M/gpu.csv" --interval 2 >/dev/null 2>&1 & SMP=$!
 SINCE=$(date -u +%Y-%m-%dT%H:%M:%SZ); T0=$(date +%s.%N)
-cd "$A"; ORNITH_OUT="$M/raw.json" MAX_TURNS=${MAX_TURNS:-80} timeout ${ARM_CAP:-1800} "$ORN" --profile "$PROFILE" "$(cat "$M/brief.txt")" > "$M/reply.txt" 2>&1; RC=$?
+SYS_ARGS=${SYS_ARGS//@P@/$PROFILE}; cd "$A"; ORNITH_OUT="$M/raw.json" MAX_TURNS=${MAX_TURNS:-80} timeout ${ARM_CAP:-1800} "$ORN" --profile "$PROFILE" "$(cat "$M/brief.txt")" ${SYS_ARGS:-} > "$M/reply.txt" 2>&1; RC=$?
 T1=$(date +%s.%N); kill $SMP 2>/dev/null; wait $SMP 2>/dev/null
-docker logs --since "$SINCE" radiance-8000 2>&1 | grep -E ' req msg_.* done ' > "$M/server.log"
-python3 $H/serverstats.py "$M/server.log" | head -1 > "$M/server.json"
+docker logs --since "$SINCE" radiance-8000 2>&1 | grep -E ' req msg_.* done ' > "$M/server.all"
+python3 $H/own_requests.py "$M/raw.json" "$M/server.all" > "$M/server.log" 2>"$M/own.err"; rm -f "$M/server.all"
+python3 $H/serverstats.py "$M/server.log" 2>/dev/null | head -1 > "$M/server.json"
 if [ $RC -ne 0 ] || grep -q 'ORNITH ERROR' "$M/reply.txt"; then
   mkdir -p $RUN/quarantine; rm -rf "$RUN/quarantine/$ARM"; mv "$M" "$RUN/quarantine/$ARM"; echo "QUARANTINE $ARM rc=$RC"; exit 0
 fi

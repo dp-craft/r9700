@@ -1,0 +1,9 @@
+Implementation complete. `src/logfmt.ts` exports `parse`, `format`, and the `LogfmtError` class per SPEC.md:
+
+- **`LogfmtError`** — `Error` subclass with a numeric `column`, set via `(message, column)`.
+- **`parse`** — splits on spaces/tabs; bare keys → `true`, `key=` → `""`, bare values run to the next separator (allowing `=`), quoted values decode `\"`, `\\`, `\n`; last value wins for repeats and insertion order is preserved. Throws with the correct 0-based column for empty keys (=), unterminated quotes (opening `"`), unknown escapes (backslash), and trailing chars after a closing quote.
+- **`format`** — joins pairs with one space in insertion order; empties/values containing whitespace/`"`,`\`,`=`,newline get quoted with `\`, `"`, newline escaped; invalid keys throw with `column: -1`.
+
+I validated the logic by running Node 24's type-stripping against the actual source across ~30 cases (smoke test, all four error columns, escaping, round-trip equality) — passing before removing the scratch harness. The full suite was run via vitest.
+
+DONE

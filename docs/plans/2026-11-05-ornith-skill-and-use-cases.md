@@ -1,6 +1,6 @@
 # Ornith skill and use-case tests: plan and status
 
-Living plan. **Nothing is committed.** Status last updated 2026-11-05, while Phase A was running.
+Living plan. **Nothing is committed.** Status last updated 2026-11-05, during the system prompt tests; see "System prompt test" for the current status and next steps.
 
 ## Goal
 
@@ -200,6 +200,79 @@ Critical-error flags, each Haiku-only flag checked against its source:
 
 **Decision:** Haiku `max` grades first; two independent passes on anything that matters. Every critical flag gets checked against the source before it's reported. An Ornith-versus-Haiku verdict gap under 4 of 18 counts as a tie, because this grader gap alone is that large.
 
+## System prompt test
+
+**Why:** Ornith ran as a main session and Haiku as subagents, so the prompts differ. The operator also wants to test a prompt from their own 27B template, which may help on complex tasks. Approved scope: document tasks, one run per arm.
+
+| Condition | What changes | How |
+|---|---|---|
+| Baseline | Nothing: the earlier P0 arms. `classify` S reruns once as `base2`, because its rebuilt fixture differs slightly (16,631 vs 16,700 tokens) | Main session prompt |
+| `sa` | The subagent text replaces the main prompt | `--system-prompt-file`; the captured request matches a real subagent's system text exactly |
+| `dp` | The operator's prompt is added to the main prompt, so only one thing changes | `--append-system-prompt-file`; first request grows by about 550 tokens |
+
+| Arms | Conditions | Why |
+|---|---|---|
+| `docsplit` L, `docreorg` L, `summary` M, `docnotes` × 4, `classify` S | `sa`, `dp` | Document tasks. `docsplit` L is a guard against breaking what already works |
+| `classify` M | `dp`, then `sa` | Document task at large size, which didn't finish in 840 s |
+| `bugs` M, `bugs` S, `impl`, `log` L | `dp` only | Complex tasks, where this prompt is meant to help; includes large-context weak spots |
+
+**Limit:** 90 minutes, estimated at 79 (`INFERRED`). An arm starts only if its cut-off still fits, and cut arms are quarantined.
+**Grading:** `summary` and `docnotes` go to blind Haiku `max` graders, at most 3 at a time, with the baseline notes in the same batch.
+**Reading it:** each arm is one run, and repeats of the same brief have differed by up to .235 (`impl`) and .18 (`docreorg` L). So a single result can only suggest a direction, and anything promising needs repeats before it changes the skill.
+
+**Result:** done in 53.9 min with no arm cut. Both prompts point to better results on large, list-like document work, and neither helps judgement. See the report's section "Does the system prompt matter?". Next steps are for the operator to decide with me.
+
+**Repeats (operator's direction: simplify, go with `dp` if no problems are expected):** 3 runs per arm on the hard rows, 3 sessions in parallel, plus one `dp` run on every other row and three short per-profile add-ons, all stress-tested on a mock first. `dp` tied on 29 of 34 tasks with 17% fewer generated tokens and no regression, so `ornith.sh` appended `references/prompt-dp.txt` by default (`ORNITH_PROMPT=none` turns it off), later split by profile, below. The add-ons weren't adopted, and `prompt-subagent.txt` left the skill; its copy stays in `harness/sysprompts/`. The `code` allow-list blocks most test commands; a wider list halved the denials on `impl` (12.0 to 5.7 per session, 3 arms) but isn't applied without approval. See the report's section "System prompt repeats".
+
+**Split by profile (applied):** per profile, `dp` gave `data` 9 tasks, 33% fewer tokens, +.02; `code` 4 tasks, 15% fewer, a tie apart from the permission-caused `testgen` 0.0; `read` 12 tasks, 20% more, −.05. So `ornith.sh` appends `dp` on `data` and `code` only, as text (`--append-system-prompt`), so that a caller's `--append-system-prompt-file` adds to it. `read` keeps Claude Code's prompt alone. Stress-tested on the mock. All `MEASURED`.
+
+**Replace instead of append (`dpr`):** `dp` replacing Claude Code's prompt scored the same as appending on notes (blind round 2: conclusion 6 of 12, config 7 of 8, 3 critical errors, vs base 9, 4 and 0). So the weakness is `dp`'s wording, not Claude Code's text around it.
+
+**One grounded prompt for every profile (`gr`, 363 tokens, replaces Claude Code's):** written against `dp`'s weak spots on documents (direction flips, strengthened certainty, editorial causes, merged classes) and the incidents no Ornith run found (footnotes, an rc 137 kill, contamination after a boundary, the last item of a numbered list). 27 arms in 33.5 min, none cut, VRAM ≤30,823 MiB.
+- Wins: log classes at 18k 1.0 twice, 340k 21 of 21 once (the definitions rule worked).
+- Losses: `impl` 1.0, .765, .735; `testgen` one 0.0; `docreorg` L below `dp`; bugs ≈ `dp`, below base.
+- Notes: incidents found base 10 of 16, `dp` 9, `gr` 10, `gr2` 8; the never-found 7 stayed at 0–1. One `gr2` run missed even the planted incident. Blind round 3, 4 reports: conclusion base 9, `dp` 7, `gr` 7, `gr2` 6 of 12; config 5, 6, 5, 6 of 8; critical errors 0, 2, 2, 2 (checked against the sources: real, the `gr` one on `hardest` drops a stated condition). The recall rules didn't move recall; the brief's search steps likely decide it (`INFERRED`).
+- Conclusion: one prompt for all profiles doesn't hold. The split stays. On notes, Claude Code's prompt alone is still best.
+
+**Testing rule from here (operator, 2026-11-05):** minimize testing and analysis. Iterate prompt variants on one case only, 1 scenario at 1 size, up to 3 runs per variant in parallel, scored by script. Run the full suite only once, with the best variant.
+- **Case:** notes on the `sharp` report (V2 brief). It holds the planted incident, two never-found incidents (rc 137 kill, line 282; contamination after a boundary, line 293), and the n=1 certainty trap.
+- **Score:** `missed_check.py` on those incident lines, plus a check that the conclusion keeps the report's own certainty. One Haiku `max` grader only for the final candidate.
+- **Stop:** when a variant finds both never-found incidents in 2 of 3 runs without a certainty error, or after a few variants without progress; then the prompt for `read` stays as it is.
+- **Cheap gate (operator):** analysis is expensive, so each iteration checks only whether the variant's intent worked: the target items found, one line per variant (`gate.py`). The full analysis (conclusion, certainty, other reports, a grader) runs only for a variant that passes.
+
+**Iteration result (stopped):** two short add-ons appended to Claude Code's prompt (`harness/sysprompts/rd1.txt`, `rd2.txt`), 3 runs each, 58–94 s per run, VRAM ≤29,579 MiB.
+- `rd1` (judge items by meaning; invalid, stale or mixed data counts): never-found incidents 0 of 2 in 3 of 3 runs; planted one 3 of 3; verdicts kept the report's certainty.
+- `rd2` (also count problems the source only suspects): 0 of 2 in 3 of 3; one run missed the planted incident too.
+- Reading the source again: line 282 (rc 137) is the planned stop of the `stop_when` regex, so leaving it out is defensible. Line 293 is a hedged contamination risk filed under grading. Every run read the whole file, so the misses are judgement, not reading. With `gr` and `gr2` before, four prompts have failed to move this recall. A system prompt doesn't reach it; the brief's search steps decide it (`INFERRED`).
+- Outcome: `read` keeps Claude Code's prompt alone. No full-suite run, since no variant won.
+
+**Thinking-method prompts and brief changes on `buildcmp` (operator's directions; case switched because its two never-found items, footnotes L52 and L64, are clear exclusions):** 3 runs each, gate only (`gate.py`). All `MEASURED`.
+
+| Variant | Where | L52 | L64 | Planted L66 |
+|---|---|---|---|---|
+| `rd3s` reread as a skeptic (was `rd3`) | System prompt, appended | 0/3 | 0/3 | 3/3 |
+| `rd4` map the source first | System prompt, appended | 0/3 | 0/3 | 3/3 |
+| `rd5` draft, then check against the source | System prompt, appended | 0/3 | 0/3 | 3/3 |
+| `rr3` operator's 4 document rules (meaning over keywords, borderline bucket, peripheral sweep, epistemic fidelity) | System prompt, **replacing** Claude Code's (operator: replace, never append; the other `rd` rows were appended) | 0/3 | 0/3 | 3/3 |
+| `rr3` on the V6 brief | System prompt replacing + brief | 0/3 | 1/3 | 3/3 |
+| V5: brief without "Think briefly" | Brief | 0/3 | 1/3 (the run with the most reasoning, 10.7k tokens) | 3/3 |
+| V6: V5, step 2 checks footnotes and caveats against the definition, no "real event in a run" filter | Brief | 0/3 | 0/3 | 3/3 |
+
+Even an explicit instruction in the brief didn't make it list the footnotes. **The test is valid: Haiku solves it.** In the earlier run (`bench/runs/2026-11-04-2207-docanalysis-ornith-vs-haiku/`, the same `INCIDENT` field and "Think briefly"), Haiku listed L64 in 6 of 6 notes and L52 in 4 of 6 (2 sets × low, medium and high effort); Ornith 0 of 3. So my guess that the field's wording blocks it is withdrawn.
+
+**Correction (2026-11-06):** the gate accepted only L52 and L64, but run `rr3-2` on V6 cited L24, the summary caveat about the same exclusion. With L24, L52 and L64 counted as one item, `rr3` (operator's prompt replacing Claude Code's) on V6 found it in 2 of 3 runs: the only pass. Every other variant scored 0–1 of 3. n = 3 on one report, so it's a lead. Review package for another session: `bench/runs/2026-11-05-0320-ornith-usecases/review-incident-recall/README.md`. Next cheap check: `rr3` + V6 on sharp and depth, gate only.
+
+**`rr7` on Haiku's own brief and set S (2026-11-06):** operator's second prompt (`harness/sysprompts/rd7.txt`) replacing Claude Code's, Haiku's exact brief, the 4 reports Haiku read, 3 runs in parallel, 222–264 s each (`harness/haikubrief_run.sh`, `haikubrief_gate.py`). buildcmp L52 0/3, L64 0/3, the cold-start exclusion at any line 1/3; sharp L293 0/3, L282 0/3; planted 6/6. On the same gate, Haiku high and medium found every target, low missed only L293. Fail: the prompt doesn't close the gap on Haiku's setup either.
+
+**`dp` replacing Claude Code's prompt on `code` (operator's request, one case):** `impl`, 3 runs in parallel. Replace 1.0, .824, .382 (mean .735), 26.9k generated tokens, 29–42 turns, 4–12 denials. Append, earlier: 1.0, 1.0, .824 (mean .941), 19.7k tokens, 24–27 turns, 11–14 denials. The .382 run spent its denials probing for `node`, `tsc` and `vitest`, which the profile blocks. Replacing is worse here, so `code` keeps `dp` appended. On notes, replace and append tied (round 2). `MEASURED`, 3 runs per arm, so the gap is a direction, not a settled size.
+
+**Status:** the wrapper ships the split. Round 3 is graded and unblinded. The report, README and SKILL don't have the `dpr`, `gr` and `rd` results yet.
+
+**Next steps:**
+1. Update the report, README and SKILL with the split, `dpr`, `gr` and `rd`; run `docs/reindex.py`.
+2. Optional, operator's call: test a brief-level fix on the same `sharp` case (a second pass over the report's confound and boundary sections, after the grep), by the same one-case rule.
+3. Operator decisions below: the `code` allow-list, `local-agent.sh`, commits.
+
 ## How results become recommendations
 
 These thresholds are my proposal, so they can change after review:
@@ -229,10 +302,11 @@ These thresholds are my proposal, so they can change after review:
 
 ## Open decisions for the operator
 
-The operator hasn't yet chosen on the system-prompt retest (report, "Open experiments", item 1).
+The system prompt retest, its repeats, the profile split, the `gr` test and the `read` prompt iteration are done. See "System prompt test".
 
 | Decision | When |
 |---|---|
+| Whether to widen the `code` profile's allow-list in `ornith.sh` (adds `node`, `npx --no-install`, `node_modules/.bin` runners, `python -m pytest`, `echo`, `head`, `tail`, `wc`) | Now |
 | Starter default if P2 wins everywhere, or a restart rule if it wins only for coding | After Phase C |
 | Whether `local-agent.sh` should get clean flags and more turns, or point to the new skill | After Phase H |
 | Whether to commit, in `amd`, `skills-agents`, `dp-forge` and `AiChatney` | After Phase J |
