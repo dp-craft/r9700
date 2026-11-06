@@ -51,7 +51,7 @@ kernel bugs (findings 6, 7). AMD's own limitations page documents Radeon-specifi
 | 27B LoRA (bf16 base) | ❌ | base alone ~54 GiB |
 | 27B DPO/GRPO | ❌ | ref-model/rollout multipliers (finding 8) |
 | 4–8B QLoRA / LoRA / DPO | ✅ | Qwen3-8B QLoRA precedent on this GPU (Tier-2); budgets in finding 8 |
-| Anything while llama-server serves the 27B | ❌ | INFERRED: serving already peaks 30.2 GiB of 32.6 GiB [MEASURED-BY-US, campaigns/2026-07-13-27b-quality-at-depth] |
+| Anything while llama-server serves the 27B | ❌ | INFERRED: serving already peaks 30.2 GiB of 32.6 GiB [MEASURED-BY-US, campaigns/quality/2026-07-13-1657-27b-quality-at-depth] |
 
 ### Consequences for the gateway's background finetune loop
 1. **Same-GPU train-while-serve is out.** The loop must be a scheduled offline window (serving down)

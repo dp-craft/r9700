@@ -8,11 +8,11 @@ takeaway: At δ 0 DFlash2 k=7 decodes faster than the model's own MTP head k=4 a
 # Benchmark: RedHat Qwen3.8-27B-MXFP4 on Sly 1.9.1 at Cactus δ 0 - DFlash2 k=7 vs MTP k=4 by depth - R9700 (gfx1201)
 
 - **Date:** 2026-10-30, probes 22:35-22:39 (DFlash2) and 22:50-22:55 (MTP) local · **Track:** engine-bench campaign (`gen_campaign.py` → `run.sh` → `capture_engine.py probe`)
-- **GPU/Host:** Radeon AI PRO R9700 (gfx1201, 32624 MiB), kernel 7.0.0-38-generic · power state during these runs: `power1_cap` 210 W (default 300 W), `power_dpm_force_performance_level=manual`, profile `POWER_SAVING`, `OD_VDDGFX_OFFSET` −80 mV, `OD_SCLK_OFFSET` 0 MHz (`bench/runs/2026-10-30-sly191-d0-power-state.log`, snapshot 22:36; cap + profile also logged before/after each campaign in `bench/runs/2026-10-30-sly191-d0-depth.log`)
+- **GPU/Host:** Radeon AI PRO R9700 (gfx1201, 32624 MiB), kernel 7.0.0-38-generic · power state during these runs: `power1_cap` 210 W (default 300 W), `power_dpm_force_performance_level=manual`, profile `POWER_SAVING`, `OD_VDDGFX_OFFSET` −80 mV, `OD_SCLK_OFFSET` 0 MHz (`campaigns/perf/2026-10-30-2232-vllm-redhat-sly191-d0-dflash-depth/tmp/2026-10-30-sly191-d0-power-state.log`, snapshot 22:36; cap + profile also logged before/after each campaign in `campaigns/perf/2026-10-30-2232-vllm-redhat-sly191-d0-dflash-depth/tmp/2026-10-30-sly191-d0-depth.log`)
 - **Engine:** `ghcr.io/slybase/vllm-sly-radiance:1.9.1-rocm10.1` @ `sha256:9744caf31e9638ec11c01b6bd6e9e61198020a8d7fb80701710caa955cf9abc8` (vLLM 0.32.0), chat template `qwen3.8-froggeric-v22.5-sly2`, `enable_thinking: true`, sampling temperature 1.0 / top_p 0.95 / top_k 20 / min_p 0 / presence_penalty 0 (all from `server-<name>.txt`, the resolved `serve_vllm.sh print`)
 - **Model:** `RedHatAI/Qwen3.8-27B-MXFP4` @ `16a86728`; drafter `syvai/Qwen3.8-27B-DFlash2-W4A16` @ `4d30ec73`; MTP = the checkpoint's own head
 - **Data:** `bench/runs/2026-10-30-vllm-redhat-sly191-d0-{dflash,mtp}-depth/` (consolidated `results.jsonl` + `server-*.txt` + `meta.txt`), per-probe dirs `bench/runs/2026-10-30-22{35,36,37,50,51,53}-engine-redhat-sly191-d0-*`; δ 0.5 reference `bench/runs/2026-10-30-vllm-redhat-sly191-{dflash,mtp}-depth/`
-- **Campaigns:** this dir and `campaigns/2026-10-30-vllm-redhat-sly191-d0-mtp-depth/` (one write-up for both)
+- **Campaigns:** this dir and `campaigns/perf/2026-10-30-2240-vllm-redhat-sly191-d0-mtp-depth/` (one write-up for both)
 
 ## Summary
 
@@ -24,7 +24,7 @@ takeaway: At δ 0 DFlash2 k=7 decodes faster than the model's own MTP head k=4 a
 
 **Decode vs depth - δ 0, DFlash2 k=7 vs MTP k=4 (p50 = the slower of 2 reps)**
 
-![Decode vs depth](charts/depth_decode.svg)
+![Decode vs depth](../../../campaigns/perf/2026-10-30-2232-vllm-redhat-sly191-d0-dflash-depth/results/charts/depth_decode.svg)
 
 > Plots the tool's p50, i.e. the slower rep. At 50k the two methods' reps overlap, so that point is a tie, not a ranking. The δ 0.5 runs are not drawn: `report.py` keys series by engine name, and the δ 0 and δ 0.5 runs share one (tool gap, see Methodology). MEASURED.
 
@@ -58,11 +58,11 @@ Fixed for every row: fp8 KV, `--max-model-len 262000`, `--max-num-seqs 1`, `--gp
 | δ 0 · MTP k=4 | 97952 | 2253.1 | 71.96 | 71.96 / 73.95 | 42.8293 / 43.4751 | 0.709 | 3.836 | 134 / 536 / 380 | 30876 | 30876 | 499 | 0 |
 | δ 0 · MTP k=4 | 145119 | 2016.7 | 63.09 | 72.82 / 63.09 | 71.927 / 71.9588 | 0.6613 | 3.645 | 141 / 564 / 373 | 30876 | 30900 | 499 | 0 |
 
-The δ 0.5 + fade/cap reference rows (same image, ctx 110000, 19:48-19:58 local) are in `docs/analysis/2026-10-30-0900-vllm-redhat-mxfp4-depth-transposed.md` → "Cactus δ 0 rerun", side by side with these, per depth.
+The δ 0.5 + fade/cap reference rows (same image, ctx 110000, 19:48-19:58 local) are in `docs/findings/radiance/2026-10-30-0900-vllm-redhat-mxfp4-depth-transposed.md` → "Cactus δ 0 rerun", side by side with these, per depth.
 
 **Health - memory & power per probe**
 
-![Memory & power](charts/memory.svg)
+![Memory & power](../../../campaigns/perf/2026-10-30-2232-vllm-redhat-sly191-d0-dflash-depth/results/charts/memory.svg)
 
 > Peak VRAM is the whole card: vLLM's reservation plus the desktop. GTT never grew during a probe: MTP sat at 499 MiB in every sample, and DFlash2 fluctuated between 161 and 253 MiB, falling during the 145k probe. So nothing spilled during a measurement (MEASURED from `gpu_samples.csv`). The absolute GTT level follows the desktop (OPEN, see finding 5).
 
@@ -96,7 +96,7 @@ Depth fits (log-log, y = a·depth^k, fit range 10k-145k):
 
 **Prefill vs depth**
 
-![Prefill vs depth](charts/depth_prefill.svg)
+![Prefill vs depth](../../../campaigns/perf/2026-10-30-2232-vllm-redhat-sly191-d0-dflash-depth/results/charts/depth_prefill.svg)
 
 > Both methods prefill in the same band, so the spec method does not change prefill. MTP's 10k point is one slow rep (2783.2 tok/s, at 136 W average versus ~207 W elsewhere), not a method effect. MEASURED.
 
@@ -116,11 +116,11 @@ Depth fits (log-log, y = a·depth^k, fit range 10k-145k):
    - MTP drafts its 4 tokens sequentially, each through the MTP layer and the 248,320-row LM head.
    - Verify is one target forward over 8 vs 5 tokens in both cases.
    - So MTP pays ~10-15 ms more per step, and its higher per-position acceptance (pos-1 0.83-0.89 vs DFlash2 0.75-0.86, from `accepted_per_pos` ÷ drafts) does not make that up.
-   - Checked and ruled out: the boot line `Falling back to the Triton GDN spec decode path: torch.ops._C.fused_gdn_decode_post_conv_mtp is not built` appears in the DFlash2 1.9.1 server log too (`bench/runs/2026-10-30-0947-dpf-brief-ab/sly191-w208/server-container.log`). It is not an MTP-only handicap (MEASURED: present in both logs).
+   - Checked and ruled out: the boot line `Falling back to the Triton GDN spec decode path: torch.ops._C.fused_gdn_decode_post_conv_mtp is not built` appears in the DFlash2 1.9.1 server log too (`campaigns/agentic/2026-10-30-0947-dpf-brief-ab/tmp/sly191-w208/server-container.log`). It is not an MTP-only handicap (MEASURED: present in both logs).
    - **OPEN:** why DFlash2's step time grows with depth (+7.6 ms from 10k to 145k) while MTP's does not, although both verify against the same KV. One hypothesis: the DFlash2 drafter attends over the target's context features (not verified).
 4. **δ 0.5's speed is acceptance, and acceptance depends on the output.**
    - On these probes DFlash2's decode gain from δ 0.5 was +31 % / +32 % / −6 % at 10k/50k/100k (mean of reps).
-   - In the W2-08 sessions the non-loop decode was 102.0 tok/s at δ 0.5 (1.9.1) vs 74.5 at δ 0 (1.8.1), i.e. +37 % (MEASURED, `docs/analysis/2026-10-30-1552-dpf-brief-fix-heretic-vs-redhat.md`). That is consistent with a larger acceptance gain on real agentic output, but the comparison crosses images and power states (INFERRED).
+   - In the W2-08 sessions the non-loop decode was 102.0 tok/s at δ 0.5 (1.9.1) vs 74.5 at δ 0 (1.8.1), i.e. +37 % (MEASURED, `docs/findings/agentic/2026-10-30-1552-dpf-brief-fix-heretic-vs-redhat.md`). That is consistent with a larger acceptance gain on real agentic output, but the comparison crosses images and power states (INFERRED).
    - S2 (δ 0.5) vs S1 (δ 0), same image, power state and RUNBOOK, is the measurement that settles the price of δ 0.
 5. **Memory:**
    - vLLM's own footprint does not depend on `--max-model-len`. Peak VRAM minus the pre-boot desktop usage (`gpu_exclusive.sh` line) is the same at ctx 262000 and 110000 (MEASURED): DFlash2 30603 vs 30609 MiB, MTP 30315 vs 30283 MiB.
@@ -140,7 +140,7 @@ Depth fits (log-log, y = a·depth^k, fit range 10k-145k):
 ```bash
 PROFILE=sly-redhat/redhat-mxfp4-dflash CACTUS_DELTA=0 SERVED_NAME=qwen38-27b-redhat-mxfp4-dflash \
   MAXLEN=262000 MAXSEQS=1 KV_DTYPE=fp8 GPU_UTIL=0.93 WATCHDOG_MIB=32 PORT=8000 \
-  bench/engine-bench/vllm/serve_vllm.sh start      # image = sly-redhat default 1.9.1-rocm10.1 (@sha256:9744caf3…abc8)
+  stack/serve/vllm/serve_vllm.sh start      # image = sly-redhat default 1.9.1-rocm10.1 (@sha256:9744caf3…abc8)
 ```
 In the agentic campaign this is one arm: `{"profile": "sly-redhat/redhat-mxfp4-dflash", "env": {"CACTUS_DELTA": "0"}}` (server defaults already MAXSEQS 1 / fp8 / 0.93 / watchdog 32).
 
@@ -152,10 +152,10 @@ In the agentic campaign this is one arm: `{"profile": "sly-redhat/redhat-mxfp4-d
 - **Failure:** the first MTP boot is a FAILED row above. The retry used the same spec plus `WATCHDOG_MIB=32` (22:43:53 local).
   - The MTP `meta.txt` still shows the first attempt's env line, because `run.sh` writes `meta.txt` only once. The retry's config is in `server-redhat-sly191-d0-mtp-fp8kv-ctx262000.txt` (`printed_utc=2026-10-30T21:43:53Z`).
   - `serve_vllm.sh print` does not echo `WATCHDOG_MIB`. The value 32 is recorded in the spec, the regenerated `run.sh` and the depth log.
-- **Charts:** `bench/lib/report.py` charts one run dir per call; with `--charts`, the last dir overwrites the others. They were therefore generated from a merged input dir: `bench/runs/2026-10-30-vllm-redhat-sly191-d0-dflash-vs-mtp-merged/` (`cat` of both `results.jsonl` + the MTP `failures.txt`; see its `README.txt`). Regenerate with `python3 bench/lib/report.py bench/runs/2026-10-30-vllm-redhat-sly191-d0-dflash-vs-mtp-merged --charts campaigns/2026-10-30-vllm-redhat-sly191-d0-dflash-depth/charts --appendix campaigns/2026-10-30-vllm-redhat-sly191-d0-dflash-depth/charts/appendix.md`. Also embedded: `charts/power_phase.svg` in the appendix only (`charts/appendix.md`).
+- **Charts:** `bench/core/report.py` charts one run dir per call; with `--charts`, the last dir overwrites the others. They were therefore generated from a merged input dir: `campaigns/perf/2026-10-30-2232-vllm-redhat-sly191-d0-dflash-depth/results/2026-10-30-vllm-redhat-sly191-d0-dflash-vs-mtp-merged/` (`cat` of both `results.jsonl` + the MTP `failures.txt`; see its `README.txt`). Regenerate with `python3 bench/core/report.py campaigns/perf/2026-10-30-2232-vllm-redhat-sly191-d0-dflash-depth/results/2026-10-30-vllm-redhat-sly191-d0-dflash-vs-mtp-merged --charts campaigns/perf/2026-10-30-2232-vllm-redhat-sly191-d0-dflash-depth/results/charts --appendix campaigns/perf/2026-10-30-2232-vllm-redhat-sly191-d0-dflash-depth/results/charts/appendix.md`. Also embedded: `charts/power_phase.svg` in the appendix only (`charts/appendix.md`).
 - **Tool gaps found** (recommendations, not done):
   - `report.py`: merge several run dirs into one chart set, and accept a per-dir series label, so that δ 0 and δ 0.5 runs of the same profile can share a chart.
   - Throughput `run.sh`: record each attempt's env, rather than writing `meta.txt` only once.
   - `serve_vllm.sh print`: echo `WATCHDOG_MIB`.
   - A pre-boot GTT baseline sample.
-- **Reproduce:** `bash campaigns/2026-10-30-vllm-redhat-sly191-d0-dflash-depth/run.sh` and `bash campaigns/2026-10-30-vllm-redhat-sly191-d0-mtp-depth/run.sh`. Both are resumable, so remove `done/` under the run dir to re-measure. The power state above should be the same before comparing numbers.
+- **Reproduce:** `bash campaigns/perf/2026-10-30-2232-vllm-redhat-sly191-d0-dflash-depth/run.sh` and `bash campaigns/perf/2026-10-30-2240-vllm-redhat-sly191-d0-mtp-depth/run.sh`. Both are resumable, so remove `done/` under the run dir to re-measure. The power state above should be the same before comparing numbers.

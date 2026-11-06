@@ -17,7 +17,7 @@ STAMP=$(date +%Y-%m-%d-%H%M)
 R=bench/runs/${STAMP}-vllm-bigwindow-depthcurve
 IMG=stilldeadcode/vllm-radiance:0.9.3
 MODEL=/home/dev/models/vllm/Qwen3.8-27B-INT4
-CACHE=/home/dev/work/dp-craft/amd/bench/dl/radiance-cache
+CACHE=/home/dev/work/dp-craft/amd/stack/serve/var/models/radiance-cache
 NAME=radiance-depthcurve        # OURS only.
 RG=$(getent group render | cut -d: -f3); VG=$(getent group video | cut -d: -f3)
 mkdir -p "$R"; exec > >(tee -a "$R/depthcurve.log") 2>&1
@@ -30,7 +30,7 @@ point() {  # $1=arm dir  $2=url  $3=model  $4=depth
   local A="$1" url="$2" model="$3" d="$4"
   local pf="bench/workloads/generated/codereview-${d}.txt"
   [ -f "$pf" ] || { echo "  DEPTH $d SKIPPED — no fixture $pf"; return 0; }
-  python3 bench/lib/capture_engine.py probe --url "$url" --model "$model" \
+  python3 bench/core/capture_engine.py probe --url "$url" --model "$model" \
     --prompt-file "$pf" --max-tokens "$MAXTOK" --temperature 0.2 \
     --reps "$REPS" --warmup 1 --prefix-mode unique --api chat --timeout 1800 \
     --label "d${d}" --engine "$(basename "$A")" >> "$A/results.jsonl" 2>> "$A/probe.err"
@@ -55,7 +55,7 @@ hc=$(curl -s -o /dev/null -w '%{http_code}' -m 900 http://127.0.0.1:9292/v1/chat
   -d "{\"model\":\"$LCPP_MODEL\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"max_tokens\":1}")
 if [ "$hc" != "200" ]; then echo "  ABORT — warmup http=$hc (rule 18: no data beats bad data)"; else
   setsid bash -c 'echo $$ > "$0"; exec "$@"' "$A/sampler.pid" \
-    python3 bench/lib/vram_sampler.py --out "$A/gpu_samples.csv" > "$A/sampler.log" 2>&1 </dev/null &
+    python3 stack/gpu/vram_sampler.py --out "$A/gpu_samples.csv" > "$A/sampler.log" 2>&1 </dev/null &
   for d in $DEPTHS; do point "$A" http://127.0.0.1:9292/v1 "$LCPP_MODEL" "$d"; done
   kill -TERM "$(cat "$A/sampler.pid")" 2>/dev/null
 fi
@@ -64,13 +64,13 @@ curl -s -m 5 "http://127.0.0.1:9292/unload" >/dev/null
 ########## ARM B — vLLM/radiance, booted directly (not via llama-swap, so ctx/mtp are ours)
 B="$R/radiance-ctx${CTX}-mtp${MTP}-kv${KVD}"; mkdir -p "$B"
 echo; echo "##### ARM B: radiance ctx=$CTX mtp=$MTP np=$NP kv=$KVD  $(date +%T)"
-if ! bash bench/lib/gpu_exclusive.sh 29000 > "$B/gpu_exclusive.log" 2>&1; then
+if ! bash stack/gpu/gpu_exclusive.sh 29000 > "$B/gpu_exclusive.log" 2>&1; then
   echo "  ABORT — GPU not exclusive:"; tail -3 "$B/gpu_exclusive.log"; exit 1; fi
 cleanup
 spec=(); [ "$MTP" -gt 0 ] && spec=(--speculative-config "{\"method\":\"mtp\",\"num_speculative_tokens\":$MTP,\"attention_backend\":\"R4D\",\"disable_padded_drafter_batch\":true}")
 kv=();   [ "$KVD" != "auto" ] && kv=(--kv-cache-dtype "$KVD")
 setsid bash -c 'echo $$ > "$0"; exec "$@"' "$B/sampler.pid" \
-  python3 bench/lib/vram_sampler.py --out "$B/gpu_samples.csv" > "$B/sampler.log" 2>&1 </dev/null &
+  python3 stack/gpu/vram_sampler.py --out "$B/gpu_samples.csv" > "$B/sampler.log" 2>&1 </dev/null &
 docker run -d --name "$NAME" --rm \
   --device /dev/kfd --device /dev/dri --group-add "$RG" --group-add "$VG" \
   --shm-size 4g --cap-add SYS_PTRACE --security-opt seccomp=unconfined \
@@ -132,5 +132,5 @@ for arm in sorted(glob.glob(os.path.join(R,"*","results.jsonl"))):
     print(f"{os.path.basename(os.path.dirname(arm))}: prefill exponent {bp:+.3f} (R2 {rp:.2f}) | "
           f"decode exponent {bd:+.3f} (R2 {rd:.2f}) | n={len(pts)}")
 PY
-python3 bench/lib/report.py "$R" 2>&1 | tail -3 || echo "  (report.py: see the known chart gap)"
+python3 bench/core/report.py "$R" 2>&1 | tail -3 || echo "  (report.py: see the known chart gap)"
 echo "===== done $(date +%T) — $R ====="

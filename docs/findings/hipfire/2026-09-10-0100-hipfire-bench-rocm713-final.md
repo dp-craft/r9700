@@ -148,7 +148,7 @@ Three measurement errors were caught and fixed; each invalidated a result that l
   and DFlash refuses to pair its draft: *"not a registry-managed artifact"*. Worked around with
   `developer.dflash_draft` pointing at the draft explicitly. The V2 ladder's naming appears to have
   outrun its own local scanner.
-- **`install.sh` exits 0 on a failed build.** Gate on `hipfire --version` / `hipfire diag`, never
+- **`stack/install/install.sh` exits 0 on a failed build.** Gate on `hipfire --version` / `hipfire diag`, never
   on exit status.
 - **Reasoning is config-owned in hipfire** (`reasoning.mode` / `effort` / `budget`), not the
   request-body `chat_template_kwargs` mechanism llama-swap rows use. The opencode `variants` block

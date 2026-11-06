@@ -44,7 +44,7 @@ trivial. VRAM peaked at 18.7 GiB (MTP off) and 20.7 GiB (MTP on) -- more than 11
 free throughout, no spill to system memory, no thermal throttling (average power
 294-299 W across the runs).
 
-![Reasoning-budget sweep: quality holds flat while cost and latency scale with the cap](../../campaigns/2026-07-13-27b-quality-tuning/charts/reasoning_budget_sweep.svg)
+![Reasoning-budget sweep: quality holds flat while cost and latency scale with the cap](../../campaigns/quality/2026-07-13-1138-27b-quality-tuning/results/charts/reasoning_budget_sweep.svg)
 <!-- LinkedIn does not render inline SVG. Export reasoning_budget_sweep.svg to PNG before posting. -->
 
 ## The tuning payoff: cap the thinking budget
@@ -66,7 +66,7 @@ judge score we measured was at ~1024 tokens (4.83, MTP on).
 ```bash
 MODEL=/home/dev/models/gguf/Qwen3.6-27B-MTP-Q4_K_M.gguf BACKEND=vulkan PORT=8081 \
 CTX=32768 NP=1 UB=2048 B=4096 FA=on KV=f16 MTP=1 \
-EXTRA_ARGS="--reasoning-budget 1024" bash bench/engine-bench/serve_llamacpp.sh start
+EXTRA_ARGS="--reasoning-budget 1024" bash stack/serve/llamacpp/serve_llamacpp.sh start
 # client sampling: temperature 0.6, top_p 0.95, top_k 20, min_p 0
 ```
 

@@ -15,7 +15,7 @@
 # (iron rule 14). The boot watchdog runs until /health answers. Stop it with `docker rm -f <name>`.
 #
 # Existing-instance handling (all modes): a STOPPED container named vllm-$PORT (crashed boot, host
-# restart) is a dead leftover -- auto-removed, and its bench/.servers/$PORT.container state file with it
+# restart) is a dead leftover -- auto-removed, and its stack/serve/var/servers/$PORT.container state file with it
 # (a state file without a container is stale and removed the same way), so a new `start` never needs a
 # manual `stop` first. A LIVE instance on the port (our container or a foreign listener) is stopped only
 # after you answer the takeover prompt in `start` mode (TTY only; non-TTY refuses with a message). `run`
@@ -25,7 +25,7 @@
 # A profile is profiles/<engine>/<model>.env (model layer) + profiles/<engine>/_engine.env (image,
 # shared env + args). Knobs (env, beat the profile): IMAGE MODEL_DIR MAXLEN MAXSEQS GPU_UTIL KV_DTYPE
 #   FREE_MIB_FLOOR PORT(8000) WAIT(1200s; first boot compiles ~10 min) EXTRA_ARGS VLLM_ROOT HF_CACHE
-#   EXCLUSIVE(bench/lib/gpu_exclusive.sh; override in unit tests to stub the free-VRAM floor)
+#   EXCLUSIVE(stack/gpu/gpu_exclusive.sh; override in unit tests to stub the free-VRAM floor)
 #   WATCHDOG_MIB(256: kill the container if free VRAM drops below this while booting; 0 = off)
 #   CONTAINER_NAME(vllm-$PORT) FLOOR_WAIT(90, run mode only)
 #   AUTO_PULL(1: `start`/`run` docker-pull a missing IMAGE once, then go on; 0 = refuse instead). Under
@@ -62,7 +62,7 @@ REPO="$(cd "$HERE/../../.." && pwd)"
 : "${WATCHDOG_MIB:=256}"   # boot-time kill switch: free VRAM below this -> docker kill (0 disables)
 : "${CONTAINER_NAME:=vllm-$PORT}"
 NAME="$CONTAINER_NAME"
-RUNDIR="$REPO/bench/.servers"; mkdir -p "$RUNDIR"
+RUNDIR="$REPO/stack/serve/var/servers"; mkdir -p "$RUNDIR"
 CFILE="$RUNDIR/$PORT.container"; LOGFILE="$RUNDIR/$PORT.log"; CMDFILE="$RUNDIR/$PORT.cmdline"
 
 running() { [ "$(docker inspect -f '{{.State.Running}}' "$NAME" 2>/dev/null)" = true ]; }
@@ -214,11 +214,11 @@ CMD+=(--model /model --served-model-name "$SERVED_NAME" --host 0.0.0.0 --port 80
 if [ -n "${EXTRA_ARGS:-}" ]; then read -r -a XA <<<"$EXTRA_ARGS"; CMD+=("${XA[@]}"); fi
 
 if [ "${1:-start}" = print ]; then
-  # Surface the same resolved config `start` records in bench/.servers/<port>.cmdline, in one command,
+  # Surface the same resolved config `start` records in stack/serve/var/servers/<port>.cmdline, in one command,
   # with no GPU (docker image inspect + local file reads only). `print` is the read-only preview.
   DIGEST=$(docker image inspect -f '{{index .RepoDigests 0}}' "$IMAGE" 2>/dev/null || echo "$IMAGE")
   {
-    echo "# resolved config (PROFILE=$PROFILE) — same as what start records in bench/.servers/$PORT.cmdline (print can't fetch vllm_version/up_after_s without a GPU)"
+    echo "# resolved config (PROFILE=$PROFILE) — same as what start records in stack/serve/var/servers/$PORT.cmdline (print can't fetch vllm_version/up_after_s without a GPU)"
     echo "#   IMAGE=$IMAGE"
     echo "#   MODEL_DIR=$MODEL_DIR"
     echo "#   SERVED_NAME=$SERVED_NAME  MAXLEN=$MAXLEN  GPU_UTIL=$GPU_UTIL  MAXSEQS=$MAXSEQS  KV_DTYPE=$KV_DTYPE  FREE_MIB_FLOOR=${FREE_MIB_FLOOR}MiB"

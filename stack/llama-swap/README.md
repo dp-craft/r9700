@@ -57,7 +57,7 @@ Per-model settings are **measured/sourced**, not guessed:
 - **KV cache**: rule "Q5/Q6 → q8_0 (8-bit), smaller → f16 (16-bit)". **Gemma is the exception →
   q8_0 always** (its KV is ~5× heavier; f16 spills VRAM at depth).
 - **MTP** (`--spec-type draft-mtp`) is on only where the gguf ships an `nextn` tensor (verified with
-  `bench/gguf_kv.py`): ThinkingCap, the unsloth Qwen 27B/35B-A3B, Qwen3.8-27B. Off for Hauhau-35B
+  `bench/core/gguf_kv.py`): ThinkingCap, the unsloth Qwen 27B/35B-A3B, Qwen3.8-27B. Off for Hauhau-35B
   and the rico03 27B finetune (0 nextn → nothing to draft).
 - **MTP + q8_0 KV**: forbidden on the **Qwen3.6** line (measured: draft acceptance collapses to
   ~0.7% vs ~90% at f16) but **fine on Qwen3.8** (38–54% at q8_0 vs 41% at f16). Re-measure per arch

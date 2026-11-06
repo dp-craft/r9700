@@ -1,6 +1,6 @@
 # Campaign 4 — **Hardest tasks: 27B quant ladder vs 35B-A3B at 128k** (R9700)
 
-*Part of the agentic-config series. Reuses the quality-at-depth harness (`campaigns/2026-07-13-27b-quality-at-depth`) — grader, corpus, tasks, judge, charts — with the **grader bug fixed** and a **sharper, narrower matrix**.*
+*Part of the agentic-config series. Reuses the quality-at-depth harness (`campaigns/quality/2026-07-13-1657-27b-quality-at-depth`) — grader, corpus, tasks, judge, charts — with the **grader bug fixed** and a **sharper, narrower matrix**.*
 
 **Status: READY TO RUN.** One command: `bash run_capture.sh`.
 

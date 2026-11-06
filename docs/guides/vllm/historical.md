@@ -31,7 +31,7 @@ without polluting the generic rules.
   version, the A-tiled path, an M-tail over-read/over-write, prefill-only kernels, and the amdgpu
   driver (7.0.0-38 and 7.0.0-34 both faulted).
 - **Solution:** `HIP_FORCE_DEV_KERNARG=0` in the container env (kernargs in host memory). Was the
-  default in `bench/engine-bench/vllm/profiles/{sly-radiance,radiance}/_engine.env` and in CLAUDE.md
+  default in `stack/serve/vllm/profiles/{sly-radiance,radiance}/_engine.env` and in CLAUDE.md
   as a generic "every ROCm engine" rule.
 - **Evidence:** with the fix, 3/3 boots × 4 Claude turns, 0 faults, at full speed (decode med 111–150
   tok/s, prefill med 2.4–3.0k tok/s, DFlash acceptance 4.8–6.2).
@@ -44,8 +44,8 @@ without polluting the generic rules.
   fault is not a live issue on the current stack. It is a *diagnostic* for a bit-44 kernarg-pointer
   corruption, not a general rule. If a future image/driver reintroduces the `0x6…` fault address
   shape, this is the fix to reach for.
-- **Provenance:** `docs/analysis/2026-10-23-0023-vllm-gpu-fault-solved-hip-kernarg.md` (MEASURED
-  rows in `docs/plans/2026-10-22-mxfp4-qwen38-options/FASTPATH.md`, `results.tsv`).
+- **Provenance:** `docs/findings/vllm/2026-10-23-0023-vllm-gpu-fault-solved-hip-kernarg.md` (MEASURED
+  rows in `notes/plans/2026-10-22-mxfp4-qwen38-options/FASTPATH.md`, `results.tsv`).
 
 ---
 

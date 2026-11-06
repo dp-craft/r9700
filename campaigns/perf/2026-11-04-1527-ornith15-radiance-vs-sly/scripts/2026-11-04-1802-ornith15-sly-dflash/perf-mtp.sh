@@ -7,13 +7,13 @@
 # ROCm-capable backends both the MXFP4 and the unquantized selectors accept.
 set -u
 REPO=/home/dev/work/dp-craft/amd; RUN="$(cd "$(dirname "$0")" && pwd)"
-SERVE=$REPO/bench/engine-bench/vllm/serve_vllm.sh; PORT=8010; GEN=$REPO/bench/workloads/generated; U=http://127.0.0.1:$PORT
+SERVE=$REPO/stack/serve/vllm/serve_vllm.sh; PORT=8010; GEN=$REPO/bench/workloads/tmp; U=http://127.0.0.1:$PORT
 M=/mnt/Lin1/work/vllm/sly-radiance/models
 XA='--max-num-batched-tokens 2048 --override-generation-config {"temperature":1.0,"top_p":0.95,"top_k":20,"min_p":0.0,"presence_penalty":1.5}'
 
 arm() {  # arm <label> <moe-backend>; returns the boot rc
-  local label=$1 moe=$2 seqs=8 d=$RUN/$1 rc served w=1 n; mkdir -p "$d"; rm -f "$REPO/bench/.servers/$PORT.log"
-  python3 $REPO/bench/lib/vram_sampler.py --out "$d/gpu_samples.csv" --interval 1 >/dev/null 2>&1 & local S=$!
+  local label=$1 moe=$2 seqs=8 d=$RUN/$1 rc served w=1 n; mkdir -p "$d"; rm -f "$REPO/stack/serve/var/servers/$PORT.log"
+  python3 $REPO/stack/gpu/vram_sampler.py --out "$d/gpu_samples.csv" --interval 1 >/dev/null 2>&1 & local S=$!
   { swapon --show; free -m; } >"$d/host_before.txt" 2>&1
   vmstat -n -t -S M 1 >"$d/vmstat.txt" 2>&1 & local V=$!
   PROFILE=sly-amd/qwen35-35b-a3b-mxfp4-mtp PORT=$PORT \
@@ -25,7 +25,7 @@ arm() {  # arm <label> <moe-backend>; returns the boot rc
     docker logs vllm-$PORT 2>&1 | tr '\r' '\n' | grep -E 'Capturing CUDA graphs' | tail -1 | cut -c1-120 >"$d/graphs.txt"
     served=$(curl -sf -m 5 "$U/v1/models" | python3 -c 'import json,sys;print(json.load(sys.stdin)["data"][0]["id"])')
     for n in 10000 50000 100000; do
-      python3 $REPO/bench/lib/capture_engine.py probe --url "$U/v1" --model "$served" \
+      python3 $REPO/bench/core/capture_engine.py probe --url "$U/v1" --model "$served" \
         --prompt-file "$GEN/codereview-$n.txt" --max-tokens 256 --temperature 1.0 --concurrency 1 --reps 3 --warmup $w \
         --prefix-mode unique --api chat --engine vllm --label "$label-$n" --timeout 600 >>"$d/results.jsonl" 2>>"$d/probe.err"
       echo "$label $n probe_rc=$? rows=$(wc -l <"$d/results.jsonl")" | tee -a "$RUN/progress-mtp.txt"; w=0
@@ -38,7 +38,7 @@ arm() {  # arm <label> <moe-backend>; returns the boot rc
   PORT=$PORT "$SERVE" stop >/dev/null 2>&1
   kill $S $V 2>/dev/null; wait $S $V 2>/dev/null
   { swapon --show; free -m; } >"$d/host_after.txt" 2>&1
-  cp "$REPO/bench/.servers/$PORT.log" "$d/server.log" 2>/dev/null; cp "$REPO/bench/.servers/$PORT.cmdline" "$d/cmdline.txt" 2>/dev/null
+  cp "$REPO/stack/serve/var/servers/$PORT.log" "$d/server.log" 2>/dev/null; cp "$REPO/stack/serve/var/servers/$PORT.cmdline" "$d/cmdline.txt" 2>/dev/null
   return "$rc"
 }
 

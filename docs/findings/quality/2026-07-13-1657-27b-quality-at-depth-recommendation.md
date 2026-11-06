@@ -5,10 +5,10 @@
 > (Q4_K_M + Q5/Q6) and the 35B-A3B. Each config is given as **(A) a full server launch** and
 > **(B) the per-request call parameters** — the two are set in different places and must not be confused.
 >
-> **Data provenance — read first.** This companion sits next to [`analysis.md`](analysis.md) /
-> [`analysis_detailed.md`](analysis_detailed.md), but **those docs are 27B-only, Q4_K_M-only, 64k/128k** —
+> **Data provenance — read first.** This companion sits next to [`analysis.md`](2026-07-13-1657-27b-quality-at-depth.md) /
+> [`analysis_detailed.md`](2026-07-13-1657-27b-quality-at-depth-detailed.md), but **those docs are 27B-only, Q4_K_M-only, 64k/128k** —
 > no Q5/Q6, no 35B. Every quant-ladder and 35B number below is `MEASURED` from the sibling campaign
-> **[`campaigns/2026-07-14-hardest-tasks-27b-vs-35b/analysis.md`](../2026-07-14-hardest-tasks-27b-vs-35b/analysis.md)**
+> **[`docs/findings/quality/2026-07-14-0000-hardest-tasks-27b-vs-35b.md`](2026-07-14-0000-hardest-tasks-27b-vs-35b.md)**
 > (14 cells × 5 hardest tasks × 3 reps, all at ~132.9k tokens). Flags/params are `MEASURED` from that
 > campaign's `serve_llamacpp.sh` + `capture.py` invocation and its `out/props_*.json`. `INFERRED` = reasoning.
 >
@@ -61,7 +61,7 @@ hard-passes** (7% one-shot → 20% best-of-3).
 MODEL=$MODELS_DIR/Qwen3.6-27B-MTP-Q4_K_M.gguf BACKEND=vulkan MTP=1 \
   CTX=102400 NP=1 UB=2048 B=4096 FA=on KV=f16 NGL=99 PORT=8081 WAIT=600 \
   EXTRA_ARGS="--reasoning-budget 4096" \
-  bash bench/engine-bench/serve_llamacpp.sh start
+  bash stack/serve/llamacpp/serve_llamacpp.sh start
 
 # The exact llama-server command it runs (every flag spelled out):
 llama-server \
@@ -107,7 +107,7 @@ Prefer it when you ship **one-shot** and the floor matters.
 MODEL=$MODELS_DIR/Qwen3.6-27B-Q6_K.gguf BACKEND=vulkan MTP=1 \
   CTX=102400 NP=1 UB=2048 B=4096 FA=on KV=q8_0 NGL=99 PORT=8081 WAIT=600 \
   EXTRA_ARGS="--reasoning-budget 4096" \
-  bash bench/engine-bench/serve_llamacpp.sh start
+  bash stack/serve/llamacpp/serve_llamacpp.sh start
 
 llama-server \
   -m $MODELS_DIR/Qwen3.6-27B-Q6_K.gguf \
@@ -148,7 +148,7 @@ truncation). At 100k, prefer the f16 (Q5_K_M) route where VRAM allows.
 MODEL=$MODELS_DIR/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf BACKEND=vulkan MTP=1 \
   CTX=102400 NP=1 UB=2048 B=4096 FA=on KV=f16 NGL=99 PORT=8081 WAIT=600 \
   EXTRA_ARGS="--reasoning-budget 16384" \
-  bash bench/engine-bench/serve_llamacpp.sh start
+  bash stack/serve/llamacpp/serve_llamacpp.sh start
 
 llama-server \
   -m $MODELS_DIR/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf \

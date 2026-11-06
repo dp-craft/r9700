@@ -14,7 +14,7 @@ R=${R:-bench/runs/2026-09-12-1844-vllm-window-bootmatrix}
 A="$R/c3-ctx36k-mtp0-rerun"; mkdir -p "$A"
 IMG=stilldeadcode/vllm-radiance:0.9.3
 MODEL=/home/dev/models/vllm/Qwen3.8-27B-INT4
-CACHE=/home/dev/work/dp-craft/amd/bench/dl/radiance-cache
+CACHE=/home/dev/work/dp-craft/amd/stack/serve/var/models/radiance-cache
 NAME=radiance-bootprobe
 RG=$(getent group render | cut -d: -f3); VG=$(getent group video | cut -d: -f3)
 FLOOR=${FLOOR:-29000}
@@ -27,7 +27,7 @@ trap cleanup EXIT INT TERM
 snap() { if docker logs "$NAME" > "$A/.log.tmp" 2>&1; then mv "$A/.log.tmp" "$A/server.log"; else rm -f "$A/.log.tmp"; fi; }
 
 echo "########## c3-ctx36k-mtp0 RERUN — MTP off, prefix caching ON  ($(date +%T))"
-if ! bash bench/lib/gpu_exclusive.sh "$FLOOR" > "$A/gpu_exclusive.log" 2>&1; then
+if ! bash stack/gpu/gpu_exclusive.sh "$FLOOR" > "$A/gpu_exclusive.log" 2>&1; then
   echo "   SKIPPED — GPU not exclusive:"; tail -3 "$A/gpu_exclusive.log" | sed 's/^/      /'; exit 0
 fi
 cleanup

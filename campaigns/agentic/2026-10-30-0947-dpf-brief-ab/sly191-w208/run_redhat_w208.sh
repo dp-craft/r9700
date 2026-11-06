@@ -6,7 +6,7 @@
 set -uo pipefail
 OUT=$1; mkdir -p "$OUT"
 FORGE=/home/dev/work/dippe/dp-forge
-PREV=/home/dev/work/dp-craft/amd/bench/runs/2026-10-30-0947-dpf-brief-ab
+PREV=/home/dev/work/dp-craft/amd/campaigns/agentic/2026-10-30-0947-dpf-brief-ab
 BASE=de110510
 WT=/home/dev/work/dippe/dpf-bench-redhat191
 P=docs/plans/2026-10-28-2239-dpf-tui-f0-f1
@@ -38,9 +38,9 @@ fp > "$OUT/main-fp-before.txt"
 # 2. server (gpu_exclusive floor inside serve_vllm.sh) + VRAM sampler
 log "booting $SRV with IMAGE=$IMAGE"
 if ! "$SRV" start > "$OUT/server-start.txt" 2>&1; then log "server start failed: $(tail -2 "$OUT/server-start.txt" | tr '\n' ' ')"; exit 1; fi
-cp "$AMD/bench/.servers/8000.cmdline" "$OUT/server.cmdline"
+cp "$AMD/stack/serve/var/servers/8000.cmdline" "$OUT/server.cmdline"
 docker exec vllm-8000 head -1 /opt/qwen-fixed.jinja > "$OUT/template-version.txt" 2>&1
-python3 "$AMD/bench/lib/vram_sampler.py" --out "$OUT/gpu_samples.csv" --interval 2 >/dev/null 2>&1 & SAMP=$!
+python3 "$AMD/stack/gpu/vram_sampler.py" --out "$OUT/gpu_samples.csv" --interval 2 >/dev/null 2>&1 & SAMP=$!
 
 # 3. the session; resume (same session) until the W2-08 progress line, within the cap
 w208(){ grep -c '^W2-08 |' "$WT/$P/review/27b-fix/progress.md" 2>/dev/null || true; }

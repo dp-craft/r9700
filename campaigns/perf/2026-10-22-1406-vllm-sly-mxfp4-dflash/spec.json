@@ -3,7 +3,7 @@
   "date": "2026-10-22",
   "title": "Sly radiance 1.6.0 \u00b7 Qwen3.8-27B MXFP4 \u00b7 fp8 KV \u00b7 DFlash2 k=7 \u2014 depth curve + growing conversation",
   "notes": [
-    "identical to campaigns/2026-10-22-vllm-sly-mxfp4-depth except speculative decoding (one variable)",
+    "identical to campaigns/perf/2026-10-22-1324-vllm-sly-mxfp4-depth except speculative decoding (one variable)",
     "drafter syvai/Qwen3.8-27B-DFlash2-W4A16 @ 4d30ec73, k=7, greedy draft sampling (Sly README recipe)",
     "warmup 1 on 8k/20k/40k: avoid the first-shape Triton JIT bias seen in the baseline (finding 4)",
     "power: monitor only; phase avg < 150 W flagged"

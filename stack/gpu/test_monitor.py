@@ -11,7 +11,7 @@ Test data is captured from a live vLLM server (swift-1.5, 2026-10-25):
 Also covers the radiance engine (stilldeadcode/radiance: native, vLLM-compatible metric names, no
 prefill-time histogram, request counters tick at FINISH) with a live idle snapshot (RAD_CUR).
 
-Run:  python3 bench/lib/test_monitor.py -v
+Run:  python3 stack/gpu/test_monitor.py -v
 
 Every assertion is a hand-computed expected value (from the captured numbers), so a
 regression in any formula fails the suite. No server / GPU is needed.

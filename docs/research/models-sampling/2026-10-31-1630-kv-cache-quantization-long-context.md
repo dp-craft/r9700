@@ -130,7 +130,7 @@ cliff earlier* rather than shifting accuracy uniformly.
    not the format.**
 4. **Practical ceiling today: treat ≤128k as safe by analogy and 128-200k as plausible but unverified.** Above 128k the model's own
    decay and Claude Code's compaction policy dominate. See
-   [the levers analysis](../analysis/2026-10-31-1640-agentic-thinking-volume-and-levers.md).
+   [the levers analysis](../../findings/agentic/2026-10-31-1640-agentic-thinking-volume-and-levers.md).
 
 ## Remaining Unknowns
 
@@ -153,7 +153,7 @@ cliff earlier* rather than shifting accuracy uniformly.
 - gotchas: kernel accumulation cliffs at ≥100k (seen on Hopper FA3); head_dim 256; per-head scales only on the FA backend; ROCm untested
 </technical>
 <integration>
-- works_with: bench/gguf_kv.py and gen_campaign.py vram-ctx for the VRAM side; the f16-vs-q8_0 ≤5% speed rule (sweep.py) for the speed side
+- works_with: bench/core/gguf_kv.py and gen_campaign.py vram-ctx for the VRAM side; the f16-vs-q8_0 ≤5% speed rule (sweep.py) for the speed side
 - conflicts_with: bf16 KV at 262k on 32 GB (does not fit with the 27B + drafter, INFERRED from the 2026-10-22 KV-pool measurement)
 - alternatives: bf16 KV at a lower ctx (e.g. 131k) as the quality reference arm; compaction-window tuning to keep the working context smaller
 </integration>
@@ -178,4 +178,4 @@ No tool owns this today: `capture_engine.py probe` measures throughput only (rul
 - NoLiMa: https://arxiv.org/abs/2502.05167 · Chroma Context Rot: https://www.trychroma.com/research/context-rot
 - localbench KV KLD (T2): https://localbench.substack.com/p/kv-cache-quantization-benchmark
 - Local inspection (MEASURED): `/mnt/Lin1/work/vllm/sly-radiance/models/RedHatAI__Qwen3.8-27B-MXFP4@16a86728/{config.json,model.safetensors.index.json}`;
-  `bench/runs/2026-10-31-redhat191-sharp-w208-blind/rep1/r191-sharp-d0/{server.txt,server-container.log}`
+  `campaigns/agentic/2026-10-31-0000-redhat191-sharp-w208-blind/rep1/r191-sharp-d0/{server.txt,server-container.log}`

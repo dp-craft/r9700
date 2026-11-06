@@ -10,7 +10,7 @@ takeaway: Ornith 1.5 on native Radiance is a good free worker when the task is c
 - **Local arm:** `keptn/ornith-1.5-35b-a3b-w4a8` on native Radiance `stilldeadcode/radiance:1.16.0` @ `sha256:b1017ce0e615…`, MTP K=3, KV fp8, `--max-model-len 262144`, `--max-num-batched-tokens 2048`, thinking on, Claude Code 2.1.312 through `skills/ornith/scripts/ornith.sh`
 - **Default preset (P0):** temp 1.0, top_p 0.95, top_k 20, presence penalty 1.5; server log shows min_p 0.00. **P2:** temp 0.6, presence penalty 0.
 - **Remote arm:** `claude-haiku-5-5` as `general-purpose` subagents, effort `max`
-- **Data:** `bench/runs/2026-11-05-0320-ornith-usecases/`. Skill: `/home/dev/work/dippe/skills-agents/skills/ornith/`
+- **Data:** `campaigns/workers/2026-11-05-0320-ornith-usecases/results/2026-11-05-0320-ornith-usecases/`. Skill: `/home/dev/work/dippe/skills-agents/skills/ornith/`
 
 **Provenance:** every score, time, token and memory figure is `MEASURED` and comes from the arm named beside it or from `summary.jsonl`. Recommended sizes and verdicts are `INFERRED` from those runs. Most arms are one run, so a difference under 0.05 is a tie.
 
@@ -224,11 +224,11 @@ Key lines correct were 4–5 of 5. Of the 4 flags, I rejected the one behind M's
 2. **Reasoning limit:** `--thinking-token-budget` exists in Radiance 1.16.0 and is untested. It might cut the cost on `bugs` and `classify`.
 3. **P2 repeats on `impl`,** because the current evidence is inconclusive.
 
-**Tooling note (iron rule 6):** no tool covers this. `gen_campaign.py` has no kind for per-task agent sessions with task-specific scorers, so the harness is hand-written in `bench/runs/2026-11-05-0320-ornith-usecases/harness/`. Recommended: add a `usecase` kind to `gen_campaign.py`.
+**Tooling note (iron rule 6):** no tool covers this. `gen_campaign.py` has no kind for per-task agent sessions with task-specific scorers, so the harness is hand-written in `bench/workers/`. Recommended: add a `usecase` kind to `gen_campaign.py`.
 
 ## All Ornith arms
 
-Finished arms, from `bench/runs/2026-11-05-0320-ornith-usecases/summary.md`.
+Finished arms, from `campaigns/workers/2026-11-05-0320-ornith-usecases/results/2026-11-05-0320-ornith-usecases/summary.md`.
 
 | Arm | Score | Clean | s | Gen | Source tok | Source/min | Gen per 1k | Peak | Drops | VRAM MiB | GTT MiB |
 |---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|

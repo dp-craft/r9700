@@ -16,7 +16,7 @@ STAMP=$(date +%Y-%m-%d-%H%M)
 R=bench/runs/${STAMP}-vllm-window-bootmatrix
 IMG=stilldeadcode/vllm-radiance:0.9.3
 MODEL=/home/dev/models/vllm/Qwen3.8-27B-INT4
-CACHE=/home/dev/work/dp-craft/amd/bench/dl/radiance-cache
+CACHE=/home/dev/work/dp-craft/amd/stack/serve/var/models/radiance-cache
 NAME=radiance-bootprobe          # OURS. Never 'radiance', never 'llama-swap-*'.
 RG=$(getent group render | cut -d: -f3); VG=$(getent group video | cut -d: -f3)
 FLOOR=${FLOOR:-29000}
@@ -38,7 +38,7 @@ boot_arm() {  # $1=slug  $2=label  $3=ctx  $4=mtp(0=off)  $5=np  $6=kvdtype(auto
   echo "   ctx=$ctx mtp=$mtp np=$np kv=$kvd extra='$*'"
 
   # Rule 14: assert the POSITIVE precondition, and name the holder if it fails.
-  if ! bash bench/lib/gpu_exclusive.sh "$FLOOR" > "$A/gpu_exclusive.log" 2>&1; then
+  if ! bash stack/gpu/gpu_exclusive.sh "$FLOOR" > "$A/gpu_exclusive.log" 2>&1; then
     echo "   SKIPPED — GPU not exclusive:"; tail -3 "$A/gpu_exclusive.log" | sed 's/^/      /'
     echo "$slug SKIPPED not-exclusive" >> "$R/summary.txt"; return 0
   fi

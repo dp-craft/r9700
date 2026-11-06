@@ -214,7 +214,7 @@ Note: authoring these surfaced two **test-file** lint rules that unfairly failed
 
 ## 7. Reproduce it yourself
 ```bash
-cd campaigns/2026-07-13-27b-quality-at-depth
+cd campaigns/quality/2026-07-13-1657-27b-quality-at-depth
 python3 score_typescript.py selftest          # auto-installs deps; asserts good=1.0 > mediocre > bad=0.0
 python3 build_context.py --task ts-harness/tasks/lru-cache --tokens 64000 --out /tmp/p.txt   # a depth prompt
 python3 score_typescript.py fixture --dir ts-harness/fixtures/count-words-good --task ts-harness/tasks/count-words

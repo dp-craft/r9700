@@ -2,9 +2,9 @@
 """long_run.py: the remaining local arms, most useful first, under a hard time limit. An arm starts only if its cap still fits, so the whole run ends by LIMIT_S.
 Log: longrun.jsonl. Reordered at 19 min: retyping cost far more than estimated (6k tokens: 480 s, or cut at 600 s), so it now runs only where it answers a question. A cut arm goes to quarantine/ through run_arm.sh and counts only as "did not finish within its cap"."""
 import json, os, subprocess, sys, time
-RUN = "/home/dev/work/dp-craft/amd/bench/runs/2026-11-05-0320-ornith-usecases"
+RUN = "/home/dev/work/dp-craft/amd/campaigns/workers/2026-11-05-0320-ornith-usecases/results/2026-11-05-0320-ornith-usecases"
 H = f"{RUN}/harness"
-STARTER = "/home/dev/work/dp-craft/amd/ornith_rad_mtp.sh"
+STARTER = "/home/dev/work/dp-craft/amd/stack/serve/radiance/ornith_rad_mtp.sh"
 P2 = "--temp 0.6 --presence-penalty 0"
 LIMIT = int(os.environ.get("LIMIT_S", 7200))
 T0 = float(os.environ.get("T0_EPOCH", time.time()))

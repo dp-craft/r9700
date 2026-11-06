@@ -23,7 +23,7 @@
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
-SERVE="$REPO/bench/engine-bench/serve_llamacpp.sh"
+SERVE="$REPO/stack/serve/llamacpp/serve_llamacpp.sh"
 
 : "${MODELS_DIR:=/home/dev/models/gguf}"
 : "${CONFIGS:=$HERE/configs.jsonl}"    # override to run a sweep, e.g. CONFIGS=configs_sampling.jsonl (add-on C)
@@ -175,7 +175,7 @@ PY
     msize=$(stat -c%s "$mfile" 2>/dev/null || echo 0)
     csv="$OUTDIR/gpu_${label}.csv"; SPID=""
     if command -v rocm-smi >/dev/null 2>&1; then
-      python3 "$REPO/bench/lib/vram_sampler.py" --out "$csv" --interval 1 & SPID=$!
+      python3 "$REPO/stack/gpu/vram_sampler.py" --out "$csv" --interval 1 & SPID=$!
       for _ in 1 2 3 4; do [ -s "$csv" ] && [ "$(wc -l <"$csv")" -ge 2 ] && break
         kill -0 "$SPID" 2>/dev/null || break; sleep 0.5; done
     fi
@@ -249,7 +249,7 @@ esac
 
 echo; echo "=== charts (reused by the benchmark-results skill) ==="
 ORDER="$(python3 -c 'import json,sys;print(",".join(json.loads(l)["label"] for l in open(sys.argv[1]) if l.strip()))' "$CONFIGS")"
-python3 "$REPO/campaigns/2026-07-12-27b-finetune-quality/make_charts.py" --dir "$OUTDIR" --charts "$HERE/charts" \
+python3 "$REPO/bench/quality/make_charts.py" --dir "$OUTDIR" --charts "$HERE/charts" \
   --order "$ORDER" --calibration "$CALIB" \
   || echo "make_charts failed (see above)"
 
@@ -280,12 +280,12 @@ if [ "$SUMMARY" = "1" ]; then
   cat > "$sp" <<'EOF'
 You are finishing the "hardest-tasks: 27B quant ladder vs 35B-A3B at 128k" benchmark in this repo. Follow the
 repo's benchmark-results skill (read .claude/skills/benchmark-results/SKILL.md) and write the analysis to
-campaigns/2026-07-14-hardest-tasks-27b-vs-35b/analysis.md.
+docs/findings/quality/2026-07-14-0000-hardest-tasks-27b-vs-35b.md.
 
 ALL the numbers are ALREADY aggregated deterministically — read ONLY:
-  - campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/summary.md        (per-cell table + PER-REP detail + findings)
-  - campaigns/2026-07-14-hardest-tasks-27b-vs-35b/charts/appendix.md    (cell-level charts + data table)
-  - campaigns/2026-07-14-hardest-tasks-27b-vs-35b/charts/detailed/appendix.md  (per-task charts, if present)
+  - campaigns/quality/2026-07-14-0000-hardest-tasks-27b-vs-35b/results/summary.md        (per-cell table + PER-REP detail + findings)
+  - campaigns/quality/2026-07-14-0000-hardest-tasks-27b-vs-35b/results/charts/appendix.md    (cell-level charts + data table)
+  - campaigns/quality/2026-07-14-0000-hardest-tasks-27b-vs-35b/results/charts/detailed/appendix.md  (per-task charts, if present)
 DO NOT read outputs.jsonl / scores_*.jsonl / judge_scores.jsonl — large per-reply logs; everything you
 need is in summary.md. For design context/glossary you may skim README.md and eval-design.md.
 

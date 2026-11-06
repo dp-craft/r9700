@@ -4,11 +4,11 @@
 # Hand-written: no tool covers boot-fit sweeps (gen_campaign.py probes servers that are already up).
 set -u
 REPO=/home/dev/work/dp-craft/amd; RUN="$(cd "$(dirname "$0")" && pwd)"
-SERVE=$REPO/bench/engine-bench/vllm/serve_vllm.sh; PORT=8010; LOG=$REPO/bench/.servers/$PORT.log
+SERVE=$REPO/stack/serve/vllm/serve_vllm.sh; PORT=8010; LOG=$REPO/stack/serve/var/servers/$PORT.log
 SUM=$RUN/summary2.txt
 trial() {  # trial <label> <env assignments...>
   local label=$1; shift; local d=$RUN/$label; mkdir -p "$d"; rm -f "$LOG"
-  python3 $REPO/bench/lib/vram_sampler.py --out "$d/gpu_samples.csv" --interval 1 >/dev/null 2>&1 & local S=$!
+  python3 $REPO/stack/gpu/vram_sampler.py --out "$d/gpu_samples.csv" --interval 1 >/dev/null 2>&1 & local S=$!
   local t0=$(date +%s)
   env PROFILE=sly-amd/qwen35-35b-a3b-mxfp4-dflash PORT=$PORT MAXLEN=262000 MAXSEQS=1 KV_DTYPE=fp8 \
       WATCHDOG_MIB=32 GPU_UTIL=0.93 CACTUS_DELTA=0 WAIT=1200 "$@" "$SERVE" start </dev/null >"$d/start.txt" 2>&1
@@ -24,7 +24,7 @@ trial() {  # trial <label> <env assignments...>
   fi
   PORT=$PORT "$SERVE" stop >/dev/null 2>&1
   kill $S 2>/dev/null; wait $S 2>/dev/null
-  cp "$LOG" "$d/server.log" 2>/dev/null; cp "$REPO/bench/.servers/$PORT.cmdline" "$d/cmdline.txt" 2>/dev/null
+  cp "$LOG" "$d/server.log" 2>/dev/null; cp "$REPO/stack/serve/var/servers/$PORT.cmdline" "$d/cmdline.txt" 2>/dev/null
   { echo "== $label [$*] rc=$rc boot_s=$dt"
     sed 's/\x1b\[[0-9;]*m//g' "$d/server.log" 2>/dev/null | grep -E "MoE backend|Model loading took|Graph capturing finished|Available KV cache memory|GPU KV cache size|GiB KV cache is needed|Initial profiling/warmup run took|MEMORY_FAULT|Memory Fault" \
       | grep -v 'dflash' | sed -E 's/^\(EngineCore pid=[0-9]+\) //; s/^ERROR.*ValueError/ValueError/; s/ Try increasing.*//' | cut -c1-210 | awk '!s[$0]++'

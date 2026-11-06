@@ -14,7 +14,7 @@ read-only `docker run --rm --entrypoint bash ...` (no `--device`; sources copied
 
 | Question | Answer | Confidence |
 |---|---|---|
-| Is the user's premise right (35B >= 2x the 27B)? | **On llama.cpp yes, on this vLLM checkpoint no.** llama.cpp Vulkan: 35B 115.7-120.2 t/s vs 27B Q4 32.6-46.1 t/s (MEASURED, `campaigns/2026-07-14-hardest-tasks-27b-vs-35b/analysis.md`, row "35B-A3B is far faster"). vLLM 27B: ~100 t/s is the 10k figure; 73.9-93.9 at 50k-145k (MEASURED, `campaigns/2026-10-30-vllm-redhat-sly191-d0-dflash-depth/analysis.md`, DFlash2 k=7, delta 0). Our 35B: 14-17 t/s. | high |
+| Is the user's premise right (35B >= 2x the 27B)? | **On llama.cpp yes, on this vLLM checkpoint no.** llama.cpp Vulkan: 35B 115.7-120.2 t/s vs 27B Q4 32.6-46.1 t/s (MEASURED, `docs/findings/quality/2026-07-14-0000-hardest-tasks-27b-vs-35b.md`, row "35B-A3B is far faster"). vLLM 27B: ~100 t/s is the 10k figure; 73.9-93.9 at 50k-145k (MEASURED, `docs/findings/vllm/2026-10-30-2232-vllm-redhat-sly191-d0-dflash-depth.md`, DFlash2 k=7, delta 0). Our 35B: 14-17 t/s. | high |
 | Root cause of 16 t/s | MoE experts run on the **EMULATION backend**: per forward pass, `dequant_mxfp4` expands `w13` and `w2` of **all 256 experts** to bf16 (`ocp_mx_emulation_moe.py:201-206`), then calls the stock Triton fused-MoE. Step time ~180 ms (INFERRED from MEASURED rate and counters) vs 37-44 ms for the 27B. | high on mechanism, medium on the share of the step (see "falsifiers") |
 | Can any non-emulated MXFP4 MoE run on gfx1201? | **No, not in this image.** Each is gated on gfx950 / gfx942 / gfx1250 / CUDA, or rejects SiLU (table below). | high (code read) |
 | Faster checkpoint format? | **W4A16 int4 (GPTQ/compressed-tensors, symmetric, no act-order)** via the Triton `int4_w4a16` fused-MoE with Sly's R9700 tuned config. FP8 does not fit 32 GB. | medium (the recipe is CLAIMED for a different 35B-A3B model) |
@@ -24,10 +24,10 @@ read-only `docker run --rm --entrypoint bash ...` (no `--device`; sources copied
 
 | Config | Decode t/s | Tag / source |
 |---|---:|---|
-| 27B RedHat MXFP4, Sly 1.9.1, delta 0, DFlash2 k=7, 10k / 50k / 100k / 145k (mean of 2 reps) | 100.2 / 73.9 / 93.9 / 80.5 | MEASURED, `campaigns/2026-10-30-vllm-redhat-sly191-d0-dflash-depth/analysis.md` |
-| same, no speculation (Sly 1.9.1, 10k/50k/100k) | 18.97 / 19.43 / 19.01 | MEASURED, `docs/analysis/2026-10-30-0900-vllm-redhat-mxfp4-depth-transposed.md` |
+| 27B RedHat MXFP4, Sly 1.9.1, delta 0, DFlash2 k=7, 10k / 50k / 100k / 145k (mean of 2 reps) | 100.2 / 73.9 / 93.9 / 80.5 | MEASURED, `docs/findings/vllm/2026-10-30-2232-vllm-redhat-sly191-d0-dflash-depth.md` |
+| same, no speculation (Sly 1.9.1, 10k/50k/100k) | 18.97 / 19.43 / 19.01 | MEASURED, `docs/findings/radiance/2026-10-30-0900-vllm-redhat-mxfp4-depth-transposed.md` |
 | 27B DFlash2 step cost | 36.8 ms @10k, 44.4 ms @145k | MEASURED (same campaign, "Step cost by method") |
-| 35B-A3B MXFP4 + DFlash k=7, 10k / 50k / 100k, n=3, p50 | 17.07 / 15.51 / 14.22 | MEASURED, `bench/runs/2026-11-04-1557-35b-perf-10k-50k-100k/dflash-k7/results.jsonl`, labels `dflash-k7-10000/-50000/-100000` |
+| 35B-A3B MXFP4 + DFlash k=7, 10k / 50k / 100k, n=3, p50 | 17.07 / 15.51 / 14.22 | MEASURED, `campaigns/perf/2026-11-04-1527-ornith15-radiance-vs-sly/results/2026-11-04-1557-35b-perf-10k-50k-100k/dflash-k7/results.jsonl`, labels `dflash-k7-10000/-50000/-100000` |
 
 So "~100" is the 10k point; the 27B averages ~87 over the four depths. The ratio the user wants is 2x of that (~175-200).
 Probe settings were the same (temperature 1.0, 256 tokens, unique prefix, conc 1), so the comparison is like for like except the model.
@@ -117,12 +117,12 @@ Memory: the int4 weights should be ~18-20 GB (INFERRED), leaving room for ctx 26
 
 | Setup | Decode t/s | Tag / source |
 |---|---:|---|
-| llama.cpp Vulkan b9950, Qwen3.6-35B-A3B Q4_K_M, depth 8K / 128K / 200K, MTP off | 104 / 71 / 61 | MEASURED `docs/analysis/2026-07-11-2200-deep-context-35b.md` |
-| llama.cpp Vulkan, 64K, MTP off / on | 114.3 / 135.9 | MEASURED `docs/analysis/2026-07-10-1810-rdna4-r9700-tuning-optimum.md` (35B table) |
+| llama.cpp Vulkan b9950, Qwen3.6-35B-A3B Q4_K_M, depth 8K / 128K / 200K, MTP off | 104 / 71 / 61 | MEASURED `docs/findings/llamacpp/2026-07-11-2200-deep-context-35b.md` |
+| llama.cpp Vulkan, 64K, MTP off / on | 114.3 / 135.9 | MEASURED `docs/findings/llamacpp/2026-07-10-1810-rdna4-r9700-tuning-optimum.md` (35B table) |
 | same file, 27B Vulkan no MTP / MTP | 31.7 / 73.5 | MEASURED (27B table) |
 | same file, vLLM 0.19.1 AWQ 35B | 19.7 | MEASURED (old stack, same finding class: vLLM was not competitive) |
-| 35B Vulkan, MTP on, ctx 4096 | 161.1 | MEASURED `docs/analysis/2026-07-16-0927-mtp-sampler-tax.md` (`presence_penalty 0.0` repA) |
-| 35B vs 27B hardest-tasks decode (llama.cpp, long ctx) | 115.7-120.2 vs 32.6-46.1 | MEASURED `campaigns/2026-07-14-hardest-tasks-27b-vs-35b/analysis.md` |
+| 35B Vulkan, MTP on, ctx 4096 | 161.1 | MEASURED `docs/findings/llamacpp/2026-07-16-0927-mtp-sampler-tax.md` (`presence_penalty 0.0` repA) |
+| 35B vs 27B hardest-tasks decode (llama.cpp, long ctx) | 115.7-120.2 vs 32.6-46.1 | MEASURED `docs/findings/quality/2026-07-14-0000-hardest-tasks-27b-vs-35b.md` |
 | R9700 Vulkan (Windows), Qwen3.5-35B-A3B UD-Q4_K_XL, llama-bench TG average | 127.4 | CLAIMED, https://github.com/ggml-org/llama.cpp/discussions/19890 (commit 244641955) |
 | Sly MiniCPM-V 4.7 35B-A3B, GPTQ + DSpark K=8, 210 W | 169.4 | CLAIMED (section 4) |
 | Our vLLM Qwen3.5-35B-A3B MXFP4 + DFlash k=7 | 14.2-17.1 | MEASURED (section 1) |
@@ -142,7 +142,7 @@ Bandwidth floor, INFERRED from `config.json` dimensions and 640 GB/s:
 
 MEASURED facts (`dflash-k7/server.log`, `spec.txt`): 807 drafts, 5649 drafted, 1518 accepted (26.9%). Mean acceptance length per 10 s window 2.08-4.45, typically 2.4-3.3; per-position acceptance ~0.6-0.8 at position 1 decaying to 0.0-0.3 by position 7. Draft sampling `probabilistic`, request temperature 1.0 (`perf2.sh`).
 
-- **The fall is not 35B-specific.** The 27B with DFlash2 also drops from 0.549 (10k) to 0.367 / 0.423 (50k / 100k) (MEASURED, `docs/analysis/2026-10-30-0900-vllm-redhat-mxfp4-depth-transposed.md`, "acceptance rate drops"). The 51% was a 400-token smoke with a short prompt and first-request JIT, one request; 27% is a mix over 9 requests at 10k-100k with code-review thinking. Different output type and n=1 vs n=9; I do not treat 51 -> 27 as one effect.
+- **The fall is not 35B-specific.** The 27B with DFlash2 also drops from 0.549 (10k) to 0.367 / 0.423 (50k / 100k) (MEASURED, `docs/findings/radiance/2026-10-30-0900-vllm-redhat-mxfp4-depth-transposed.md`, "acceptance rate drops"). The 51% was a 400-token smoke with a short prompt and first-request JIT, one request; 27% is a mix over 9 requests at 10k-100k with code-review thinking. Different output type and n=1 vs n=9; I do not treat 51 -> 27 as one effect.
 - Candidate causes (all INFERRED, not isolated): (a) drafter z-lab/Qwen3.5-35B-A3B-DFlash is trained against the BF16/FP8 parent while the target here is W4A4-quantized (the 27B drafter has the same mismatch, but also a different training base); (b) temperature 1.0 sampling lowers draft/target agreement versus greedy; (c) long-context drift of the drafter (window 4096, `radiance.dflash_skip` log); (d) thinking text is higher-entropy than the short smoke.
 - **Method/K:** because step cost under emulation is independent of M, K=7 is nearly free there, so K cannot be tuned from the current data. Once on a native int4 path, step cost grows with distinct experts (section 6) and the best K is probably lower than 7 (INFERRED; Cascade-style adaptivity). Sly's MoE recipe used K=8 with its own drafter (CLAIMED), so K=7-8 is not obviously wrong either. MTP k=4 on this model uses `TRITON_ATTN` because R4D refuses gqa=8 (MEASURED, profile header); the arm is still running.
 - Worst case for MoE verification: a draft block whose rows route to disjoint experts maximizes the union (up to 56 of 256 experts per layer at K=7 with 8 rows) and its cost, while acceptance is low; with the emulated path this is moot, with a native path it costs up to ~7x expert bytes per step (INFERRED).
@@ -166,7 +166,7 @@ Code-heavy, low-entropy outputs do reach 186-211 t/s on the 27B under BetterBenc
 
 ## 10. Not verified
 
-- Late partial read of the MTP arm (MEASURED, `bench/runs/2026-11-04-1557-35b-perf-10k-50k-100k/mtp-k4/results.jsonl`, aggregates `mtp-k4-10000` / `mtp-k4-50000`, p50): decode 17.07 / 14.72 t/s, prefill 5230 / 3331 t/s. A different drafter (own MTP head, k=4) gives the same decode rate as DFlash k=7 (17.07 / 15.51), consistent with a step cost that is independent of drafter and K (INFERRED; supports section 2, does not prove it). The 100k point and the nospec arm were not finished when this was written.
+- Late partial read of the MTP arm (MEASURED, `campaigns/perf/2026-11-04-1527-ornith15-radiance-vs-sly/results/2026-11-04-1557-35b-perf-10k-50k-100k/mtp-k4/results.jsonl`, aggregates `mtp-k4-10000` / `mtp-k4-50000`, p50): decode 17.07 / 14.72 t/s, prefill 5230 / 3331 t/s. A different drafter (own MTP head, k=4) gives the same decode rate as DFlash k=7 (17.07 / 15.51), consistent with a step cost that is independent of drafter and K (INFERRED; supports section 2, does not prove it). The 100k point and the nospec arm were not finished when this was written.
 - Share of the ~180 ms step spent in dequant vs Triton GEMM vs drafter vs GDN is INFERRED from bandwidth arithmetic, not profiled. The drafter's own cost is unmeasured.
 - Whether `triton_unfused` runs MXFP4 correctly on gfx1201; whether Sly's int4 config applies to Qwen3.5 (shape matches; model not tested by anyone I could find).
 - The AMD product page timed out; 640 GB/s rests on retailer/press listings.
@@ -184,4 +184,4 @@ Code-heavy, low-entropy outputs do reach 186-211 t/s on the 27B under BetterBenc
 - https://arxiv.org/abs/2506.20675v1 , https://arxiv.org/abs/2602.16052 , https://www.alphaxiv.org/abs/2607.12696.md (abstracts/summaries only)
 - https://www.tomshardware.com/pc-components/gpus/amd-launches-radeon-ai-pro-r9700-to-challenge-nvidias-ai-market-dominance , https://hothardware.com/news/radeon-ai-pro-r9700-arrives-32gb-vram-machine-learning
 - https://huggingface.co/RESMP-DEV/Qwen3.5-35B-A3B-GPTQ-Hybrid (search snippet only)
-- Repo: `bench/runs/2026-11-04-1557-35b-perf-10k-50k-100k/`, `campaigns/2026-10-30-vllm-redhat-sly191-d0-dflash-depth/analysis.md`, `docs/analysis/2026-10-30-0900-vllm-redhat-mxfp4-depth-transposed.md`, `docs/analysis/2026-07-10-1810-rdna4-r9700-tuning-optimum.md`, `docs/analysis/2026-07-11-2200-deep-context-35b.md`, `docs/analysis/2026-07-16-0927-mtp-sampler-tax.md`, `campaigns/2026-07-14-hardest-tasks-27b-vs-35b/analysis.md`
+- Repo: `campaigns/perf/2026-11-04-1527-ornith15-radiance-vs-sly/results/2026-11-04-1557-35b-perf-10k-50k-100k/`, `docs/findings/vllm/2026-10-30-2232-vllm-redhat-sly191-d0-dflash-depth.md`, `docs/findings/radiance/2026-10-30-0900-vllm-redhat-mxfp4-depth-transposed.md`, `docs/findings/llamacpp/2026-07-10-1810-rdna4-r9700-tuning-optimum.md`, `docs/findings/llamacpp/2026-07-11-2200-deep-context-35b.md`, `docs/findings/llamacpp/2026-07-16-0927-mtp-sampler-tax.md`, `docs/findings/quality/2026-07-14-0000-hardest-tasks-27b-vs-35b.md`

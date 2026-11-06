@@ -9,9 +9,9 @@ takeaway: SlyBase/vllm-sly-radiance **1.6.0** (docker, vLLM 0.31.0) serving **am
 
 - **Date:** 2026-10-22 13:37–14:00 local · **Track:** engine-bench campaign (`gen_campaign.py`, new `engine: vllm`)
 - **GPU/Host:** AMD Radeon AI PRO R9700, 32624 MiB, power cap **210 W** (card minimum; `POWER_SAVING` profile, −100 mV, −21 MHz offset — user tuning, left as is) · Ryzen 5 3600, 31 GB RAM · kernel 7.0.0-38
-- **Runtime:** `ghcr.io/slybase/vllm-sly-radiance:1.6.0-rocm10.1` @ `sha256:bf153fa38868…7506` (reports **vLLM 0.31.0**, `RADIANCE_VERSION=1.6.0`, ROCm 10.1 in-image) · launcher `bench/engine-bench/vllm/serve_vllm.sh`, profile `sly-radiance/qwen38-mxfp4`
+- **Runtime:** `ghcr.io/slybase/vllm-sly-radiance:1.6.0-rocm10.1` @ `sha256:bf153fa38868…7506` (reports **vLLM 0.31.0**, `RADIANCE_VERSION=1.6.0`, ROCm 10.1 in-image) · launcher `stack/serve/vllm/serve_vllm.sh`, profile `sly-radiance/qwen38-mxfp4`
 - **Model:** `amd/Qwen3.8-27B-Quark-AWQ-MXFP4` @ `5233554c` (Quark MXFP4 W4A8, 19 GB) · KV **fp8** · ctx **150000** · max-num-seqs 1 · gpu-mem-util 0.90 · **no speculative decoding**
-- **Data:** `bench/runs/2026-10-22-vllm-sly-mxfp4-depth/` (consolidated `results.jsonl`; attempt 1 quarantined in `quarantine/`) · smoke boots: `bench/runs/2026-10-22-1252-vllm-sly-1.6.0-smoke/`
+- **Data:** `campaigns/perf/2026-10-22-1324-vllm-sly-mxfp4-depth/` (consolidated `results.jsonl`; attempt 1 quarantined in `quarantine/`) · smoke boots: `campaigns/perf/2026-10-22-1324-vllm-sly-mxfp4-depth/results/2026-10-22-1252-vllm-sly-1.6.0-smoke/`
 
 ## Summary
 
@@ -26,7 +26,7 @@ On one R9700, Sly radiance 1.6.0 with AMD's MXFP4 checkpoint is **a prefill engi
 | depth / `crN` | code-review fixture padded to N tokens (`codereview-N.txt`), unique prefix, chat API, 256-token answer | prefill and decode both decay as power laws (fits below) | 4 cold depths × 2 reps |
 | conversation | growing multi-turn chat: turn 0 = 10k tokens, each turn adds the reply + 15k new tokens, prior turns cached (iron rule 17) | per-turn cost = prefill of NEW tokens + decode at the grown depth | `capture_engine.py conversation`, 2 reps to ~131k |
 | `cached` / `new` | vLLM `prompt_tokens_details.cached_tokens`; new = prompt − cached | cached = previous prompt rounded down to the 64-token KV block (MEASURED) | per turn |
-| phase power | GPU power averaged over each request's prefill window (start → first token) and decode window (first token → end) | 179–217 W prefill, 207–215 W decode: at the cap (MEASURED) | `bench/lib/phase_power.py`, flag < 150 W |
+| phase power | GPU power averaged over each request's prefill window (start → first token) and decode window (first token → end) | 179–217 W prefill, 207–215 W decode: at the cap (MEASURED) | `stack/gpu/phase_power.py`, flag < 150 W |
 | mclk / sclk | memory / core clock from `gpu_samples.csv` | decode: mclk **1258 MHz in 100 % of samples**; prefill: mclk 456–875, sclk 2.1–2.5 GHz (power-limited) | per phase, skill rule 16 |
 
 ## Results — cold depth curve (all MEASURED, per request; 256 generated tokens)
@@ -53,11 +53,11 @@ On one R9700, Sly radiance 1.6.0 with AMD's MXFP4 checkpoint is **a prefill engi
 | conversation | prefill of new tokens | −0.360 | 0.882 | 17 |
 | conversation | decode | −0.229 | 0.934 | 17 |
 
-**Prefill vs depth** — ![Prefill vs depth](charts/depth_prefill.svg)
+**Prefill vs depth** — ![Prefill vs depth](../../../campaigns/perf/2026-10-22-1324-vllm-sly-mxfp4-depth/results/charts/depth_prefill.svg)
 
 > The tool's "p50" over 2 reps is the **minimum** of each metric, so the 20k and 40k points are the JIT-hit reps (1,870 / 1,987). The clean reps make the cold curve monotone (2,845 → 2,574 → 2,291 → 1,500). MEASURED.
 
-**Decode vs depth** — ![Decode vs depth](charts/depth_decode.svg)
+**Decode vs depth** — ![Decode vs depth](../../../campaigns/perf/2026-10-22-1324-vllm-sly-mxfp4-depth/results/charts/depth_decode.svg)
 
 > Decode is reproducible to ±0.1 tok/s between reps at every depth (MEASURED), so the decay is real, not noise.
 
@@ -77,15 +77,15 @@ On one R9700, Sly radiance 1.6.0 with AMD's MXFP4 checkpoint is **a prefill engi
 
 Wall per conversation: rep 0 = 9 turns in **184.8 s** (92.9 s of it TTFT). VRAM 30,039–30,041 MiB, GTT 79 MiB. ⚠ = Triton JIT again (log 11:47:28, `kernel_unified_attention_2d`).
 
-**Conversation: prefill of new tokens per turn** — ![Conversation prefill](charts/conv_prefill_new.svg)
+**Conversation: prefill of new tokens per turn** — ![Conversation prefill](../../../campaigns/perf/2026-10-22-1324-vllm-sly-mxfp4-depth/results/charts/conv_prefill_new.svg)
 
 > Each turn prefills only its ~15k new tokens, but they get slower as the cached history they attend to grows (k −0.36). MEASURED.
 
-**Conversation: TTFT per turn** — ![Conversation TTFT](charts/conv_ttft.svg)
+**Conversation: TTFT per turn** — ![Conversation TTFT](../../../campaigns/perf/2026-10-22-1324-vllm-sly-mxfp4-depth/results/charts/conv_ttft.svg)
 
 > The agent-facing cost: 4–15 s per turn up to 131k context, against 90 s for one cold 136k prefill. MEASURED.
 
-**Power by phase** — ![Power by phase](charts/power_phase.svg)
+**Power by phase** — ![Power by phase](../../../campaigns/perf/2026-10-22-1324-vllm-sly-mxfp4-depth/results/charts/power_phase.svg)
 
 > Both phases sit at the 210 W cap. Peaks up to 315 W are sub-second transients over an averaging limit. No probe was flagged (threshold 150 W). MEASURED.
 
@@ -100,11 +100,11 @@ Boot attempts with MXFP4: 2 smoke/campaign boots, 0 boot failures, **1 of 2 boot
 
 ## Consequences & root causes
 
-1. **Prefill is the strength, and it comes from the W4A8 fp8-WMMA path.** 2,845 tok/s at 8k and 1,500 at 136k (MEASURED). The repo's earlier runs on the same `codereview-N` fixtures (unique prefix, chat, 256 tokens; `bench/runs/2026-09-12-1943-vllm-bigwindow-depthcurve`, MEASURED there) gave llama.cpp b10909 + MTP **890 @ 8k / 637 @ 98k** and radiance 0.9.3 INT4 + MTP-3 **1,242 / 662**. That is 2.3–3.2× faster at 8k and >2× at depth. Not like-for-like (different builds, quants, speculation, and an unknown power cap then), so this is a direction, not a ranking. INFERRED cause: all 304 linears run on gfx1201's fp8 WMMA instead of a W4A16 dequant-to-fp16 GEMM (Sly PERFORMANCE.md:163, CLAIMED).
+1. **Prefill is the strength, and it comes from the W4A8 fp8-WMMA path.** 2,845 tok/s at 8k and 1,500 at 136k (MEASURED). The repo's earlier runs on the same `codereview-N` fixtures (unique prefix, chat, 256 tokens; `campaigns/perf/2026-09-12-1844-vllm-window-budgets/results/2026-09-12-1943-vllm-bigwindow-depthcurve`, MEASURED there) gave llama.cpp b10909 + MTP **890 @ 8k / 637 @ 98k** and radiance 0.9.3 INT4 + MTP-3 **1,242 / 662**. That is 2.3–3.2× faster at 8k and >2× at depth. Not like-for-like (different builds, quants, speculation, and an unknown power cap then), so this is a direction, not a ranking. INFERRED cause: all 304 linears run on gfx1201's fp8 WMMA instead of a W4A16 dequant-to-fp16 GEMM (Sly PERFORMANCE.md:163, CLAIMED).
    **→ For agent workloads that re-read large contexts, prefill is the cost that grows, and this engine is the best this repo has measured at it.**
 
 2. **Decode without speculation is below llama.cpp+MTP.** 33.8 → 17.9 tok/s (MEASURED) vs llama.cpp+MTP's 67.4 @ 8k / 35.4 @ 98k in the earlier run. Bandwidth bound (INFERRED): ~14.7 GB of weights per token at 640 GB/s (CLAIMED, AMD spec: 256-bit GDDR6 @ 20 Gbps) caps decode at ~43 tok/s, so 33.8 at 8k is ~78 % of the roofline. At 131k the fp8 KV adds 16 attn layers × 4 KV heads × 256 × 2 B ≈ 32 KiB/token (INFERRED from the model card's geometry, CLAIMED) ≈ 4.2 GB/token, which caps decode at ~34 tok/s; the measured 18.3 is ~54 %. **OPEN:** the decode attention kernel loses efficiency with depth. The memory clock was pinned at maximum (1,258 MHz) in 100 % of decode samples, so the 210 W cap is not the limiter here.
-   **→ The drafter (Sly's headline 149.6 tok/s is CLAIMED *with* DFlash2 k=7) is the next measurement. Without it, llama.cpp+MTP remains the decode choice.** *Update: measured in [`../2026-10-22-vllm-sly-mxfp4-dflash/analysis.md`](../2026-10-22-vllm-sly-mxfp4-dflash/analysis.md) — 136.6 tok/s @ 8k, 100.5 @ 136k cold (MEASURED).*
+   **→ The drafter (Sly's headline 149.6 tok/s is CLAIMED *with* DFlash2 k=7) is the next measurement. Without it, llama.cpp+MTP remains the decode choice.** *Update: measured in [`../2026-10-22-vllm-sly-mxfp4-dflash/analysis.md`](2026-10-22-1406-vllm-sly-mxfp4-dflash.md) — 136.6 tok/s @ 8k, 100.5 @ 136k cold (MEASURED).*
 
 3. **Prefix caching works on this GDN hybrid.** Cached tokens = the previous turn's prompt rounded down to the 64-token block. Turn 8's TTFT is 15.1 s for 15,084 new tokens, vs 90.2 s for a cold 135,689-token prompt (MEASURED) — the skill-rule-11 check (wall ≈ delta/rate, not ctx/rate) passes. The previous reply is *not* cached: the Qwen template drops prior reasoning from history, so its tokens differ (INFERRED from cached = previous prompt only).
    **→ An agent loop to ~130k pays ~15 s per turn of prefill here, not ~90 s.**
@@ -138,13 +138,13 @@ Boot attempts with MXFP4: 2 smoke/campaign boots, 0 boot failures, **1 of 2 boot
 | 13 | image version | PR #162 says 1.6.0 moved to vLLM 0.32.0; the pulled `1.6.0-rocm10.1` reports 0.31.0 | **OPEN** (recorded by digest) |
 
 Tool changes made in this session (all stress-tested; mock-server end-to-end + real run):
-`bench/engine-bench/vllm/{serve_vllm.sh,fetch_model.sh,profiles/}` (new) · `gen_campaign.py` (`engine: vllm`, `mode: conversation`, per-probe `warmup`) · `capture_engine.py` (`conversation` mode, wall-clock phase times, vLLM `/tokenize` + `delta.reasoning`, cut-stream = interrupted) · `bench/lib/phase_power.py` (new) · `engine-bench/run.sh` (`MODE=conversation`, phase power, nonzero exit on failure) · `report.py` (conversation charts, power table + flag, per-series log-log fits).
+`bench/engine-bench/vllm/{serve_vllm.sh,fetch_model.sh,profiles/}` (new) · `gen_campaign.py` (`engine: vllm`, `mode: conversation`, per-probe `warmup`) · `capture_engine.py` (`conversation` mode, wall-clock phase times, vLLM `/tokenize` + `delta.reasoning`, cut-stream = interrupted) · `stack/gpu/phase_power.py` (new) · `engine-bench/run.sh` (`MODE=conversation`, phase power, nonzero exit on failure) · `report.py` (conversation charts, power table + flag, per-series log-log fits).
 
 ## Recommended config (what this campaign ran)
 
 ```bash
-PROFILE=sly-radiance/qwen38-mxfp4 PORT=8000 bench/engine-bench/vllm/serve_vllm.sh      # MAXLEN=150000 KV_DTYPE=fp8 MAXSEQS=1
-# exact docker argv + image digest + model revision: bench/.servers/8000.cmdline (copied per boot)
+PROFILE=sly-radiance/qwen38-mxfp4 PORT=8000 stack/serve/vllm/serve_vllm.sh      # MAXLEN=150000 KV_DTYPE=fp8 MAXSEQS=1
+# exact docker argv + image digest + model revision: stack/serve/var/servers/8000.cmdline (copied per boot)
 ```
 Use it for **prefill-heavy, interactive** work with a client-side timeout. For long unattended runs, wait for the fault to be bisected. For decode-heavy work, llama.cpp+MTP stays ahead until the DFlash drafter is measured.
 
@@ -160,4 +160,4 @@ Use it for **prefill-heavy, interactive** work with a client-side timeout. For l
 
 Sly README (1.5.1 reference, 300 W, fp8 KV, **with DFlash2 k=7**): decode 149.6 tok/s single stream, prefill ~3,024 tok/s at 1.5k / 2,430 at 47k, 439,031-token KV pool. Our drafter-off pool (433,957 @ 0.90 util) matches it closely. Our 40k prefill (2,291 clean) vs their 2,430 @ 47k is ~6 % lower at 210 W vs 300 W.
 
-Full chart appendix: [`appendix.md`](appendix.md) (adds `conv_decode.svg`, `memory.svg`).
+Full chart appendix: [`appendix.md`](../../../campaigns/perf/2026-10-22-1324-vllm-sly-mxfp4-depth/results/appendix.md) (adds `conv_decode.svg`, `memory.svg`).

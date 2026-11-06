@@ -2,7 +2,7 @@
 """score_notes.py WORKDIR KEYDIR: docnotes through the earlier report's scorer. score = mean of exact facts, planted incidents found, and paths found. Meaning is graded separately, blind."""
 import json, os, subprocess, sys, tempfile
 W, K = sys.argv[1:3]
-S = "/home/dev/work/dp-craft/amd/bench/runs/2026-11-04-2207-docanalysis-ornith-vs-haiku/harness/score.py"
+S = "/home/dev/work/dp-craft/amd/campaigns/workers/2026-11-04-2207-docanalysis-ornith-vs-haiku/harness/score.py"
 with tempfile.TemporaryDirectory() as t:
     os.symlink(f"{K}/key.json", f"{t}/key.json")
     os.symlink(f"{W}/docs", f"{t}/docs")

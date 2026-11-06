@@ -9,8 +9,8 @@ takeaway: **Corrects the 27b-vs-35b campaign's `presence_penalty × MTP` mechani
 - **GPU/Host:** AMD Radeon AI PRO R9700, 32624 MiB · `HSA_OVERRIDE_GFX_VERSION=12.0.1` · ROCm-SMI 7.8.0 · **Ryzen 5 3600 (6c/12t)**, 31 GB RAM, no swap
 - **Runtime:** llama.cpp **b9950-961e4b26a** — Vulkan/RADV · `-ub 2048 -b 4096 -fa on -ngl 99 -np 1` · ctx **4096** · KV **f16** · seed **42**
 - **Models:** `Qwen3.6-27B-MTP-Q4_K_M.gguf` (dense) · `Qwen3.6-35B-A3B-UD-Q4_K_M.gguf` (MoE) — **both carry an MTP head**
-- **Data:** `bench/runs/2026-07-16-0927-mtp-sampler-probe/` — `results.jsonl` (26 rows), `meta.txt`, per-cell `gpu_*.csv`, regenerate with `./probe.sh`
-- **Refutes:** `campaigns/2026-07-14-hardest-tasks-27b-vs-35b/analysis.md` § *The presence_penalty × MTP interaction — the sharpest unexplained result*
+- **Data:** `campaigns/perf/2026-07-16-0927-mtp-sampler-tax/results/2026-07-16-0927-mtp-sampler-probe/` — `results.jsonl` (26 rows), `meta.txt`, per-cell `gpu_*.csv`, regenerate with `./probe.sh`
+- **Refutes:** `docs/findings/quality/2026-07-14-0000-hardest-tasks-27b-vs-35b.md` § *The presence_penalty × MTP interaction — the sharpest unexplained result*
 
 > ## ⚠ These are OTHER measurements — not reproducible within the 27b-vs-35b test set
 > This is a **scouting probe at ctx 4096 on a ~24-token prompt with n=1** on most cells. The campaign
@@ -101,7 +101,7 @@ MEASURED, 35B MoE, pp 0, ctx 4096, n=1:
 | 6 | 128.9 | 42.0% | `76134e4fa453` |
 | 8 | **80.2** | 37.3% | `183430599685` |
 
-- **The default is already optimal** at this depth. Acceptance falls monotonically with draft width, throughput peaks at 3, and **n-max 8 (80.2 t/s) is *worse than turning MTP off*** (107.6). Cheap insurance against "tuning" it upward. **And it is the *better* draft-length lever** — its sibling `--spec-draft-p-min` is also *live* on the MTP path (MEASURED, [`bench/runs/2026-07-16-1111-spec-draft-pmin-mtp/`](../../bench/runs/2026-07-16-1111-spec-draft-pmin-mtp/analysis.md): raising it 0→0.99 cuts drafted-tok/pass 2.98→0.46 and *lowers* decode 160→106 t/s, and does not reduce fluctuation), so it is a throughput cost, not a knob to reach for. ⚠ This corrects an earlier source-read ([`docs/research/2026-07-16-1016-spec-draft-p-min-mtp.md`](../research/2026-07-16-1016-spec-draft-p-min-mtp.md), now erratum'd) that called p_min "unwired for MTP".
+- **The default is already optimal** at this depth. Acceptance falls monotonically with draft width, throughput peaks at 3, and **n-max 8 (80.2 t/s) is *worse than turning MTP off*** (107.6). Cheap insurance against "tuning" it upward. **And it is the *better* draft-length lever** — its sibling `--spec-draft-p-min` is also *live* on the MTP path (MEASURED, [`campaigns/perf/2026-07-16-0927-mtp-sampler-tax/results/2026-07-16-1111-spec-draft-pmin-mtp/`](../../../campaigns/perf/2026-07-16-0927-mtp-sampler-tax/results/2026-07-16-1111-spec-draft-pmin-mtp/analysis.md): raising it 0→0.99 cuts drafted-tok/pass 2.98→0.46 and *lowers* decode 160→106 t/s, and does not reduce fluctuation), so it is a throughput cost, not a knob to reach for. ⚠ This corrects an earlier source-read ([`docs/research/llamacpp/2026-07-16-1016-spec-draft-p-min-mtp.md`](../../research/llamacpp/2026-07-16-1016-spec-draft-p-min-mtp.md), now erratum'd) that called p_min "unwired for MTP".
 - **`k = 3.00` draft tokens/pass, exactly, in all 14 campaign cells** (MEASURED, `outputs.jsonl`) — the MTP geometry model is clean and validates this reading.
 - ⚠ **MTP is NOT output-preserving.** At a fixed seed, MTP off (`e40c532d`) and MTP on (`30303b0c`) emit **different text**, and n-max ≥ 4 diverges again per setting. Expected — speculation changes batch shape, and floating-point non-associativity under a changed reduction order is the known mechanism for inference non-determinism (CLAIMED, vLLM [#27433](https://github.com/vllm-project/vllm/issues/27433), **open**) — the same issue the campaign already cites. **Consequence: MTP is a quality-relevant knob, not a free speed knob.** All 14 campaign cells are MTP-on, so nothing *within* the campaign is confounded by this; but "MTP is free" is false in principle, and an MTP-off arm would not reproduce the campaign's replies.
 
@@ -109,7 +109,7 @@ MEASURED, 35B MoE, pp 0, ctx 4096, n=1:
 
 ## Memory — MEASURED (mandatory column)
 
-Per-cell means over the active window, `bench/lib/vram_sampler.py`. **Idle GTT baseline on this box = 79 MiB.**
+Per-cell means over the active window, `stack/gpu/vram_sampler.py`. **Idle GTT baseline on this box = 79 MiB.**
 
 | config | GTT used (MiB, mean) | Δ vs idle | note |
 |---|--:|--:|---|
@@ -185,7 +185,7 @@ it holding *somewhere* with acceptance pinned, which it does.
 - **Host generality.** The ~2 ms/token is a **Ryzen 5 3600** number. It should shrink on a faster host and grow relative to a faster GPU. Untested — one data point, one box.
 - **Host generality.** The ~2 ms/token is a **Ryzen 5 3600** number. It should shrink on a faster host and grow relative to a faster GPU. Untested — one data point, one box.
 - **Why the penalties branch costs ~2 ms.** Inferred to be the per-position scan the penalties sampler performs over the 151k-token vocabulary (llama.cpp skips the branch entirely when all penalties are neutral). **Not verified** — that needs a profiler or the source, and this box has binaries only.
-- ~~**`--spec-draft-backend-sampling`.**~~ **TESTED — it is not a lever for this tax** (MEASURED, 35B, ctx 4096): forcing it on (`--spec-draft-backend-sampling`) or off (`--no-...`) leaves the pp0→pp0.01 drop unchanged (−27.6% vs −27.3%), and `/props` reports `backend_sampling: false` in both cases. Expected in hindsight: the tax is on the **target-model verification** sampler (penalties re-applied when checking each drafted token), not draft sampling — so where draft sampling runs is irrelevant to it. (CLAIMED: verification runs the full sampler chain including penalties, `common/sampling.cpp`; the MTP draft-depth knobs `--spec-draft-n-max`/`--spec-draft-p-min` are both live but sit on the draft side, not verification — MEASURED, [`bench/runs/2026-07-16-1111-spec-draft-pmin-mtp/`](../../bench/runs/2026-07-16-1111-spec-draft-pmin-mtp/analysis.md).)
+- ~~**`--spec-draft-backend-sampling`.**~~ **TESTED — it is not a lever for this tax** (MEASURED, 35B, ctx 4096): forcing it on (`--spec-draft-backend-sampling`) or off (`--no-...`) leaves the pp0→pp0.01 drop unchanged (−27.6% vs −27.3%), and `/props` reports `backend_sampling: false` in both cases. Expected in hindsight: the tax is on the **target-model verification** sampler (penalties re-applied when checking each drafted token), not draft sampling — so where draft sampling runs is irrelevant to it. (CLAIMED: verification runs the full sampler chain including penalties, `common/sampling.cpp`; the MTP draft-depth knobs `--spec-draft-n-max`/`--spec-draft-p-min` are both live but sit on the draft side, not verification — MEASURED, [`campaigns/perf/2026-07-16-0927-mtp-sampler-tax/results/2026-07-16-1111-spec-draft-pmin-mtp/`](../../../campaigns/perf/2026-07-16-0927-mtp-sampler-tax/results/2026-07-16-1111-spec-draft-pmin-mtp/analysis.md).)
 
 ---
 
@@ -197,7 +197,7 @@ it holding *somewhere* with acceptance pinned, which it does.
 
 **Changed in this run (rule 6 — extend the tool, don't work around it):**
 
-- **`bench/lib/vram_sampler.py` now records `mclk_mhz` and `gpu_busy_pct`** (`rocm-smi --showuse`; `utilization.gpu`/`clocks.mem` on NVIDIA), and reports both in the summary line. **This was load-bearing, not cosmetic:** `sclk` alone cannot distinguish a **downclocked** GPU (thermal/power limit; busy% stays high) from a **starved** one (host on the critical path; busy% and sclk both sag). The entire "CPU-bound" reading of the pp cells hinged on that distinction, and the old sampler could not make it.
+- **`stack/gpu/vram_sampler.py` now records `mclk_mhz` and `gpu_busy_pct`** (`rocm-smi --showuse`; `utilization.gpu`/`clocks.mem` on NVIDIA), and reports both in the summary line. **This was load-bearing, not cosmetic:** `sclk` alone cannot distinguish a **downclocked** GPU (thermal/power limit; busy% stays high) from a **starved** one (host on the critical path; busy% and sclk both sag). The entire "CPU-bound" reading of the pp cells hinged on that distinction, and the old sampler could not make it.
 
 **Correction to a claim made earlier in this investigation:** I asserted the harness "throws away the acceptance rate" and proposed teaching `capture.py` to record it. **That was wrong.** `capture.py` stores llama.cpp's whole `timings` blob verbatim, and `draft_n`/`draft_n_accepted` are present on **210/210** campaign rows. The gap is that **`aggregate.py` never surfaces them** — a reporting gap, not a capture gap. The campaign's "untested — one MTP-on/off run answers it" was **already answerable from data it had collected**.
 
@@ -205,9 +205,9 @@ it holding *somewhere* with acceptance pinned, which it does.
 
 ## Provenance
 
-- **MEASURED** — everything in the tables above, from `bench/runs/2026-07-16-0927-mtp-sampler-probe/results.jsonl` (26 rows, cite the row `label`) and, where stated, the 210 rows of `campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/outputs.jsonl`.
+- **MEASURED** — everything in the tables above, from `campaigns/perf/2026-07-16-0927-mtp-sampler-tax/results/2026-07-16-0927-mtp-sampler-probe/results.jsonl` (26 rows, cite the row `label`) and, where stated, the 210 rows of `campaigns/quality/2026-07-14-0000-hardest-tasks-27b-vs-35b/tmp/out/outputs.jsonl`.
 - **INFERRED** — the vocabulary-scan explanation for the ~2 ms; the Amdahl framing; the claim that the tax shrinks on faster hosts.
-- **CLAIMED** — vLLM [#27433](https://github.com/vllm-project/vllm/issues/27433) (open) for batch-invariance as the known mechanism of inference non-determinism. Depth-scaling of MTP's benefit from `docs/analysis/2026-07-11-2200-deep-context-35b.md` (MEASURED, ours).
+- **CLAIMED** — vLLM [#27433](https://github.com/vllm-project/vllm/issues/27433) (open) for batch-invariance as the known mechanism of inference non-determinism. Depth-scaling of MTP's benefit from `docs/findings/llamacpp/2026-07-11-2200-deep-context-35b.md` (MEASURED, ours).
 
 ## Recommended next steps
 

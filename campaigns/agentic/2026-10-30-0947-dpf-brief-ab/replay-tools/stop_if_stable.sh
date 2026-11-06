@@ -28,7 +28,7 @@ log "B capture: $V"
 case $V in stable*) ;; *) log "not stable -- full A/B continues"; exit 0;; esac
 kill -TERM -"$PG" 2>/dev/null; sleep 3; kill -KILL -"$PG" 2>/dev/null
 log "chain stopped (B replays skipped); stopping the B server"
-"$FORGE/vllm.sh" stop > "$OUT/server-stop-B.txt" 2>&1; cp "$AMD/bench/.servers/8000.log" "$OUT/server-container-B.log" 2>/dev/null
+"$FORGE/vllm.sh" stop > "$OUT/server-stop-B.txt" 2>&1; cp "$AMD/stack/serve/var/servers/8000.log" "$OUT/server-container-B.log" 2>/dev/null
 for i in $(seq 30); do ss -ltn | grep -q ':8000 ' || break; sleep 2; done
 ss -ltn | grep -q ':8000 ' && { log "port 8000 still held -- not booting A"; exit 1; }
 log "control: arm A (Cactus 0.5) x$N_A on the same body"

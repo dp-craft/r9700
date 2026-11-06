@@ -7,14 +7,14 @@ REPO = "/home/dev/work/dp-craft/amd"
 UC = sys.argv[1]
 SPLIT = {
     "P": "CLAUDE.md",
-    "S": "docs/analysis/2026-07-11-2200-deep-context-35b.md",
-    "M": "docs/analysis/2026-07-27-runner-benchmark-unified.md",
-    "L": "campaigns/2026-07-14-hardest-tasks-27b-vs-35b/analysis.md",
+    "S": "docs/findings/llamacpp/2026-07-11-2200-deep-context-35b.md",
+    "M": "docs/findings/quality/2026-07-27-0000-runner-benchmark-unified.md",
+    "L": "docs/findings/quality/2026-07-14-0000-hardest-tasks-27b-vs-35b.md",
 }
 REORG = {
-    "S": ["docs/research/2026-07-12-2310-qwen36-sampling-llamacpp-serving-knobs.md", "docs/research/2026-10-08-0930-rocmtos-cachyos-ubuntu2604-rdna4.md", "docs/research/2026-07-14-1550-gfx1201-llm-training-feasibility.md"],
-    "M": ["campaigns/2026-07-12-27b-serving-substrate/analysis.md", "docs/research/2026-07-16-1016-spec-draft-p-min-mtp.md", "docs/research/2026-07-13-1712-hard-ts-quality-benchmark-design.md"],
-    "L": ["docs/analysis/2026-07-10-1810-rdna4-r9700-tuning-optimum.md", "campaigns/2026-10-31-q4kxl-sharp-w208-blind/analysis.md", "docs/analysis/2026-10-31-1640-agentic-thinking-volume-and-levers.md"],
+    "S": ["docs/research/models-sampling/2026-07-12-2310-qwen36-sampling-llamacpp-serving-knobs.md", "docs/research/rocm-driver/2026-10-08-0930-rocmtos-cachyos-ubuntu2604-rdna4.md", "docs/research/models-sampling/2026-07-14-1550-gfx1201-llm-training-feasibility.md"],
+    "M": ["docs/findings/llamacpp/2026-07-13-0733-27b-serving-substrate.md", "docs/research/llamacpp/2026-07-16-1016-spec-draft-p-min-mtp.md", "docs/research/methodology/2026-07-13-1712-hard-ts-quality-benchmark-design.md"],
+    "L": ["docs/findings/llamacpp/2026-07-10-1810-rdna4-r9700-tuning-optimum.md", "docs/findings/agentic/2026-10-31-0000-q4kxl-sharp-w208-blind.md", "docs/findings/agentic/2026-10-31-1640-agentic-thinking-volume-and-levers.md"],
 }
 
 

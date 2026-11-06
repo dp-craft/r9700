@@ -30,19 +30,19 @@
   "resume_prompt": "Continue: follow docs/plans/2026-10-28-2239-dpf-tui-f0-f1/review/27b-fix/RUNBOOK.md exactly for brief W2-08 only (W2-06 and W2-07 are out of scope); resume where you stopped.",
   "install": [
     {
-      "src": "bench/runs/2026-10-30-0947-dpf-brief-ab/heretic/inputs/W2-06.md",
+      "src": "campaigns/agentic/2026-10-30-0947-dpf-brief-ab/inputs/heretic/W2-06.md",
       "dst": "docs/plans/2026-10-28-2239-dpf-tui-f0-f1/briefs/W2-06.md"
     },
     {
-      "src": "bench/runs/2026-10-30-0947-dpf-brief-ab/heretic/inputs/W2-07.md",
+      "src": "campaigns/agentic/2026-10-30-0947-dpf-brief-ab/inputs/heretic/W2-07.md",
       "dst": "docs/plans/2026-10-28-2239-dpf-tui-f0-f1/briefs/W2-07.md"
     },
     {
-      "src": "bench/runs/2026-10-30-0947-dpf-brief-ab/heretic/inputs/W2-08.md",
+      "src": "campaigns/agentic/2026-10-30-0947-dpf-brief-ab/inputs/heretic/W2-08.md",
       "dst": "docs/plans/2026-10-28-2239-dpf-tui-f0-f1/briefs/W2-08.md"
     },
     {
-      "src": "bench/runs/2026-10-30-0947-dpf-brief-ab/heretic/inputs/progress.md",
+      "src": "campaigns/agentic/2026-10-30-0947-dpf-brief-ab/inputs/heretic/progress.md",
       "dst": "docs/plans/2026-10-28-2239-dpf-tui-f0-f1/review/27b-fix/progress.md"
     }
   ],
@@ -113,7 +113,7 @@
       "image": "ghcr.io/slybase/vllm-sly-radiance:1.9.1-rocm10.1",
       "env": {
         "CACTUS_DELTA": "0",
-        "CHAT_TEMPLATE": "/home/dev/work/dp-craft/amd/campaigns/2026-10-31-redhat191-sharp-w208-blind/sharp-chat_template.jinja"
+        "CHAT_TEMPLATE": "/home/dev/work/dp-craft/amd/campaigns/agentic/2026-10-31-0000-redhat191-sharp-w208-blind/sharp-chat_template.jinja"
       }
     },
     {
@@ -122,7 +122,7 @@
       "image": "ghcr.io/slybase/vllm-sly-radiance:1.9.1-rocm10.1",
       "env": {
         "CACTUS_DELTA": "0.3",
-        "CHAT_TEMPLATE": "/home/dev/work/dp-craft/amd/campaigns/2026-10-31-redhat191-sharp-w208-blind/sharp-chat_template.jinja"
+        "CHAT_TEMPLATE": "/home/dev/work/dp-craft/amd/campaigns/agentic/2026-10-31-0000-redhat191-sharp-w208-blind/sharp-chat_template.jinja"
       }
     },
     {
@@ -131,7 +131,7 @@
       "image": "ghcr.io/slybase/vllm-sly-radiance:1.9.1-rocm10.1",
       "env": {
         "CACTUS_DELTA": "0.5",
-        "CHAT_TEMPLATE": "/home/dev/work/dp-craft/amd/campaigns/2026-10-31-redhat191-sharp-w208-blind/sharp-chat_template.jinja"
+        "CHAT_TEMPLATE": "/home/dev/work/dp-craft/amd/campaigns/agentic/2026-10-31-0000-redhat191-sharp-w208-blind/sharp-chat_template.jinja"
       }
     }
   ]

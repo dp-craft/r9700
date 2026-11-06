@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # run_arm.sh TASK SIZE VARIANT PRESET [REP]: one Ornith arm through the skill's ornith.sh; arms may run in parallel. Rerun skips finished arms. Failed or cut runs go to quarantine/. ARM_CAP = seconds before the session is cut. SYS_ARGS = extra claude flags, used for the system prompt test; @P@ becomes the profile. ARM_PROFILE overrides the profile. ORN overrides the wrapper (the wide allow-list test).
-RUN=/home/dev/work/dp-craft/amd/bench/runs/2026-11-05-0320-ornith-usecases; H=$RUN/harness
+RUN=/home/dev/work/dp-craft/amd/campaigns/workers/2026-11-05-0320-ornith-usecases/results/2026-11-05-0320-ornith-usecases; H=$RUN/harness
 UC=/tmp/claude-1001/-home-dev-work-dp-craft-amd/bf832afa-1002-41d9-a4b8-4b201a1bc43c/scratchpad/uc
 ORN=${ORN:-/home/dev/work/dippe/skills-agents/skills/ornith/scripts/ornith.sh}
-TS=/home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/ts-harness/node_modules
+TS=/home/dev/work/dp-craft/amd/bench/quality/var/node_modules
 TASK=$1; SIZE=$2; V=$3; P=$4; REP=${5:-}; ARM=$TASK.$SIZE.$V.$P${REP:+.$REP}; A=$UC/runs/$ARM; M=$RUN/arms/$ARM
 [ -f "$M/result.json" ] && { echo "skip $ARM"; exit 0; }
 case "$P" in P0) want="presence-penalty 1.5"; want2="--temp 1.0";; P1) want="presence-penalty 0"; want2="--temp 1.0";; P2) want="presence-penalty 0"; want2="--temp 0.6";; esac
@@ -27,7 +27,7 @@ case "$TASK" in
   *) python3 $H/briefs.py "$TASK" "$V" "$A" > "$M/brief.txt";;
 esac
 sleep 2
-python3 /home/dev/work/dp-craft/amd/bench/lib/vram_sampler.py --out "$M/gpu.csv" --interval 2 >/dev/null 2>&1 & SMP=$!
+python3 /home/dev/work/dp-craft/amd/stack/gpu/vram_sampler.py --out "$M/gpu.csv" --interval 2 >/dev/null 2>&1 & SMP=$!
 SINCE=$(date -u +%Y-%m-%dT%H:%M:%SZ); T0=$(date +%s.%N)
 SYS_ARGS=${SYS_ARGS//@P@/$PROFILE}; cd "$A"; ORNITH_OUT="$M/raw.json" MAX_TURNS=${MAX_TURNS:-80} timeout ${ARM_CAP:-1800} "$ORN" --profile "$PROFILE" "$(cat "$M/brief.txt")" ${SYS_ARGS:-} > "$M/reply.txt" 2>&1; RC=$?
 T1=$(date +%s.%N); kill $SMP 2>/dev/null; wait $SMP 2>/dev/null

@@ -8,7 +8,7 @@
 # working set while llama-swap still had ~27 GB resident; nothing appeared in serve.log
 # or dmesg and the entire concurrency sweep had to be discarded.
 #
-# Usage:  bench/lib/gpu_exclusive.sh [required_free_mib]
+# Usage:  stack/gpu/gpu_exclusive.sh [required_free_mib]
 # Exits non-zero (and names the holder) when the card cannot be freed.
 set -u
 REQUIRED_FREE_MIB="${1:-26000}"

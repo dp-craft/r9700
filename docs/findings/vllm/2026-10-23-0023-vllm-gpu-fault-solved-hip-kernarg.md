@@ -8,8 +8,8 @@ takeaway: The random HSA_STATUS_ERROR_MEMORY_FAULT (any ROCm kernel, address = a
 # vLLM GPU memory fault on the R9700 — solved by `HIP_FORCE_DEV_KERNARG=0`
 
 - **Date:** 2026-10-22 evening → 2026-10-23 · **Track:** engine-bench (vLLM) · **Supersedes the open root cause in**
-  `docs/analysis/2026-10-22-1643-vllm-mxfp4-atiled-fault-and-llama-swap-serving.md`
-- **Working notes / raw rows:** `docs/plans/2026-10-22-mxfp4-qwen38-options/FASTPATH.md`, `results.tsv`, `logs/`
+  `docs/findings/vllm/2026-10-22-1643-vllm-mxfp4-atiled-fault-and-llama-swap-serving.md`
+- **Working notes / raw rows:** `notes/plans/2026-10-22-mxfp4-qwen38-options/FASTPATH.md`, `results.tsv`, `logs/`
 
 ## Summary
 
@@ -17,7 +17,7 @@ takeaway: The random HSA_STATUS_ERROR_MEMORY_FAULT (any ROCm kernel, address = a
 |---|---|
 | **Issue** | `HSA_STATUS_ERROR_MEMORY_FAULT` ("page not present"), then a 5–16 min hang and a dead engine. Hit Claude Code's first request on most boots of Sly radiance 1.5.1/1.6.0 MXFP4 + DFlash, at any ctx, with or without llama-swap |
 | **Root cause (INFERRED, strong)** | A **corrupted kernel-argument pointer**. The fault address is a valid buffer pointer with **bit 44 cleared**. MEASURED once, by pointer logging (ptrlog-4): the down_proj weight `0x7c930da00000…` was read at `0x6c94bc6a2000`. Every fault address seen was `0x6…`, while all buffers live at `0x7…`. By default HIP places kernel arguments in **device memory that the CPU writes over the PCIe BAR**; with them in **host memory** the faults stop |
-| **Fix** | `HIP_FORCE_DEV_KERNARG=0` in the container env. Now the default in `bench/engine-bench/vllm/profiles/{sly-radiance,radiance}/_engine.env` |
+| **Fix** | `HIP_FORCE_DEV_KERNARG=0` in the container env. Now the default in `stack/serve/vllm/profiles/{sly-radiance,radiance}/_engine.env` |
 | **Evidence** | Fix: **3/3 boots × 4 Claude turns, 0 faults** (hostka-1..3, MEASURED). Without it: faults in **~12 of ~21 boots** this session (MEASURED rows below). Chance of 3 clean boots by luck at that rate ≈ 0.43³ ≈ **8 %** (INFERRED) → strong but not final; more runs are in progress |
 | **Speed with the fix** | Same as the unstable config: decode median **111–150 tok/s**, prefill median **2.4–3.0k tok/s** (max 5.6k), DFlash acceptance 4.8–6.2 (MEASURED, `speeds.py`, 10 s log windows) — well above the ≥50 / ≥1000 target |
 | **Ruled out (MEASURED)** | llama-swap; ctx size (120k–180k); Sly version (1.5.1 faults too); the A-tiled path; an M-tail over-read/over-write (padding A, x_scale and out by 256 rows: still faulted); prefill kernels only (the decode kernel faulted too); the amdgpu driver in kernel 7.0.0-38 (7.0.0-34 faulted too); warm start (a boot that survived a replayed Claude request still faulted) |
@@ -61,7 +61,7 @@ in both vLLM and llama.cpp **on ROCm only** (never on Vulkan), and kept one bit 
 CPU into VRAM through the BAR is the one path all of these share, and moving kernargs to host memory removes it. Which
 part of that path flips bit 44 (PCIe link, BAR write-combining, firmware) is not established.
 
-## Numbers (MEASURED, `docs/plans/2026-10-22-mxfp4-qwen38-options/results.tsv` + `speeds.py`)
+## Numbers (MEASURED, `campaigns/investigation/2026-10-22-1925-vllm-mxfp4-gpu-fault/results/results.tsv` + `speeds.py`)
 
 | label | config | result | turn times | decode med | prefill med / max | accept |
 |---|---|---|---|---|---|---|
@@ -98,6 +98,6 @@ windows ≥1000 prompt tok/s, which read low when part-idle). They compare image
 |---|---|
 | `docs/plans/…/claudetest.sh` | the gate: boots a profile, runs 4 real `claude -p` turns, polls for `MEMORY_FAULT`; `AUTOCOMPACT_PCT` (default min(75, safe − 3)), `WARM=1` |
 | `…/ladder.sh`, `…/kerneltest.sh`, `…/speeds.py` | ctx ladder; post-reboot gate; prefill/decode/acceptance from the server log |
-| `bench/engine-bench/vllm/serve_vllm.sh` `PY_OVERLAY` | mount a dir of Python modules that shadow the image's |
-| `bench/engine-bench/vllm/overlays/sly-pad-a/` | diagnostic overlay for `radiance_mxfp4.py` (PAD_A, PAD_OUT_ROWS, SPLIT_M, PTRLOG) |
-| `bench/engine-bench/vllm/capture_proxy.py`, `warm_start.sh`, `warmup/claude-first/` | capture real Claude request bodies; boot + replay + reboot-on-fault |
+| `stack/serve/vllm/serve_vllm.sh` `PY_OVERLAY` | mount a dir of Python modules that shadow the image's |
+| `stack/serve/vllm/overlays/sly-pad-a/` | diagnostic overlay for `radiance_mxfp4.py` (PAD_A, PAD_OUT_ROWS, SPLIT_M, PTRLOG) |
+| `bench/core/capture_proxy.py`, `warm_start.sh`, `warmup/claude-first/` | capture real Claude request bodies; boot + replay + reboot-on-fault |

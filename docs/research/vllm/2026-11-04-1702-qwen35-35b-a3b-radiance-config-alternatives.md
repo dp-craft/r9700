@@ -7,7 +7,7 @@ takeaway: Switching amd/Qwen3.5-35B-A3B-MXFP4 from the EMULATION MoE backend to 
 
 **Date:** 2026-11-04 · **Kind:** technical research + direct measurement · **Method:** `/research` technical (intake questions skipped: the request stated its goal and stop rule). Web research by two subagents; the key Sly figures were re-fetched from the primary doc. Tags per iron rule 1.
 
-> **Correction (2026-11-04 17:46).** This report concluded that no alternative had a big chance of ~200 t/s. That was wrong. Its native Radiance row covered only the Qwen3.6 FP8 file and missed `keptn/ornith-1.5-35b-a3b-w4a8` in Radiance's own model list, which has an official single-card config and measured 219.8 t/s at 10k (`MEASURED`, `docs/analysis/2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md`). The step times below are also corrected: the 35B on `triton_unfused` takes about 27 ms per step at 10k, not 37 ms, so it is faster per step than the 27B rather than equal.
+> **Correction (2026-11-04 17:46).** This report concluded that no alternative had a big chance of ~200 t/s. That was wrong. Its native Radiance row covered only the Qwen3.6 FP8 file and missed `keptn/ornith-1.5-35b-a3b-w4a8` in Radiance's own model list, which has an official single-card config and measured 219.8 t/s at 10k (`MEASURED`, `docs/findings/radiance/2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md`). The step times below are also corrected: the 35B on `triton_unfused` takes about 27 ms per step at 10k, not 37 ms, so it is faster per step than the 27B rather than equal.
 
 ## Summary
 
@@ -21,7 +21,7 @@ takeaway: Switching amd/Qwen3.5-35B-A3B-MXFP4 from the EMULATION MoE backend to 
 
 ## Measurements
 
-Run: `bench/runs/2026-11-04-1557-35b-perf-10k-50k-100k/`. Sly 1.9.1 (vLLM 0.32.0), ctx 262000, util 0.93, fp8 KV, 256 tokens, temp 1.0, unique prefix, mean of 3. All `MEASURED`; 0 cached tokens and no error rows or GPU faults in these arms. Labels: `<arm>-<depth>`.
+Run: `campaigns/perf/2026-11-04-1527-ornith15-radiance-vs-sly/results/2026-11-04-1557-35b-perf-10k-50k-100k/`. Sly 1.9.1 (vLLM 0.32.0), ctx 262000, util 0.93, fp8 KV, 256 tokens, temp 1.0, unique prefix, mean of 3. All `MEASURED`; 0 cached tokens and no error rows or GPU faults in these arms. Labels: `<arm>-<depth>`.
 
 | Arm | MoE backend | Full-model CUDA graph | Decode t/s 10k / 50k / 100k | TTFT s 10k / 50k / 100k | Full time s 10k / 50k / 100k |
 |---|---|---|---|---|---|
@@ -48,7 +48,7 @@ Run: `bench/runs/2026-11-04-1557-35b-perf-10k-50k-100k/`. Sly 1.9.1 (vLLM 0.32.0
 
 ## Why 2x remains unlikely on Sly
 
-This section applies to Qwen on Sly only; see the correction above for Ornith on native Radiance. At about 27 ms per step, 200 t/s needs about 5.4 tokens per step (`INFERRED`), against 2.95 measured here and 3.45 for the 27B (`bench/runs/2026-11-04-1740-27b-sly-baseline/`). Step time also rises to about 44 ms at 100k.
+This section applies to Qwen on Sly only; see the correction above for Ornith on native Radiance. At about 27 ms per step, 200 t/s needs about 5.4 tokens per step (`INFERRED`), against 2.95 measured here and 3.45 for the 27B (`campaigns/perf/2026-11-04-1527-ornith15-radiance-vs-sly/results/2026-11-04-1740-27b-sly-baseline/`). Step time also rises to about 44 ms at 100k.
 
 The best published MoE figure agrees: 169.4 t/s against "Qwen3.8 + DFlash2 production = 132.4 in the same window", which is 1.28x (`CLAIMED`, [Sly MINICPM-V47.md](https://github.com/SlyBase/vllm-sly-radiance/blob/main/docs/MINICPM-V47.md); one R9700, 210 W cap, 64k context, DSpark K=8, thinking off; a different model).
 
@@ -61,17 +61,17 @@ Chance estimates are judgement (`INFERRED`), not measurements.
 | **Amd MXFP4 + `triton_unfused` + DFlash** | Present locally | 110 / 93 / 67 t/s (`MEASURED`) | Under 5% |
 | `Qwen/Qwen3.5-35B-A3B-GPTQ-Int4` + the MiniCPM-style settings | sha `3af5ca29`, 24.46 GB, not booted here | None for this model. Sly's int4 MoE config alone: "1.2-1.7x per MoE call, ~+8 % end-to-end" (`CLAIMED`) | Under 5% |
 | MiniCPM-V 4.7 W4A16 | Described by Sly; no separate W4A16 repo found | 169.4 t/s at 64k (`CLAIMED`); no coding evaluation | Under 5% |
-| Ornith on vLLM (corrected: this report's search missed `Capicua25x/Ornith-1.5-35B-A3B-MXFP4-Quark-RDNA4` and `ornith-ai/Ornith-1.5-35B-A3B-DFlash`) | Fetched for the test, deleted afterwards | 95 / 71 / 67 t/s at 10k / 50k / 100k with DFlash K=3 (`MEASURED`, `docs/analysis/2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md`) | Not reached |
+| Ornith on vLLM (corrected: this report's search missed `Capicua25x/Ornith-1.5-35B-A3B-MXFP4-Quark-RDNA4` and `ornith-ai/Ornith-1.5-35B-A3B-DFlash`) | Fetched for the test, deleted afterwards | 95 / 71 / 67 t/s at 10k / 50k / 100k with DFlash K=3 (`MEASURED`, `docs/findings/radiance/2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md`) | Not reached |
 | Native Radiance `.rad` Qwen3.6 FP8 | 34.63 GiB, built for 2 GPUs | None published | About 0% on one card |
 | **Native Radiance `.rad` Ornith 1.5 w4a8** (added by the correction; not in the original table) | `keptn/ornith-1.5-35b-a3b-w4a8@cfed0f8f`, 19.74 GiB, official single-card config | 219.8 / 205.0 / 174.5 t/s at 10k / 50k / 100k (`MEASURED`) | Reached at 10k and 50k |
 | hipfire | `hipfire-models/qwen3.6-35b-a3b` | 48.5 t/s plain decode on R9700 (`CLAIMED`) | Under 5% |
-| llama.cpp Vulkan, Qwen3.6 Q4_K_M | Present | 104 / 71 / 61 t/s at 8k / 128k / 200k, no drafter; 135.9 at 64k with MTP (`MEASURED`, `docs/analysis/2026-07-11-2200-deep-context-35b.md`, `docs/analysis/2026-07-10-1810-rdna4-r9700-tuning-optimum.md`) | Low |
+| llama.cpp Vulkan, Qwen3.6 Q4_K_M | Present | 104 / 71 / 61 t/s at 8k / 128k / 200k, no drafter; 135.9 at 64k with MTP (`MEASURED`, `docs/findings/llamacpp/2026-07-11-2200-deep-context-35b.md`, `docs/findings/llamacpp/2026-07-10-1810-rdna4-r9700-tuning-optimum.md`) | Low |
 
 The ~200 t/s headline in the [Level1Techs guide](https://forum.level1techs.com/t/ultimate-2x-r9700-guide-for-qwen-3-8-27b-mxfp4-200t-s-c-1-500t-s-at-c-8/257789) is from two R9700s with tensor parallelism and does not transfer.
 
 ## Recommendation
 
-Superseded by `docs/analysis/2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md`.
+Superseded by `docs/findings/radiance/2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md`.
 
 1. Original advice to stop chasing 2x: withdrawn. Ornith 1.5 w4a8 on native Radiance reaches it on speed; coding quality is untested.
 2. If the 35B stays in use, set `--moe-backend triton_unfused` as the default in `profiles/sly-amd/qwen35-35b-a3b-mxfp4.env`, then run the 250k growing-conversation test and a real coding session before trusting it.

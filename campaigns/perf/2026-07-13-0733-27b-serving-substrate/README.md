@@ -1,10 +1,10 @@
 # 27B serving substrate — real prefill curve, KV f16/q8_0, MTP decode, cache reuse (R9700, 2026-07-12)
 
-Scaffolded by `bench/gen_campaign.py`. The executable driver is **`run.sh`** in this folder
+Scaffolded by `bench/core/gen_campaign.py`. The executable driver is **`run.sh`** in this folder
 (resumable — per-probe markers in `done/`, rerun to continue).
 
 > **This is Campaign 1 of a 3-campaign series** — the plan is
-> `docs/plans/2026-07-12-27b-agentic-config-campaign-series.md`. This one measures the
+> `notes/plans/2026-07-12-27b-agentic-config-campaign-series.md`. This one measures the
 > **quality-independent serving substrate** (real prefill curve, KV f16 vs q8_0, MTP decode speed,
 > prefix-cache reuse, Vulkan vs HIP). No judge, no sampling — those are Campaign 2, which runs on
 > **this campaign's winning substrate**. Goal of the series: a stable config for heavy agentic
@@ -33,7 +33,7 @@ Scaffolded by `bench/gen_campaign.py`. The executable driver is **`run.sh`** in 
   substrate is arch+quant-determined and **transfers to jackrong-qwopus**, re-confirmed as
   Campaign 2 step B0) · backend **vulkan** · tuning `-ub 2048 -b 4096 -fa on` · ctx 65536 · np 1 ·
   server on :8081.
-- Fixtures already exist in `bench/workloads/generated/`: `codereview-{8000,32000,64000}.txt`,
+- Fixtures already exist in `bench/workloads/tmp/`: `codereview-{8000,32000,64000}.txt`,
   `thinking-hard.txt`. **No new fixtures needed** for the base run.
 
 ## Extra passes (backend + server flags are GLOBAL, so these are documented re-runs, not spec rows)
@@ -43,7 +43,7 @@ Scaffolded by `bench/gen_campaign.py`. The executable driver is **`run.sh`** in 
 `EXTRA_ARGS` (already plumbed through `serve_llamacpp.sh`):
 ```bash
 EXTRA_ARGS="--cache-reuse 256 --cache-ram 8192" \
-  ONLY='warm-cr32000' bash campaigns/2026-07-12-27b-serving-substrate/run.sh
+  ONLY='warm-cr32000' bash campaigns/perf/2026-07-13-0733-27b-serving-substrate/run.sh
 ```
 Compare its warm ttft/prefill to the baseline `warm-cr32000`. (A dedicated *fixed-20K-prefix +
 small-delta* fixture is a Campaign-2/3 refinement — the tracked `agentic-*.txt` deliberately put a
@@ -55,11 +55,11 @@ compare to `pf-cr32000` / `dec-think`:
 ```bash
 # start HIP server
 MODEL=/home/dev/models/gguf/Qwen3.6-27B-MTP-Q4_K_M.gguf BACKEND=rocm PORT=8080 CTX=65536 \
-  KV=f16 UB=2048 B=4096 FA=on bash bench/engine-bench/serve_llamacpp.sh
+  KV=f16 UB=2048 B=4096 FA=on bash stack/serve/llamacpp/serve_llamacpp.sh
 # probe it (engine-bench run.sh against the running server)
 SERVERS='http://localhost:8080' PREFIX_MODE=unique REPS=3 MAX_TOKENS=256 API=completions \
-  bash bench/engine-bench/run.sh   # prompts=codereview-32000.txt ; then thinking-hard.txt max_tokens 512 api chat
-MODEL=... BACKEND=rocm PORT=8080 bash bench/engine-bench/serve_llamacpp.sh stop
+  bash bench/perf/engine-bench/run.sh   # prompts=codereview-32000.txt ; then thinking-hard.txt max_tokens 512 api chat
+MODEL=... BACKEND=rocm PORT=8080 bash stack/serve/llamacpp/serve_llamacpp.sh stop
 ```
 The interesting number is whether HIP has a **lower per-request launch floor** (the ~255 ms fixed
 cost) or higher sustained decode than Vulkan.
@@ -70,15 +70,15 @@ cost) or higher sustained decode than Vulkan.
   server on :8081.
 
 ## Build fixtures first
-Build every prompt file referenced below into `bench/workloads/generated/` with
-`build_prompt.py` (see `docs/GUIDE.md` §2). The driver assumes they exist.
+Build every prompt file referenced below into `bench/workloads/tmp/` with
+`build_prompt.py` (see `docs/guides/GUIDE.md` §2). The driver assumes they exist.
 
 ## Run
 ```bash
-bash campaigns/2026-07-12-27b-serving-substrate/run.sh
+bash campaigns/perf/2026-07-13-0733-27b-serving-substrate/run.sh
 # resume after interruption: same command (done/ markers skip finished probes)
-# subset / shorter pass:  ONLY='*-q8-*' REPS=1 MAX_TOKENS=64 bash campaigns/2026-07-12-27b-serving-substrate/run.sh
-# tighten the guard:      VRAM_BUDGET_MIB=31000 bash campaigns/2026-07-12-27b-serving-substrate/run.sh
+# subset / shorter pass:  ONLY='*-q8-*' REPS=1 MAX_TOKENS=64 bash campaigns/perf/2026-07-13-0733-27b-serving-substrate/run.sh
+# tighten the guard:      VRAM_BUDGET_MIB=31000 bash campaigns/perf/2026-07-13-0733-27b-serving-substrate/run.sh
 ```
 The driver **continues past a failed server** and **skips (before launch) any server predicted to
 exceed `VRAM_BUDGET_MIB`** — so it stays in VRAM and never risks a system-RAM spill/freeze. VRAM &
@@ -99,6 +99,6 @@ GTT are sampled per probe into each run dir's `gpu_samples.csv`.
 | sub-mtp1 | 65536 | 1 | f16 | 1 | `dec-think-mtp1` | 1 | thinking-hard.txt |
 
 ## Write-up
-**benchmark-results** skill → co-located `campaigns/2026-07-12-27b-serving-substrate/analysis.md` (summary + table
+**benchmark-results** skill → co-located `docs/findings/llamacpp/2026-07-13-0733-27b-serving-substrate.md` (summary + table
 first, **memory column mandatory**); `report.html` auto-generated by `run.sh`'s last step
-(`bench/lib/report.py`). Add a `<!-- meta -->` block to the report and run `docs/reindex.py`.
+(`bench/core/report.py`). Add a `<!-- meta -->` block to the report and run `docs/reindex.py`.

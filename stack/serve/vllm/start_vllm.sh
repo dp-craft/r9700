@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# start_vllm.sh — simple vLLM launcher for the R9700 (host venv, no Docker).
-# Design + rationale for every flag: docs/brainstorm/vllm-qwen38-r9700/vllm-qwen38-r9700.md (Recommendation).
-# Conventions mirror bench/engine-bench/serve_llamacpp.sh (pidfile/log/cmdline in bench/.servers/<port>.*).
+# stack/serve/vllm/start_vllm.sh — simple vLLM launcher for the R9700 (host venv, no Docker).
+# Design + rationale for every flag: notes/brainstorm/vllm-qwen38-r9700/vllm-qwen38-r9700.md (Recommendation).
+# Conventions mirror stack/serve/llamacpp/serve_llamacpp.sh (pidfile/log/cmdline in stack/serve/var/servers/<port>.*).
 # (Repo rule 6: no bench/ tool launches vLLM yet — fold this into bench/engine-bench/ if vLLM becomes regular.)
 #
 # Usage:
@@ -15,7 +15,7 @@
 set -euo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-: "${VENV:=$REPO/bench/dl/vllm-venv}"
+: "${VENV:=$REPO/stack/serve/var/venvs/vllm-venv}"
 : "${MODEL:=$HOME/models/vllm/amd/Qwen3.8-27B-Quark-AWQ-MXFP4}"
 #: "${MODEL:=$HOME/models/vllm/Qwen3.8-27B-INT4}"
 : "${NAME:=qwen38-27b-int4}"
@@ -28,7 +28,7 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 : "${GPU_UTIL:=0.90}"
 : "${WAIT:=2400}"            # first boot JIT-compiles Triton/torch.compile kernels (reportedly 15–20 min)
 
-RUNDIR="$REPO/bench/.servers"; mkdir -p "$RUNDIR"
+RUNDIR="$REPO/stack/serve/var/servers"; mkdir -p "$RUNDIR"
 PIDFILE="$RUNDIR/$PORT.pid"; LOGFILE="$RUNDIR/$PORT.log"; CMDFILE="$RUNDIR/$PORT.cmdline"
 
 vram() {  # prints "<used_mib> <total_mib>" of the first amdgpu card

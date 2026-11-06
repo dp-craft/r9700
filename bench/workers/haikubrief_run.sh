@@ -5,13 +5,13 @@
 # Hand-written (iron rule 6): prompt_run.py runs one report per session on the newer briefs; the old run_local.sh can't swap the prompt.
 set -u
 TAG=$1; PROMPT=$2; REPS=${3:-3}
-OLD=/home/dev/work/dp-craft/amd/bench/runs/2026-11-04-2207-docanalysis-ornith-vs-haiku
+OLD=/home/dev/work/dp-craft/amd/campaigns/workers/2026-11-04-2207-docanalysis-ornith-vs-haiku
 SP=/tmp/claude-1001/-home-dev-work-dp-craft-amd/bf832afa-1002-41d9-a4b8-4b201a1bc43c/scratchpad
 ORN=/home/dev/work/dippe/skills-agents/skills/ornith/scripts/ornith.sh
 [ -f "$PROMPT" ] || { echo "no prompt file $PROMPT" >&2; exit 2; }
 PROMPT=$(realpath "$PROMPT")  # each session runs from its own ROOT
 mkdir -p "$SP/hb"
-python3 /home/dev/work/dp-craft/amd/bench/lib/vram_sampler.py --out "$SP/hb/$TAG-gpu.csv" --interval 1 & VS=$!
+python3 /home/dev/work/dp-craft/amd/stack/gpu/vram_sampler.py --out "$SP/hb/$TAG-gpu.csv" --interval 1 & VS=$!
 P=()
 for i in $(seq 1 "$REPS"); do
   ROOT=$SP/hb/$TAG-$i; M=$ROOT/meta

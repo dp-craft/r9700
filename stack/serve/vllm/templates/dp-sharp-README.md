@@ -168,8 +168,8 @@ dp-sharp V2 found **11/19 reference findings** (weighted ~26/38), compared to:
 
 ## References
 
-- Campaign: `campaigns/2026-11-01-redhat191-dp-sharp-w208-blind/`
-- Analysis: `campaigns/2026-11-01-redhat191-dp-sharp-w208-blind/analysis.md`
-- Opus grade (V1): `campaigns/2026-11-01-redhat191-dp-sharp-w208-blind/grading-opus.md`
-- Opus grade prompt (V2): `campaigns/2026-11-01-redhat191-dp-sharp-w208-blind/opus-grade-prompt-rep2.md`
-- Main comparison: `docs/analysis/2026-10-31-1640-agentic-thinking-volume-and-levers.md`
+- Campaign: `campaigns/agentic/2026-11-01-0000-redhat191-dp-sharp-w208-blind/`
+- Analysis: `docs/findings/agentic/2026-11-01-0000-redhat191-dp-sharp-w208-blind.md`
+- Opus grade (V1): `campaigns/agentic/2026-11-01-0000-redhat191-dp-sharp-w208-blind/inputs/grading-opus.md`
+- Opus grade prompt (V2): `campaigns/agentic/2026-11-01-0000-redhat191-dp-sharp-w208-blind/inputs/opus-grade-prompt-rep2.md`
+- Main comparison: `docs/findings/agentic/2026-10-31-1640-agentic-thinking-volume-and-levers.md`

@@ -40,7 +40,7 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BUILD="$REPO/llamacpp/builds"
+BUILD="$REPO/stack/llamacpp/var/builds"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SDK_SETUP="$SCRIPT_DIR/setup_vulkan.sh"
 UPSTREAM="https://github.com/ggml-org/llama.cpp.git"
@@ -395,7 +395,7 @@ build_one() {  # BACKEND JOBS
           vulkan)
               echo "glslc=$(glslc --version | head -1)"
               echo "vulkan_sdk=${SDK_VER:-system}"
-              [ "${SDK_VER:-system}" != "system" ] && echo "vulkan_sdk_path=$REPO/llamacpp/vulkansdk/$SDK_VER"
+              [ "${SDK_VER:-system}" != "system" ] && echo "vulkan_sdk_path=$REPO/stack/llamacpp/var/vulkansdk/$SDK_VER"
               ;;
           rocm) echo "hip=$(hipconfig --version)" ;;
       esac
@@ -434,8 +434,8 @@ cmd_build() {
 
     # Init Vulkan SDK if needed
     if echo "$list" | grep -q "vulkan"; then
-        if [ -L "$REPO/llamacpp/vulkansdk/latest" ]; then
-            local sdk="$(readlink -f "$REPO/llamacpp/vulkansdk/latest")"
+        if [ -L "$REPO/stack/llamacpp/var/vulkansdk/latest" ]; then
+            local sdk="$(readlink -f "$REPO/stack/llamacpp/var/vulkansdk/latest")"
             local glslc_path
             glslc_path=$(find "$sdk" -name glslc -type f -executable 2>/dev/null | head -1)
             if [ -n "$glslc_path" ]; then

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Ornith 1.5 on Sly with settings as near as Sly allows to the creator's native Radiance config, on the SAME probe as
-# bench/runs/2026-11-04-1730-ornith15-w4a8-radiance, 2026-11-04-1740-27b-sly-baseline and 2026-11-04-1557-35b-perf-10k-50k-100k.
+# campaigns/perf/2026-11-04-1527-ornith15-radiance-vs-sly/results/2026-11-04-1730-ornith15-w4a8-radiance, 2026-11-04-1740-27b-sly-baseline and 2026-11-04-1557-35b-perf-10k-50k-100k.
 # Sly cannot load the .rad, so weights = Capicua25x Quark MXFP4 (not the .rad's gptq w4 experts + fp8 attention).
 # Drafter = official ornith-ai DFlash. Radiance's MTP K=3 is replaced by DFlash at the same K=3.
 # Matched to Radiance: K=3, 8 seqs, batched tokens 2048, ctx 262144, fp8 KV, temp 1.0, top_p 0.95, top_k 20, presence 1.5.
@@ -8,13 +8,13 @@
 # Second arm changes K only (K=7 = the Sly profiles' value). A boot failure at 8 seqs retries once at 1 seq and says so.
 set -u
 REPO=/home/dev/work/dp-craft/amd; RUN="$(cd "$(dirname "$0")" && pwd)"
-SERVE=$REPO/bench/engine-bench/vllm/serve_vllm.sh; PORT=8010; GEN=$REPO/bench/workloads/generated; U=http://127.0.0.1:$PORT
+SERVE=$REPO/stack/serve/vllm/serve_vllm.sh; PORT=8010; GEN=$REPO/bench/workloads/tmp; U=http://127.0.0.1:$PORT
 M=/mnt/Lin1/work/vllm/sly-radiance/models
 XA='--moe-backend triton_unfused --max-num-batched-tokens 2048 --override-generation-config {"temperature":1.0,"top_p":0.95,"top_k":20,"min_p":0.0,"presence_penalty":1.5}'
 
 arm() {  # arm <label> <K> <seqs>; returns the boot rc
-  local label=$1 k=$2 seqs=$3 d=$RUN/$1 rc served w=1 n; mkdir -p "$d"; rm -f "$REPO/bench/.servers/$PORT.log"
-  python3 $REPO/bench/lib/vram_sampler.py --out "$d/gpu_samples.csv" --interval 1 >/dev/null 2>&1 & local S=$!
+  local label=$1 k=$2 seqs=$3 d=$RUN/$1 rc served w=1 n; mkdir -p "$d"; rm -f "$REPO/stack/serve/var/servers/$PORT.log"
+  python3 $REPO/stack/gpu/vram_sampler.py --out "$d/gpu_samples.csv" --interval 1 >/dev/null 2>&1 & local S=$!
   { swapon --show; free -m; } >"$d/host_before.txt" 2>&1
   vmstat -n -t -S M 1 >"$d/vmstat.txt" 2>&1 & local V=$!
   PROFILE=sly-amd/qwen35-35b-a3b-mxfp4-dflash PORT=$PORT \
@@ -26,7 +26,7 @@ arm() {  # arm <label> <K> <seqs>; returns the boot rc
   if [ "$rc" = 0 ]; then
     served=$(curl -sf -m 5 "$U/v1/models" | python3 -c 'import json,sys;print(json.load(sys.stdin)["data"][0]["id"])')
     for n in 10000 50000 100000; do
-      python3 $REPO/bench/lib/capture_engine.py probe --url "$U/v1" --model "$served" \
+      python3 $REPO/bench/core/capture_engine.py probe --url "$U/v1" --model "$served" \
         --prompt-file "$GEN/codereview-$n.txt" --max-tokens 256 --temperature 1.0 --concurrency 1 --reps 3 --warmup $w \
         --prefix-mode unique --api chat --engine vllm --label "$label-$n" --timeout 600 >>"$d/results.jsonl" 2>>"$d/probe.err"
       echo "$label $n probe_rc=$? rows=$(wc -l <"$d/results.jsonl")" | tee -a "$RUN/progress.txt"; w=0
@@ -39,7 +39,7 @@ arm() {  # arm <label> <K> <seqs>; returns the boot rc
   PORT=$PORT "$SERVE" stop >/dev/null 2>&1
   kill $S $V 2>/dev/null; wait $S $V 2>/dev/null
   { swapon --show; free -m; } >"$d/host_after.txt" 2>&1
-  cp "$REPO/bench/.servers/$PORT.log" "$d/server.log" 2>/dev/null; cp "$REPO/bench/.servers/$PORT.cmdline" "$d/cmdline.txt" 2>/dev/null
+  cp "$REPO/stack/serve/var/servers/$PORT.log" "$d/server.log" 2>/dev/null; cp "$REPO/stack/serve/var/servers/$PORT.cmdline" "$d/cmdline.txt" 2>/dev/null
   return "$rc"
 }
 

@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 # ornith_sly_dflash.sh — start/stop Sly 1.9.1 serving Capicua25x/Ornith-1.5-35B-A3B-MXFP4-Quark-RDNA4 + the official
 # ornith-ai/Ornith-1.5-35B-A3B-DFlash drafter (K=3) on one card, through serve_vllm.sh.
-# ARCHIVED 2026-11-04: slower than ornith_rad_mtp.sh, and its checkpoints were deleted. Run the Fetch lines below (repo root) first.
-#   bench/engine-bench/vllm/archive/ornith_sly_dflash.sh start|stop|status|logs     then: claude --settings ~/.config/claude/local_vllm_direct/settings-redhat.json
-# Settings = the MEASURED arm bench/runs/2026-11-04-1802-ornith15-sly-dflash/ornith-k3-s8: Radiance's serving values
+# ARCHIVED 2026-11-04: slower than stack/serve/radiance/ornith_rad_mtp.sh, and its checkpoints were deleted. Run the Fetch lines below (repo root) first.
+#   stack/serve/vllm/retired/ornith_sly_dflash.sh start|stop|status|logs     then: claude --settings ~/.config/claude/local_vllm_direct/settings-redhat.json
+# Settings = the MEASURED arm campaigns/perf/2026-11-04-1527-ornith15-radiance-vs-sly/results/2026-11-04-1802-ornith15-sly-dflash/ornith-k3-s8: Radiance's serving values
 # (K=3, 8 seqs, batched 2048, ctx 262144, fp8 KV, temp 1.0, top_p 0.95, top_k 20, presence 1.5) on Sly's own stack.
-# This is the slower Ornith setup: 95/71/67 t/s at 10k/50k/100k against 220/205/175 on ornith_rad_mtp.sh.
-# MTP is not available here: triton_unfused, triton and aiter all fail at load on this checkpoint (docs/vllm/known-issues.md).
+# This is the slower Ornith setup: 95/71/67 t/s at 10k/50k/100k against 220/205/175 on stack/serve/radiance/ornith_rad_mtp.sh.
+# MTP is not available here: triton_unfused, triton and aiter all fail at load on this checkpoint (docs/guides/vllm/known-issues.md).
 # triton_unfused follows the checkpoint card's gfx12 advice; the default backend falls back to slow emulation.
 # Claude: port and served name come from SETTINGS (default the 27b's settings-redhat.json), so the same config works
 # unchanged. The name is an alias: Claude and /v1/models show the 27b's name while Ornith answers.
-# Fetch: bench/engine-bench/vllm/fetch_model.sh Capicua25x/Ornith-1.5-35B-A3B-MXFP4-Quark-RDNA4 9e488f46c0f7969f84c9923ee0256311cd50316e
-#        bench/engine-bench/vllm/fetch_model.sh ornith-ai/Ornith-1.5-35B-A3B-DFlash 942d20fee84d04c9ecbf18e9c6fc4144914a1d5d
+# Fetch: stack/serve/vllm/fetch_model.sh Capicua25x/Ornith-1.5-35B-A3B-MXFP4-Quark-RDNA4 9e488f46c0f7969f84c9923ee0256311cd50316e
+#        stack/serve/vllm/fetch_model.sh ornith-ai/Ornith-1.5-35B-A3B-DFlash 942d20fee84d04c9ecbf18e9c6fc4144914a1d5d
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SERVE="$HERE/../serve_vllm.sh"

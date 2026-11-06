@@ -4,7 +4,7 @@
 Window = session start .. the blind boundary = first tool call that READS the Opus reference review
 (Read of .../27b-fix/opus/W2-08.md, or cat/sed/head/tail/less/awk/grep on it; ls/test/wc do not count).
 Usage: thinking_digest.py NAME=RUN_ARM_DIR ...   -> one JSON line per arm (stdout).
-Data source for docs/analysis/2026-10-31-1640-agentic-thinking-volume-and-levers.md."""
+Data source for docs/findings/agentic/2026-10-31-1640-agentic-thinking-volume-and-levers.md."""
 import glob, json, re, sys
 from datetime import datetime
 

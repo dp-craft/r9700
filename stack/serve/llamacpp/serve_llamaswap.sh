@@ -27,7 +27,7 @@ REPO="$(cd "$HERE/../.." && pwd)"
 : "${CURL:=curl}"
 : "${LOAD_TIMEOUT_S:=900}"
 BASE="http://127.0.0.1:$PORT"
-RUNDIR="$REPO/bench/.servers"; mkdir -p "$RUNDIR"
+RUNDIR="$REPO/stack/serve/var/servers"; mkdir -p "$RUNDIR"
 LOGPID="$RUNDIR/llamaswap-$PORT.logpid"
 
 usage() { echo "usage: MODEL=<llama-swap model id> $0 print|start   |   PORT=$PORT $0 stop" >&2; exit 2; }

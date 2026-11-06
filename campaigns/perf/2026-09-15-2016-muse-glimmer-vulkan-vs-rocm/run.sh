@@ -3,7 +3,7 @@
 #
 # Hand-written exception per iron rule 6: gen_campaign.py cannot emit this lifecycle (its run.sh
 # hardcodes serve_llamacpp.sh start/stop; here the operator starts each backend in llama-swap
-# manually and this script only probes). Every probe reuses bench/engine-bench/run.sh
+# manually and this script only probes). Every probe reuses bench/perf/engine-bench/run.sh
 # (capture_engine.py + vram_sampler.py) — nothing measurement-related is reimplemented.
 # Recommended tool follow-up: teach gen_campaign.py a `source: llama-swap` server mode.
 #

@@ -20,7 +20,7 @@
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
-WL="$REPO/bench/workloads/generated"
+WL="$REPO/bench/workloads/tmp"
 
 : "${MODEL:=/home/dev/models/gguf/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf}"
 : "${SLUG:=combo35b}"
@@ -36,7 +36,7 @@ WL="$REPO/bench/workloads/generated"
 : "${CONC_NP:=4}"
 : "${REPS:=2}"
 
-# --- workload fixtures must exist (see docs/GUIDE.md §2) ---
+# --- workload fixtures must exist (see docs/guides/GUIDE.md §2) ---
 MISSING=0
 for T in $DEPTHS; do [ -f "$WL/codereview-$T.txt" ] || { echo "missing $WL/codereview-$T.txt"; MISSING=1; }; done
 [ -f "$WL/thinking-hard.txt" ] || { echo "missing $WL/thinking-hard.txt"; MISSING=1; }
@@ -45,7 +45,7 @@ for v in 1 2 3 4; do
   [ -f "$WL/agentic-8000-v$v.txt" ] || { echo "missing $WL/agentic-8000-v$v.txt"; MISSING=1; }
   CONC_FILES="$CONC_FILES $WL/agentic-8000-v$v.txt"
 done
-[ "$MISSING" = 1 ] && { echo "build workloads first (docs/GUIDE.md §2)" >&2; exit 1; }
+[ "$MISSING" = 1 ] && { echo "build workloads first (docs/guides/GUIDE.md §2)" >&2; exit 1; }
 
 if [ -z "${CAMPAIGN_DIR:-}" ]; then
   STAMP="$(date '+%Y-%m-%d-%H%M')"
@@ -60,14 +60,14 @@ RESULTS="$CAMPAIGN_DIR/results.jsonl"
   echo "base: UB=$UB B=$B FA=$FA CTX=$CTX NGL=$NGL"
   echo "partA: DEPTHS=$DEPTHS MAX_TOKENS=$MAX_TOKENS THINK_MAX_TOKENS=$THINK_MAX_TOKENS"
   echo "partB: CONC_LIST=$CONC_LIST CONC_NP=$CONC_NP REPS=$REPS"
-  bash -c "source '$REPO/bench/lib/gpu_env.sh'; gpu_meta"
+  bash -c "source '$REPO/stack/gpu/gpu_env.sh'; gpu_meta"
 } > "$CAMPAIGN_DIR/meta.txt"
 echo "campaign → $CAMPAIGN_DIR"
 
 probe() {  # probe <engine-label> <label> <max_tokens> <concurrency> <reps> <prefix_mode> <api> <files...>
   local engine="$1" label="$2" mt="$3" conc="$4" reps="$5" pm="$6" api="$7"; shift 7
   local pf=(); local f; for f in "$@"; do pf+=(--prompt-file "$f"); done
-  python3 "$REPO/bench/lib/capture_engine.py" probe --url "http://localhost:$PORT/v1" --model local \
+  python3 "$REPO/bench/core/capture_engine.py" probe --url "http://localhost:$PORT/v1" --model local \
     "${pf[@]}" --max-tokens "$mt" --concurrency "$conc" --reps "$reps" \
     --prefix-mode "$pm" --api "$api" --engine "$engine" --label "$label" >> "$RESULTS" \
     || echo "  probe FAILED: $engine/$label" | tee -a "$CAMPAIGN_DIR/failures.txt"
@@ -79,7 +79,7 @@ start_server() {  # start_server <cfg-name> <np>
     KV="$kv" MTP="$mtp" NGL="$NGL" PORT="$PORT" "$HERE/serve_llamacpp.sh" start \
     > "$CAMPAIGN_DIR/servers/$cfg.start.log" 2>&1
   local rc=$?
-  cp "$REPO/bench/.servers/$PORT.cmdline" "$CAMPAIGN_DIR/servers/$cfg.cmdline" 2>/dev/null
+  cp "$REPO/stack/serve/var/servers/$PORT.cmdline" "$CAMPAIGN_DIR/servers/$cfg.cmdline" 2>/dev/null
   curl -sf -m 5 "http://localhost:$PORT/props" -o "$CAMPAIGN_DIR/servers/$cfg.props.json" 2>/dev/null
   return $rc
 }

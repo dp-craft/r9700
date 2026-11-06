@@ -1,4 +1,4 @@
-# llamacpp/ — llama.cpp build pipeline
+# stack/llamacpp/ — llama.cpp build pipeline
 
 Fetches, builds, and promotes llama.cpp binaries for the R9700 (gfx1201). Two scripts, one purpose each.
 
@@ -12,7 +12,7 @@ Fetches, builds, and promotes llama.cpp binaries for the R9700 (gfx1201). Two sc
 ## Directory layout
 
 ```
-llamacpp/
+stack/llamacpp/
   build_llamacpp.sh      build driver (move from bench/)
   setup_vulkan.sh        Vulkan SDK manager
   README.md              this file
@@ -28,7 +28,7 @@ llamacpp/
     latest →             symlink → installed SDK version
 ```
 
-`build/` at the repo root is a symlink → `llamacpp/builds/`. All downstream tools (`llama-swap/generate.py`, `compare_builds.py`, campaign scripts) resolve through it transparently.
+`build/` at the repo root is a symlink → `stack/llamacpp/var/builds/`. All downstream tools (`stack/llama-swap/generate.py`, `compare_builds.py`, campaign scripts) resolve through it transparently.
 
 ## Build directory naming
 
@@ -130,29 +130,29 @@ Download and install the latest SDK (or a specific version if given). Verifies S
 
 ```bash
 # Check current state
-llamacpp/setup_vulkan.sh status
+stack/llamacpp/setup_vulkan.sh status
 
 # Download latest SDK (~314MB)
-llamacpp/setup_vulkan.sh update
+stack/llamacpp/setup_vulkan.sh update
 
 # Build with it
-llamacpp/build_llamacpp.sh build
+stack/llamacpp/build_llamacpp.sh build
 
 # Build specific tag, Vulkan only
-llamacpp/build_llamacpp.sh build --tag b10909 --backend vulkan
+stack/llamacpp/build_llamacpp.sh build --tag b10909 --backend vulkan
 
 # Promote the new build
-llamacpp/build_llamacpp.sh promote b10969
+stack/llamacpp/build_llamacpp.sh promote b10969
 
 # Roll back to an older build
-llamacpp/build_llamacpp.sh promote b10909 --backend vulkan
+stack/llamacpp/build_llamacpp.sh promote b10909 --backend vulkan
 ```
 
 ## Interaction with llama-swap
 
-`llama-swap/generate.py` resolves the server binary as:
+`stack/llama-swap/generate.py` resolves the server binary as:
 ```python
 f"{REPO}/build/latest-{backend}/bin/llama-server"
 ```
 
-Because `build/` → `llamacpp/builds/` (symlink), and `latest-*` → `<ver>-<backend>[-<sdk>]`, the chain resolves automatically. After promoting, llama-swap picks up the new binary at the next model load. A running model keeps the old binary until unloaded (`GET /unload`).
+Because `build/` → `stack/llamacpp/var/builds/` (symlink), and `latest-*` → `<ver>-<backend>[-<sdk>]`, the chain resolves automatically. After promoting, llama-swap picks up the new binary at the next model load. A running model keeps the old binary until unloaded (`GET /unload`).

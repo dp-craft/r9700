@@ -4,10 +4,10 @@
 registered in `docs/INDEX.md`) after Phase C.*
 
 - **Date:** 2026-07-13 · **Status:** scaffolded, ready to run · **Campaign 2 of 3**
-  (plan: `docs/plans/2026-07-12-27b-agentic-config-campaign-series.md`)
+  (plan: `notes/plans/2026-07-12-27b-agentic-config-campaign-series.md`)
 - **Owner split:** Phase A (GPU capture + deterministic scoring) = one `run_capture.sh` invocation
   by the user; Phase B (LLM-judge of the 3 rubric tasks, blind) + Phase C (aggregate + write-up) =
-  Claude. Same contract as `campaigns/2026-07-12-27b-finetune-quality/`.
+  Claude. Same contract as `campaigns/quality/2026-07-12-1736-27b-finetune-quality/`.
 
 ## Why this is a custom driver (not `gen_campaign.py`)
 `benchmark-new-campaign`/`gen_campaign.py` emit **engine-bench throughput** probes (`openai_probe`:
@@ -23,11 +23,11 @@ phase), gap-analysis done.
 Vulkan b9950 · **KV f16** · **MTP-on** (unsloth) · `-ub 2048 -b 4096 -fa on`. Prefix-cache reuse is
 automatic (built-in). **This campaign changes only quality knobs on that fixed substrate.**
 The big correction it acts on: **the finetune-quality run used temp 1.0**, but Qwen3.6 thinking mode
-officially wants **temp 0.6** (`docs/research/2026-07-12-2310-qwen36-sampling-llamacpp-serving-knobs.md`)
+officially wants **temp 0.6** (`docs/research/models-sampling/2026-07-12-2310-qwen36-sampling-llamacpp-serving-knobs.md`)
 — B0 re-baselines this first.
 
 ## 1. VRAM (skill step 2 — non-binding, documented)
-Both models ~15.4/15.9 GiB weights, 64 KiB/tok f16 (hybrid, from `bench/gguf_kv.py`). At **CTX 32768
+Both models ~15.4/15.9 GiB weights, 64 KiB/tok f16 (hybrid, from `bench/core/gguf_kv.py`). At **CTX 32768
 f16 → ~20.4 GiB predicted** (q8_0 ~19.4), ~12 GiB under the 32400 budget. No guard needed at this
 depth; the driver samples actual VRAM/GTT/power per server into `out/gpu_<name>.csv` → `out/vram.jsonl`.
 
@@ -80,7 +80,7 @@ follow-up, not required for this run.
 ## 4. Run — Phase A (user)
 ```bash
 cd /home/dev/work/dp-craft/amd
-bash campaigns/2026-07-13-27b-quality-tuning/run_capture.sh            # all configs, reps 1
+bash campaigns/quality/2026-07-13-1138-27b-quality-tuning/run_capture.sh            # all configs, reps 1
 # subset:            ONLY='jr-*'          bash .../run_capture.sh
 # majority-vote:     REPS=3               bash .../run_capture.sh
 # at agentic depth:  CONTEXT_PREFIX=codereview-8000.txt bash .../run_capture.sh
@@ -92,7 +92,7 @@ past a failed server** (`out/failures.txt`). It finishes by running `score_deter
 ⚠️ **`CONTEXT_PREFIX` and ctx:** default (no prefix) runs at CTX 32768 — fine. If you prepend a code
 context, raise CTX so `prompt + max_tokens(8192) ≤ CTX`: `codereview-8000` → CTX≥16384 default ok;
 `codereview-32000` needs `CTX=40960` (`CTX=40960 CONTEXT_PREFIX=codereview-32000.txt …`). Valid
-prefixes: any `bench/workloads/generated/*.txt` (missing ones auto-build via the campaign recipe if
+prefixes: any `bench/workloads/tmp/*.txt` (missing ones auto-build via the campaign recipe if
 you run them through a gen_campaign campaign first, else build with `build_prompt.py`).
 ⚠️ **capture.py sampling:** supports temp/top_p/top_k/seed only. `min_p`/`presence_penalty`
 (Qwen-recommended anti-repetition) need a small `capture.py` extension — noted, out of scope for v1.

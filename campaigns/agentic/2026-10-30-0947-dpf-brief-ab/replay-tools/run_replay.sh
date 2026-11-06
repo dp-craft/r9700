@@ -18,7 +18,7 @@ FORGE=/home/dev/work/dippe/dp-forge; BASE=de110510; WT=/home/dev/work/dippe/dpf-
 P=docs/plans/2026-10-28-2239-dpf-tui-f0-f1; AMD=/home/dev/work/dp-craft/amd
 SRV=$FORGE/vllm.sh; SET=/home/dev/.config/claude/local_vllm_direct/settings-redhat.json
 N=${N:-5}; MAXTOK=${MAXTOK:-40000}; CAPTURE_CAP_S=${CAPTURE_CAP_S:-2700}; ARMS=${ARMS:-"B A C D"}
-SERVE=$AMD/bench/engine-bench/vllm/serve_vllm.sh; MTP_NAME=qwen38-27b-redhat-mxfp4-mtp
+SERVE=$AMD/stack/serve/vllm/serve_vllm.sh; MTP_NAME=qwen38-27b-redhat-mxfp4-mtp
 GEN_C='{"temperature":1.0,"top_p":0.95,"top_k":20,"min_p":0.0,"presence_penalty":0.3}'
 PROMPT='Run docs/plans/2026-10-28-2239-dpf-tui-f0-f1/review/27b-fix/RUNBOOK.md for brief W2-08 only (W2-06 and W2-07
 are out of scope): read it whole first (cat, it is short), then follow it exactly.'
@@ -33,7 +33,7 @@ boot(){ case $1 in
     D) env -u CACTUS_DELTA -u EXTRA_ARGS PROFILE=sly-redhat/redhat-mxfp4-mtp PORT=8000 MAXLEN=262000 MAXSEQS=1 KV_DTYPE=fp8 \
          WATCHDOG_MIB=32 GPU_UTIL=0.93 "$SERVE" start;;
   esac > "$OUT/server-start-$1.txt" 2>&1; }
-stop(){ "$SRV" stop > "$OUT/server-stop-$1.txt" 2>&1; cp "$AMD/bench/.servers/8000.log" "$OUT/server-container-$1.log" 2>/dev/null
+stop(){ "$SRV" stop > "$OUT/server-stop-$1.txt" 2>&1; cp "$AMD/stack/serve/var/servers/8000.log" "$OUT/server-container-$1.log" 2>/dev/null
   sleep 5; ss -ltn | grep -q ':8000 ' && log "WARNING port 8000 still held after $1"; }
 review_written(){ python3 - "$1" <<'EOF'
 import json, sys
@@ -59,7 +59,7 @@ capture(){
   [ -d /tmp/dp-refine ] && mv /tmp/dp-refine "$OUT/dp-refine-preexisting"
   fp > "$OUT/main-fp-before.txt"
   python3 -c 'import json,sys; s=json.load(open(sys.argv[1])); s["env"]["ANTHROPIC_BASE_URL"]="http://127.0.0.1:8001"; json.dump(s,open(sys.argv[2],"w"),indent=1)' "$SET" "$OUT/settings-capture.json"
-  python3 "$AMD/bench/engine-bench/vllm/capture_proxy.py" 8001 http://127.0.0.1:8000 "$OUT/capture" > "$OUT/capture-proxy.txt" 2>&1 & PX=$!
+  python3 "$AMD/bench/core/capture_proxy.py" 8001 http://127.0.0.1:8000 "$OUT/capture" > "$OUT/capture-proxy.txt" 2>&1 & PX=$!
   sleep 2
   log "capture session (cap ${CAPTURE_CAP_S}s)"
   (cd "$WT" && exec timeout -k 30 --signal=INT "$CAPTURE_CAP_S" claude -p "$PROMPT" --settings "$OUT/settings-capture.json" \
@@ -81,7 +81,7 @@ capture(){
 for arm in $ARMS; do
   log "boot $arm"
   if ! boot "$arm"; then log "boot $arm failed: $(tail -2 "$OUT/server-start-$arm.txt" | tr '\n' ' ')"; stop "$arm"; continue; fi
-  cp "$AMD/bench/.servers/8000.cmdline" "$OUT/server-$arm.cmdline"
+  cp "$AMD/stack/serve/var/servers/8000.cmdline" "$OUT/server-$arm.cmdline"
   log "$arm: $(grep -o 'RADIANCE_CACTUS_DELTA=[0-9.]*' "$OUT/server-$arm.cmdline") | $(docker logs vllm-8000 2>&1 | grep -o 'overridden by the model.*' | tail -1 | cut -c1-200)"
   if [ "$arm" = C ] && ! docker logs vllm-8000 2>&1 | grep -q "'presence_penalty': 0.3"; then log "C: presence_penalty 0.3 NOT applied -- skipping"; stop C; continue; fi
   if [ ! -s "$OUT/body-W2-08.json" ]; then capture || { stop "$arm"; log "capture failed -- abort"; exit 1; }; fi

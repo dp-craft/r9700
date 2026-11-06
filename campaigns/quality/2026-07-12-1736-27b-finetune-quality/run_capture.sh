@@ -10,7 +10,7 @@
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
-SERVE="$REPO/bench/engine-bench/serve_llamacpp.sh"
+SERVE="$REPO/stack/serve/llamacpp/serve_llamacpp.sh"
 
 : "${MODELS_DIR:=/home/dev/models/gguf}"
 : "${PORT:=8081}" ; : "${CTX:=132768}" ; : "${KV:=f16}" ; : "${UB:=2048}" ; : "${B:=4096}"
@@ -49,7 +49,7 @@ for entry in "${CONFIGS[@]}"; do
     # sample VRAM/GTT/power across the whole probe (peak + avg power)
     csv="$OUTDIR/gpu_${label}.csv"; SPID=""
     if command -v rocm-smi >/dev/null 2>&1; then
-      python3 "$REPO/bench/lib/vram_sampler.py" --out "$csv" --interval 1 &
+      python3 "$REPO/stack/gpu/vram_sampler.py" --out "$csv" --interval 1 &
       SPID=$!
       for _ in 1 2 3 4; do
         [ -s "$csv" ] && [ "$(wc -l <"$csv")" -ge 2 ] && break

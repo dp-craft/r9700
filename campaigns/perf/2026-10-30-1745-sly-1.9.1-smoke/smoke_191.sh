@@ -6,7 +6,7 @@ set -u
 REPO=/home/dev/work/dp-craft/amd
 OUT=${OUT:?OUT dir}; mkdir -p "$OUT"
 export IMAGE=ghcr.io/slybase/vllm-sly-radiance:1.9.1-rocm10.1 PROFILE=sly-redhat/redhat-mxfp4-dflash PORT=8000
-SERVE=$REPO/bench/engine-bench/vllm/serve_vllm.sh
+SERVE=$REPO/stack/serve/vllm/serve_vllm.sh
 MODEL=qwen38-27b-redhat-mxfp4-dflash
 used() { rocm-smi --showmeminfo vram 2>/dev/null | grep -oP 'Used Memory \(B\): \K\d+' | awk '{printf "%d", $1/1048576}'; }
 
@@ -21,7 +21,7 @@ echo "before: VRAM used $(used) MiB" | tee "$OUT/summary.txt"
 "$SERVE" print >"$OUT/print.txt" 2>&1
 MAXLEN=262000 MAXSEQS=1 KV_DTYPE=fp8 WATCHDOG_MIB=32 GPU_UTIL=0.93 "$SERVE" start >"$OUT/start.txt" 2>&1
 rc=$?; echo "start rc=$rc, VRAM used $(used) MiB" | tee -a "$OUT/summary.txt"
-cp "$REPO/bench/.servers/8000.cmdline" "$OUT/server.cmdline" 2>/dev/null
+cp "$REPO/stack/serve/var/servers/8000.cmdline" "$OUT/server.cmdline" 2>/dev/null
 [ $rc = 0 ] || { tail -40 "$OUT/start.txt"; exit 1; }
 
 docker exec vllm-8000 head -1 /opt/qwen-fixed.jinja | tee -a "$OUT/summary.txt"

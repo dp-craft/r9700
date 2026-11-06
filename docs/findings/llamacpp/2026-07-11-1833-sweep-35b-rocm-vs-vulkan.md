@@ -7,9 +7,9 @@ takeaway: Adaptive tuning optimum: **ROCm `-ub 4096`, Vulkan `-ub 2048`** (inter
 
 - **Date:** 2026-07-11 18:33 · **Track:** model-bench sweep (`sweep.py`, adaptive optimum + KV rule)
 - **GPU/Host:** AMD Radeon AI PRO R9700, 32624 MiB · host `bipubi` k6.17 · `HSA_OVERRIDE_GFX_VERSION=12.0.1`
-- **Runtimes/builds:** llama.cpp **b9950-961e4b26a** — ROCm/HIP build (`bench/llamacpp/`) and Vulkan/RADV build (`bench/llamacpp-vulkan/`)
+- **Runtimes/builds:** llama.cpp **b9950-961e4b26a** — ROCm/HIP build (`stack/llamacpp/var/builds/b9949-rocm/bin/`) and Vulkan/RADV build (`stack/llamacpp/var/builds/b9950-vulkan/bin/`)
 - **Models:** `Qwen3.6-35B-A3B-UD-Q4_K_M.gguf` (MoE ~3B active, embedded MTP layer)
-- **Data:** `bench/runs/2026-07-11-1833-sweep-35b-rocm/`, `bench/runs/2026-07-11-1837-sweep-35b-vulkan/` (synthetic llama-bench, pp=8192 / tg=128, reps=3)
+- **Data:** `campaigns/perf/2026-07-11-1833-starter-baseline/results/2026-07-11-1833-sweep-35b-rocm/`, `campaigns/perf/2026-07-11-1833-starter-baseline/results/2026-07-11-1837-sweep-35b-vulkan/` (synthetic llama-bench, pp=8192 / tg=128, reps=3)
 
 ## Summary
 
@@ -98,5 +98,5 @@ llama-server -m Qwen3.6-35B-A3B-UD-Q4_K_M.gguf -ngl 99 -fa on -ub 2048 -b 4096 -
 ## External comparison
 
 Legacy harness (2026-07-10, superseded) `CLAIMED` Vulkan+MTP ≈135.9 decode at 64 K
-([INDEX](../INDEX.md)). This sweep's synthetic Vulkan decode (115, no MTP, depth 0) is consistent
+([INDEX](../../INDEX.md)). This sweep's synthetic Vulkan decode (115, no MTP, depth 0) is consistent
 directionally; the served +MTP rate is in the campaign report.

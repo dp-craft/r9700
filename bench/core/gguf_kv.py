@@ -10,7 +10,7 @@ only ~16 full-attention layers, so f16 KV ≈ 64 KiB/tok (not the ~260 you'd get
 That difference decides whether 200K context fits in 32 GB (it does) or not (it wouldn't). Trust
 this over an online "will it fit" calculator AND over any all-layers hand-math.
 
-    python3 bench/gguf_kv.py /path/to/model.gguf [--weights-gib G] [--budget-mib M]
+    python3 bench/core/gguf_kv.py /path/to/model.gguf [--weights-gib G] [--budget-mib M]
 
 Reads the metadata + tensor directory (names/offsets only, never tensor data), so it's instant
 even on a 16 GB file. Stdlib only.

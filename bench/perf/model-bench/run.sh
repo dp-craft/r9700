@@ -2,7 +2,7 @@
 # model-bench — single-engine tuning microscope via llama.cpp `llama-bench`.
 # Sweeps knobs (comma-separated values are swept by llama-bench in one invocation), holds the rest
 # fixed, emits canonical JSON to bench/runs/. Vendor-neutral: AMD/NVIDIA detected via
-# bench/lib/gpu_env.sh — on NVIDIA just point LLAMA_BENCH at a CUDA build.
+# stack/gpu/gpu_env.sh — on NVIDIA just point LLAMA_BENCH at a CUDA build.
 #
 # Usage:
 #   MODEL=/home/dev/models/gguf/Qwen3.6-27B-Q4_K_S.gguf SLUG=27b-ubsweep ./run.sh
@@ -16,11 +16,11 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
 
 # --- environment (vendor-aware) ---
-source "$REPO/bench/lib/gpu_env.sh"
+source "$REPO/stack/gpu/gpu_env.sh"
 gpu_setup_env
-# ROCm build by default; Vulkan: LLAMA_BENCH=$REPO/bench/llamacpp-vulkan/llama-bench
+# ROCm build by default; Vulkan: LLAMA_BENCH=$REPO/stack/llamacpp/var/builds/b9950-vulkan/bin/llama-bench
 # NVIDIA/other: LLAMA_BENCH=/path/to/cuda-build/llama-bench
-: "${LLAMA_BENCH:=$REPO/bench/llamacpp/llama-bench}"
+: "${LLAMA_BENCH:=$REPO/stack/llamacpp/var/builds/b9949-rocm/bin/llama-bench}"
 : "${MODEL:?set MODEL=/path/to/model.gguf}"
 : "${SLUG:=modelbench}"
 
@@ -65,7 +65,7 @@ mkdir -p "$OUT"
 
 SAMPLER_PID=""
 if [ "$VRAM_SAMPLE" = "1" ]; then
-  python3 "$REPO/bench/lib/vram_sampler.py" --out "$OUT/gpu_samples.csv" --interval 1 &
+  python3 "$REPO/stack/gpu/vram_sampler.py" --out "$OUT/gpu_samples.csv" --interval 1 &
   SAMPLER_PID=$!
 fi
 cleanup() { [ -n "$SAMPLER_PID" ] && kill "$SAMPLER_PID" 2>/dev/null || true; }

@@ -10,7 +10,7 @@ takeaway: **Adopt, two-tool split.** Tuning → `llama-bench` (de-facto RDNA4 st
 
 ## Summary
 **Adopt, don't build — as a two-tool split.** For single-engine *tuning sweeps*, llama.cpp's own
-**`llama-bench`** (already shipped in `bench/llamacpp/`) is the de-facto RDNA4 standard: it sweeps
+**`llama-bench`** (already shipped in `stack/llamacpp/var/builds/b9949-rocm/bin/`) is the de-facto RDNA4 standard: it sweeps
 `-p/-n/-b/-ub/-ngl/-fa/-ctk/-ctv` in one invocation, does repetitions + stddev, and emits
 JSON/CSV/SQL/markdown. For *cross-engine comparison* (llama.cpp vs ollama vs vLLM), adopt one
 **OpenAI-endpoint HTTP benchmarker** — they are GPU-transparent, so RDNA4 "just works" because the

@@ -13,7 +13,7 @@ an OpenAI-compatible server endpoint. This is also where the *serving-only* knob
 | `run.sh` | drive a set of already-running engines with one workload (probe or benchy) |
 | `serve_llamacpp.sh` | parameterized llama-server launcher: `BACKEND/MTP/KV/CTX/NP/UB/B/FA/PORT`, health-wait, records exact cmdline + `/props` |
 | `campaign.sh` | the **combination matrix**: backend × MTP × KV × depth × concurrency, resumable |
-| llama-benchy | standardized synthetic pp/tg/depth/concurrency curves (installed in `bench/dl/benchy-venv`, v0.4.0 verified) |
+| llama-benchy | standardized synthetic pp/tg/depth/concurrency curves (installed in `stack/serve/var/venvs/benchy-venv`, v0.4.0 verified) |
 
 ## Probe metrics (why these)
 

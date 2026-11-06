@@ -62,5 +62,5 @@
  "env": {
   "CACTUS_DELTA": "0"
  },
- "note": "Stage 1 of the δ0 follow-up to docs/analysis/2026-10-30-1552-dpf-brief-fix-heretic-vs-redhat.md: at δ 0 speculative decoding is distribution-preserving, so DFlash2 k=7 vs MTP k=4 is a pure speed question; this pair decides the spec method for the W2-08 session S1. Differs from campaigns/2026-10-30-vllm-redhat-sly191-dflash-depth (δ 0.5) in: CACTUS_DELTA 0 (fade/cap are inert at δ 0), ctx 262000 (= the session MAXLEN from settings-redhat.json, was 110000) and the extra 150k depth (sessions sit at 90-180k before auto-compaction). Image pinned by tag; the digest is in the run dir's server-<name>.txt."
+ "note": "Stage 1 of the δ0 follow-up to docs/findings/agentic/2026-10-30-1552-dpf-brief-fix-heretic-vs-redhat.md: at δ 0 speculative decoding is distribution-preserving, so DFlash2 k=7 vs MTP k=4 is a pure speed question; this pair decides the spec method for the W2-08 session S1. Differs from campaigns/perf/2026-10-30-1951-vllm-redhat-sly191-dflash-depth (δ 0.5) in: CACTUS_DELTA 0 (fade/cap are inert at δ 0), ctx 262000 (= the session MAXLEN from settings-redhat.json, was 110000) and the extra 150k depth (sessions sit at 90-180k before auto-compaction). Image pinned by tag; the digest is in the run dir's server-<name>.txt."
 }

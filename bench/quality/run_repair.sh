@@ -9,7 +9,7 @@
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
-SERVE="$REPO/bench/engine-bench/serve_llamacpp.sh"
+SERVE="$REPO/stack/serve/llamacpp/serve_llamacpp.sh"
 : "${MODELS_DIR:=/home/dev/models/gguf}" ; : "${CONFIGS:=$HERE/configs.jsonl}"
 : "${PORT:=8081}" ; : "${BACKEND:=vulkan}" ; : "${UB:=2048}" ; : "${B:=4096}" ; : "${WAIT:=600}"
 OUTDIR="$HERE/out" ; OUT="$OUTDIR/outputs.jsonl" ; SCORES="$OUTDIR/scores_typescript.jsonl"

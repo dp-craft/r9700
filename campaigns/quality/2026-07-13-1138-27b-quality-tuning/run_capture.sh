@@ -12,20 +12,20 @@
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
-FT="$REPO/campaigns/2026-07-12-27b-finetune-quality"   # source of capture.py + graders (reused)
-SERVE="$REPO/bench/engine-bench/serve_llamacpp.sh"
+FT="$REPO/campaigns/quality/2026-07-12-1736-27b-finetune-quality"   # source of capture.py + graders (reused)
+SERVE="$REPO/stack/serve/llamacpp/serve_llamacpp.sh"
 : "${MODELS_DIR:=/home/dev/models/gguf}"
 : "${PORT:=8081}" ; : "${CTX:=32768}" ; : "${UB:=2048}" ; : "${B:=4096}" ; : "${BACKEND:=vulkan}"
 : "${REPS:=1}" ; : "${MAX_TOKENS:=8192}" ; : "${ONLY:=}" ; : "${CONTEXT_PREFIX:=}"
 OUTDIR="$HERE/out" ; mkdir -p "$OUTDIR/done"
 OUT="$OUTDIR/outputs.jsonl" ; VRAM="$OUTDIR/vram.jsonl"
-SAMPLER="$REPO/bench/lib/vram_sampler.py"
+SAMPLER="$REPO/stack/gpu/vram_sampler.py"
 TASKS="$HERE/tasks/tasks.jsonl"
 # optional: build a tasks file whose prompts are prefixed with a fixed code context (agentic depth)
 if [ -n "$CONTEXT_PREFIX" ]; then
   echo "NOTE: CONTEXT_PREFIX=$CONTEXT_PREFIX — prepending to every task prompt (agentic operating point)"
   TASKS="$OUTDIR/tasks-ctx.jsonl"
-  python3 - "$HERE/tasks/tasks.jsonl" "$REPO/bench/workloads/generated/$CONTEXT_PREFIX" "$TASKS" <<'PY'
+  python3 - "$HERE/tasks/tasks.jsonl" "$REPO/bench/workloads/tmp/$CONTEXT_PREFIX" "$TASKS" <<'PY'
 import json,sys
 src,ctxf,out=sys.argv[1],sys.argv[2],sys.argv[3]
 ctx=open(ctxf).read()

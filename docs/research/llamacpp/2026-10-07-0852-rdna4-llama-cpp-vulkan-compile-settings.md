@@ -59,7 +59,7 @@ spirv-headers`, then `cmake -B build -DGGML_VULKAN=1`; it gives **no RDNA4-speci
 
 ## On-machine facts (MEASURED this pass)
 
-- Self-managed Vulkan SDK **1.4.363.0** installed, glslc = shaderc v2026.4 (`llamacpp/vulkansdk/1.4.363.0`) —
+- Self-managed Vulkan SDK **1.4.363.0** installed, glslc = shaderc v2026.4 (`stack/llamacpp/var/vulkansdk/1.4.363.0`) —
   satisfies the cooperative-matrix requirement of #29409.
 - Baseline build `b10969-vulkan-1.4.357.1` and new `b10969-vulkan-1.4.363.0` (same source) are built; the
   step-3a bench isolates SDK/shaderc, step-3b isolates the llama.cpp shader changes above.
@@ -68,7 +68,7 @@ spirv-headers`, then `cmake -B build -DGGML_VULKAN=1`; it gives **no RDNA4-speci
 
 - **#22898 (`RADV_PERFTEST=nogttspill`)** could not be fully retrieved this pass (rate-limited) — tagged
   `UNVERIFIED`. Re-pull before relying on it; if confirmed, it is a candidate addition to the long-context
-  runtime env (iron rule 9: propose as a follow-up, don't change `bench/lib/gpu_env.sh` unprompted).
+  runtime env (iron rule 9: propose as a follow-up, don't change `stack/gpu/gpu_env.sh` unprompted).
 - The two open gfx1201 issues (#29314, #26663) are the bench's tripwires — if a Vulkan cell regresses in
   step 3b, check these before attributing it to b11448.
 

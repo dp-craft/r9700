@@ -9,7 +9,7 @@ takeaway: Best 35B on one R9700 at 210 W is Ornith-1.5-35B-A3B w4a8 on native Ra
 - **GPU/Host:** R9700, 32624 MiB, power cap 210 W (`MEASURED`, hwmon `power1_cap`), PCIe link limited to 8 GT/s x16 by the slot (Radiance boot log), kernel 7.0.0-38, CPU governor `powersave`, 31 GB RAM, 4.7 GiB swap
 - **Runtimes:** `stilldeadcode/radiance:1.16.0` @ `sha256:b1017ce0e615…`; `ghcr.io/slybase/vllm-sly-radiance:1.9.1-rocm10.1` @ `sha256:9744caf31e96…` (vLLM 0.32.0)
 - **Models:** `keptn/ornith-1.5-35b-a3b-w4a8@cfed0f8f`; `RedHatAI/Qwen3.8-27B-MXFP4@16a86728` + `syvai/Qwen3.8-27B-DFlash2-W4A16@4d30ec73`; `amd/Qwen3.5-35B-A3B-MXFP4@2e19c657` + `z-lab/Qwen3.5-35B-A3B-DFlash@52cb554b`; `Capicua25x/Ornith-1.5-35B-A3B-MXFP4-Quark-RDNA4@9e488f46` + `ornith-ai/Ornith-1.5-35B-A3B-DFlash@942d20fe`
-- **Data:** `bench/runs/2026-11-04-1730-ornith15-w4a8-radiance/`, `bench/runs/2026-11-04-1740-27b-sly-baseline/`, `bench/runs/2026-11-04-1557-35b-perf-10k-50k-100k/`, `bench/runs/2026-11-04-1802-ornith15-sly-dflash/`
+- **Data:** `campaigns/perf/2026-11-04-1527-ornith15-radiance-vs-sly/results/2026-11-04-1730-ornith15-w4a8-radiance/`, `campaigns/perf/2026-11-04-1527-ornith15-radiance-vs-sly/results/2026-11-04-1740-27b-sly-baseline/`, `campaigns/perf/2026-11-04-1527-ornith15-radiance-vs-sly/results/2026-11-04-1557-35b-perf-10k-50k-100k/`, `campaigns/perf/2026-11-04-1527-ornith15-radiance-vs-sly/results/2026-11-04-1802-ornith15-sly-dflash/`
 
 ## Summary
 
@@ -68,19 +68,19 @@ Step time is tokens per step ÷ decode rate. Tokens per step is 1 + accepted ÷ 
 
 **Decode vs depth (p50 per stream)**
 
-![Decode vs depth](../../bench/runs/2026-11-04-1740-27b-sly-baseline/comparison/charts/depth_decode.svg)
+![Decode vs depth](../../../campaigns/perf/2026-11-04-1527-ornith15-radiance-vs-sly/results/2026-11-04-1740-27b-sly-baseline/comparison/charts/depth_decode.svg)
 
 > The chart plots p50 and the tables use means, so values differ slightly. The arms differ in model as well as engine, so the gap is not a pure engine comparison.
 
 **Prefill vs depth (p50)**
 
-![Prefill vs depth](../../bench/runs/2026-11-04-1740-27b-sly-baseline/comparison/charts/depth_prefill.svg)
+![Prefill vs depth](../../../campaigns/perf/2026-11-04-1527-ornith15-radiance-vs-sly/results/2026-11-04-1740-27b-sly-baseline/comparison/charts/depth_prefill.svg)
 
 > Ornith's lead narrows with depth because its prefill decays fastest. All arms are cold prefill, which a real cached conversation does not repeat on every turn.
 
 ### Depth fits
 
-Log-log fits on p50 from `bench/lib/report.py`. **Three depths only**, one short of iron rule 16's minimum, so treat these as indicative. Valid for 10k–100k.
+Log-log fits on p50 from `bench/core/report.py`. **Three depths only**, one short of iron rule 16's minimum, so treat these as indicative. Valid for 10k–100k.
 
 | Config | Prefill exponent | R² | Decode exponent | R² |
 |---|---:|---:|---:|---:|
@@ -107,7 +107,7 @@ All ratios derived from the `MEASURED` means above.
 3. **Radiance's lead comes from step time, not drafting.** Draft acceptance is about equal on the two Ornith arms: 50.0% with MTP K=3 on Radiance (1522/3042) and 50.6% with DFlash K=3 on Sly (1639/3237), or 2.50 and 2.52 tokens per step. Steps take about 11 ms on Radiance and 26 ms on Sly at 10k (`INFERRED` arithmetic), so the model is not the cause. What remains is the engine, MoE kernels, weights and activations together, and this data cannot split them (**OPEN**): Radiance runs 4-bit GPTQ experts with FP8 activations on `libr4d`, and Sly runs data-free MXFP4 with BF16 activations through `triton_unfused` (card and log values). The Qwen3.6 FP8 `.rad` test was cancelled because the 34.63 GiB file does not fit on one card.
 4. **The 27B's ~100 t/s figure holds up approximately.** This cold probe gives 82.5–96.0 t/s means with no trend across depth, and individual requests range from 75.7 to 111.6. So 2x is reached on this probe at all three depths.
 5. **Ornith's prefill advantage shrinks with depth but should not reverse inside the window.** The exponents imply parity with the 27B only far beyond 262k tokens. At 200k the fits give about 4,200 vs 2,200 t/s. Both figures are `INFERRED`: fit range 10k–100k, projected 2x past the data, from three points.
-6. **Radiance's default headroom is unsafe beside a desktop.** It claims the card and left 232.52 MiB free at load (log), with 113 MiB free at peak in the samples. Chrome crashed at 17:32 and GNOME Shell at 17:33 (`/var/crash` timestamps, session restart in `ps`), about 7 minutes after the probe ended, with the server idle. The container was not OOM-killed. The VRAM cause is `INFERRED` from timing and from the same pattern in `docs/vllm/known-issues.md` (NVFP4 load peak). The crash reports and kernel log were not readable from this account, so a system RAM cause is not formally excluded, although about 9.6 GiB was available after the probe. The probe rows finished before the crash and are kept.
+6. **Radiance's default headroom is unsafe beside a desktop.** It claims the card and left 232.52 MiB free at load (log), with 113 MiB free at peak in the samples. Chrome crashed at 17:32 and GNOME Shell at 17:33 (`/var/crash` timestamps, session restart in `ps`), about 7 minutes after the probe ended, with the server idle. The container was not OOM-killed. The VRAM cause is `INFERRED` from timing and from the same pattern in `docs/guides/vllm/known-issues.md` (NVFP4 load peak). The crash reports and kernel log were not readable from this account, so a system RAM cause is not formally excluded, although about 9.6 GiB was available after the probe. The probe rows finished before the crash and are kept.
 7. **Swap did not contribute.** The box has 4.7 GiB of swap, 566 MiB already used before the Ornith run. During the runs, traffic was 1 MiB in and 1 MiB out on Ornith, and 1 MiB in and 18 MiB out on the 27B (`vmstat`, `MEASURED`). The 35B arms had no `vmstat` logging. `CLAUDE.md` still says "no swap", which is out of date.
 8. **Memory clock does not explain the gap.** Under load both new arms show the same distribution: p10 456, p50 772, p90 1258 MHz, median power 206–207 W.
 9. **MTP does not load for this checkpoint on Sly (`MEASURED`, three boots).** Its experts are MXFP4 and its MTP layer's experts are unquantized BF16, and no usable backend serves both. `triton_unfused`: `not supported for unquantized MoE`. `triton`: `kernel does not support MoEActivation.SILU activation`. `aiter`: `AITER_TRITON_MXFP4_BF16 ... does not support current device rocm`. Only `EMULATION` is left, which was not tested because it ran the Qwen 35B at about 16 t/s. The first error is not evidence for vLLM's undocumented comment `TRITON_UNFUSED has bug with MTP support` ([#49446](https://github.com/vllm-project/vllm/issues/49446), open), which sits on the non-ROCm selection lists.
@@ -140,8 +140,8 @@ Other 35B starters, both on Sly, slower and archived. The Ornith Sly checkpoints
 
 | Script | Serves | Decode t/s at 10k / 50k / 100k |
 |---|---|---:|
-| `bench/engine-bench/vllm/archive/ornith_sly_dflash.sh start` | Ornith 1.5 MXFP4 + official DFlash K=3 | 95.2 / 71.0 / 66.5 |
-| `bench/engine-bench/vllm/archive/qwen35_sly_dflash.sh start` | Qwen3.5-35B MXFP4 + z-lab DFlash K=7, `triton_unfused` | 110.2 / 92.9 / 67.3 |
+| `stack/serve/vllm/retired/ornith_sly_dflash.sh start` | Ornith 1.5 MXFP4 + official DFlash K=3 | 95.2 / 71.0 / 66.5 |
+| `stack/serve/vllm/retired/qwen35_sly_dflash.sh start` | Qwen3.5-35B MXFP4 + z-lab DFlash K=7, `triton_unfused` | 110.2 / 92.9 / 67.3 |
 
 The `sly-amd` profile's default backend is still `EMULATION`; `qwen35_sly_dflash.sh` passes the override. The Ornith scripts take their port and served name from `~/.config/claude/local_vllm_direct/settings-redhat.json`, so `claude --settings` on that file works unchanged. Claude shows the 27B's name while Ornith answers.
 
@@ -149,7 +149,7 @@ The `sly-amd` profile's default backend is still `EMULATION`; `qwen35_sly_dflash
 
 - **Probe:** `capture_engine.py probe`, `--max-tokens 256 --temperature 1.0 --concurrency 1 --reps 3 --prefix-mode unique --api chat`, one untimed warm-up at the first depth. Fixtures `codereview-{10000,50000,100000}.txt`; tokenizers differ, so real prompts are 10.2k–10.4k / 49.3k–49.6k / 98.0k–98.2k. No failed or interrupted rows.
 - **Not the agentic shape:** cold prefill at three depths. The growing-conversation test to 250k (iron rule 17) and an A/B/A prefix interleave were not run. Prefix reuse on Radiance is untested.
-- **Coding quality is untested on Ornith 1.5.** One correct answer (391, `s[::-1]`) and one well-formed tool call are all the output checks. Ornith 1.0 scored 62.2% against Qwen3.6-35B-A3B's 73.3% in `campaigns/2026-07-19-ornith-vs-gemma/analysis.md`, but 1.5 is a different model.
+- **Coding quality is untested on Ornith 1.5.** One correct answer (391, `s[::-1]`) and one well-formed tool call are all the output checks. Ornith 1.0 scored 62.2% against Qwen3.6-35B-A3B's 73.3% in `docs/findings/quality/2026-07-19-0000-ornith-vs-gemma.md`, but 1.5 is a different model.
 - **Only the Ornith Sly arm uses Radiance's serving values.** It also sets `presence_penalty` 1.5, ctx 262144 and the same sampler. The 27B and Qwen 35B arms keep their Sly recipes. Its probe commands match the Radiance run except the `--engine` label and the client timeout. Where it still differs: drafter (MTP does not load), MoE backend, weights, util 0.93 against 96 MiB headroom, `RADIANCE_KV_GROUP_SIZE=2`, Cactus delta 0.
 
   | Setting (`cmdline.txt`) | Radiance, Ornith | Sly, Ornith | Sly, 27B | Sly, Qwen 35B |
@@ -165,7 +165,7 @@ The `sly-amd` profile's default backend is still `EMULATION`; `qwen35_sly_dflash
 - **Not identical across arms:** the 27B used the production `dp-sharp` chat template, and Ornith its own. Both Ornith arms used the creator's `top_k 20` and `presence_penalty 1.5`. Ctx is 262144 on the Ornith arms and 262000 on the others. The 27B ran after the desktop restart with Chrome and PyCharm closed; the Radiance and Qwen 35B arms ran with them open; this was not recorded for the Ornith Sly arm.
 - **Claude Code works on both Ornith scripts, on one smoke test each (`MEASURED`, `claude-smoke/`).** With the unchanged `settings-redhat.json`, `claude -p` used the Read tool and returned the file's marker: 2 turns, 3.7 s on Radiance and 10.5 s on Sly (318 s boot). Claude printed an `unrecognized_model` warning for the alias on Radiance. The Radiance smoke used `--gpu-headroom-mib 2048`, so it shows that setting boots and answers, and says nothing about its speed. No real coding session was run.
 - **Headroom left for later:** Radiance's boot log also flags the 210 W cap, the `powersave` governor and the 8 GT/s link. None were changed.
-- **Tooling:** `serve_vllm.sh` does not cover native Radiance, hence `ornith_rad_mtp.sh`. `report.py` reads depth only from `cr<N>` or `-d<N>` labels, hence `comparison/merge.py`, which relabels the aggregate rows without touching the originals. Suggested tool change: let `report.py` read depth from a numeric field instead of the label.
+- **Tooling:** `serve_vllm.sh` does not cover native Radiance, hence `stack/serve/radiance/ornith_rad_mtp.sh`. `report.py` reads depth only from `cr<N>` or `-d<N>` labels, hence `comparison/merge.py`, which relabels the aggregate rows without touching the originals. Suggested tool change: let `report.py` read depth from a numeric field instead of the label.
 
 ## External comparison
 

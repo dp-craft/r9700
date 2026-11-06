@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """gate.py CASE VARIANT...: one line per variant, target incidents only. PASS = every never-found target in >=2 of 3 runs and the planted one in all."""
 import os, re, sys
-RUN = '/home/dev/work/dp-craft/amd/bench/runs/2026-11-05-0320-ornith-usecases'
+RUN = '/home/dev/work/dp-craft/amd/campaigns/workers/2026-11-05-0320-ornith-usecases/results/2026-11-05-0320-ornith-usecases'
 T = {'buildcmp': ({24, 52, 64}, {66}), 'sharp': ({293, 294}, {152}), 'depth': ({308}, {166})}  # targets..., planted last
 case, variants = sys.argv[1], sys.argv[2:]
 *targets, planted = T[case]

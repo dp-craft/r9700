@@ -2,7 +2,7 @@
 """make_charts_detailed.py — PER-TASK decision charts for analysis_detailed.md.
 
 Reuse, don't fork (CLAUDE.md iron rule #6): this imports the shared dataviz-validated SVG toolkit
-from campaigns/2026-07-12-27b-finetune-quality/make_charts.py (hbar / small_multiples / line_panels /
+from bench/quality/make_charts.py (hbar / small_multiples / line_panels /
 heatmap / svg / esc) and adds ONE new multi-dimensional primitive (scatter_panels) that the campaign
 tool doesn't have. The campaign-level charts still come from make_charts.py; this only adds the
 task-resolved views the detailed write-up needs. Input: out/summary_by_task.json (from

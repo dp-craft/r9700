@@ -1,6 +1,6 @@
 # Campaign 3 — Qwen3.6-27B **quality + parameter-effects at agentic depth** (R9700)
 
-*Part of the agentic-config series (`docs/plans/2026-07-12-27b-agentic-config-campaign-series.md`).*
+*Part of the agentic-config series (`notes/plans/2026-07-12-27b-agentic-config-campaign-series.md`).*
 **Status: READY TO RUN** — harness, 8-task eval, corpus, driver, and charts are all built and
 validated offline. One command runs it: `bash run_capture.sh`.
 

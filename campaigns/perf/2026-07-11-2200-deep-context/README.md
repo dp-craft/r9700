@@ -1,12 +1,12 @@
 # Deep-context campaign — max depth + parallel at the ceiling (R9700, 2026-07-11)
 
-A self-contained run plan. Built from the conventions in `docs/GUIDE.md`.
+A self-contained run plan. Built from the conventions in `docs/guides/GUIDE.md`.
 ✅ = command uses verified repo tooling · ⚠️ = watch point.
 
 **Two ways to run it.** ① **Automated + resumable:** after Phase 1 (fixtures), just
-`bash campaigns/2026-07-11-deep-context/run.sh` — it loops every server/probe below with
+`bash campaigns/perf/2026-07-11-2200-deep-context/run.sh` — it loops every server/probe below with
 per-probe `done/` markers (rerun to continue after an interruption), consolidates every probe
-into one `results.jsonl`, and auto-generates `report.html` as the last step. `run.sh` is generated from `spec.json` by `bench/gen_campaign.py`;
+into one `results.jsonl`, and auto-generates `report.html` as the last step. `run.sh` is generated from `spec.json` by `bench/core/gen_campaign.py`;
 edit the spec and regenerate, or hand-edit. ② **Manual:** run the phase commands below yourself.
 
 **Why this campaign.** The starter campaign capped at 64K and hit a `cr64000` context overflow.
@@ -27,7 +27,7 @@ behaves at the ceiling, single-stream and in parallel.
 
 ## Fixed parameters
 - Model `Qwen3.6-35B-A3B-UD-Q4_K_M.gguf` (embedded MTP layer) · llama.cpp build b9950 (record if different).
-- Repo root `$ROOT`; GPU/vendor env auto via `bench/lib/gpu_env.sh`. Vulkan server on **:8081**
+- Repo root `$ROOT`; GPU/vendor env auto via `stack/gpu/gpu_env.sh`. Vulkan server on **:8081**
   (matches `run.sh`'s `llamacpp-vulkan` engine URL).
 
 ```bash
@@ -36,7 +36,7 @@ cd "$ROOT/bench/engine-bench"
 # Only probe the Vulkan server we start (silences the not-running rocm/ollama engines):
 export ENGINES_LIST="llamacpp-vulkan|http://localhost:8081/v1|local"
 export MODEL=/home/dev/models/gguf/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf
-export GEN=$ROOT/bench/workloads/generated
+export GEN=$ROOT/bench/workloads/tmp
 ```
 
 ## Phase 1 — build the deep fixtures ✅ (~2 min)
@@ -110,9 +110,9 @@ The automated `run.sh` already does this and writes `report.html` into the campa
 the phases manually, consolidate the per-probe run dirs and render (self-contained HTML, Chart.js
 vendored, no network):
 ```bash
-CDIR="$ROOT/bench/runs/2026-07-11-deep-context"; mkdir -p "$CDIR"
+CDIR="$ROOT/campaigns/perf/2026-07-11-2200-deep-context"; mkdir -p "$CDIR"
 cat "$ROOT"/bench/runs/*-engine-deep-*/results.jsonl > "$CDIR/results.jsonl"
-python3 "$ROOT/bench/lib/report.py" "$CDIR"          # → $CDIR/report.html
+python3 "$ROOT/bench/core/report.py" "$CDIR"          # → $CDIR/report.html
 xdg-open "$CDIR/report.html"                          # or open in a browser
 ```
 
@@ -123,8 +123,8 @@ xdg-open "$CDIR/report.html"                          # or open in a browser
 - [x] 3: q8_0 confirm @200k (MTP=1) — first attempt (2306) empty, re-run 2310 OK
 - [x] 4: parallel np=2 (agentic-32k ×2)
 - [x] 4: parallel np=4 (agentic-32k ×4)
-- [x] 5: analysis doc + INDEX + README max-ctx refresh → `docs/analysis/2026-07-11-2200-deep-context-35b.md`
-- [x] 6: report.html generated → `bench/runs/2026-07-11-2200-deep-context/report.html`
+- [x] 5: analysis doc + INDEX + README max-ctx refresh → `docs/findings/llamacpp/2026-07-11-2200-deep-context-35b.md`
+- [x] 6: report.html generated → `campaigns/perf/2026-07-11-2200-deep-context/tmp/2026-07-11-2200-deep-context/report.html`
 
 ## Out of scope (deliberately)
 - **ROCm backend** (Vulkan wins decode; add later if needed) · **full q8_0 matrix** (one confirm

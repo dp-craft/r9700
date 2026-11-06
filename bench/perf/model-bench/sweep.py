@@ -14,7 +14,7 @@ the report includes the measured VRAM saving either way.
 
 Every llama-bench invocation is stored raw (invocations/*.json), every measured point becomes a
 line in sweep-log.jsonl, and sweep-summary.json holds the curves, decisions and the final
-recommended config. GPU VRAM/power is sampled per invocation (bench/lib/vram_sampler.py).
+recommended config. GPU VRAM/power is sampled per invocation (stack/gpu/vram_sampler.py).
 
 Usage:
   ./sweep.py --model /home/dev/models/gguf/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf --slug 35b-rocm
@@ -28,7 +28,7 @@ import argparse, datetime, json, os, pathlib, shutil, signal, subprocess, sys, t
 
 HERE = pathlib.Path(__file__).resolve().parent
 REPO = HERE.parent.parent
-SAMPLER = REPO / "bench/lib/vram_sampler.py"
+SAMPLER = REPO / "stack/gpu/vram_sampler.py"
 
 UB_CAPS = (64, 16384)
 BATCH_CAPS = (256, 16384)
@@ -44,7 +44,7 @@ def setup_env():
 def gpu_meta_lines():
     try:
         out = subprocess.run(["bash", "-c",
-                              f'source "{REPO}/bench/lib/gpu_env.sh"; gpu_setup_env; gpu_meta'],
+                              f'source "{REPO}/stack/gpu/gpu_env.sh"; gpu_setup_env; gpu_meta'],
                              capture_output=True, text=True, timeout=15).stdout
         return out.strip().splitlines()
     except Exception:
@@ -207,7 +207,7 @@ def sweep_numeric_axis(bench, axis, grid, fixed, metric, noise_pct, caps):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--model", required=True)
-    ap.add_argument("--llama-bench", default=str(REPO / "bench/llamacpp/llama-bench"))
+    ap.add_argument("--llama-bench", default=str(REPO / "stack/llamacpp/var/builds/b9949-rocm/bin/llama-bench"))
     ap.add_argument("--slug", default="sweep")
     ap.add_argument("--pp", type=int, default=8192, help="prefill size measured (tokens)")
     ap.add_argument("--tg", type=int, default=128, help="decode tokens measured")

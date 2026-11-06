@@ -2,7 +2,7 @@
 """prompt_run.py: is the dp prompt safe as the default, and does a profile add-on earn its place? Up to CONC arms at once, in priority order, under LIMIT_S.
 dp = operator's prompt appended. dps = dp + the profile's add-on. b2, b3 = current prompt, repeated. Wall time is under load, so compare generated tokens, not seconds. Log: prompts.jsonl. Rerun skips finished arms."""
 import json, os, subprocess, sys, threading, time, urllib.request
-RUN = "/home/dev/work/dp-craft/amd/bench/runs/2026-11-05-0320-ornith-usecases"
+RUN = "/home/dev/work/dp-craft/amd/campaigns/workers/2026-11-05-0320-ornith-usecases/results/2026-11-05-0320-ornith-usecases"
 H = f"{RUN}/harness"
 LIMIT = int(os.environ.get("LIMIT_S", 7200))
 CONC = int(os.environ.get("CONC", 3))

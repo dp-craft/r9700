@@ -273,7 +273,7 @@
     },
     "budget_mib": 32400,
     "overhead_mib": 2000,
-    "note": "weights_gib INCLUDES the 1.52 GiB drafter (18.41 + 1.52). KV geometry MEASURED via bench/gguf_kv.py: arch muse-glimmer, 52 attn layers, 52 KiB/tok f16. Predicted full-ctx ≈ 29,064 MiB < 32,400 budget."
+    "note": "weights_gib INCLUDES the 1.52 GiB drafter (18.41 + 1.52). KV geometry MEASURED via bench/core/gguf_kv.py: arch muse-glimmer, 52 attn layers, 52 KiB/tok f16. Predicted full-ctx ≈ 29,064 MiB < 32,400 budget."
   },
   "notes": "Depths 8/32/64/96K per iron rule 16 (>=4 points for a log-log prefill-decay fit per backend; ctx is PINNED at 131072 = trained depth, so 98304 + 512 output leaves ~32k headroom). prefix_mode=unique = cold prefill per rep (uuid prefix defeats the cache) — this measures the backend compute shape, NOT the incremental agentic cache-reuse pattern (rule 17); that is a documented out-of-scope follow-up. Untimed warmup=1 matters for Vulkan (first prefill compiles shaders). Vendor reference: Muse-Glimmer card CLAIMS 74.9 -> 233.4 tok/s (3.1x) with the DFlash drafter on an RTX 5090 — different GPU, provenance CLAIMED."
 }

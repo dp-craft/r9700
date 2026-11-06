@@ -16,7 +16,7 @@ takeaway: sharp-sly2 (keep-newest reasoning replay) did not complete step A — 
   `qwen3.8-froggeric-v22.5-sly2+sharp`, sha256 `f76daf0a…`
 - **Client:** Claude Code 2.1.312, `settings-redhat.json`, sampling temperature 1.0 / top_p 0.95 / top_k 20 / min_p 0 / presence 0
 - **Model:** `RedHatAI/Qwen3.8-27B-MXFP4` (W4A8 MXFP4) · **Task:** dp-forge W2-08 brief, RUNBOOK step A (blind review), base `de110510`
-- **Data:** `bench/runs/2026-10-31-redhat191-sharpsly2-w208-blind/` (arm `rep1/r191-sharpsly2-d0/`)
+- **Data:** `campaigns/agentic/2026-10-31-0000-redhat191-sharpsly2-w208-blind/` (arm `rep1/r191-sharpsly2-d0/`)
 
 ## Summary
 
@@ -55,12 +55,12 @@ Reference rows are the keep-all arms from the same δ-ladder campaign (same char
 
 **Speed and loop panels: one row per arm (MEASURED)**
 
-![Agentic speed](charts/agentic_speed.svg)
+![Agentic speed](../../../campaigns/agentic/2026-10-31-0000-redhat191-sharpsly2-w208-blind/results/charts/agentic_speed.svg)
 
 > The k = 1 arm is the only row that did not finish: its step-A wall is the cap (3,601 s). Decode is comparable to keep-all (54.0 vs
 > 55.8 tok/s), but it generated 1.4× the tokens, so the wall is longer. Read the wall, not the decode.
 
-![Agentic loops](charts/agentic_loops.svg)
+![Agentic loops](../../../campaigns/agentic/2026-10-31-0000-redhat191-sharpsly2-w208-blind/results/charts/agentic_loops.svg)
 
 > No arm in this table has an exact 40-line loop in this pass. The k = 1 arm's longest thinking block is 0.0% repeated lines — the
 > "circling" a semantic pass found (haiku) is re-derivation, not an exact repetition, so it does not trip the detector.
@@ -136,7 +136,7 @@ replay.
 ```
 # No change: keep-all (sharp) at Cactus δ 0 remains the best-measured single arm for this workload.
 # sharp-sly2 (k=1) is not a winner over keep-all (slower, did not complete). Do not adopt it.
-PROFILE=sly-redhat/redhat-mxfp4-dflash CACTUS_DELTA=0 PORT=8000 bench/engine-bench/vllm/serve_vllm.sh start
+PROFILE=sly-redhat/redhat-mxfp4-dflash CACTUS_DELTA=0 PORT=8000 stack/serve/vllm/serve_vllm.sh start
 #   image ghcr.io/slybase/vllm-sly-radiance:1.9.1-rocm10.1, KV fp8, max_model_len 262000, max_num_seqs 1, gpu util 0.93
 #   template: sharp-chat_template.jinja (keep-all) — NOT sharp-sly2-chat_template.jinja
 ```

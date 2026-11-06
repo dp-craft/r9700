@@ -18,9 +18,9 @@ when generation dominates prefill.
 **KV:** keep **f16 everywhere** — q8_0 fails the ≤5 % rule and **gets *worse* with depth** (32K
 Vulkan −29.7 % prefill → 200K **−40 % prefill / −22 % decode / TTFT +66 %**); f16 fits 262144 so
 q8_0 never earns its place here.
-Full picture: [sweep](docs/analysis/2026-07-11-1833-sweep-35b-rocm-vs-vulkan.md) ·
-[serving campaign](docs/analysis/2026-07-11-1844-campaign-combo35b.md) ·
-[deep context to 200K](docs/analysis/2026-07-11-2200-deep-context-35b.md).
+Full picture: [sweep](docs/findings/llamacpp/2026-07-11-1833-sweep-35b-rocm-vs-vulkan.md) ·
+[serving campaign](docs/findings/llamacpp/2026-07-11-1844-campaign-combo35b.md) ·
+[deep context to 200K](docs/findings/llamacpp/2026-07-11-2200-deep-context-35b.md).
 
 ## The harness in one paragraph
 
@@ -37,7 +37,7 @@ NVIDIA works by pointing it at a CUDA llama.cpp build; the cross-engine side is 
 | Path | What |
 |------|------|
 | [`docs/INDEX.md`](docs/INDEX.md) | Register of every report, newest first — **start here** |
-| [`docs/GUIDE.md`](docs/GUIDE.md) | **How to run the benchmarks yourself, step by step** |
+| [`docs/guides/GUIDE.md`](docs/guides/GUIDE.md) | **How to run the benchmarks yourself, step by step** |
 | `docs/analysis/` | Our measurements on this box (dated) |
 | `docs/research/` | External, sourced research (dated) |
 | `bench/model-bench/` | **Tuning microscope** — `run.sh` (manual) + `sweep.py` (**adaptive optimum search** + KV ≤5% rule) |
@@ -46,11 +46,11 @@ NVIDIA works by pointing it at a CUDA llama.cpp build; the cross-engine side is 
 | `bench/lib/` | Vendor abstraction (AMD/NVIDIA) + VRAM/power sampler |
 | `bench/runs/` | Dated campaign outputs `YYYY-MM-DD-HHMM-<slug>/` |
 | `bench/legacy/` | ⚠️ Original harness — **frozen, superseded** (see `bench/legacy/README.md`) |
-| `install.sh` | ROCm stack install (`amdgpu-install` + render/video groups) |
+| `stack/install/install.sh` | ROCm stack install (`amdgpu-install` + render/video groups) |
 | `CLAUDE.md` | Map + working rules for AI sessions |
 
-Big build artifacts (`bench/llamacpp*/`, `bench/dl/`, `unsloth_compiled_cache/`), `bench/runs/*/`
-logs and `bench/workloads/generated/` are gitignored; tracked content is scripts + `results_*.jsonl` + docs.
+Big build artifacts (`bench/llamacpp*/`, `stack/serve/var/`, `unsloth_compiled_cache/`), `bench/runs/*/`
+logs and `bench/workloads/tmp/` are gitignored; tracked content is scripts + `results_*.jsonl` + docs.
 See [`bench/README.md`](bench/README.md) for the two-track rationale.
 
 ## Setup
@@ -62,7 +62,7 @@ export HSA_OVERRIDE_GFX_VERSION=12.0.1
 
 ## Run a benchmark
 
-Full step-by-step in [`docs/GUIDE.md`](docs/GUIDE.md). The short version (vendor env is
+Full step-by-step in [`docs/guides/GUIDE.md`](docs/guides/GUIDE.md). The short version (vendor env is
 auto-detected — works on NVIDIA too by pointing `LLAMA_BENCH`/`LLAMA_SERVER` at a CUDA build):
 
 ```bash

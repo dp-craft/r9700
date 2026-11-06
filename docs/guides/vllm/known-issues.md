@@ -16,8 +16,8 @@ an issue lives in `settings.md`; a fix that was version/env-specific lives in `h
 - **version seen:** sly-radiance 1.6.0 / 1.5.1 + kernel 7.0.0-34 / -38.
 - **workaround:** `HIP_FORCE_DEV_KERNARG=0` (historical fix); interim: client timeout < 387 s +
   restart between long sessions.
-- **report:** `docs/analysis/2026-10-22-1643-vllm-mxfp4-atiled-fault-and-llama-swap-serving.md`,
-  `docs/analysis/2026-10-23-0023-vllm-gpu-fault-solved-hip-kernarg.md`; graduated to `historical.md`.
+- **report:** `docs/findings/vllm/2026-10-22-1643-vllm-mxfp4-atiled-fault-and-llama-swap-serving.md`,
+  `docs/findings/vllm/2026-10-23-0023-vllm-gpu-fault-solved-hip-kernarg.md`; graduated to `historical.md`.
 
 ## NVFP4 load-peak OOM — **parked**
 - **symptom:** the load-time NVFP4→MXFP4 requant + fp8→bf16 lm_head transient filled the card: peak
@@ -29,8 +29,8 @@ an issue lives in `settings.md`; a fix that was version/env-specific lives in `h
 - **version seen:** sly-radiance 1.6.0 (A2 = `unsloth/Qwen3.8-27B-NVFP4@f0b7c9e7`).
 - **workaround:** boot watchdog (sysfs 0.2 s poll, `docker kill` below 256 MiB free);
   `RADIANCE_NVFP4_LMHEAD=fp8` (keep the 0.6 GiB lm_head out of bf16); run with the GUI stopped.
-- **report:** `campaigns/2026-10-22-vllm-sly-mxfp4-depth/analysis.md` (setup lesson);
-  `docs/vllm/workflows.md` (Roadmap, A2).
+- **report:** `docs/findings/vllm/2026-10-22-1324-vllm-sly-mxfp4-depth.md` (setup lesson);
+  `docs/guides/vllm/workflows.md` (Roadmap, A2).
 
 ## Native Radiance default headroom starves the desktop — **live**
 - **symptom:** with the default `--gpu-headroom-mib` of 96, Radiance claims nearly the whole card: 232.52 MiB free at
@@ -45,7 +45,7 @@ an issue lives in `settings.md`; a fix that was version/env-specific lives in `h
   has no VRAM watchdog.
 - **not affected:** the 27B on `sly-redhat` is stable as configured and needs no extra headroom (operator report; 1,427 MiB
   min free at ctx 262000, MEASURED).
-- **report:** `docs/analysis/2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md`.
+- **report:** `docs/findings/radiance/2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md`.
 
 ## MXFP4 MoE `EMULATION` slow path — **live on `sly-amd`**
 - **symptom:** `amd/Qwen3.5-35B-A3B-MXFP4` decodes at about 16 tok/s with DFlash K=7, at any depth. Prefill is healthy.
@@ -53,13 +53,13 @@ an issue lives in `settings.md`; a fix that was version/env-specific lives in `h
   override. No AMD or vLLM source recommends it, but a community checkpoint card does for gfx12 (CLAIMED). The log says it
   runs BF16 activations instead of the checkpoint's quantized ones (quality effect unmeasured).
 - **version seen:** sly 1.9.1 (vLLM 0.32.0), 2026-11-04.
-- **workaround:** `bench/engine-bench/vllm/archive/qwen35_sly_dflash.sh` passes `--moe-backend triton_unfused`: 110.2 / 92.9 / 67.3 tok/s at 10k / 50k / 100k
+- **workaround:** `stack/serve/vllm/retired/qwen35_sly_dflash.sh` passes `--moe-backend triton_unfused`: 110.2 / 92.9 / 67.3 tok/s at 10k / 50k / 100k
   against 16.6 / 15.4 / 15.8 (MEASURED, DFlash K=7).
 - **trap:** arms without DFlash logged `Capturing CUDA graphs (FULL): 0it`, so they ran with no full-model graph.
   Their decode (`nospec` 6.2, `nospec-unfused` 8.7, `mtp-k4` 16.8 tok/s at 10k) does not measure backend cost. The cause
   is open.
-- **report:** `docs/analysis/2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md`;
-  `docs/research/2026-11-04-1702-qwen35-35b-a3b-radiance-config-alternatives.md`.
+- **report:** `docs/findings/radiance/2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md`;
+  `docs/research/vllm/2026-11-04-1702-qwen35-35b-a3b-radiance-config-alternatives.md`.
 
 ## MTP does not load on the Ornith 1.5 MXFP4 checkpoint — **live on Sly**
 - **symptom:** `Capicua25x/Ornith-1.5-35B-A3B-MXFP4-Quark-RDNA4` with `method: mtp` fails at load. Its experts are MXFP4 and
@@ -69,11 +69,11 @@ an issue lives in `settings.md`; a fix that was version/env-specific lives in `h
 - **status:** **live**. Only `EMULATION` is left, not tested because it ran the Qwen 35B at about 16 tok/s. A failed load leaves
   the container up, so the launcher waits until `WAIT` runs out.
 - **version seen:** sly 1.9.1 (vLLM 0.32.0), 2026-11-04.
-- **workaround:** use `ornith_rad_mtp.sh` for MTP. DFlash K=3 does load on Sly (`bench/engine-bench/vllm/archive/ornith_sly_dflash.sh`; its checkpoints were deleted, fetch commands in its header). Native Radiance is not affected: its
+- **workaround:** use `stack/serve/radiance/ornith_rad_mtp.sh` for MTP. DFlash K=3 does load on Sly (`stack/serve/vllm/retired/ornith_sly_dflash.sh`; its checkpoints were deleted, fetch commands in its header). Native Radiance is not affected: its
   image has no vLLM, and it measured MTP K=3 at 219.8 tok/s.
 - **not the same as:** vLLM's comment `TRITON_UNFUSED has bug with MTP support` (`oracle/mxfp4.py`:403, :442), whose symptom nobody
   documents ([#49446](https://github.com/vllm-project/vllm/issues/49446), open).
-- **report:** `docs/analysis/2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md`; raw boots in
+- **report:** `docs/findings/radiance/2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md`; raw boots in
   `bench/runs/2026-11-04-1802-ornith15-sly-dflash/ornith-mtp-k3-*FAILED*`.
 
 ## `.rad`-vs-HF-checkpoint loading distinction — **live (design, not a bug)**
@@ -97,14 +97,14 @@ an issue lives in `settings.md`; a fix that was version/env-specific lives in `h
 - **upstream mitigation (2026-10-30):** Sly 1.9.0 adds a fade (δ falls to 0 between 4,096 and 16,384 output
   tokens; `RADIANCE_CACTUS_FADE_END=0` = off) and a cap (`RADIANCE_CACTUS_CAP_R`, default 0.5; `0` = off; env knobs `CACTUS_FADE_START/END`, `CACTUS_CAP_R`, see `settings.md`); 1.9.1 adds the
   `v22.5-sly2` template (older turns' reasoning not replayed). CLAIMED: loops 20/32 → 3/32; #164 still open.
-  The sly-redhat profile runs 1.9.1 since 2026-10-30 (smoke test `bench/runs/2026-10-30-1745-sly-1.9.1-smoke/`);
-  MEASURED on a real session (`docs/analysis/2026-10-30-1552-dpf-brief-fix-heretic-vs-redhat.md`, Claude Code
+  The sly-redhat profile runs 1.9.1 since 2026-10-30 (smoke test `campaigns/perf/2026-10-30-1745-sly-1.9.1-smoke/`);
+  MEASURED on a real session (`docs/findings/agentic/2026-10-30-1552-dpf-brief-fix-heretic-vs-redhat.md`, Claude Code
   dp-forge brief fix W2-08, RedHat MXFP4 + DFlash2 k=7, budget RUNBOOK): **reduced, not removed**. 10-s decode windows
   at acceptance ≥ 7 of 8 = 58 of 514 (11.3 %) on 1.9.1 (δ 0.5 + fade/cap, `v22.5-sly2`), vs 777 of 1,067 (72.8 %) on
   1.8.1 δ 0.5 (whole 3-h run, 0 of 3 briefs finished) and 7 of 650 (1.1 %) on 1.8.1 δ 0 (not a controlled A/B: RUNBOOK and briefs in the prompt differ too). Still 3 decision loops and
   1 output-cap hit on 1.9.1; the largest began at δ 0.5 and kept going after the fade reached δ 0, so pinned acceptance
   is a symptom rather than the cause (INFERRED). Short-probe speed is unchanged vs 1.8.1 (depth 10k/50k/100k,
-  `docs/analysis/2026-10-30-0900-vllm-redhat-mxfp4-depth-transposed.md`).
+  `docs/findings/radiance/2026-10-30-0900-vllm-redhat-mxfp4-depth-transposed.md`).
 - **mechanism (2026-10-31; code MEASURED, mechanism INFERRED):**
   - **Rule:** the accept test uses `h = min(1, p + sqrt(2δ·p(1−p)))` instead of the target probability p of the drafted token, so δ is
     a per-token divergence budget (KL ≈ δ).
@@ -118,7 +118,7 @@ an issue lives in `settings.md`; a fix that was version/env-specific lives in `h
   - **Verdict:** inherent to lossy acceptance plus a 1.8.1 saturation flaw; not a coding bug (δ 0 is bit-exact).
   - **Knobs that matter:** `CACTUS_CAP_R` (0.8 keeps ≥ 80% of the escape), an early fade (`FADE_START=0`, `FADE_END` a few
     thousand), or δ 0.
-  - Full write-up: `docs/analysis/2026-10-31-1745-reasoning-replay-sharp-template-cactus-loops.md` §5.
+  - Full write-up: `docs/findings/agentic/2026-10-31-1745-reasoning-replay-sharp-template-cactus-loops.md` §5.
 - **report:** `settings.md` (RADIANCE_CACTUS_DELTA); `profiles/sly-radiance/_engine.env` (comment);
   Sly issue #164.
 

@@ -1,19 +1,19 @@
 # vLLM track — workflows (procedures)
 
 Task-based procedures. The "add a model to llama-swap" and "run Claude via llama-swap" procedures are
-**Plan B** (`docs/plans/2026-10-25-vllm-llama-swap-path.md`) — not this track.
+**Plan B** (`notes/plans/2026-10-25-vllm-llama-swap-path.md`) — not this track.
 
 ## Boot a server
 
 ```bash
 ./fetch_model.sh <org/repo> <40-hex-rev>                       # pinned, resumable download
-PROFILE=<engine>/<model> PORT=8000 bench/engine-bench/vllm/serve_vllm.sh   # boot (gpu_exclusive.sh floor first)
+PROFILE=<engine>/<model> PORT=8000 stack/serve/vllm/serve_vllm.sh   # boot (gpu_exclusive.sh floor first)
 PROFILE=<engine>/<model> ./serve_vllm.sh print                # show the full resolved config (no GPU)
 IMAGE=ghcr.io/slybase/vllm-sly-radiance:<new-tag> PROFILE=... ./serve_vllm.sh   # try a new image
 PORT=8000 ./serve_vllm.sh stop|status|logs
 ```
 
-- Every boot writes `bench/.servers/<port>.cmdline`: argv, image digest, model repo+revision, vLLM version.
+- Every boot writes `stack/serve/var/servers/<port>.cmdline`: argv, image digest, model repo+revision, vLLM version.
 - While booting, a **VRAM watchdog** polls sysfs every 0.2 s and `docker kill`s the container if free
   VRAM drops below `WATCHDOG_MIB` (default 256; the desktop shares the card).
 - `print` is the read-only preview: it shows the same resolved config `start` records (env + docker
@@ -22,7 +22,7 @@ PORT=8000 ./serve_vllm.sh stop|status|logs
 Native Radiance has its own launcher, because `serve_vllm.sh` builds vLLM arguments:
 
 ```bash
-bench/engine-bench/vllm/fetch_model.sh keptn/ornith-1.5-35b-a3b-w4a8 cfed0f8f07d0ef8d0c7dcf4d29a07eeb6a402472
+stack/serve/vllm/fetch_model.sh keptn/ornith-1.5-35b-a3b-w4a8 cfed0f8f07d0ef8d0c7dcf4d29a07eeb6a402472
 ./ornith_rad_mtp.sh start    # port 8000
 ./ornith_rad_mtp.sh stop|status|logs
 ```
@@ -31,25 +31,25 @@ It runs the `gpu_exclusive.sh` floor first but has no VRAM watchdog and writes n
 which crashed the desktop once, so close Chrome if VRAM gets tight. `EXTRA_ARGS="--gpu-headroom-mib 2048"` is recommended
 only, and unmeasured (see `known-issues.md`).
 
-`ornith_rad_mtp.sh` is the fastest 35B. Its Claude config is
+`stack/serve/radiance/ornith_rad_mtp.sh` is the fastest 35B. Its Claude config is
 `claude --settings ~/.config/claude/local_vllm_direct/settings-redhat.json`; it serves under that file's model name.
 
 The slower Sly starters are archived and use the same port, so run one at a time. `qwen35_sly_dflash.sh` uses
 `settings-35b.json`. `ornith_sly_dflash.sh` needs its checkpoints fetched first (commands in its header).
 
 ```bash
-bench/engine-bench/vllm/archive/ornith_sly_dflash.sh start|stop|status|logs   # Ornith 1.5 MXFP4 + DFlash K=3 on Sly
-bench/engine-bench/vllm/archive/qwen35_sly_dflash.sh start|stop|status|logs   # Qwen3.5-35B MXFP4 + DFlash K=7, triton_unfused, on Sly
+stack/serve/vllm/retired/ornith_sly_dflash.sh start|stop|status|logs   # Ornith 1.5 MXFP4 + DFlash K=3 on Sly
+stack/serve/vllm/retired/qwen35_sly_dflash.sh start|stop|status|logs   # Qwen3.5-35B MXFP4 + DFlash K=7, triton_unfused, on Sly
 ```
 
 ## Observe a running server (no GPU, read-only)
 
 ```bash
-python3 bench/lib/monitor.py --port 8000                 # live view (zero-install: Python + rocm-smi)
-python3 bench/lib/monitor.py --port 8000 --out session.jsonl   # live, records the session
-python3 bench/lib/monitor.py --port 8000 --once         # single snapshot
-python3 bench/lib/monitor.py --port 8000 --history 50   # show 50 history rows
-./bench/engine-bench/claude/monitor.sh --once           # thin wrapper, records to bench/.servers/<port>.session.jsonl
+python3 stack/gpu/monitor.py --port 8000                 # live view (zero-install: Python + rocm-smi)
+python3 stack/gpu/monitor.py --port 8000 --out session.jsonl   # live, records the session
+python3 stack/gpu/monitor.py --port 8000 --once         # single snapshot
+python3 stack/gpu/monitor.py --port 8000 --history 50   # show 50 history rows
+./bench/engine-bench/claude/monitor.sh --once           # thin wrapper, records to stack/serve/var/servers/<port>.session.jsonl
 ```
 
 - `monitor.py` polls `/metrics` + rocm-smi + the log every 2 s; blocks = polls (requests) / avg (last
@@ -62,29 +62,29 @@ python3 bench/lib/monitor.py --port 8000 --history 50   # show 50 history rows
     | grep -E "prefix_cache_(hits|queries)_total|kv_cache_usage_perc|num_requests_running|spec_decode_num_(accepted|draft)_tokens" \
     | grep -v "^#"'
   ```
-- **Log:** `tail -f bench/.servers/8000.log` (like llama-swap `status`).
+- **Log:** `tail -f stack/serve/var/servers/8000.log` (like llama-swap `status`).
 
 ## Run a campaign
 
 ```bash
-PROFILE=<engine>/<model> PORT=8000 bench/engine-bench/vllm/serve_vllm.sh   # boot
-python3 bench/lib/capture_engine.py probe ...        # throughput/concurrency + ttft
-python3 bench/lib/capture_engine.py tasks ...        # quality capture
-python3 bench/lib/report.py <run_dir> --charts ... --appendix ...          # charts + appendix.md
+PROFILE=<engine>/<model> PORT=8000 stack/serve/vllm/serve_vllm.sh   # boot
+python3 bench/core/capture_engine.py probe ...        # throughput/concurrency + ttft
+python3 bench/core/capture_engine.py tasks ...        # quality capture
+python3 bench/core/report.py <run_dir> --charts ... --appendix ...          # charts + appendix.md
 ```
 
 - Fixtures: `bench/workloads/build_prompt.py` (or the `codereview-*.txt` fixtures).
 - Resumable via `done/` markers (row-level in `capture.py`).
-- The exact argv + digest + revision for every boot is in `bench/.servers/<port>.cmdline` (attributable).
+- The exact argv + digest + revision for every boot is in `stack/serve/var/servers/<port>.cmdline` (attributable).
 
 ## Debug a fault
 
-- **Check the fault:** `grep -n MEMORY_FAULT bench/.servers/8000.log` (saved on stop) or `docker logs vllm-8000`.
+- **Check the fault:** `grep -n MEMORY_FAULT stack/serve/var/servers/8000.log` (saved on stop) or `docker logs vllm-8000`.
 - **Check residency** (iron rule 15): `amd-smi process -g 0` — a daemon holding far less than its known
   working set is a contention signal (the on-demand-paging engine degrades silently, no OOM, no log line).
 - **After a fix**, check the upstream log does **not** contain `[radiance.mxfp4] A-tiled GEMM path`
   (when the A-tiled path is the suspect).
-- **Orphan check** (iron rule 14): `PORT=8000 bench/engine-bench/vllm/serve_vllm.sh stop`, verify
+- **Orphan check** (iron rule 14): `PORT=8000 stack/serve/vllm/serve_vllm.sh stop`, verify
   `amd-smi metric -g 0 -m` FREE_VRAM ≈ 32 GB, then rerun.
 - **Process matching:** use `pgrep -af` with a **split pattern** — `pkill -f` / `pgrep -f` can match
   their own command line.
@@ -95,9 +95,9 @@ python3 bench/lib/report.py <run_dir> --charts ... --appendix ...          # cha
 
 ## Plan B (not this track)
 
-- **Add a model to llama-swap** → `docs/plans/2026-10-25-vllm-llama-swap-path.md` (the `generate.py`
+- **Add a model to llama-swap** → `notes/plans/2026-10-25-vllm-llama-swap-path.md` (the `generate.py`
   vllm rows + the add-model skill; needs GPU testing, riskier).
-- **Run Claude via llama-swap** → `docs/plans/2026-10-25-vllm-llama-swap-path.md` (the
+- **Run Claude via llama-swap** → `notes/plans/2026-10-25-vllm-llama-swap-path.md` (the
   `claude-llama-swap.sh` launcher).
 
 ## Roadmap (migrated from the tool README "Plan" — agreed, not now)

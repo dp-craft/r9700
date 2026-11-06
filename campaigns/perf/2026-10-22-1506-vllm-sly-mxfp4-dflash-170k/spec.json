@@ -7,7 +7,7 @@
     "user experience: <= 30.8 GB total VRAM use is stable on this box; MTP on llama.cpp creeps slowly",
     "turn 0 = 150k tokens of codereview-200000.txt; later turns = thinking-hard.prompt.txt only (step 0), 1024 max tokens, reasoning_effort high",
     "kv_usage_peak per turn = vLLM kv_cache_usage_perc polled during the turn; VRAM/GTT sampled at 1 s for the whole probe",
-    "same profile as campaigns/2026-10-22-vllm-sly-mxfp4-dflash except MAXLEN 170000"
+    "same profile as campaigns/perf/2026-10-22-1406-vllm-sly-mxfp4-dflash except MAXLEN 170000"
   ],
   "engine": "vllm",
   "profile": "sly-radiance/qwen38-mxfp4-dflash",

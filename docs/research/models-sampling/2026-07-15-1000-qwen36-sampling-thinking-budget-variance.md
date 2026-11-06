@@ -8,7 +8,7 @@ sources: 8 verified (Tier-1: 8) + 3 unverified-and-flagged
 takeaway: Our campaign's temp 0.6 / top_p 0.95 / top_k 20 / min_p 0 / presence_penalty 0 is EXACTLY Qwen's "thinking mode, precise coding" recommendation — vendor-correct, do not change it. The real finding: Qwen recommends **32,768 output tokens** (81,920 for highly complex problems) while we run `--reasoning-budget 4096` and the model **saturates it every time** (3629–4095 MEASURED) — we have been truncating thinking ~8× below vendor guidance, a plausible driver of the erratic outputs. 16384 is the practical ceiling at 128k depth (32768 does NOT fit ctx 163840). `--reasoning-budget 0` is NOT "non-thinking mode": it forces an immediate end-of-thinking, whereas Qwen's non-thinking recipe (temp 0.7 / top_p 0.80 / presence_penalty 1.5) belongs to the `enable_thinking=false` template path — conflating them confounds budget with sampling. Qwen3.6 docs contain NO greedy-decoding warning and NO variance-reduction guidance beyond presence_penalty for repetition: "lower temp = less variance" is FOLKLORE here. MTP (on in every cell) is a documented output-changing mechanism (llama.cpp #23335, closed) and is an untested variance suspect.
 -->
 
-- **Date:** 2026-07-15 10:00 · **For:** `campaigns/2026-07-14-hardest-tasks-27b-vs-35b` budget/variance extension
+- **Date:** 2026-07-15 10:00 · **For:** `campaigns/quality/2026-07-14-0000-hardest-tasks-27b-vs-35b` budget/variance extension
 - **Method:** haiku fan-out (CLAUDE.md rule #4) → **every decision-relevant claim re-verified by hand** against the primary source or our own build. Digest-only claims that failed verification are listed as UNVERIFIED and are **not** used.
 
 ## Summary — what is documented vs what is folklore
@@ -48,7 +48,7 @@ Fetched directly from the model cards on 2026-07-15 (not via the digest):
 
 **Unsloth adds nothing of its own.** `unsloth/Qwen3.6-35B-A3B-GGUF` exists and reproduces the table above, explicitly **attributed to the Qwen Team** (verified). It offers **no KV-cache guidance** and **no Qwen3.6-specific UD accuracy numbers**. Treat Unsloth's params as Qwen's, not independent corroboration.
 
-### Reconciliation with `docs/research/2026-07-12-2310-qwen36-sampling-llamacpp-serving-knobs.md`
+### Reconciliation with `docs/research/models-sampling/2026-07-12-2310-qwen36-sampling-llamacpp-serving-knobs.md`
 
 That earlier report is **not contradicted** — but two of its numbers are **Qwen3-family, not Qwen3.6**, and this report supersedes them for Qwen3.6:
 
@@ -191,7 +191,7 @@ These are recorded so nobody re-derives them and mistakes them for sourced facts
 - llama.cpp issue **#23335** "Eval bug: draft-mtp changes deterministic output on Qwen3.6 MTP model": https://github.com/ggml-org/llama.cpp/issues/23335 — **exists, CLOSED**, resolution unverified
 
 **Verified locally (MEASURED, this box):**
-- `bench/llamacpp-rocm-b9950/llama-server --version` → `9950 (961e4b26a)` — matches the campaign's `/props` `build_info` exactly
+- `stack/llamacpp/var/builds/b9950-rocm/bin/llama-server --version` → `9950 (961e4b26a)` — matches the campaign's `/props` `build_info` exactly
 - `llama-server --help` (b9950) → `--reasoning-budget` legal values; `-rea/--reasoning on|off|auto`; `--spec-type … draft-mtp`
 - `campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/props_*.json` → `build_info: b9950-961e4b26a`, server default `min_p 0.05`, `reasoning_format: none`
 

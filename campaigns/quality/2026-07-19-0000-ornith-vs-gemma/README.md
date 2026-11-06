@@ -3,7 +3,7 @@
 Two new models, one substrate, the **hardest-tasks TS-TDD harness** (copied from
 `2026-07-14-hardest-tasks-27b-vs-35b` — same tasks, same real `tsc + eslint + vitest` grader with the
 pre-grade self-check). Model facts + provenance:
-`docs/research/2026-07-19-1821-ornith-35b-gemma-4-31b-configs.md`.
+`docs/research/models-sampling/2026-07-19-1821-ornith-35b-gemma-4-31b-configs.md`.
 
 ## Cells (`configs.jsonl`)
 
@@ -51,4 +51,4 @@ ONLY='ornith-*' REPS=1 bash campaigns/2026-07-19-ornith-vs-gemma/run_capture.sh
 
 Resumable (row-level in `capture.py` + per-cell markers in `out/done/`). Outputs: `out/outputs.jsonl`,
 `out/scores_typescript.jsonl`, `out/summary.md`, `charts/`. Stop a stuck server by pidfile
-(`bench/.servers/8081.pid`) and verify VRAM idle before relaunch (iron rule 14).
+(`stack/serve/var/servers/8081.pid`) and verify VRAM idle before relaunch (iron rule 14).

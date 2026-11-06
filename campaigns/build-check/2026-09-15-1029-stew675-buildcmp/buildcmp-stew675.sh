@@ -18,7 +18,7 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
-BUILD="$REPO/llamacpp/builds"
+BUILD="$REPO/stack/llamacpp/var/builds"
 MODEL="/home/dev/models/gguf/unsloth/Qwen3.8-27B-UD-Q4_K_XL.gguf"
 FORCE=0
 
@@ -37,7 +37,7 @@ UB=2048; BATCH=4096; CTK=q8_0; CTV=q8_0; FA=on; NGL=99; REPS=1
 declare -a SHAPES=("128,64" "512,256" "2048,512" "8192,1024" "32768,2048")
 
 # --- existing baseline ---
-EXISTING_BASELINE="$REPO/bench/runs/2026-09-14-2350-model-buildcmp-b10969-vulkan-1.4.357.1"
+EXISTING_BASELINE="$REPO/campaigns/build-check/2026-09-14-2345-llamacpp-b10969/results/2026-09-14-2350-model-buildcmp-b10969-vulkan-1.4.357.1"
 
 # --- find or create output dir ---
 # Look for the most recent buildcmp-stew675 dir to resume from

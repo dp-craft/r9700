@@ -221,7 +221,7 @@ models:
   #     depths requested: f16 at ~130k, or q8_0 at 200k. Same id on purpose -- full_id() appends the
   #     `kvq8` tag, so the generated ids stay distinct (same trick as the q4kxl pair above).
   #
-  # VRAM, from bench/gguf_kv.py on THIS gguf (not hand-math, and not an online calculator: the arch
+  # VRAM, from bench/core/gguf_kv.py on THIS gguf (not hand-math, and not an online calculator: the arch
   # is HYBRID -- 65 blocks but only 16 full-attention KV layers, 48 SSM/linear + 1 nextn, so KV is
   # 64 KiB/tok f16 / 34 KiB/tok q8_0, roughly a quarter of what block_count would suggest):
   #   weights 20.47 GiB = 20961 MiB;  card total 32624 MiB (31.86 GiB);  guard budget 32400 MiB
@@ -341,7 +341,7 @@ models:
   # --- vllm rows ---------------------------------------------------------------------------------
   # 2026-10-22: the two stilldeadcode/vllm-radiance:0.9.3 rows (qwen38-27b-int4-*) were REMOVED (user
   # decision) -- that image was deleted, so they could not start. Their MEASURED window/MTP notes are
-  # in git history and in dp-craft docs/analysis/2026-09-12-1535-vllm-window-budgets-and-rocm-knobs.md.
+  # in git history and in dp-craft docs/findings/vllm/2026-09-12-1535-vllm-window-budgets-and-rocm-knobs.md.
   #
   # PROFILE-backed row: `vllm_profile` names a dp-craft serve_vllm.sh profile (image + model + drafter
   # + engine args, exactly what the benchmarks measured) and llama-swap runs `serve_vllm.sh run`.
@@ -360,7 +360,7 @@ models:
   # engine hangs then dies. 3 of 3 interactive Claude Code boots WITH the RAM KV tier faulted on the first
   # request (campaigns without it: 2 in 84, never first). RAM tier removed 2026-10-22 as the A/B; A-tiled
   # back on (turning it off did not help). See dp-craft
-  # docs/analysis/2026-10-22-1643-vllm-mxfp4-atiled-fault-and-llama-swap-serving.md
+  # docs/findings/vllm/2026-10-22-1643-vllm-mxfp4-atiled-fault-and-llama-swap-serving.md
   # kv_ram_gib 8: user cap "max 10 GB RAM". Power of two on purpose: the pinned host buffer is rounded up
   # to the next power of two (MEASURED 2026-10-22: 4 GiB -> 4.28 GiB pinned, 9 GiB -> 16.28 GiB). ~37 KiB/token -> ~225k tokens
   # (INFERRED from the GPU pool's bytes/token).

@@ -13,36 +13,36 @@ takeaway: Transcript-only analysis of seven W2-08 agentic runs (no GPU). (1) Old
 
   | Arm | Template (replay rule) | Cactus | Run dir |
   |---|---|---|---|
-  | q4kxl-sharp | sharp (keep all) | — (llama.cpp MTP) | `bench/runs/2026-10-31-q4kxl-sharp-w208-blind/rep1/q4kxl-sharp` |
-  | redhat181-sharp-d0 | sharp (keep all) | δ 0 | `bench/runs/2026-10-31-redhat-sharp-w208-blind/rep1/redhat-d0-sharp` |
-  | redhat191-sharp-d0 | sharp (keep all) | δ 0 | `bench/runs/2026-10-31-redhat191-sharp-w208-blind/rep1/r191-sharp-d0` |
-  | redhat181-oldtpl-d0 | froggeric v22.5 (keep all) | δ 0 | `bench/runs/2026-10-30-0947-dpf-brief-ab/delta0-w208-part2` |
+  | q4kxl-sharp | sharp (keep all) | — (llama.cpp MTP) | `campaigns/agentic/2026-10-31-0000-q4kxl-sharp-w208-blind/rep1/q4kxl-sharp` |
+  | redhat181-sharp-d0 | sharp (keep all) | δ 0 | `campaigns/agentic/2026-10-31-0000-redhat-sharp-w208-blind/rep1/redhat-d0-sharp` |
+  | redhat191-sharp-d0 | sharp (keep all) | δ 0 | `campaigns/agentic/2026-10-31-0000-redhat191-sharp-w208-blind/rep1/r191-sharp-d0` |
+  | redhat181-oldtpl-d0 | froggeric v22.5 (keep all) | δ 0 | `campaigns/agentic/2026-10-30-0947-dpf-brief-ab/delta0-w208-part2` |
   | redhat191-sharp-d03 | sharp (keep all) | δ 0.3 + fade/cap | `…/r191-sharp-d03` |
   | redhat191-sharp-d05 | sharp (keep all) | δ 0.5 + fade/cap | `…/r191-sharp-d05` |
-  | redhat191-sly2-d05-k1 | Sly `v22.5-sly2` (**keep newest only**) | δ 0.5 + fade/cap | `bench/runs/2026-10-30-0947-dpf-brief-ab/sly191-w208` (budget RUNBOOK) |
-  | redhat181-redhat-d05 | froggeric v22.5 (keep all) | δ 0.5, no fade/cap | `bench/runs/2026-10-30-0947-dpf-brief-ab/redhat` (loop study only) |
+  | redhat191-sly2-d05-k1 | Sly `v22.5-sly2` (**keep newest only**) | δ 0.5 + fade/cap | `campaigns/agentic/2026-10-30-0947-dpf-brief-ab/sly191-w208` (budget RUNBOOK) |
+  | redhat181-redhat-d05 | froggeric v22.5 (keep all) | δ 0.5, no fade/cap | `campaigns/agentic/2026-10-30-0947-dpf-brief-ab/redhat` (loop study only) |
 
 - **Tools.** No repo tool covers transcript-level reasoning reuse or loop onset (rule 6). Two one-off scripts sit next to the data
   they produce, beside `thinking_digest.py`:
-  - `bench/runs/2026-10-31-agentic-thinking-volume/thinking_reuse.py` → `thinking_reuse.jsonl`
+  - `campaigns/agentic/2026-10-31-0000-agentic-thinking-volume/thinking_reuse.py` → `thinking_reuse.jsonl`
   - `…/loop_onset.py` → `loop_onset.jsonl`
 
   Both were stress-tested on synthetic transcripts with hand-computed answers. Two bugs were caught and fixed before the real run:
   `json.dumps` glued `\n` onto identifiers, and blank lines capped the window share at ~50%. The blind judge inputs and outputs are in
   the session scratchpad (`reuse-test/judge_{input,out}_{A,B}.jsonl`, keys separate).
-  - **Recommended tool change** (needs approval): fold the loop-window criterion into `bench/lib/report.py`'s loop signal (see §4).
+  - **Recommended tool change** (needs approval): fold the loop-window criterion into `bench/core/report.py`'s loop signal (see §4).
 - **Builds on:**
   - [thinking volume + levers](2026-10-31-1640-agentic-thinking-volume-and-levers.md)
-  - [preserved-thinking research](../research/2026-10-31-1725-preserved-thinking-how-much-to-keep.md)
-  - [sharp-template campaign](../../campaigns/2026-10-31-redhat-sharp-w208-blind/analysis.md)
-  - [Cactus known issue](../vllm/known-issues.md)
+  - [preserved-thinking research](../../research/models-sampling/2026-10-31-1725-preserved-thinking-how-much-to-keep.md)
+  - [sharp-template campaign](2026-10-31-0000-redhat-sharp-w208-blind.md)
+  - [Cactus known issue](../../guides/vllm/known-issues.md)
 
 ## Summary
 
 | Question | Answer | Provenance |
 |---|---|---|
 | Is "sharp" the froggeric template? | **No.** It is a third-party HF template, "Qwen Sharp Chat Templates" (`base_model: froggeric/Qwen-Fixed-Chat-Templates`). It is froggeric's template plus a TERSENESS system-prompt block and a tool-protocol guard, which is inactive here. Our file is the Sly 1.8.1 image's froggeric v22.5 plus that block (a 32-line diff). Its version string still reads `qwen3.8-froggeric-v22.5.0` | MEASURED (diff, `~/.config/llama-swap/templates/sharp-README.md`) |
-| Do we have a quality measurement of sharp? | **Yes, one A/B, n = 1.** RedHat δ 0, only `--chat-template` changed: Opus findings 11 vs 9 (weighted 22 vs 20), highs 4 vs 4, precision 14/14 vs 13/14. That is +2, below the pre-registered ≥ 5, so a gain is **not demonstrated** and no loss is seen. Work fell 35-38%. Severity calibration was weaker (one grader) | MEASURED work · INFERRED grades ([campaign analysis](../../campaigns/2026-10-31-redhat-sharp-w208-blind/analysis.md)) |
+| Do we have a quality measurement of sharp? | **Yes, one A/B, n = 1.** RedHat δ 0, only `--chat-template` changed: Opus findings 11 vs 9 (weighted 22 vs 20), highs 4 vs 4, precision 14/14 vs 13/14. That is +2, below the pre-registered ≥ 5, so a gain is **not demonstrated** and no loss is seen. Work fell 35-38%. Severity calibration was weaker (one grader) | MEASURED work · INFERRED grades ([campaign analysis](2026-10-31-0000-redhat-sharp-w208-blind.md)) |
 | How much does a later step need older reasoning? | **Little.** 3.4-6.7% of emitted identifiers existed only in thinking ≥ 2 steps back, and ~25% of those reach a tool input or text. A k = 1 run re-derives 3.6% without seeing old thinking. Blind judge: 6/32 real dependencies (keep-all), 0/8 (k = 1); 2/32 risky, both from 2 steps back (k = 2 would have kept them) | MEASURED (lexical) · INFERRED (judge) |
 | Would the reasoning's conclusion be enough? | **A written conclusion, yes; a truncated tail, no.** A ≤ 15% conclusion covers what the next 4 steps used in 7/10 blocks (3 partly). The block's own last paragraph covers it in 2/10. The last 20% holds 31-38% of the reused identifiers | INFERRED (judge) · MEASURED (tail) |
 | buun Qwen3.6 template: anything for us? | **Not as-is.** By default it turns thinking **off** whenever tools are present. Its replay rule keeps everything in an agent chain. After two short error-looking tool results it forces an empty think block, which our tsc/eslint probes trigger. One idea is worth borrowing: a history-based warning injected into the prompt | MEASURED (file read) |
@@ -282,14 +282,14 @@ tokens = char offset × that message's tokens/char)**
 | # | What | Why | Design | GPU | Gate |
 |---|---|---|---|---|---|
 | **P0** | Finish the δ 0.5 sharp arm: blind grade + campaign `analysis.md` | approved earlier; the review exists | 2-way/3-way blind grade with the sharp δ 0 anchor; δ 0.3 reported FAILED (protocol skip); loop table from §5 | none | — |
-| **P0b** | `report.py` loop signal → window rule (§4) | removes the code-line false positive | port `loop_onset.py`'s rule plus a unit test case of repeated imports in `test_report.py` | none | approve change to `bench/lib/report.py` |
-| **P1** | Template A/B at **δ 0**, Sly 1.9.1 RedHat, W2-08 step A | decides replay rule + terseness with one variable at a time | **arms:** (a) `v22.5-sly2` as shipped (k = 1, no terse; no new file); (b) `sharp-sly2` = sly2 + the original terse block; (c) optional `sharp-scoped-sly2` = sly2 + the §1.2 wording. Reference: the two existing sharp keep-all δ 0 runs (22, 21/38). **n = 2 per arm** (3 if time allows). **Measures:** blind weighted score, highs, precision, severity calibration, thinking/tool calls, compactions, wall, loop blocks. **Rule:** pre-registered Δ ≥ 5; on a tie take the cheaper | ~45-60 min per run → 4-6 runs ≈ 4-6 h | approve new template files (copies; current templates stay restorable). **Result (1 run, 2026-10-31 20:05):** the `sharp-sly2` (b) arm at δ 0 hit the 1 h cap still probing (1.65× keep-all wall, 1.4× tokens, 2.5× thinking/tool call, 0 exact loops) — k = 1 re-derived rather than replayed; it did not write the review, so it is a quarantined speed-only run and **not a quality winner** (see `campaigns/2026-10-31-redhat191-sharpsly2-w208-blind/analysis.md`). keep-all (sharp) remains the single best arm |
+| **P0b** | `report.py` loop signal → window rule (§4) | removes the code-line false positive | port `loop_onset.py`'s rule plus a unit test case of repeated imports in `test_report.py` | none | approve change to `bench/core/report.py` |
+| **P1** | Template A/B at **δ 0**, Sly 1.9.1 RedHat, W2-08 step A | decides replay rule + terseness with one variable at a time | **arms:** (a) `v22.5-sly2` as shipped (k = 1, no terse; no new file); (b) `sharp-sly2` = sly2 + the original terse block; (c) optional `sharp-scoped-sly2` = sly2 + the §1.2 wording. Reference: the two existing sharp keep-all δ 0 runs (22, 21/38). **n = 2 per arm** (3 if time allows). **Measures:** blind weighted score, highs, precision, severity calibration, thinking/tool calls, compactions, wall, loop blocks. **Rule:** pre-registered Δ ≥ 5; on a tie take the cheaper | ~45-60 min per run → 4-6 runs ≈ 4-6 h | approve new template files (copies; current templates stay restorable). **Result (1 run, 2026-10-31 20:05):** the `sharp-sly2` (b) arm at δ 0 hit the 1 h cap still probing (1.65× keep-all wall, 1.4× tokens, 2.5× thinking/tool call, 0 exact loops) — k = 1 re-derived rather than replayed; it did not write the review, so it is a quarantined speed-only run and **not a quality winner** (see `docs/findings/agentic/2026-10-31-0000-redhat191-sharpsly2-w208-blind.md`). keep-all (sharp) remains the single best arm |
 | **P2** | Findings ledger written to a file during step A | removes the only dependency class k = 1 loses (§2) | RUNBOOK line: "append each finding (id, severity, evidence, verdict) to `review/<W>.draft.md` as you go" | rides on P1's winner, 1-2 runs | dp-forge change (outside this repo) |
 | **P3** | Cactus retry on the P1 winner | the +51% decode (δ 0.3) is the largest speed lever | δ 0.5 + `CACTUS_CAP_R=0.8` + `FADE_START=0 FADE_END=4096` vs δ 0. Report decode with the mclk trace, acceptance, loop blocks, onsets, blind grade | 2-4 runs | after P1 |
 | **P4** | Loop guard | time lost to loops (up to 64k tokens per block) | (i) replay dedup + warning in the template (k = 1 turn); (ii) warn-only `loop_warning` events in `capture_proxy.py`; (iii) a repetition-gated δ, suggested upstream on #164 | none to build; validated in P3 | approve each; (iii) is outward-facing |
 | **P5** | k = 2 or a `STATE:` marker variant | if P2 (ledger file) is not adopted, or P1/P2 show recall failures (re-derivations, repeated probes); k = 2 would have kept both risk cases of §2 | template: keep the last 2 assistant reasoning blocks, or only the `STATE:` tail of older ones | 2 runs | conditional |
 
-**Before any run (rule 14):** `bench/lib/gpu_exclusive.sh` with the RedHat working set as the floor, since the GPU is currently
+**Before any run (rule 14):** `stack/gpu/gpu_exclusive.sh` with the RedHat working set as the floor, since the GPU is currently
 in use by someone else.
 
 ## Methodology & caveats

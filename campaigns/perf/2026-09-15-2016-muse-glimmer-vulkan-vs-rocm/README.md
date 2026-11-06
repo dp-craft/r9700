@@ -42,7 +42,7 @@ it in `meta.txt` per pass, warning if it is not the arm's expected build — so 
 ## Runbook (operator starts the backends; `run.sh` only probes)
 
 Arms `vulkan` and `rocm` are **done** (2026-09-15, 20:33–21:01). Remaining: two arms, ~20–25 min
-each plus load time. All results land in `bench/runs/2026-09-15-muse-glimmer-vulkan-vs-rocm/` —
+each plus load time. All results land in `campaigns/perf/2026-09-15-2016-muse-glimmer-vulkan-vs-rocm/` —
 append-only and resumable; each arm has its own slug prefix, so nothing overwrites the first pass.
 
 **⚠ Loading either muse model UNLOADS whatever llama-swap currently serves** (32 GB card, no
@@ -52,28 +52,28 @@ moment and works again only after the final restore below.
 ### Arm C — `rocm-b10969`
 
 ```bash
-ln -sfn /home/dev/work/dp-craft/amd/llamacpp/builds/b10969-rocm \
+ln -sfn /home/dev/work/dp-craft/amd/stack/llamacpp/var/builds/b10969-rocm \
         /home/dev/work/dp-craft/amd/build/latest-rocm
 curl -s "http://127.0.0.1:9292/unload"          # NOTE: GET — POST returns 405 (iron rule 14)
 curl -sN --max-time 700 -X POST http://127.0.0.1:9292/v1/chat/completions \
   -H 'Content-Type: application/json' \
   -d '{"model":"muse-glimmer-30b-q5kl-f16-ctx128k-dflash-rocm","messages":[{"role":"user","content":"ping"}],"max_tokens":8}'
-bash /home/dev/work/dp-craft/amd/campaigns/2026-09-15-muse-glimmer-vulkan-vs-rocm/run.sh rocm-b10969
-ln -sfn /home/dev/work/dp-craft/amd/llamacpp/builds/b790cf51aa-stew675-rocm \
+bash /home/dev/work/dp-craft/amd/campaigns/perf/2026-09-15-2016-muse-glimmer-vulkan-vs-rocm/run.sh rocm-b10969
+ln -sfn /home/dev/work/dp-craft/amd/stack/llamacpp/var/builds/b790cf51aa-stew675-rocm \
         /home/dev/work/dp-craft/amd/build/latest-rocm   # restore
 ```
 
 ### Arm D — `vulkan-stew675`
 
 ```bash
-ln -sfn /home/dev/work/dp-craft/amd/llamacpp/builds/b790cf51aa-stew675-vulkan-1.4.357.1 \
+ln -sfn /home/dev/work/dp-craft/amd/stack/llamacpp/var/builds/b790cf51aa-stew675-vulkan-1.4.357.1 \
         /home/dev/work/dp-craft/amd/build/latest-vulkan
 curl -s "http://127.0.0.1:9292/unload"
 curl -sN --max-time 700 -X POST http://127.0.0.1:9292/v1/chat/completions \
   -H 'Content-Type: application/json' \
   -d '{"model":"muse-glimmer-30b-q5kl-f16-ctx128k-dflash","messages":[{"role":"user","content":"ping"}],"max_tokens":8}'
-bash /home/dev/work/dp-craft/amd/campaigns/2026-09-15-muse-glimmer-vulkan-vs-rocm/run.sh vulkan-stew675
-ln -sfn /home/dev/work/dp-craft/amd/llamacpp/builds/b10969-vulkan-system \
+bash /home/dev/work/dp-craft/amd/campaigns/perf/2026-09-15-2016-muse-glimmer-vulkan-vs-rocm/run.sh vulkan-stew675
+ln -sfn /home/dev/work/dp-craft/amd/stack/llamacpp/var/builds/b10969-vulkan-system \
         /home/dev/work/dp-craft/amd/build/latest-vulkan   # restore
 ```
 
@@ -120,7 +120,7 @@ curl -sN --max-time 700 -X POST http://127.0.0.1:9292/v1/chat/completions \
 `gen_campaign.py` cannot emit this campaign: its run.sh lifecycle is hardcoded to
 `serve_llamacpp.sh` start/stop, and there is no "server provided by llama-swap" mode. The operator
 chose manual starts, so `run.sh` here is the hand-written exception — ~40 lines of glue around the
-standard per-probe runner (`bench/engine-bench/run.sh`), which does all the measuring. **Recommended
+standard per-probe runner (`bench/perf/engine-bench/run.sh`), which does all the measuring. **Recommended
 follow-up:** teach `gen_campaign.py` a `source: llama-swap` server mode (swap-in via a trigger
 request, readiness poll on `GET /running`, teardown via `GET /unload`) so future campaigns of this
 shape are spec → run.sh reproducible like the rest.

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """aggregate.py: arms/ and quarantine/ into summary.jsonl and a Markdown table with throughput. Source tokens come from sizes.json or the fixture key."""
 import glob, json, os, re, sys
-RUN = "/home/dev/work/dp-craft/amd/bench/runs/2026-11-05-0320-ornith-usecases"
+RUN = "/home/dev/work/dp-craft/amd/campaigns/workers/2026-11-05-0320-ornith-usecases/results/2026-11-05-0320-ornith-usecases"
 UC = "/tmp/claude-1001/-home-dev-work-dp-craft-amd/bf832afa-1002-41d9-a4b8-4b201a1bc43c/scratchpad/uc"
 sizes = json.load(open(f"{UC}/sizes.json")) if os.path.exists(f"{UC}/sizes.json") else {}
 

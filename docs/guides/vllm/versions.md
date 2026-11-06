@@ -18,33 +18,33 @@ that actually ran.
 
 ## Citation notes (provenance per row)
 
-- **sly-radiance 1.6.0** (row 2): `campaigns/2026-10-22-vllm-sly-mxfp4-depth/analysis.md` (baseline,
-  no spec), `campaigns/2026-10-22-vllm-sly-mxfp4-dflash/analysis.md` (DFlash2),
-  `campaigns/2026-10-22-vllm-sly-mxfp4-dflash-170k/analysis.md` (170k max), and
-  `docs/analysis/2026-10-23-0023-vllm-gpu-fault-solved-hip-kernarg.md` (the fault + fix).
+- **sly-radiance 1.6.0** (row 2): `docs/findings/vllm/2026-10-22-1324-vllm-sly-mxfp4-depth.md` (baseline,
+  no spec), `docs/findings/vllm/2026-10-22-1406-vllm-sly-mxfp4-dflash.md` (DFlash2),
+  `docs/findings/vllm/2026-10-22-1506-vllm-sly-mxfp4-dflash-170k.md` (170k max), and
+  `docs/findings/vllm/2026-10-23-0023-vllm-gpu-fault-solved-hip-kernarg.md` (the fault + fix).
 - **The 0.31.0 vs 0.32.0 discrepancy** (row 2): the image *reports* vLLM 0.31.0, but Sly PR #162
   says 1.6.0 = 0.32.0. **Do not assert a settled version** — the row is flagged open, not resolved.
-- **radiance 0.9.3** (row 3): `docs/analysis/2026-09-12-1055-vllm-radiance-r9700-evaluation.md`
+- **radiance 0.9.3** (row 3): `docs/findings/radiance/2026-09-12-1055-vllm-radiance-r9700-evaluation.md`
   (R4D + MTP, the "tuned" build behind Puget's numbers) and
-  `docs/analysis/2026-09-12-1535-vllm-window-budgets-and-rocm-knobs.md` (window budgets, fp8-KV
+  `docs/findings/vllm/2026-09-12-1535-vllm-window-budgets-and-rocm-knobs.md` (window budgets, fp8-KV
   null). The INT4 + TRITON_ATTN finding is
-  `docs/analysis/2026-09-11-2047-vllm-qwen38-27b-int4.md` (host 0.29.0 venv).
+  `docs/findings/vllm/2026-09-11-2047-vllm-qwen38-27b-int4.md` (host 0.29.0 venv).
 - **sly-official 1.8.1** (row 1): config-only (profile `sly-official/heretic-mxfp4.env`). The
   MEASURED row is added when the campaign lands — the update-trigger rule in `README.md`.
-- **sly-redhat 1.9.1** (row 5): MEASURED smoke test `bench/runs/2026-10-30-1745-sly-1.9.1-smoke/` (`summary.txt`: boot 475 s
+- **sly-redhat 1.9.1** (row 5): MEASURED smoke test `campaigns/perf/2026-10-30-1745-sly-1.9.1-smoke/` (`summary.txt`: boot 475 s
   incl. first compile, VRAM, `RADIANCE_VERSION=1.9.1`, vLLM 0.32.0, template line; replay check: an older turn's
   reasoning adds 0 prompt tokens, the newest turn's adds 1,169). Fade/cap/template behaviour and the loop and speed
   gains are CLAIMED (Sly v1.9.0/v1.9.1 release notes). Depth probe (MEASURED, 2026-10-30 19:32-19:59, ctx 110000,
-  fp8 KV, 1 stream, 256 tok, 2 reps): `docs/analysis/2026-10-30-0900-vllm-redhat-mxfp4-depth-transposed.md` § "Sly 1.9.1
+  fp8 KV, 1 stream, 256 tok, 2 reps): `docs/findings/radiance/2026-10-30-0900-vllm-redhat-mxfp4-depth-transposed.md` § "Sly 1.9.1
   rerun" (run dirs `bench/runs/2026-10-30-vllm-redhat-sly191{,-mtp,-dflash}-depth/`). Real session (loops reduced, not
-  removed): `docs/analysis/2026-10-30-1552-dpf-brief-fix-heretic-vs-redhat.md`. Previous RedHat image 1.8.1: profile comment
-  `profiles/sly-redhat/_engine.env` (rollback) and `docs/analysis/2026-10-30-0900-vllm-redhat-mxfp4-depth-transposed.md`.
+  removed): `docs/findings/agentic/2026-10-30-1552-dpf-brief-fix-heretic-vs-redhat.md`. Previous RedHat image 1.8.1: profile comment
+  `profiles/sly-redhat/_engine.env` (rollback) and `docs/findings/radiance/2026-10-30-0900-vllm-redhat-mxfp4-depth-transposed.md`.
 - **`.rad` native** (row 4): the `.rad`-vs-HF-checkpoint loading distinction is documented in
   `known-issues.md` (sly loads HF only, radiance loads `.rad`).
 - **Radiance 1.16.0 + Ornith 1.5, sly-amd (Qwen and Ornith), and the sly-redhat rerun (2026-11-04):**
-  `docs/analysis/2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md`; raw data in
-  `bench/runs/2026-11-04-1730-ornith15-w4a8-radiance/`, `bench/runs/2026-11-04-1557-35b-perf-10k-50k-100k/`,
-  `bench/runs/2026-11-04-1802-ornith15-sly-dflash/` and `bench/runs/2026-11-04-1740-27b-sly-baseline/`. The sly-redhat rerun used ctx 262000 and the `dp-sharp`
+  `docs/findings/radiance/2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md`; raw data in
+  `campaigns/perf/2026-11-04-1527-ornith15-radiance-vs-sly/results/2026-11-04-1730-ornith15-w4a8-radiance/`, `campaigns/perf/2026-11-04-1527-ornith15-radiance-vs-sly/results/2026-11-04-1557-35b-perf-10k-50k-100k/`,
+  `campaigns/perf/2026-11-04-1527-ornith15-radiance-vs-sly/results/2026-11-04-1802-ornith15-sly-dflash/` and `campaigns/perf/2026-11-04-1527-ornith15-radiance-vs-sly/results/2026-11-04-1740-27b-sly-baseline/`. The sly-redhat rerun used ctx 262000 and the `dp-sharp`
   template: 86.9/96.0/82.5 tok/s at 10k/50k/100k, 31,197 MiB peak. It adds to the ctx 110000 row and does not replace it.
 
 ## How to add a row

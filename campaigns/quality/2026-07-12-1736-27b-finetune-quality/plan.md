@@ -2,13 +2,13 @@
 
 *This is the campaign **runbook** (a plan, run across sessions). The results write-up lands in
 `analysis.md` (co-located, registered in `docs/INDEX.md`) after Phase C. Scaffolded from `spec.json`
-by `bench/gen_campaign.py` (`kind: quality`) → generated `run.sh`.*
+by `bench/core/gen_campaign.py` (`kind: quality`) → generated `run.sh`.*
 
 > **⚠ Reproducing the committed data vs. running fresh (2026-07-16 merge note).** The results in
 > `analysis.md`/`out/` were captured by this dir's own `run_capture.sh` → `capture.py` →
 > `make_charts.py`, which **remain here and are the authoritative reproduction path** — they carry the
 > `--min-p`/`--presence-penalty` passthrough, the incomplete-stream guard (Iron Rule 15), and the
-> row-level resume the committed rows depend on. The `spec.json` → `run.sh` → `bench/lib/capture_engine.py`
+> row-level resume the committed rows depend on. The `spec.json` → `run.sh` → `bench/core/capture_engine.py`
 > pipeline described below is the **go-forward** path for *new* runs; per the merge review it is **not
 > yet a drop-in reproducer** for the committed rows (capture_engine lacks those three capabilities), so
 > use `run_capture.sh` to reproduce and `run.sh` for fresh work until they are ported.
@@ -34,7 +34,7 @@ layers** + 1 nextn/MTP), so they share one KV geometry:
 
 This corrects an earlier error (a prior spec claimed 260 KiB/tok / "200K impossible" by counting all
 65 blocks instead of the 16 attention layers). **MEASURED:** local `Qwen3.6-27B-Q4_K_S` loaded at
-**200K f16 in 31 s using 29.0 GiB VRAM / 0.95 GiB GTT**. Tool: `bench/gguf_kv.py` (hybrid-aware;
+**200K f16 in 31 s using 29.0 GiB VRAM / 0.95 GiB GTT**. Tool: `bench/core/gguf_kv.py` (hybrid-aware;
 counts `blk.*.attn_k` tensors). Since all four share this, a max-context bisection would return the
 same number four times → dropped.
 
@@ -84,7 +84,7 @@ block) so grading needs no model.
 ## 4. Metrics captured (everything measurable)
 
 Per config × task × rep (`out/outputs.jsonl`, streamed so latency is real) — captured by
-`bench/lib/capture_engine.py tasks`:
+`bench/core/capture_engine.py tasks`:
 - **Tokens / economy:** `prompt/completion/total/cached_tokens`, **`think_tokens`** (headline),
   `answer_tokens`.
 - **Throughput** (llama.cpp `timings`): `prefill_tps`, `decode_tps`, `prompt_n/ms`, `predicted_n/ms`,
@@ -128,26 +128,26 @@ ln -sf "$M"/_dl/jackrong/*Q4_K_M*.gguf "$M/Qwopus3.6-27B-v1-preview-Q4_K_M.gguf"
 
 ### A2. (Recommended) sanity-check each model's KV geometry
 ```bash
-for f in "$M"/Qwen3.6-27B-*.gguf "$M"/Qwopus3.6-27B-*.gguf; do python3 bench/gguf_kv.py "$f"; echo; done
+for f in "$M"/Qwen3.6-27B-*.gguf "$M"/Qwopus3.6-27B-*.gguf; do python3 bench/core/gguf_kv.py "$f"; echo; done
 ```
 Expect `HYBRID: 16 full-attention KV layers … 64 KiB/tok` for all — confirms same arch.
 
 ### A3. Run capture + deterministic scoring (resumable, VRAM-guarded)
 ```bash
 cd /home/dev/work/dp-craft/amd
-bash campaigns/2026-07-12-27b-finetune-quality/run.sh          # all 5 configs, reps 1
+bash campaigns/quality/2026-07-12-1736-27b-finetune-quality/run.sh          # all 5 configs, reps 1
 # subset / more reps to average sampling noise:
-# ONLY='unsloth*' REPS=3 bash campaigns/2026-07-12-27b-finetune-quality/run.sh
+# ONLY='unsloth*' REPS=3 bash campaigns/quality/2026-07-12-1736-27b-finetune-quality/run.sh
 ```
 The generated `run.sh` serves each config, samples VRAM/GTT/power/thermal across the probe, sends all
 12 tasks via `capture_engine tasks`, stops the server; **resumable** (`out/done/`), **continues past a
 failed config** (`out/failures.txt`), and **skips any model predicted over the VRAM budget**. It ends
-by running `bench/lib/graders/score_deterministic.py` (pass% table) and `bench/lib/report.py`
+by running `bench/quality/graders/score_deterministic.py` (pass% table) and `bench/core/report.py`
 (SVG charts + `appendix.md`). ⚠️ `pyexec` **runs model-generated code** in a subprocess+timeout — fine
 on this box; be aware. Est. runtime ≈ **30–60 min** at reps 1.
 
 > **Clean re-run:** if a previous partial run left stale rows, `rm -rf
-> campaigns/2026-07-12-27b-finetune-quality/out` before re-running so every config captures the full
+> campaigns/quality/2026-07-12-1736-27b-finetune-quality/out` before re-running so every config captures the full
 > schema uniformly (done-markers would otherwise skip finished configs).
 
 ---
@@ -158,10 +158,10 @@ The 3 `judge` tasks have no deterministic answer. Judge them **blind** (opaque i
 like "uncensored"/"opus" must not bias the grade):
 
 ```bash
-python3 bench/lib/graders/prepare_judge.py \
-  --outputs campaigns/2026-07-12-27b-finetune-quality/out/outputs.jsonl \
-  --tasks   campaigns/2026-07-12-27b-finetune-quality/tasks/tasks.jsonl \
-  --out     campaigns/2026-07-12-27b-finetune-quality/out/judge_bundle.md
+python3 bench/quality/graders/prepare_judge.py \
+  --outputs campaigns/quality/2026-07-12-1736-27b-finetune-quality/tmp/out/outputs.jsonl \
+  --tasks   campaigns/quality/2026-07-12-1736-27b-finetune-quality/inputs/tasks/tasks.jsonl \
+  --out     campaigns/quality/2026-07-12-1736-27b-finetune-quality/out/judge_bundle.md
 ```
 
 Paste the **entire** `judge_bundle.md` into a Claude session under this exact prompt:
@@ -182,17 +182,17 @@ bonus for the recall trade-off of linear attention. `refactor-fn` expects `is no
 
 Save Claude's JSON array to `out/judge_raw.json`, then fold it in and re-render:
 ```bash
-python3 bench/lib/graders/apply_judge_scores.py \
-  --raw campaigns/2026-07-12-27b-finetune-quality/out/judge_raw.json \
-  --out campaigns/2026-07-12-27b-finetune-quality/out/judge_scores.jsonl
-python3 bench/lib/report.py campaigns/2026-07-12-27b-finetune-quality   # re-render WITH judge data
+python3 bench/quality/graders/apply_judge_scores.py \
+  --raw campaigns/quality/2026-07-12-1736-27b-finetune-quality/out/judge_raw.json \
+  --out campaigns/quality/2026-07-12-1736-27b-finetune-quality/results/judge_scores.jsonl
+python3 bench/core/report.py campaigns/quality/2026-07-12-1736-27b-finetune-quality   # re-render WITH judge data
 ```
 `apply_judge_scores.py` clamps to 0–5 and warns on any unknown/unscored/out-of-range block, so a bad
 paste can't silently corrupt the analysis.
 
 ## Phase C — AGGREGATE, CHART & WRITE UP (Claude → benchmark-results skill)
 
-Charts are already generated by `run.sh` / the Phase-B re-render (`bench/lib/report.py` → `charts/*.svg`
+Charts are already generated by `run.sh` / the Phase-B re-render (`bench/core/report.py` → `charts/*.svg`
 + `appendix.md`): quality-vs-cost scatter (headline efficient frontier), deterministic accuracy, judge
 score, token economy (think vs answer), throughput (decode/prefill), latency (ttft→ttfa dumbbell),
 memory·power·thermal small-multiples, per-task heatmap. One fixed color per config across all charts,
@@ -221,9 +221,9 @@ charts/            GENERATED (committed): the SVG decision charts
 appendix.md        GENERATED (committed): embeds charts/ into analysis.md
 analysis.md        Phase-C write-up (benchmark-results skill) + charts appendix
 ```
-Shared machinery (not in this dir): `bench/lib/capture_engine.py` (tasks capture),
-`bench/lib/graders/` (score_deterministic + prepare_judge + apply_judge_scores),
-`bench/lib/report.py` (charts), `bench/lib/vram_sampler.py`.
+Shared machinery (not in this dir): `bench/core/capture_engine.py` (tasks capture),
+`bench/quality/graders/` (score_deterministic + prepare_judge + apply_judge_scores),
+`bench/core/report.py` (charts), `stack/gpu/vram_sampler.py`.
 
 ## Risks / notes
 - **Same arch ⇒ quality differences are from fine-tuning data, not capacity.** Frame findings that way.

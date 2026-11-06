@@ -8,7 +8,7 @@ takeaway: Companion research for the thinking-volume analysis. (1) 4-bit weight-
 **Date:** 2026-10-31 · **Method:** a `/research` deep-dive pass with one Sonnet web-research subagent, run sequentially after the KV
 pass ([2026-10-31-1630-kv-cache-quantization-long-context.md](2026-10-31-1630-kv-cache-quantization-long-context.md)).
 **Why:** the user asked why the Q4_K_XL arm "thought much less" than RedHat MXFP4. These are the external facts the
-[analysis](../analysis/2026-10-31-1640-agentic-thinking-volume-and-levers.md) needs. External facts are `CLAIMED`. "snippet" means the
+[analysis](../../findings/agentic/2026-10-31-1640-agentic-thinking-volume-and-levers.md) needs. External facts are `CLAIMED`. "snippet" means the
 number was not on a fetched page.
 
 ## Strategic Summary

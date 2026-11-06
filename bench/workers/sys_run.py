@@ -2,7 +2,7 @@
 """sys_run.py: does the system prompt change Ornith's weak spots? One run per arm, most useful first, under LIMIT_S. An arm starts only if its cap still fits.
 sa = the exact subagent text replaces the main prompt (--system-prompt-file). dp = the operator's prompt appended to the main prompt (--append-system-prompt-file). Baseline = the earlier P0 arms. Log: sysprompt.jsonl."""
 import json, os, subprocess, time
-RUN = "/home/dev/work/dp-craft/amd/bench/runs/2026-11-05-0320-ornith-usecases"
+RUN = "/home/dev/work/dp-craft/amd/campaigns/workers/2026-11-05-0320-ornith-usecases/results/2026-11-05-0320-ornith-usecases"
 H = f"{RUN}/harness"
 LIMIT = int(os.environ.get("LIMIT_S", 5400))
 T0 = time.time()

@@ -9,7 +9,7 @@ takeaway: The vLLM row's 36864 window could not serve the dp-forge spec-pipeline
 - **GPU/Host:** AMD Radeon AI PRO R9700, RDNA4 gfx1201, 32624 MiB · ROCm 10.0.0 · Ryzen 5 3600, 31 GB
 - **Runtimes:** `stilldeadcode/vllm-radiance:0.9.3` (vLLM 0.27.1, torch 2.11.0+rocm7.14) · host venv vLLM 0.29.0+rocm723 · llama.cpp b10909
 - **Model:** `RedHatAI/Qwen3.8-27B-INT4` @ `bf08f3db` (compressed-tensors W4A16 g128)
-- **Data:** **`bench/runs/2026-09-12-1844-vllm-window-bootmatrix/`** (Phase A), **`bench/runs/2026-09-12-1943-vllm-bigwindow-depthcurve/`** (Phase B), `bench/runs/2026-09-12-1330-depth-curve-mtp/`, `bench/runs/2026-09-11-2047-vllm-qwen38-27b-int4/`; consumer evidence `dippe/dp-forge/docs/test/2026-09-11-w4-t1-restart2.md`
+- **Data:** **`campaigns/perf/2026-09-12-1844-vllm-window-budgets/results/2026-09-12-1844-vllm-window-bootmatrix/`** (Phase A), **`campaigns/perf/2026-09-12-1844-vllm-window-budgets/results/2026-09-12-1943-vllm-bigwindow-depthcurve/`** (Phase B), `campaigns/perf/2026-09-12-1330-depth-curve-mtp/`, `campaigns/perf/2026-09-11-2047-vllm-qwen38-27b-int4/`; consumer evidence `dippe/dp-forge/docs/test/2026-09-11-w4-t1-restart2.md`
 
 ## Summary
 
@@ -56,8 +56,8 @@ GPU runs (Phase A + B) and their artefacts:
 
 | Artefact | Change |
 |---|---|
-| `bench/runs/2026-09-12-1844-vllm-window-bootmatrix/` | 8 arms + 3 clean re-collections; w1/c3/c4 originals moved to `quarantine/` with `CAVEAT.txt`; `summary.txt` carries an ERRATA block for three mislabelled rerun lines; `meta.txt`; `scripts/` |
-| `bench/runs/2026-09-12-1943-vllm-bigwindow-depthcurve/` | 2 arms × 4 depths × 3 reps; `summary.txt` from `scripts/summarize_depth.py`; `meta.txt`; `scripts/` |
+| `campaigns/perf/2026-09-12-1844-vllm-window-budgets/results/2026-09-12-1844-vllm-window-bootmatrix/` | 8 arms + 3 clean re-collections; w1/c3/c4 originals moved to `quarantine/` with `CAVEAT.txt`; `summary.txt` carries an ERRATA block for three mislabelled rerun lines; `meta.txt`; `scripts/` |
+| `campaigns/perf/2026-09-12-1844-vllm-window-budgets/results/2026-09-12-1943-vllm-bigwindow-depthcurve/` | 2 arms × 4 depths × 3 reps; `summary.txt` from `scripts/summarize_depth.py`; `meta.txt`; `scripts/` |
 | `~/.config/llama-swap/models.yaml` | rationale comment corrected: fp8 removed from the fallback order, Phase A/B results recorded (comment only — generated config unchanged) |
 | This document | §2c, §2d added; §2b consequences, §3 fp8 row, §4 fallback order and the Summary corrected — every pre-run prediction that failed is left visible and marked WITHDRAWN/SUPERSEDED rather than deleted |
 
@@ -222,7 +222,7 @@ That geometry — **head_dim 256, GQA 6** — is exactly what radiance's fp8 dec
 
 ## 2c. MEASURED: the Phase A boot matrix
 
-**Data:** `bench/runs/2026-09-12-1844-vllm-window-bootmatrix/` · 8 arms + 3 re-collections, boot-log
+**Data:** `campaigns/perf/2026-09-12-1844-vllm-window-budgets/results/2026-09-12-1844-vllm-window-bootmatrix/` · 8 arms + 3 re-collections, boot-log
 only (aborted at the pool line, before graph capture). All rows MEASURED.
 
 | arm | ctx | MTP | np | KV | avail KV | pool tokens | conc | attn block | weights | verdict |
@@ -309,7 +309,7 @@ re-collected with `bootarm.sh`, which keeps the container and never overwrites a
 
 ## 2d. MEASURED: Phase B — the big-window depth curve
 
-**Data:** `bench/runs/2026-09-12-1943-vllm-bigwindow-depthcurve/` · 2 arms × 4 depths × 3 reps, 12/12
+**Data:** `campaigns/perf/2026-09-12-1844-vllm-window-budgets/results/2026-09-12-1943-vllm-bigwindow-depthcurve/` · 2 arms × 4 depths × 3 reps, 12/12
 requests OK per arm, 0 errors · `codereview-{8000,20000,40000,100000}` · `--prefix-mode unique --api chat`
 · 256 generated tokens · temperature 0.2. Arms run back to back in one session, card exclusive for each.
 
@@ -505,7 +505,7 @@ acceptance (τ) reported per arm.
   each arm dir, `report.py` wrote **0 charts** — it does not render per-request depth rows at all.
 - **Still open from earlier sessions:** finding 22 (agentic-vs-codereview cross-family comparison is not
   internally controlled); the llama.cpp GTT spill (now 2 283 MiB peak in Phase B, still unexplained); folding everything into
-  `docs/analysis/2026-09-11-2047-vllm-qwen38-27b-int4.md`; disk at 96% with the 13.7 GB radiance image.
+  `docs/findings/vllm/2026-09-11-2047-vllm-qwen38-27b-int4.md`; disk at 96% with the 13.7 GB radiance image.
 
 ## 6. External comparison (CLAIMED)
 

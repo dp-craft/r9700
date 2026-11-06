@@ -9,7 +9,7 @@ takeaway: Q4_K_XL did not think less per step. Thinking per tool call was 3.0-3.
   the 2026-10-30 A/B harness). No new GPU time was spent.
 - **GPU/Host:** Radeon AI PRO R9700 (gfx1201, 32624 MiB). All runs were at **power1_cap 210 W** (user setting, documented, not
   discussed further). Power profile POWER_SAVING, `power_dpm_force_performance_level=manual` (MEASURED,
-  `bench/runs/2026-10-30-sly191-d0-power-state.log`).
+  `campaigns/perf/2026-10-30-2232-vllm-redhat-sly191-d0-dflash-depth/tmp/2026-10-30-sly191-d0-power-state.log`).
 - **Arms** (same brief W2-08, same dp-forge commit, same Claude Code client settings except the endpoint):
   - **Q4_K_XL + sharp:** llama.cpp b11448 Vulkan, `Qwen3.8-27B-UD-Q4_K_XL.gguf`, KV q8_0, MTP draft, `-c 260000`.
   - **RedHat 1.8.1 / 1.9.1 + sharp δ 0:** Sly radiance 1.8.1 / 1.9.1, `RedHatAI/Qwen3.8-27B-MXFP4`, KV fp8 (calibrated, see below),
@@ -18,11 +18,11 @@ takeaway: Q4_K_XL did not think less per step. Thinking per tool call was 3.0-3.
   - **RedHat 1.9.1 + sharp δ 0.3:** the second arm of the running δ ladder.
   - **Sampler:** temp 1.0 / top_p 0.95 / top_k 20 / min_p 0 / presence 0 on every arm (MEASURED from the argv).
 - **Data:**
-  - `bench/runs/2026-10-31-agentic-thinking-volume/` holds `thinking_digest.py` and `thinking_digest.jsonl`;
-  - speed and memory come from `bench/lib/report.py` (agentic kind);
-  - blind grades come from `bench/runs/2026-10-31-redhat-sharp-w208-blind/blind-grading/` and `…/2026-10-31-redhat191-sharp-w208-blind/blind-grading-d0/`.
-- **External facts:** [KV quantization research](../research/2026-10-31-1630-kv-cache-quantization-long-context.md) and
-  [quantization / compaction / variance research](../research/2026-10-31-1635-quantization-reasoning-length-compaction-variance.md).
+  - `campaigns/agentic/2026-10-31-0000-agentic-thinking-volume/` holds `thinking_digest.py` and `thinking_digest.jsonl`;
+  - speed and memory come from `bench/core/report.py` (agentic kind);
+  - blind grades come from `campaigns/agentic/2026-10-31-0000-redhat-sharp-w208-blind/blind-grading/` and `…/2026-10-31-redhat191-sharp-w208-blind/blind-grading-d0/`.
+- **External facts:** [KV quantization research](../../research/models-sampling/2026-10-31-1630-kv-cache-quantization-long-context.md) and
+  [quantization / compaction / variance research](../../research/models-sampling/2026-10-31-1635-quantization-reasoning-length-compaction-variance.md).
 
 ## Summary
 
@@ -97,7 +97,7 @@ two methods differ, so cross-engine ratios are approximate.
 > The **dp-sharp** row is **throttled** (mclk 1,258 MHz, power 203 W vs the arms above at 875 MHz / ~137 W), so its Wall / mclk /
 > power are **not comparable**; its Decode/Gen/Prefilled are **N/A** because the vLLM logger reported `output_tokens = 0` (the engine
 > was mislabelled `llama.cpp` by `report.py` for the same reason). Its VRAM / GTT (peak 31,649 / 143 MiB) are still valid — no host-RAM
-> spill (GTT within ~150 MiB of idle). See `campaigns/2026-11-01-redhat191-dp-sharp-w208-blind/analysis.md`.
+> spill (GTT within ~150 MiB of idle). See `docs/findings/agentic/2026-11-01-0000-redhat191-dp-sharp-w208-blind.md`.
 
 ## Legend
 
@@ -137,7 +137,7 @@ V1 missed; kept all of V1's matches. Still missed #1 (confirm-chain), #4 (T3 sou
 19 findings total (vs V1's 12); 125 tool calls (vs 74); 387,609 thinking chars (vs 226,522); wall 2,384 s (vs 1,242 s).*
 
 - **dp-sharp V1 found 8/19** reference findings (high 3, med 2, low 3), weighted **16/38** (authoritative Opus grade,
-  `campaigns/2026-11-01-redhat191-dp-sharp-w208-blind/grading-opus.md`), precision **11/12** (7 matched + 4 real review-only,
+  `campaigns/agentic/2026-11-01-0000-redhat191-dp-sharp-w208-blind/inputs/grading-opus.md`), precision **11/12** (7 matched + 4 real review-only,
   0 wrong, 1 unverifiable — W11).
 - **dp-sharp V2 (preliminary) found 11/19** reference findings (high 4, med 3, low 4), weighted **~26/38** — a strict improvement
   over V1 (+3 findings, +10 weighted points). The V2 terse prompt (explicit step-by-step mechanics tracing + boundary/failure-case
@@ -153,7 +153,7 @@ V1 missed; kept all of V1's matches. Still missed #1 (confirm-chain), #4 (T3 sou
   and #8; the remaining misses (#1, #4, #7, #9, #11, #12, #14, #16, #18) are either cross-contract data-flow (#1, #4) or
   assertion-strength/unused-input/abort-class (#9, #12, #14, #16) defects.
   → *Terseness trades coverage for focus: tighter, cleaner review, narrower finding set.* The full finding-by-finding handling
-  (each of the 19 accepted/rejected) is in `campaigns/2026-11-01-redhat191-dp-sharp-w208-blind/analysis.md`.
+  (each of the 19 accepted/rejected) is in `docs/findings/agentic/2026-11-01-0000-redhat191-dp-sharp-w208-blind.md`.
 
 ## Consequences & root causes
 
@@ -288,11 +288,11 @@ V1 missed; kept all of V1's matches. Still missed #1 (confirm-chain), #4 (T3 sou
   percentage can only lower the trigger) are CLAIMED T1.
 - **Rule-6 note:**
   - `thinking_digest.py` is a one-off analysis script stored with its output in
-    `bench/runs/2026-10-31-agentic-thinking-volume/`.
-  - The reusable parts (thinking per tool call, compaction count and seconds, distinct files read) belong in `bench/lib/report.py`'s
+    `campaigns/agentic/2026-10-31-0000-agentic-thinking-volume/`.
+  - The reusable parts (thinking per tool call, compaction count and seconds, distinct files read) belong in `bench/core/report.py`'s
     agentic kind. That extension is proposed, not done.
 - The δ 0.5 arm is done: +65% decode, 2.4× wall, 49% of tokens in 7 loops (one hit the 64k cap), 16/38 blind grade (−5 at the Δ ≥ 5 threshold) —
-  see `campaigns/2026-10-31-redhat191-sharp-w208-blind/analysis.md`.
+  see `docs/findings/agentic/2026-10-31-0000-redhat191-sharp-w208-blind.md`.
 - The `sharp-sly2` (k = 1) replay arm is done: 1.65× keep-all wall, 1.4× tokens, 2.5× thinking/tool call, 0 exact loops, no review written
   (hit the 1 h cap — quarantined, rule 18); keep-all (sharp) remains the best single arm — see
-  `campaigns/2026-10-31-redhat191-sharpsly2-w208-blind/analysis.md`.
+  `docs/findings/agentic/2026-10-31-0000-redhat191-sharpsly2-w208-blind.md`.

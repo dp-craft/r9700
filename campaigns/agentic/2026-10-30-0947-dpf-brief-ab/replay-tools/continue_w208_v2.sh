@@ -31,9 +31,9 @@ fp > "$OUT/main-fp-before.txt"
 
 log "booting $SRV with CACTUS_DELTA=0"
 if ! env -u EXTRA_ARGS CACTUS_DELTA=0 "$SRV" start > "$OUT/server-start.txt" 2>&1; then log "server start failed: $(tail -2 "$OUT/server-start.txt" | tr '\n' ' ')"; exit 1; fi
-cp "$AMD/bench/.servers/8000.cmdline" "$OUT/server.cmdline"
+cp "$AMD/stack/serve/var/servers/8000.cmdline" "$OUT/server.cmdline"
 log "$(grep -o 'RADIANCE_CACTUS_DELTA=[0-9.]*' "$OUT/server.cmdline")"
-python3 "$AMD/bench/lib/vram_sampler.py" --out "$OUT/gpu_samples.csv" --interval 2 >/dev/null 2>&1 & SAMP=$!
+python3 "$AMD/stack/gpu/vram_sampler.py" --out "$OUT/gpu_samples.csv" --interval 2 >/dev/null 2>&1 & SAMP=$!
 
 T0=$(date +%s); n=1
 cd "$WT" || exit 1
@@ -51,7 +51,7 @@ done
 echo "wall_s=$(( $(date +%s) - T0 )) continuation_calls=$n session=$sid w2_08_lines=$(done08) (plus the 4.5 min capture, session-0)" > "$OUT/summary.txt"
 
 kill "$SAMP" 2>/dev/null; wait "$SAMP" 2>/dev/null
-"$SRV" stop > "$OUT/server-stop.txt" 2>&1; cp "$AMD/bench/.servers/8000.log" "$OUT/server-container.log" 2>/dev/null
+"$SRV" stop > "$OUT/server-stop.txt" 2>&1; cp "$AMD/stack/serve/var/servers/8000.log" "$OUT/server-container.log" 2>/dev/null
 sleep 5; ss -ltn | grep -q ':8000 ' && log "WARNING port 8000 still held"
 
 git -C "$WT" status --porcelain > "$OUT/wt-status-after.txt"; git -C "$WT" diff > "$OUT/wt.diff"

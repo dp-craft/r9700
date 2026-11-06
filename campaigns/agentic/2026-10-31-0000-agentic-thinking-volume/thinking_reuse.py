@@ -13,7 +13,7 @@ A compaction (compact_boundary) resets both histories; the compact summary count
 Window = session start .. the blind boundary (first READ of the Opus reference review), as in thinking_digest.py.
 Caveat: lexical reuse != dependency (the model may re-derive), and a semantic carry-over with no shared token is missed.
 Usage: thinking_reuse.py NAME=RUN_ARM_DIR ... [--samples OUT.jsonl]  -> one JSON line per arm (stdout).
-Data source for docs/analysis/2026-10-31-1640-agentic-thinking-volume-and-levers.md (replay section)."""
+Data source for docs/findings/agentic/2026-10-31-1640-agentic-thinking-volume-and-levers.md (replay section)."""
 import glob, json, random, re, sys
 
 BOUND = re.compile(r"\b(cat|sed|head|tail|less|awk|grep)\b[^|;&]*27b-fix/opus/W2-08")

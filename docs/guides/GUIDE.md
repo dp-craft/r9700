@@ -11,12 +11,12 @@ Step-by-step for both tracks. Legend: ✅ = verified working in this repo (2026-
 ```bash
 cd /home/dev/work/dp-craft/amd        # $ROOT
 ```
-- Vendor env (HSA override on AMD) is handled by the scripts via `bench/lib/gpu_env.sh` — you no
+- Vendor env (HSA override on AMD) is handled by the scripts via `stack/gpu/gpu_env.sh` — you no
   longer export it by hand. On **NVIDIA / other GPUs** everything works the same: point
   `LLAMA_BENCH` / `LLAMA_SERVER` at a CUDA (or other) build; `gpu_env.sh` records the GPU via
   `nvidia-smi`, and engine-bench is pure HTTP anyway. ✅ (AMD path verified; NVIDIA path ⚠️ untested)
 - Models in `/home/dev/models/gguf/` (27B Q4_K_S, 35B-A3B-UD Q4_K_M with embedded MTP layer). ✅
-- llama.cpp builds: `bench/llamacpp/` (ROCm) + `bench/llamacpp-vulkan/` (RADV), build b9950. ✅
+- llama.cpp builds: `stack/llamacpp/var/builds/b9949-rocm/bin/` (ROCm) + `stack/llamacpp/var/builds/b9950-vulkan/bin/` (RADV), build b9950. ✅
 - GPU check: `rocm-smi --showproductname` → "AMD Radeon AI PRO R9700". ✅
 
 ---
@@ -38,7 +38,7 @@ recommended server command). ~30–60 min per backend on the 35B.
 ```bash
 MODEL=/home/dev/models/gguf/Qwen3.6-27B-Q4_K_S.gguf SLUG=27b-check UB=1024,2048 ./run.sh
 ```
-Knobs: `bench/model-bench/README.md`. KV **default is f16** (baseline); q8_0 only via the
+Knobs: `bench/perf/model-bench/README.md`. KV **default is f16** (baseline); q8_0 only via the
 sweep's ≤5% acceptance rule.
 
 ---
@@ -81,7 +81,7 @@ Key facts: **MTP** = `--spec-type draft-mtp` (draft layer is embedded in the 35B
 **ollama** (port 11434): ⚠️
 ```bash
 OLLAMA_FLASH_ATTENTION=1 OLLAMA_KV_CACHE_TYPE=q8_0 ollama serve   # then, once:
-ollama create q35:local -f bench/engine-bench/ollama/Modelfile_q35
+ollama create q35:local -f stack/serve/ollama/Modelfile_q35
 ```
 **vLLM** (port 8000, Docker): ⚠️ 27B failed to load in prior tests; 35B AWQ only
 ```bash
@@ -91,7 +91,7 @@ docker run --rm -it --device /dev/kfd --device /dev/dri -p 8000:8000 \
   vllm serve /models/Qwen3.6-35B-A3B-AWQ-4bit --port 8000
 ```
 
-**vLLM via a campaign spec** (`engine: "vllm"`, `bench/engine-bench/vllm/serve_vllm.sh`): optional
+**vLLM via a campaign spec** (`engine: "vllm"`, `stack/serve/vllm/serve_vllm.sh`): optional
 `"image"` pins the docker image (default = the profile's; run-time `IMAGE=` beats both) and `"env"`
 (top-level and per-server, server wins; e.g. `{"CACTUS_DELTA": "0"}`) is passed to `serve_vllm.sh`.
 `run.sh` saves `serve_vllm.sh print` (resolved image + digest, env, argv) to `server-<name>.txt` and
@@ -99,12 +99,12 @@ records image/env in `meta.txt`. Not valid on llamacpp.
 
 **Observe a running server** (any engine with a log; vLLM also gets `/metrics` + rocm-smi): ✅
 ```bash
-python3 bench/lib/monitor.py --port 8000        # live table: per-request tokens/TTFT/TPS + 5-min avg + session + GPU + log (Ctrl-C quits)
-python3 bench/lib/monitor.py --port 8000 --once # single snapshot
+python3 stack/gpu/monitor.py --port 8000        # live table: per-request tokens/TTFT/TPS + 5-min avg + session + GPU + log (Ctrl-C quits)
+python3 stack/gpu/monitor.py --port 8000 --once # single snapshot
 ```
 Read-only — no requests, no kill. `--out FILE` records one JSONL row per poll;
 `--help` lists usage + what each block shows. The "observe" half of the
-bench 3-task model (probe = `bench/lib/capture_engine.py` / monitor / report).
+bench 3-task model (probe = `bench/core/capture_engine.py` / monitor / report).
 
 ---
 
@@ -131,7 +131,7 @@ PROMPT_FILE="$PWD/../workloads/generated/agentic-8000-v1.txt $PWD/../workloads/g
   $PWD/../workloads/generated/agentic-8000-v3.txt $PWD/../workloads/generated/agentic-8000-v4.txt" \
   SLUG=agentic4 CONCURRENCY=4 REPS=3 PREFIX_MODE=unique MAX_TOKENS=256 ./run.sh
 ```
-**llama-benchy** (standardized synthetic curves, installed at `bench/dl/benchy-venv`): ✅ install
+**llama-benchy** (standardized synthetic curves, installed at `stack/serve/var/venvs/benchy-venv`): ✅ install
 ```bash
 USE_BENCHY=1 BENCHY_ARGS="--pp 2048 8192 --tg 128 --concurrency 1 4 --runs 3" SLUG=benchy ./run.sh
 ```
@@ -139,17 +139,17 @@ USE_BENCHY=1 BENCHY_ARGS="--pp 2048 8192 --tg 128 --concurrency 1 4 --runs 3" SL
 ---
 
 ## 5. Visualize a run (charts, no install) ✅
-`bench/lib/report.py` renders any run/campaign dir into **theme-aware SVG charts** (`charts/*.svg`)
+`bench/core/report.py` renders any run/campaign dir into **theme-aware SVG charts** (`charts/*.svg`)
 plus an `appendix.md` that embeds them — so the charts live INSIDE the Markdown write-up (stdlib
 Python only, works offline, light/dark aware). It auto-detects the run kind:
 ```bash
 # throughput (results.jsonl) → depth curves, concurrency scaling, TTFT p95, thinking, memory:
-bench/lib/report.py bench/runs/<stamp>-campaign-combo35b        # → <dir>/charts/ + <dir>/appendix.md
+bench/core/report.py bench/runs/<stamp>-campaign-combo35b        # → <dir>/charts/ + <dir>/appendix.md
 # quality (outputs.jsonl) → quality-vs-cost, accuracy, judge, token economy, latency, per-task heatmap
-bench/lib/report.py campaigns/<date>-<slug>
+bench/core/report.py campaigns/<date>-<slug>
 # sweep (sweep-summary.json) → -ub/-b tuning curves + VRAM + KV verdict
-bench/lib/report.py bench/runs/<stamp>-sweep-35b-vulkan
-bench/lib/report.py <dir> --charts DIR --appendix FILE          # custom output paths
+bench/core/report.py bench/runs/<stamp>-sweep-35b-vulkan
+bench/core/report.py <dir> --charts DIR --appendix FILE          # custom output paths
 ```
 Failures (`failures.txt`, `n_err>0`) and errored requests are surfaced in a note, never averaged
 in; every chart set ships a color-independent data table. The SVGs under `charts/` are **committed**
@@ -170,9 +170,9 @@ The doc must include (spec + canonical glossary rows live in the skill's output 
 ---
 
 ## 7. Agentic campaigns (real `claude -p` sessions, A/B of vllm configs) ✅
-Scaffold with `/benchmark-new-campaign` (`kind: "agentic"`; `bench/gen_campaign.py example --agentic`):
+Scaffold with `/benchmark-new-campaign` (`kind: "agentic"`; `bench/core/gen_campaign.py example --agentic`):
 ```bash
-python3 bench/gen_campaign.py emit --spec campaigns/<date>-<slug>/spec.json   # validates, resolves base sha, hashes installs
+python3 bench/core/gen_campaign.py emit --spec campaigns/<date>-<slug>/spec.json   # validates, resolves base sha, hashes installs
 bash campaigns/<date>-<slug>/run.sh                                           # run; the SAME command resumes
 ```
 Each (rep, arm) boots a fresh vllm server + fresh git worktree at the base commit, runs `claude -p`
@@ -202,7 +202,7 @@ Run level: `summary.tsv`, `failures.txt`, `driver.log`, `agentic_helper.py`.
 **Optional request capture:** `"capture_requests": true` puts `capture_proxy.py` on the client port and the
 server on port+1; request bodies land in `<arm_dir>/requests/*.gz`.
 
-**Testing the scaffolder** (no GPU, ~20 s): `python3 bench/test_gen_campaign.py -v`.
+**Testing the scaffolder** (no GPU, ~20 s): `python3 bench/core/test_gen_campaign.py -v`.
 
 ---
 

@@ -41,8 +41,8 @@ fp > "$OUT/main-fp-before.txt"
 # 3. server (gpu_exclusive floor inside serve_vllm.sh) + VRAM sampler
 log "booting $SRV"
 if ! "$SRV" start > "$OUT/server-start.txt" 2>&1; then log "server start failed: $(tail -2 "$OUT/server-start.txt" | tr '\n' ' ')"; exit 1; fi
-cp "$AMD/bench/.servers/8000.cmdline" "$OUT/server.cmdline"
-python3 "$AMD/bench/lib/vram_sampler.py" --out "$OUT/gpu_samples.csv" --interval 2 >/dev/null 2>&1 & SAMP=$!
+cp "$AMD/stack/serve/var/servers/8000.cmdline" "$OUT/server.cmdline"
+python3 "$AMD/stack/gpu/vram_sampler.py" --out "$OUT/gpu_samples.csv" --interval 2 >/dev/null 2>&1 & SAMP=$!
 
 # 4. the session; resume (same session) while fewer than 3 W2 lines are recorded, within the cap
 w2done(){ grep -c '^W2-0[678] |' "$WT/$P/review/27b-fix/progress.md" 2>/dev/null || true; }

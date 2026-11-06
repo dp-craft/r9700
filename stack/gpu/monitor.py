@@ -38,7 +38,7 @@ Usage:
 
   --once     single snapshot, then exit (for a quick check)
   --out      append one JSONL row per poll (the session record)
-  --log      the engine log to tail (default bench/.servers/<port>.log; not read on radiance)
+  --log      the engine log to tail (default stack/serve/var/servers/<port>.log; not read on radiance)
   --container  the radiance container whose log gives the request rows (default radiance-<port>; needs docker access)
   --history  number of past request rows under the current poll (default 15; 0 hides the past rows — the current poll row always shows)
 
@@ -850,7 +850,7 @@ def _row(snap):
 
 
 def _default_log_path(port):
-    """The engine log under bench/.servers, independent of the current directory."""
+    """The engine log under stack/serve/var/servers, independent of the current directory."""
     return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".servers", f"{port}.log")
 
 
@@ -862,7 +862,7 @@ def main():
                "  monitor.py --port 8000                       live table, polls every 2 s (Ctrl-C to quit)\n"
                "  monitor.py --port 8000 --once                single snapshot, then exit\n"
                "  monitor.py --port 8000 --out session.jsonl   live + record one JSONL row per poll\n"
-               "  bench/engine-bench/claude/monitor.sh         same, with PORT/paths from _lib.sh\n\n"
+               "  stack/gpu/monitor.sh         same, with PORT/paths from _lib.sh\n\n"
                "blocks:\n"
                "  GPU               VRAM/GTT + 5 colored bars (GPU use / power / VRAM / edge temp / mem temp) + fan + clocks; red over 80/90 C\n"
                "  cache/queue/spec  KV % (colored), prefix-cache % cached + block hit rate (radiance: + recomputed = tokens the attention cache held but no linear checkpoint let it skip, since server start), spec acceptance (accepted/draft tokens), running/waiting\n"
@@ -878,7 +878,7 @@ def main():
                "  if `docker logs` fails: rows per poll, comp/prefill n/a, no log block, and the block title says so.")
     ap.add_argument("--port", type=int, default=8000, help="server port (default 8000)")
     ap.add_argument("--interval", type=float, default=2.0, help="poll interval in seconds (default 2.0)")
-    ap.add_argument("--log", default=None, help="engine log to tail (default bench/.servers/<port>.log; not read on radiance, see below)")
+    ap.add_argument("--log", default=None, help="engine log to tail (default stack/serve/var/servers/<port>.log; not read on radiance, see below)")
     ap.add_argument("--container", default=None,
                     help="radiance container whose log gives the request rows (default radiance-<port>; needs docker access)")
     ap.add_argument("--out", default=None,

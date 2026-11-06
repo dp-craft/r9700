@@ -20,9 +20,9 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../../.." && pwd)"
-SERVE="$REPO/bench/engine-bench/serve_llamacpp.sh"
-SAMPLER="$REPO/bench/lib/vram_sampler.py"
-CAMP="$REPO/campaigns/2026-07-14-hardest-tasks-27b-vs-35b"
+SERVE="$REPO/stack/serve/llamacpp/serve_llamacpp.sh"
+SAMPLER="$REPO/stack/gpu/vram_sampler.py"
+CAMP="$REPO/campaigns/quality/2026-07-14-0000-hardest-tasks-27b-vs-35b"
 OUT="$HERE/results_depth.jsonl"
 PORT="${PORT:-8099}"
 : > "$OUT"
@@ -55,7 +55,7 @@ boot () { # boot(mtp, nmax_or_empty)
 ask () {
   local label="$1" mtp="$2" nmax="$3" pp="$4" seed="$5" maxtok="$6"
   local pid csv resp cpu0 cpu1 t0 t1 payload
-  pid=$(cat "$REPO/bench/.servers/$PORT.pid")
+  pid=$(cat "$REPO/stack/serve/var/servers/$PORT.pid")
   csv="$HERE/gpu_depth_${label}.csv"
   payload="$HERE/.depth_req.json"
   # build the full request payload (prompt + this cell's sampler) from the extracted base

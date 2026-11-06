@@ -36,7 +36,7 @@ default 32768). Guarantees:
 | Env | Default | Meaning |
 |-----|---------|---------|
 | `MODEL` | *(required)* | GGUF path |
-| `LLAMA_BENCH` | `bench/llamacpp/llama-bench` | Vulkan: `bench/llamacpp-vulkan/llama-bench`; NVIDIA: any CUDA build |
+| `LLAMA_BENCH` | `stack/llamacpp/var/builds/b9949-rocm/bin/llama-bench` | Vulkan: `stack/llamacpp/var/builds/b9950-vulkan/bin/llama-bench`; NVIDIA: any CUDA build |
 | `PP` / `TG` | `512,2048,8192` / `128` | prefill sizes / decode tokens (comma = swept) |
 | `DEPTH` | `0` | context depth `-d` — measure pp/tg AT 32768/65536, not just empty |
 | `UB` / `BATCH` | `512,1024,2048` / `2048` | micro-batch / logical batch |
@@ -50,7 +50,7 @@ default 32768). Guarantees:
 
 Output → `bench/runs/<stamp>-model-<slug>/` (`llama-bench.json` + `meta.txt` incl. `build_commit`;
 with `NPL`: `batched-bench.json` + `batched-bench.log`, version line in `meta.txt`).
-Vendor handling via `bench/lib/gpu_env.sh` (AMD: HSA override auto; NVIDIA: nvidia-smi meta).
+Vendor handling via `stack/gpu/gpu_env.sh` (AMD: HSA override auto; NVIDIA: nvidia-smi meta).
 
 ## What this track CAN'T do (use engine-bench instead)
 - No **real prompts** (synthetic tokens): no thinking mode, no chat template.

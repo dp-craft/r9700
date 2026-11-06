@@ -73,7 +73,7 @@ Our measured cost of keep-all (2026-10-30 `template_tokens.json`): over the same
 **Keep-newest + δ 0 has never been run on our workload.**
 
 **Our transcripts: how much later steps reuse older thinking** (added 17:45, MEASURED lexical + a blind Sonnet judge; full method in
-[the analysis](../analysis/2026-10-31-1745-reasoning-replay-sharp-template-cactus-loops.md) §2):
+[the analysis](../../findings/agentic/2026-10-31-1745-reasoning-replay-sharp-template-cactus-loops.md) §2):
 - **Identifiers:** 5.4-6.7% of the identifiers a δ 0 keep-all step emits existed only in thinking ≥ 2 steps back. ~25% of those reach a
   tool input or text. A k = 1 run, which never saw old thinking, re-derives 3.6% by itself.
 - **Blind judge:** 6 of 32 keep-all cases are real dependencies, all of them the running **findings ledger** (ids, severities,
@@ -180,6 +180,6 @@ steps earlier, or repeating probes it already ran. Switch cost: a few lines in t
 - ECHO (snippet): https://arxiv.org/abs/2606.31650
 - Sly v1.9.1 release: https://github.com/SlyBase/vllm-sly-radiance/releases/tag/v1.9.1 · issue #164: https://github.com/SlyBase/vllm-sly-radiance/issues/164
 - froggeric template cache discussion (snippet, T2): https://huggingface.co/froggeric/Qwen-Fixed-Chat-Templates/discussions/80
-- Local (MEASURED): `bench/runs/2026-10-30-0947-dpf-brief-ab/templates/{model-stock-qwen3.8.chat_template.jinja,render_test.txt,froggeric-README.md}`,
-  `bench/runs/2026-10-30-0947-dpf-brief-ab/template_tokens.json`, the 1.9.1 image's `/opt/qwen-fixed.jinja`,
-  `campaigns/2026-10-31-redhat191-sharp-w208-blind/sharp-chat_template.jinja`, and the run dirs cited above.
+- Local (MEASURED): `campaigns/agentic/2026-10-30-0947-dpf-brief-ab/templates/{model-stock-qwen3.8.chat_template.jinja,render_test.txt,froggeric-README.md}`,
+  `campaigns/agentic/2026-10-30-0947-dpf-brief-ab/results/template_tokens.json`, the 1.9.1 image's `/opt/qwen-fixed.jinja`,
+  `campaigns/agentic/2026-10-31-0000-redhat191-sharp-w208-blind/sharp-chat_template.jinja`, and the run dirs cited above.

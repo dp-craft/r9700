@@ -110,7 +110,7 @@ The GPU must be exclusive — llama-swap holds ~20 GB of 32.6 GB and will starve
 **Use the gate, don't hand-roll it:**
 
 ```bash
-bench/lib/gpu_exclusive.sh 26000     # unload + kill + assert floor; non-zero names the holder
+stack/gpu/gpu_exclusive.sh 26000     # unload + kill + assert floor; non-zero names the holder
 ```
 
 It exists because this section's advice was already here on 2026-09-10 and the run was contaminated

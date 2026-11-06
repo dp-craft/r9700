@@ -1,14 +1,14 @@
 ---
 name: benchmark-new-campaign
-description: Design AND scaffold a new benchmark campaign for the R9700 harness. Use when the user wants to plan a new set of runs (a "campaign") — pick the model/backend, work out the VRAM budget and max context, decide the MTP/KV/depth/concurrency matrix, catch gaps BEFORE burning expensive GPU time, then emit a resumable run.sh + README via bench/gen_campaign.py. The judgement lives here; the deterministic emission lives in gen_campaign.py. Produces campaigns/<date>-<slug>/{spec.json,run.sh,README.md}. Hand off to the benchmark-results skill to write up results (co-located as campaigns/<date>-<slug>/analysis.md).
+description: Design AND scaffold a new benchmark campaign for the R9700 harness. Use when the user wants to plan a new set of runs (a "campaign") — pick the model/backend, work out the VRAM budget and max context, decide the MTP/KV/depth/concurrency matrix, catch gaps BEFORE burning expensive GPU time, then emit a resumable run.sh + README via bench/core/gen_campaign.py. The judgement lives here; the deterministic emission lives in gen_campaign.py. Produces campaigns/<date>-<slug>/{spec.json,run.sh,README.md}. Hand off to the benchmark-results skill to write up results (co-located as campaigns/<date>-<slug>/analysis.md).
 ---
 
 # benchmark-new-campaign — plan first, then scaffold deterministically
 
 Campaign runs are **expensive** (server loads + deep prefills = hours). This skill spends cheap
-thinking to avoid costly re-runs: reason the matrix through, then let `bench/gen_campaign.py`
+thinking to avoid costly re-runs: reason the matrix through, then let `bench/core/gen_campaign.py`
 emit the mechanical driver. Output language: **English**. Concrete run plans are the *runbooks*;
-the generic how-to is `docs/GUIDE.md`.
+the generic how-to is `docs/guides/GUIDE.md`.
 
 ## Process
 
@@ -26,14 +26,14 @@ the generic how-to is `docs/GUIDE.md`.
 2. **VRAM budget → max context** (deterministic) — and this is now the **safety guard**, not just a
    sizing hint. **Get KV-per-token from the model file, never an online calculator** (online tools —
    and naïve hand-math — get **HYBRID** archs badly wrong): run
-   **`bench/gguf_kv.py /path/model.gguf --weights-gib G`** — it prints f16 & q8_0 KiB/tok, the max
+   **`bench/core/gguf_kv.py /path/model.gguf --weights-gib G`** — it prints f16 & q8_0 KiB/tok, the max
    ctx per budget, AND a paste-ready `vram` block. (Under the hood: **only full-attention layers
    cache KV** = `n_attn_layers × head_count_kv × (key_length+value_length) × 2 B`; q8_0 ≈ 0.53× f16.
    For a hybrid model like Qwen3.6 — SSM/Gated-DeltaNet linear-attn layers keep a *fixed* state, not
    a per-token cache — `n_attn_layers` ≪ `block_count`; the tool counts `blk.*.attn_k` tensors, so
    don't multiply by all layers. E.g. Qwen3.6-27B = 16 attn layers of 65 blocks → **64 KiB/tok f16,
    not 260** → 200K f16 fits in ~29 GiB, MEASURED. Trust the tool over any formula or calculator.)
-   For a quick what-if, `bench/gen_campaign.py vram-ctx --weights-gib G --kv-kib-per-tok K --budget-mib M`.
+   For a quick what-if, `bench/core/gen_campaign.py vram-ctx --weights-gib G --kv-kib-per-tok K --budget-mib M`.
    - The generated `run.sh` carries a **pre-flight guard**: for every server it computes predicted
      VRAM and **skips it before launching** if it exceeds `VRAM_BUDGET_MIB`. This is the hard
      "**GPU/VRAM only, never spill to system RAM**" enforcement — an over-budget config is never
@@ -71,20 +71,20 @@ the generic how-to is `docs/GUIDE.md`.
      of `run.sh` required (that was a past defect; it is now the default).
    - Backends/ports match (`vulkan`→:8081, `rocm`→:8080) and the right llama.cpp builds exist.
 
-5. **Draft `spec.json`** (servers × probes; schema: `bench/gen_campaign.py example`). Show the
+5. **Draft `spec.json`** (servers × probes; schema: `bench/core/gen_campaign.py example`). Show the
    matrix table + a **runtime estimate** (deep prefills ≈ prompt_tokens / ~2000 tok/s each × reps)
    and confirm scope with the user before emitting. Keep probes **short and configurable**: the
    generated `run.sh` honors `ONLY="slugglob,…"` (run just a subset), `REPS=` / `MAX_TOKENS=`
    overrides (quick pass), and `VRAM_BUDGET_MIB=` (guard threshold). Set sensible per-probe defaults
    (reps 2, max_tokens 256) so the whole campaign *and* a chosen subset both give reliable numbers.
 
-6. **Emit**: `bench/gen_campaign.py emit --spec campaigns/<date>-<slug>/spec.json`
+6. **Emit**: `bench/core/gen_campaign.py emit --spec campaigns/<date>-<slug>/spec.json`
    → resumable `run.sh` (per-probe `done/` markers) + a README skeleton, under
    `campaigns/<date>-<slug>/`. Flesh out the README prose (goal, decisions, out-of-scope). run.sh
    consolidates every probe into one `results.jsonl` (with VRAM/GTT samples per server) and its
-   **last step auto-generates SVG charts + `appendix.md`** (`bench/lib/report.py`) to embed in the write-up.
+   **last step auto-generates SVG charts + `appendix.md`** (`bench/core/report.py`) to embed in the write-up.
 
-7. **Hand off**: remind the user to (a) build fixtures (`build_prompt.py`, see `docs/GUIDE.md` §2),
+7. **Hand off**: remind the user to (a) build fixtures (`build_prompt.py`, see `docs/guides/GUIDE.md` §2),
    (b) run `bash campaigns/<date>-<slug>/run.sh` (resumable — rerun to continue; `ONLY=`/`REPS=` to
    subset or shorten), (c) write up with the **benchmark-results** skill → co-located
    `campaigns/<date>-<slug>/analysis.md`, then add a `<!-- meta -->` block and run `docs/reindex.py`.
@@ -98,7 +98,7 @@ For `engine: "vllm"` a spec may pin the docker **`image`** (default = the profil
 
 ## `kind: "agentic"` — real Claude Code sessions (`claude -p`) against a vllm server
 **Pick it** for an A/B of engine / sampler / template configs on a *real agentic task* (not a synthetic
-probe). Schema: `bench/gen_campaign.py example --agentic` (+ the module docstring). Design rules:
+probe). Schema: `bench/core/gen_campaign.py example --agentic` (+ the module docstring). Design rules:
 - **One variable per arm** (profile, image, env knob or server override); everything else is identical.
 - **Pin every task input via `install`** (prompts, runbooks, briefs): src is copied into each fresh
   worktree and its sha256 is recorded (README table at emit + `installs.sha256` per arm). Base is a commit, not a branch.
@@ -109,7 +109,7 @@ probe). Schema: `bench/gen_campaign.py example --agentic` (+ the module docstrin
 - **1 session per arm is n=1** — say so in the write-up; no significance claims. Use `reps` ≥ 3 for those.
 - **Emit-time validation** (fix the spec, don't hand-edit `run.sh`): claude settings port and model names
   vs `served_model`, `base` resolves to a sha in `repo`, every `install` src exists, `done_when.regex` compiles.
-- Hand-off is step 7 above, plus knobs `ONLY REPS CAP_S MAX_RESUMES RUN_DIR IMAGE`; see `docs/GUIDE.md` §7.
+- Hand-off is step 7 above, plus knobs `ONLY REPS CAP_S MAX_RESUMES RUN_DIR IMAGE`; see `docs/guides/GUIDE.md` §7.
 
 ## Token policy
 Planning is reasoning — do it in the main context. Shell out for `ls`/`vram-ctx`/gguf parsing

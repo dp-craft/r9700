@@ -5,7 +5,7 @@ Builds two synthetic arms in a temp dir — one vLLM (10 s logger windows, UTC c
 llama.cpp (llama-swap follower log that REPLAYS an earlier load) — with hand-computed expected values,
 so a regression in the window, decode, acceptance or loop-signal formulas fails the suite.
 
-Run:  python3 bench/lib/test_report.py -v
+Run:  python3 bench/core/test_report.py -v
 """
 import json
 import os

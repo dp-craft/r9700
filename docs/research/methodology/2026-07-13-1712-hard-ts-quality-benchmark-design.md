@@ -116,4 +116,4 @@ takeaway: To make the 27B quality eval DISCRIMINATE, stop chasing pass@1 and sta
 - IFBench — https://arxiv.org/abs/2507.02833 — 2026-07-13 — Tier-1 — 58 unseen constraint types
 - Qwen3.6-27B card — https://huggingface.co/Qwen/Qwen3.6-27B — 2026-07-13 — Tier-1 — 262K native context (coding scores VERIFY on card)
 - Qwen3 technical report — https://arxiv.org/html/2505.09388v1 — 2026-07-13 — Tier-1 — DCA/YaRN long-context training; no depth-quality curve
-- Companion (our) sampling/knobs doc — docs/research/2026-07-12-2310-qwen36-sampling-llamacpp-serving-knobs.md — Tier-1 (ours) — thinking-mode sampling + reasoning-budget levers
+- Companion (our) sampling/knobs doc — docs/research/models-sampling/2026-07-12-2310-qwen36-sampling-llamacpp-serving-knobs.md — Tier-1 (ours) — thinking-mode sampling + reasoning-budget levers

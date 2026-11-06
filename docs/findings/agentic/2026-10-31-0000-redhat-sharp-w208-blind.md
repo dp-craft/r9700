@@ -11,19 +11,19 @@ takeaway: Swapping only the chat template (froggeric v22.5 → sharp = v22.5 + a
   `engine: "vllm"` + `stop_when`) · **Write-up:** this file, co-located with `spec.json` / `run.sh` / `README.md`
 - **GPU/Host:** Radeon AI PRO R9700 (gfx1201, 32624 MiB), kernel 7.0.0-38-generic. Power state at launch: `power1_cap`
   210 W (default 300 W), `power_dpm_force_performance_level=manual`, profile `POWER_SAVING`
-  (`bench/runs/2026-10-31-redhat-sharp-w208-blind/pre-launch-provenance.txt`, 12:42:50).
+  (`campaigns/agentic/2026-10-31-0000-redhat-sharp-w208-blind/results/pre-launch-provenance.txt`, 12:42:50).
 - **Runtime:** `ghcr.io/slybase/vllm-sly-radiance:1.8.1-rocm10.1`, digest `sha256:9b918ac0…850a` (vLLM 0.32.0), profile
   `sly-redhat/redhat-mxfp4-dflash`, `RADIANCE_CACTUS_DELTA=0`. Claude Code 2.1.312. Source: `rep1/redhat-d0-sharp/server.txt`.
 - **Model:** `RedHatAI/Qwen3.8-27B-MXFP4@16a86728` + draft `syvai/Qwen3.8-27B-DFlash2-W4A16@4d30ec73`. Both are the same as
   the δ 0 baseline.
-- **Chat template:** `campaigns/2026-10-31-redhat-sharp-w208-blind/sharp-chat_template.jinja`, sha256 `cdff39fb…a84a`
+- **Chat template:** `campaigns/agentic/2026-10-31-0000-redhat-sharp-w208-blind/sharp-chat_template.jinja`, sha256 `cdff39fb…a84a`
   (a copy of `~/.config/llama-swap/templates/sharp-chat_template.jinja`, the same file the Q4_K_XL run used). It is mounted at
   `/templates/sharp-chat_template.jinja`, and the container checks are in `server-info.txt`.
-- **Data:** `bench/runs/2026-10-31-redhat-sharp-w208-blind/` (run, `blind-grading/`)
+- **Data:** `campaigns/agentic/2026-10-31-0000-redhat-sharp-w208-blind/` (run, `blind-grading/`)
 - **Baselines (earlier runs, not re-run):**
-  - RedHat δ 0 and heretic W2-08: `bench/runs/2026-10-30-0947-dpf-brief-ab/`, written up in
-    `docs/analysis/2026-10-30-1552-dpf-brief-fix-heretic-vs-redhat.md`.
-  - Q4_K_XL: `campaigns/2026-10-31-q4kxl-sharp-w208-blind/analysis.md`.
+  - RedHat δ 0 and heretic W2-08: `campaigns/agentic/2026-10-30-0947-dpf-brief-ab/`, written up in
+    `docs/findings/agentic/2026-10-30-1552-dpf-brief-fix-heretic-vs-redhat.md`.
+  - Q4_K_XL: `docs/findings/agentic/2026-10-31-0000-q4kxl-sharp-w208-blind.md`.
 - **Question:** how much does the chat template alone change RedHat's review? The δ 0 baseline is held fixed and only
   `--chat-template` is swapped to sharp. Quality only; speed is out of scope.
 - **Answer (short):** it reduces the work by about a third without a measurable quality loss. +2 Opus findings is within
@@ -231,7 +231,7 @@ Server argv identical except `--chat-template` and its `-v` mount (MEASURED: `di
 ## Recommended next step
 
 1. **Noise check (cheapest, highest information): a second rep of RedHat + sharp** (`REPS=2
-   campaigns/2026-10-31-redhat-sharp-w208-blind/run.sh`, fresh worktree `dpf-bench-redhat-d0-sharp-r2`). Grade it blind
+   campaigns/agentic/2026-10-31-0000-redhat-sharp-w208-blind/run.sh`, fresh worktree `dpf-bench-redhat-d0-sharp-r2`). Grade it blind
    together with rep 1, so the same grader sees both. If rep 2 also lands at ≥ 9/19 with 4/6 highs, the "no quality loss"
    claim is supported by two runs. The second Q4_K_XL rep (still open) is the same check for that config.
 2. **Adoption (user's decision):** `sly-redhat/redhat-mxfp4-dflash` with `CHAT_TEMPLATE=` pointing at the sharp file, the
@@ -239,7 +239,7 @@ Server argv identical except `--chat-template` and its `-v` mount (MEASURED: `di
 
 ```
 docker run … -e RADIANCE_CACTUS_DELTA=0 … \
-  -v /home/dev/work/dp-craft/amd/campaigns/2026-10-31-redhat-sharp-w208-blind/sharp-chat_template.jinja:/templates/sharp-chat_template.jinja:ro \
+  -v /home/dev/work/dp-craft/amd/campaigns/agentic/2026-10-31-0000-redhat-sharp-w208-blind/sharp-chat_template.jinja:/templates/sharp-chat_template.jinja:ro \
   ghcr.io/slybase/vllm-sly-radiance:1.8.1-rocm10.1 --model /model --served-model-name qwen38-27b-redhat-mxfp4-dflash \
   --max-model-len 262000 --speculative-config.method dflash --speculative-config.model /draft \
   --speculative-config.num_speculative_tokens 7 --speculative-config.draft_sample_method probabilistic \
@@ -250,11 +250,11 @@ docker run … -e RADIANCE_CACTUS_DELTA=0 … \
 # launcher form:
 PROFILE=sly-redhat/redhat-mxfp4-dflash IMAGE=ghcr.io/slybase/vllm-sly-radiance:1.8.1-rocm10.1 PORT=8000 \
   MAXLEN=262000 MAXSEQS=1 KV_DTYPE=fp8 GPU_UTIL=0.93 CACTUS_DELTA=0 \
-  CHAT_TEMPLATE=/home/dev/work/dp-craft/amd/campaigns/2026-10-31-redhat-sharp-w208-blind/sharp-chat_template.jinja \
-  bench/engine-bench/vllm/serve_vllm.sh start
+  CHAT_TEMPLATE=/home/dev/work/dp-craft/amd/campaigns/agentic/2026-10-31-0000-redhat-sharp-w208-blind/sharp-chat_template.jinja \
+  stack/serve/vllm/serve_vllm.sh start
 ```
 
-(full argv: `bench/runs/2026-10-31-redhat-sharp-w208-blind/rep1/redhat-d0-sharp/server.txt`)
+(full argv: `campaigns/agentic/2026-10-31-0000-redhat-sharp-w208-blind/tmp/rep1/redhat-d0-sharp/server.txt`)
 
 ## Methodology & caveats
 

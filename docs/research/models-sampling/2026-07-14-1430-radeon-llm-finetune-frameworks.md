@@ -91,7 +91,7 @@ All recommend **ROCm 7.2.1+**, **AMD fork of bitsandbytes**, and **RocmAttention
 1. **For R9700 finetuning work:** Use **LLaMA-Factory** (docker + ROCm 7.2.1, AMD bitsandbytes fork). Cite the Level1Techs forum success report as a precedent.
 2. **Benchmark target:** Add a finetuning campaign (QLoRA on Qwen3-8B or Llama3.1-8B, rank=64, learning_rate=1e-4) to `campaigns/` if quality track is planned. Use AMD's official Docker stack as baseline.
 3. **Validate attention:** Run both eager + RocmAttention paths in `bench/model-bench/` to surface any latency regression during SFT.
-4. **Document the bitsandbytes fork:** If finetuning becomes a production task, add a note to `docs/GUIDE.md` about AMD's fork requirement and how to install it.
+4. **Document the bitsandbytes fork:** If finetuning becomes a production task, add a note to `docs/guides/GUIDE.md` about AMD's fork requirement and how to install it.
 
 ## Sources
 - **LLaMA-Factory README & ROCm docs** — github.com/hiyouga/LLaMA-Factory — accessed 2026-07-14 — Tier 1

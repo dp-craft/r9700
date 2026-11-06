@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Ornith-1.5-35B-A3B w4a8 on native Radiance 1.16.0, one card, creator's flags (radiance-ornith.start.sh).
-# Same probe as bench/runs/2026-11-04-1557-35b-perf-10k-50k-100k so the numbers compare. Leaves the server UP on port 8000.
+# Same probe as campaigns/perf/2026-11-04-1527-ornith15-radiance-vs-sly/results/2026-11-04-1557-35b-perf-10k-50k-100k so the numbers compare. Leaves the server UP on port 8000.
 set -u
-REPO=/home/dev/work/dp-craft/amd; RUN="$(cd "$(dirname "$0")" && pwd)"; PORT=8000; GEN=$REPO/bench/workloads/generated
+REPO=/home/dev/work/dp-craft/amd; RUN="$(cd "$(dirname "$0")" && pwd)"; PORT=8000; GEN=$REPO/bench/workloads/tmp
 START=$REPO/radiance-ornith.start.sh; U=http://127.0.0.1:$PORT
 d=$RUN/ornith15-w4a8; mkdir -p "$d"; rm -f "$d"/*.jsonl
-python3 $REPO/bench/lib/vram_sampler.py --out "$d/gpu_samples.csv" --interval 1 >/dev/null 2>&1 & S=$!
+python3 $REPO/stack/gpu/vram_sampler.py --out "$d/gpu_samples.csv" --interval 1 >/dev/null 2>&1 & S=$!
 # host side: swap in use, then per-second si/so (swap), bi/bo (disk), free/cache, with timestamps
 { swapon --show; free -m; } >"$d/host_before.txt" 2>&1
 vmstat -n -t -S M 1 >"$d/vmstat.txt" 2>&1 & V=$!
@@ -15,7 +15,7 @@ if [ "$rc" = 0 ]; then
   served=$(curl -sf -m 5 "$U/v1/models" | python3 -c 'import json,sys;print(json.load(sys.stdin)["data"][0]["id"])'); echo "served=$served" >>"$d/start.txt"
   w=1
   for n in 10000 50000 100000; do
-    python3 $REPO/bench/lib/capture_engine.py probe --url "$U/v1" --model "$served" \
+    python3 $REPO/bench/core/capture_engine.py probe --url "$U/v1" --model "$served" \
       --prompt-file "$GEN/codereview-$n.txt" --max-tokens 256 --temperature 1.0 --concurrency 1 --reps 3 --warmup $w \
       --prefix-mode unique --api chat --engine radiance --label "ornith15-w4a8-$n" --timeout 1500 >>"$d/results.jsonl" 2>>"$d/probe.err"
     echo "$n probe_rc=$? rows=$(wc -l <"$d/results.jsonl")" | tee -a "$RUN/progress.txt"; w=0

@@ -11,7 +11,7 @@ takeaway: 64K sweep: **llama.cpp Vulkan + MTP wins** (35B 2993 pf / 135.9 dec). 
 - **Context:** 64K (65 536) for **every** run · prompt ≈ **6 990 tokens** (code-review prompt, unique-prefixed to defeat prefix cache) · decode = 256 tokens · single stream
 - **Models:** `Qwen3.6-35B-A3B` (MoE, ~3B active) · `Qwen3.6-27B` (SSM/Mamba-Transformer hybrid, MTP-capable), both GGUF Q4
 - **Harness:** `bench/harness/*.sh` + `bench/harness/probe.py` (runtime-native timings) — see [Reproducing](#reproducing)
-- **Companion research:** [`docs/research/2026-07-10-rdna4-llamacpp-ollama-backend-tuning.md`](../research/2026-07-10-rdna4-llamacpp-ollama-backend-tuning.md)
+- **Companion research:** [`docs/research/llamacpp/2026-07-10-0000-rdna4-llamacpp-ollama-backend-tuning.md`](../../research/llamacpp/2026-07-10-0000-rdna4-llamacpp-ollama-backend-tuning.md)
 
 ---
 
@@ -182,9 +182,9 @@ Best-effort path loading the AWQ weights via `AutoModelForCausalLM.from_pretrain
 ## 4. Exact optimum configurations (per runtime)
 
 ### 4.1 llama.cpp — **Vulkan / RADV** (recommended for BOTH models) 🏆
-Build: **ggml-org release b9950**, `ubuntu-vulkan-x64` (dir `bench/llamacpp-vulkan/`); driver: **Mesa RADV 25.2.8**.
+Build: **ggml-org release b9950**, `ubuntu-vulkan-x64` (dir `stack/llamacpp/var/builds/b9950-vulkan/bin/`); driver: **Mesa RADV 25.2.8**.
 ```bash
-VK=bench/llamacpp-vulkan          # the Vulkan llama.cpp build dir
+VK=stack/llamacpp/var/builds/b9950-vulkan/bin          # the Vulkan llama.cpp build dir
 LD_LIBRARY_PATH=$VK $VK/llama-server \
   -m <MODEL>.gguf \
   --host 127.0.0.1 --port 8899 \
@@ -207,10 +207,10 @@ LD_LIBRARY_PATH=$VK $VK/llama-server \
 - **Max 35B prefill** ⇒ the HauhauCS blob without MTP (3221).
 
 ### 4.2 llama.cpp — **ROCm/HIP** (lemonade b1295, self-contained runtime)
-Build: **lemonade b1295 gfx120X** (dir `bench/llamacpp/`), bundles its own ROCm 7.15 runtime — **use this, not the
+Build: **lemonade b1295 gfx120X** (dir `stack/llamacpp/var/builds/b9949-rocm/bin/`), bundles its own ROCm 7.15 runtime — **use this, not the
 ggml-org ROCm release b9950, which ships no runtime and silently falls back to CPU** (§3.3). Slower than Vulkan; use only if Vulkan is unavailable.
 ```bash
-LC=bench/llamacpp
+LC=stack/llamacpp/var/builds/b9949-rocm/bin
 LD_LIBRARY_PATH=$LC $LC/llama-server \
   -m <MODEL>.gguf --host 127.0.0.1 --port 8899 \
   -c 65536 -ngl 99 \
@@ -307,8 +307,8 @@ All scripts are version-controlled under `bench/harness/` and write JSONL via th
 `bench/harness/results_tuning_2026-07-10_1714.jsonl` (ub/b sweeps, backends, num_batch, MTP@auto, vLLM) ·
 transformers-HF rows in `bench/harness/results.jsonl`.
 
-**Builds:** llama.cpp ROCm = lemonade **b1295** gfx120X (bundled ROCm 7.15, dir `bench/llamacpp/`) · llama.cpp Vulkan = ggml-org
-release **b9950** (dir `bench/llamacpp-vulkan/`) · ollama **0.31.2** (bundled ROCm 7.2) · Mesa RADV **25.2.8** ·
+**Builds:** llama.cpp ROCm = lemonade **b1295** gfx120X (bundled ROCm 7.15, dir `stack/llamacpp/var/builds/b9949-rocm/bin/`) · llama.cpp Vulkan = ggml-org
+release **b9950** (dir `stack/llamacpp/var/builds/b9950-vulkan/bin/`) · ollama **0.31.2** (bundled ROCm 7.2) · Mesa RADV **25.2.8** ·
 vLLM **0.19.1** + ROCm **7.13** rc2 + PyTorch **2.10** (`rocm/vllm` image, gfx120X).
 
 **Environment gotchas hit during this session (for faithful reproduction):**

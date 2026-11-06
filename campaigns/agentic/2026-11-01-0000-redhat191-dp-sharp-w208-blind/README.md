@@ -1,6 +1,6 @@
 # RedHat Qwen3.8-27B-MXFP4 on Sly 1.9.1 (DFlash2 k=7, fp8, 262000), Cactus delta 0, with the dp-sharp chat template (keep-all reasoning, froggeric v22.5 + the dp terse prompt) - W2-08 blind review (RUNBOOK step A); one variable vs r191-sharp-d0 -- only the terse prompt differs (keep-all replay + delta 0 held fixed) (R9700, 2026-11-01)
 
-Scaffolded by `bench/gen_campaign.py` (`kind: agentic`). The executable driver is **`run.sh`** in this folder.
+Scaffolded by `bench/core/gen_campaign.py` (`kind: agentic`). The executable driver is **`run.sh`** in this folder.
 Each (rep, arm) reuses the **already-running** user-managed server on :8000 (the driver does **not** boot, stop or unload it, and does not run `gpu_exclusive.sh`), creates a **fresh git
 worktree** of `/home/dev/work/dippe/dp-forge` at `de110510eb9a4561a8e412f47a7c8d80fa5f0ebd`, runs a real `claude -p` session (same session resumed until `done_when`),
 tears the server down and collects the outputs. Loop order: reps outer, arms inner (arms interleave).
@@ -25,10 +25,10 @@ Per arm, the driver verifies the server is up and serves `qwen38-27b-redhat-mxfp
 ## Installs (copied into each fresh worktree)
 | src | dst (worktree-relative) | sha256 at emit time |
 |-----|-----|-----|
-| `/home/dev/work/dp-craft/amd/bench/runs/2026-10-30-0947-dpf-brief-ab/heretic/inputs/W2-06.md` | `docs/plans/2026-10-28-2239-dpf-tui-f0-f1/briefs/W2-06.md` | `afdff4f392841aa15e852770856fcb5f8f8d54908a83f7f14b63ec2c51780baa` |
-| `/home/dev/work/dp-craft/amd/bench/runs/2026-10-30-0947-dpf-brief-ab/heretic/inputs/W2-07.md` | `docs/plans/2026-10-28-2239-dpf-tui-f0-f1/briefs/W2-07.md` | `e8218f2efd5686fae2b4a8bcef415aed5ba3365142ba989821172f969f68f26b` |
-| `/home/dev/work/dp-craft/amd/bench/runs/2026-10-30-0947-dpf-brief-ab/heretic/inputs/W2-08.md` | `docs/plans/2026-10-28-2239-dpf-tui-f0-f1/briefs/W2-08.md` | `b249ad0d2645cf9dc03c2d2233353f0eca9e0980ae2fd9a17f2f17fa98222e23` |
-| `/home/dev/work/dp-craft/amd/bench/runs/2026-10-30-0947-dpf-brief-ab/heretic/inputs/progress.md` | `docs/plans/2026-10-28-2239-dpf-tui-f0-f1/review/27b-fix/progress.md` | `fc434b236e9f32855e47209aaf7a40e84011ccb45d49bb29f720bc811703887e` |
+| `/home/dev/work/dp-craft/amd/campaigns/agentic/2026-10-30-0947-dpf-brief-ab/inputs/heretic/W2-06.md` | `docs/plans/2026-10-28-2239-dpf-tui-f0-f1/briefs/W2-06.md` | `afdff4f392841aa15e852770856fcb5f8f8d54908a83f7f14b63ec2c51780baa` |
+| `/home/dev/work/dp-craft/amd/campaigns/agentic/2026-10-30-0947-dpf-brief-ab/inputs/heretic/W2-07.md` | `docs/plans/2026-10-28-2239-dpf-tui-f0-f1/briefs/W2-07.md` | `e8218f2efd5686fae2b4a8bcef415aed5ba3365142ba989821172f969f68f26b` |
+| `/home/dev/work/dp-craft/amd/campaigns/agentic/2026-10-30-0947-dpf-brief-ab/inputs/heretic/W2-08.md` | `docs/plans/2026-10-28-2239-dpf-tui-f0-f1/briefs/W2-08.md` | `b249ad0d2645cf9dc03c2d2233353f0eca9e0980ae2fd9a17f2f17fa98222e23` |
+| `/home/dev/work/dp-craft/amd/campaigns/agentic/2026-10-30-0947-dpf-brief-ab/inputs/heretic/progress.md` | `docs/plans/2026-10-28-2239-dpf-tui-f0-f1/review/27b-fix/progress.md` | `fc434b236e9f32855e47209aaf7a40e84011ccb45d49bb29f720bc811703887e` |
 
 The sha256 of each src at run time is written to `<arm dir>/installs.sha256`; compare with the table above.
 - `rewrite`: `[{"glob": "docs/plans/2026-10-28-2239-dpf-tui-f0-f1/briefs/W2-0[678].md", "from": "/home/dev/work/dippe/dpf-bench-heretic", "to": "{wt}"}, {"glob": "docs/plans/2026-10-28-2239-dpf-tui-f0-f1/01-writer-brief.md", "from": "/home/dev/work/dippe/dp-forge", "to": "{wt}"}]`
@@ -62,12 +62,12 @@ Continue: follow docs/plans/2026-10-28-2239-dpf-tui-f0-f1/review/27b-fix/RUNBOOK
 
 ## Run / rerun / re-collect
 ```bash
-bash campaigns/2026-11-01-redhat191-dp-sharp-w208-blind/run.sh
+bash campaigns/agentic/2026-11-01-0000-redhat191-dp-sharp-w208-blind/run.sh
 # resume after interruption: same command (done/ markers skip finished arms)
-# subset / shorter:  ONLY='s1-*' REPS=1 CAP_S=3600 MAX_RESUMES=2 bash campaigns/2026-11-01-redhat191-dp-sharp-w208-blind/run.sh
-# another output dir: RUN_DIR=/path bash campaigns/2026-11-01-redhat191-dp-sharp-w208-blind/run.sh
+# subset / shorter:  ONLY='s1-*' REPS=1 CAP_S=3600 MAX_RESUMES=2 bash campaigns/agentic/2026-11-01-0000-redhat191-dp-sharp-w208-blind/run.sh
+# another output dir: RUN_DIR=/path bash campaigns/agentic/2026-11-01-0000-redhat191-dp-sharp-w208-blind/run.sh
 ```
-Output: `bench/runs/2026-11-01-redhat191-dp-sharp-w208-blind/` (or `$RUN_DIR`): `summary.tsv` (rep, arm, status, wall_s, calls, resumes, done_line,
+Output: `campaigns/agentic/2026-11-01-0000-redhat191-dp-sharp-w208-blind/` (or `$RUN_DIR`): `summary.tsv` (rep, arm, status, wall_s, calls, resumes, done_line,
 main_unchanged, port_free, image, env), `failures.txt`, `driver.log`, and per (rep, arm) `rep<R>/<arm>/`: `server.txt`,
 `calls.tsv`, `session-N.jsonl`, `gpu_samples.csv`, `wt.diff`, `outputs/`, `tmp/`, `claude-project/`, `main-*.txt`.
 
@@ -77,4 +77,4 @@ re-collect by hand use the commands `run.sh` prints (worktree status/diff, the s
 `git worktree remove --force` its worktree, then rerun.
 
 ## Write-up
-**benchmark-results** skill -> co-located `campaigns/2026-11-01-redhat191-dp-sharp-w208-blind/analysis.md` (summary + table first).
+**benchmark-results** skill -> co-located `docs/findings/agentic/2026-11-01-0000-redhat191-dp-sharp-w208-blind.md` (summary + table first).

@@ -10,8 +10,8 @@ takeaway: `stilldeadcode/vllm-radiance` (gfx1201-only vLLM 0.27.1 + libr4d kerne
 - **Host venv (reference):** vLLM 0.29.0+rocm723 · torch 2.12.0+git6bbd260 · triton 3.7.1 · transformers 5.17.0 · `HSA_OVERRIDE_GFX_VERSION=12.0.1`
 - **Container:** `stilldeadcode/vllm-radiance:0.9.3` (pushed 2026-08-27, 3.96 GB compressed / **13.7 GB on disk**)
 - **Model:** `RedHatAI/Qwen3.8-27B-INT4` @ `bf08f3db` (compressed-tensors **W4A16**, group 128) · hybrid 64 layers = 48 Gated-DeltaNet + 16 full attention
-- **Data:** `bench/runs/2026-09-11-2047-vllm-qwen38-27b-int4/radiance-*` · `bench/runs/2026-09-12-1330-depth-curve-mtp/` (findings 21–24)
-- **Related:** `docs/analysis/2026-09-11-2047-vllm-qwen38-27b-int4.md` (the host-venv vLLM spike this branches from)
+- **Data:** `bench/runs/2026-09-11-2047-vllm-qwen38-27b-int4/radiance-*` · `campaigns/perf/2026-09-12-1330-depth-curve-mtp/` (findings 21–24)
+- **Related:** `docs/findings/vllm/2026-09-11-2047-vllm-qwen38-27b-int4.md` (the host-venv vLLM spike this branches from)
 
 ## Summary
 
@@ -211,7 +211,7 @@ head 256 aborts at CUDA-graph capture).
     8 beat 3 on the host — that rested on a single n=3 arm and does not survive n=10.
 
 15. **On REAL workloads radiance is markedly faster than on synthetic tokens — the headline risk resolved the
-    opposite way to the one feared.** (MEASURED, `bench/workloads/generated/` corpus fixtures, chat API.)
+    opposite way to the one feared.** (MEASURED, `bench/workloads/tmp/` corpus fixtures, chat API.)
 
     | Workload | prompt tok | decode tok/s | prefill tok/s | TTFT |
     |---|---|---|---|---|
@@ -305,7 +305,7 @@ head 256 aborts at CUDA-graph capture).
     finding.
 
 21. **CORRECTION — the depth confound is now closed, and it WITHDRAWS finding 20.** (MEASURED, run
-    `bench/runs/2026-09-12-1330-depth-curve-mtp/`, `t3.log` + `t3-armA.log`.) Same fixture family
+    `campaigns/perf/2026-09-12-1330-depth-curve-mtp/`, `t3.log` + `t3-armA.log`.) Same fixture family
     (`codereview-N`) at four depths, MTP on both engines, `--prefix-mode unique`, `--api chat`,
     `max_tokens 256`, n=3/point, temperature 0.2, one boot per engine. llama.cpp = the operator's
     current profile `qwen38-27b-q4kxl-q8-mtp-ctx200000-kvq8-mtp-sharp-coding` (the `ctx220k` id used in
@@ -408,7 +408,7 @@ head 256 aborts at CUDA-graph capture).
     could not be expressed by the existing tool — `--prefix-mode unique` prepends its marker at the
     **front**, moving token 0 and defeating prefix caching entirely, while `shared` resends the prompt
     byte-for-byte. Neither models an agent that re-reads one repo and asks a new question. Rather than
-    hand-roll a script, `bench/lib/capture_engine.py` gained `--prefix-mode tail` plus a repeatable
+    hand-roll a script, `bench/core/capture_engine.py` gained `--prefix-mode tail` plus a repeatable
     `--tail` (a literal `{}` is replaced by a random hex id); it always builds on `prompts[0]` so every
     request shares one prefix. +22 lines, purely additive — the `none`/`unique`/`shared` paths are
     untouched.
@@ -431,7 +431,7 @@ docker run -d --name radiance --rm \
   --shm-size 4g --cap-add SYS_PTRACE --security-opt seccomp=unconfined \
   -p 127.0.0.1:8000:8000 \
   -v /home/dev/models/vllm/Qwen3.8-27B-INT4:/model:ro \
-  -v /home/dev/work/dp-craft/amd/bench/dl/radiance-cache:/cache \
+  -v /home/dev/work/dp-craft/amd/stack/serve/var/models/radiance-cache:/cache \
   -e VLLM_ROCM_USE_AITER=1 -e VLLM_ROCM_USE_AITER_UNIFIED_ATTENTION=1 \
   -e VLLM_ROCM_USE_AITER_MHA=0 -e VLLM_ROCM_USE_AITER_MLA=0 -e VLLM_ROCM_USE_AITER_MOE=0 \
   -e VLLM_ROCM_USE_AITER_LINEAR=0 -e VLLM_ROCM_USE_AITER_FP8BMM=0 \

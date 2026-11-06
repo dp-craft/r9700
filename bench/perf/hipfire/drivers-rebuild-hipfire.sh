@@ -14,7 +14,7 @@ bash "$HOME/.hipfire/src/scripts/install.sh" \
   --gpu-arch gfx1201 \
   --strict-rocm \
   --yes
-echo "=== install.sh exit=$? (DO NOT TRUST IT - gate on hipfire --version) $(date -Is) ==="
+echo "=== stack/install/install.sh exit=$? (DO NOT TRUST IT - gate on hipfire --version) $(date -Is) ==="
 "$HOME/.hipfire/bin/hipfire" --version 2>&1 | head -3
 echo "=== install.json ==="; cat "$HOME/.hipfire/install.json" 2>/dev/null
 echo "REBUILD SCRIPT DONE"

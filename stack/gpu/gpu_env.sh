@@ -1,6 +1,6 @@
 # gpu_env.sh — vendor detection + vendor-neutral GPU meta. Source this, don't execute.
 #
-#   source "$REPO/bench/lib/gpu_env.sh"
+#   source "$REPO/stack/gpu/gpu_env.sh"
 #   gpu_setup_env      # AMD only: exports HSA_OVERRIDE_GFX_VERSION (respects pre-set value)
 #   gpu_meta           # prints gpu_vendor= / gpu_name= / gpu_driver= / vram_total_mib= lines
 #

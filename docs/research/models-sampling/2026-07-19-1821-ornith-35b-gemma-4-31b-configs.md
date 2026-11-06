@@ -8,7 +8,7 @@ takeaway: Two new models staged in the HF cache. Ornith-1.0-35B is a qwen35moe H
 # Research: Ornith-1.0-35B & Gemma-4-31B-it-qat — configs + arch for benchmarking
 
 - **Date:** 2026-07-19 18:21 (research)  · **Question:** how do we benchmark the two newly-staged models (`Ornith-1.0-35B-UD-Q4_K_M.gguf`, `gemma-4-31B-it-qat-UD-Q4_K_XL.gguf`), and what are their vendor-recommended run configs?
-- **Sources:** HF model cards `unsloth/Ornith-1.0-35B-GGUF` and `unsloth/gemma-4-31B-it-qat-GGUF` (extracted by a haiku subagent) = **CLAIMED**; local GGUF metadata via `bench/gguf_kv.py` + a bounded header read = **MEASURED**.
+- **Sources:** HF model cards `unsloth/Ornith-1.0-35B-GGUF` and `unsloth/gemma-4-31B-it-qat-GGUF` (extracted by a haiku subagent) = **CLAIMED**; local GGUF metadata via `bench/core/gguf_kv.py` + a bounded header read = **MEASURED**.
 
 ## Summary
 
@@ -35,7 +35,7 @@ but **MTP off** (it has no MTP tensors — unlike `Qwen3.6-27B-MTP`). Gemma is a
 sampler, a thinking template, an *external* MTP drafter, and no automatic VRAM guard.
 
 > ### ⚠ UPDATE 2026-07-19 (MEASURED) — Gemma deep-context CRASHES on the Vulkan/RADV driver
-> The `campaigns/2026-07-19-ornith-vs-gemma/` run shipped **Ornith-only at depth**: Gemma-4-31B
+> The `campaigns/quality/2026-07-19-0000-ornith-vs-gemma/` run shipped **Ornith-only at depth**: Gemma-4-31B
 > **cannot complete a deep prefill** on the Vulkan/RADV build (b9950, gfx1201). `llama-server` dies
 > mid-prefill with `decode() failed: vk::Queue::submit: ErrorDeviceLost` → `terminate … vk::DeviceLostError`,
 > a **GPU device-loss that crashes the whole Ubuntu desktop**. MEASURED crash points: n_tokens ≈ **65.5k
@@ -43,7 +43,7 @@ sampler, a thinking template, an *external* MTP drafter, and no automatic VRAM g
 > line in the log (solo VRAM 26.3/32.6 GiB), i.e. a RADV device hang — **but a concurrent VRAM consumer turns
 > it into a hard OOM** (a stray 31 GiB `Q5_K_M-35B` server on :8092 + Gemma ~26 GiB = 57 GiB on a 32 GB card;
 > always verify VRAM idle + kill stray servers first). No Vulkan workaround at deep ctx (q8_0 forces `-fa on`).
-> **FIX = `BACKEND=rocm`** (MEASURED 2026-07-19): `bench/llamacpp/llama-server` (b1-049326a) + `HSA_OVERRIDE_GFX_VERSION=12.0.1`
+> **FIX = `BACKEND=rocm`** (MEASURED 2026-07-19): `stack/llamacpp/var/builds/b9949-rocm/bin/llama-server` (b1-049326a) + `HSA_OVERRIDE_GFX_VERSION=12.0.1`
 > ran the **full ~140k prefill + all 5 replies clean** at q8_0/ctx150000 — past the exact ~65k Vulkan crash point, no
 > device-loss, no GUI crash (VRAM 27.1 GiB, GTT 90 MiB). ROCm prefill ~650→200 t/s (decays), **decode ~11.6 t/s
 > (~6× slower than Vulkan)** — the old "ROCm ~92× slower" figure did NOT hold. So the Vulkan crash is a RADV bug, not hardware.
@@ -72,7 +72,7 @@ sampler, a thinking template, an *external* MTP drafter, and no automatic VRAM g
 
 Neither model is emitted by `gen_campaign.py` (that only scaffolds *throughput* probes). The right
 harness is the **quality** track — reuse the frozen, grader-fixed
-`campaigns/2026-07-12-27b-finetune-quality/` machinery (`capture.py` + `graders/score_deterministic.py`
+`campaigns/quality/2026-07-12-1736-27b-finetune-quality/` machinery (`capture.py` + `graders/score_deterministic.py`
 + `make_charts.py` + `tasks/`), copied into a new campaign dir, per the operator note now in
 CLAUDE.md ("New-model quality campaign"). Substrate = Vulkan · f16 · `-ub 2048 -b 4096 -fa on`
 (the repo's frozen quality substrate). Two configs at minimum: `ornith-mtp-off` and

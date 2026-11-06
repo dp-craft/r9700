@@ -21,9 +21,9 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../../.." && pwd)"
-SERVE="$REPO/bench/engine-bench/serve_llamacpp.sh"
-SAMPLER="$REPO/bench/lib/vram_sampler.py"
-ROW="$REPO/bench/runs/2026-07-16-0927-mtp-sampler-probe/row.py"
+SERVE="$REPO/stack/serve/llamacpp/serve_llamacpp.sh"
+SAMPLER="$REPO/stack/gpu/vram_sampler.py"
+ROW="$REPO/campaigns/perf/2026-07-16-0927-mtp-sampler-tax/scripts/2026-07-16-0927-mtp-sampler-probe/row.py"
 OUT="$HERE/results2.jsonl"
 PORT="${PORT:-8099}"
 : > "$OUT"
@@ -43,7 +43,7 @@ boot () { # boot(model, mtp, extra_args)
 ask_seed () {
   local label="$1" arch="$2" mtp="$3" nmax="$4" maxtok="$5" seed="$6" frag="$7"
   local pid csv resp cpu0 cpu1 t0 t1
-  pid=$(cat "$REPO/bench/.servers/$PORT.pid")
+  pid=$(cat "$REPO/stack/serve/var/servers/$PORT.pid")
   csv="$HERE/gpu_${label}.csv"
   python3 "$SAMPLER" --out "$csv" --interval 0.5 & local spid=$!
   sleep 1

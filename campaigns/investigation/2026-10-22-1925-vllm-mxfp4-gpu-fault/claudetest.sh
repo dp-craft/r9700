@@ -63,10 +63,10 @@ EOF
 echo "[$label] compaction ${pct}% of $MAXLEN"
 
 TURN=(
- "Read CLAUDE.md, docs/GUIDE.md, bench/engine-bench/vllm/serve_vllm.sh and bench/lib/capture_engine.py in full. Then explain end to end how a vLLM benchmark run flows through these files."
- "Now read bench/gen_campaign.py and bench/lib/report.py in full and explain how they connect to the flow you described. Quote 3 concrete function names."
- "Read docs/plans/2026-10-22-mxfp4-qwen38-options/PLAN.md and docs/plans/2026-10-22-mxfp4-qwen38-options/ISSUE-SUMMARY.md in full and list every open hypothesis about the memory fault."
- "Read bench/model-bench/sweep.py and bench/model-bench/compare_builds.py in full and list 5 concrete risks in them, with line references."
+ "Read CLAUDE.md, docs/guides/GUIDE.md, stack/serve/vllm/serve_vllm.sh and bench/core/capture_engine.py in full. Then explain end to end how a vLLM benchmark run flows through these files."
+ "Now read bench/core/gen_campaign.py and bench/core/report.py in full and explain how they connect to the flow you described. Quote 3 concrete function names."
+ "Read notes/plans/2026-10-22-mxfp4-qwen38-options/PLAN.md and notes/plans/2026-10-22-mxfp4-qwen38-options/ISSUE-SUMMARY.md in full and list every open hypothesis about the memory fault."
+ "Read bench/perf/model-bench/sweep.py and bench/build-check/compare_builds.py in full and list 5 concrete risks in them, with line references."
 )
 res=PASS; times=""; [ "${WARM:-0}" = 1 ] && times=" $(grep -oE 'OK after [0-9]+' "$LOG.boot" | sed 's/OK after /warmboots=/')"
 cd "$REPO"

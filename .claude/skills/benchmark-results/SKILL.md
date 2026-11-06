@@ -7,7 +7,7 @@ description: Run a benchmark on the R9700 (RDNA4) box AND document it to a fixed
 
 The measured counterpart to the research skill. **Every configuration tested becomes a data row AND
 a documented line in the report.** Output language: **English**. Deterministic shape every time.
-Full how-to for a human: `docs/GUIDE.md`. Standard campaign: `campaigns/2026-07-11-starter-baseline/`.
+Full how-to for a human: `docs/guides/GUIDE.md`. Standard campaign: `campaigns/perf/2026-07-11-1833-starter-baseline/`.
 
 ## Route first — which track?
 | If the goal is… | Tool | Dir |
@@ -16,7 +16,7 @@ Full how-to for a human: `docs/GUIDE.md`. Standard campaign: `campaigns/2026-07-
 | Quick manual knob check (fixed grid, one invocation) | `run.sh` | `bench/model-bench/` |
 | Real-workload cross-engine / thinking / **concurrency** numbers against running servers | `run.sh` (capture_engine probe) | `bench/engine-bench/` |
 | The **combination matrix** — backend × MTP × KV × depth × parallel streams, server restarts handled, resumable | **`campaign.sh`** | `bench/engine-bench/` |
-| Community-comparable synthetic serving curves | llama-benchy (`bench/dl/benchy-venv`) | `bench/engine-bench/` |
+| Community-comparable synthetic serving curves | llama-benchy (`stack/serve/var/venvs/benchy-venv`) | `bench/engine-bench/` |
 
 llama-bench = synthetic tokens (no real prompts, no thinking, no MTP, no concurrency). Serving-only
 knobs (MTP `--spec-type draft-mtp`, `-np` slots, prefix cache) live in engine-bench. Don't force
@@ -161,10 +161,10 @@ unexplained ones stay listed as OPEN.>
 A campaign that produces charts but never shows them is a half-written report. **Never hand-draw an
 SVG or hand-write an appendix** — the tools own that (iron rule #6).
 
-1. **Generate** (quality campaigns): `campaigns/2026-07-12-27b-finetune-quality/make_charts.py --dir out
+1. **Generate** (quality campaigns): `bench/quality/make_charts.py --dir out
    --charts charts [--order …] [--calibration …]` → cell-level SVGs + `charts/appendix.md`. Per-task views:
    the campaign's own `make_charts_detailed.py --dir out --charts charts/detailed` → `charts/detailed/`.
-   Throughput runs: `bench/lib/report.py <run_dir>` → theme-aware SVG charts + `appendix.md` instead. Wire the call into the
+   Throughput runs: `bench/core/report.py <run_dir>` → theme-aware SVG charts + `appendix.md` instead. Wire the call into the
    campaign's `run_capture.sh` so charts regenerate with the data — a chart built from a stale
    `summary*.json` is a correctness bug, not a cosmetic one.
 2. **Embed the decision-grade charts INLINE at the finding they support** — a chart belongs next to the
@@ -183,7 +183,7 @@ SVG or hand-write an appendix** — the tools own that (iron rule #6).
    Judge verdicts · task heatmap → per-task results.
 3. **Link the rest**, don't dump all of them: name the appendix-only SVGs and point at
    `charts/appendix.md` + `charts/detailed/appendix.md`. Roughly 10–15 inline is right for a long
-   report; the reference shape is `campaigns/2026-07-14-hardest-tasks-27b-vs-35b/analysis.md`.
+   report; the reference shape is `docs/findings/quality/2026-07-14-0000-hardest-tasks-27b-vs-35b.md`.
 4. **A caption must not out-claim the statistics.** If the doc says the configs are not resolvable
    (overlapping CIs), every bar-chart caption must say the bar order is **not a ranking** — charts are
    the easiest place to quietly reintroduce a ranking the data does not support. Same for

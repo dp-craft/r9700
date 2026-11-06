@@ -194,7 +194,7 @@ def main():
                            # draft_n_accepted are 0/absent when the server ran with --spec-type none;
                            # acceptance is the single number that decides whether a sampler change hurt
                            # SPECULATION (draft rejection) vs added a fixed host cost (see
-                           # docs/analysis/2026-07-16-0927-mtp-sampler-tax.md).
+                           # docs/findings/llamacpp/2026-07-16-0927-mtp-sampler-tax.md).
                            "draft_n": tm.get("draft_n"),
                            "draft_n_accepted": tm.get("draft_n_accepted"),
                            "draft_acceptance_pct": (round(100 * tm["draft_n_accepted"] / tm["draft_n"], 2)

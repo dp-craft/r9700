@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # haiku_arm.sh prep|score TASK SIZE VARIANT: the same fixture, brief and scorer as run_arm.sh, for a Haiku subagent. Work dir: $UC/runs-haiku/<arm>. Results: arms-haiku/<arm>/.
-RUN=/home/dev/work/dp-craft/amd/bench/runs/2026-11-05-0320-ornith-usecases; H=$RUN/harness
+RUN=/home/dev/work/dp-craft/amd/campaigns/workers/2026-11-05-0320-ornith-usecases/results/2026-11-05-0320-ornith-usecases; H=$RUN/harness
 UC=/tmp/claude-1001/-home-dev-work-dp-craft-amd/bf832afa-1002-41d9-a4b8-4b201a1bc43c/scratchpad/uc
-TS=/home/dev/work/dp-craft/amd/campaigns/2026-07-14-hardest-tasks-27b-vs-35b/ts-harness/node_modules
+TS=/home/dev/work/dp-craft/amd/bench/quality/var/node_modules
 CMD=$1; TASK=$2; SIZE=$3; V=$4; ARM=$TASK.$SIZE.$V.haiku; A=$UC/runs-haiku/$ARM; M=$RUN/arms-haiku/$ARM; KD=$UC/$TASK-$SIZE
 case "$TASK" in impl|testgen|edit|bugfix) KD=$H/code/$TASK;; esac
 if [ "$CMD" = prep ]; then

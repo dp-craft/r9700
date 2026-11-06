@@ -7,7 +7,7 @@ takeaway: Per-task deep dive. The 27B sits in the haiku->sonnet band (best cells
 
 # Qwen3.6-27B — quality at depth, **per-task deep dive** (R9700, gfx1201)
 
-> **Companion to [`analysis.md`](analysis.md).** This is the per-task breakdown: parameter effects,
+> **Companion to [`analysis.md`](2026-07-13-1657-27b-quality-at-depth.md).** This is the per-task breakdown: parameter effects,
 > every blind-judge comment, best-config-per-task, and external research.
 >
 > **One dataset, stated up front.** The benchmark run's *original* grade was voided by a measurement
@@ -36,7 +36,7 @@ takeaway: Per-task deep dive. The 27B sits in the haiku->sonnet band (best cells
 - 🎯 **The genuine bottleneck is strict lint + types, not logic.** The model writes correct,
   well-tested code (tests 0.89, edge 0.95, reuse 0.97) but trips **strict `eslint`** (mean **0.29**)
   and **strict `tsc`** (mean **0.32**). This is the real, *designed-in* wall — even Opus fails
-  `expr-eval` lint one-shot. *(MEASURED, corroborates [eval-design.md](eval-design.md))*
+  `expr-eval` lint one-shot. *(MEASURED, corroborates [eval-design.md](../../../campaigns/quality/2026-07-13-1657-27b-quality-at-depth/eval-design.md))*
 - 🧠 **Reasoning budget: helps at 64k, saturates at 128k.** 64k: 68→75→**79%** as budget goes
   1024→2048→4096. 128k: 68→73→73% (flat). The model **always spends the whole budget** (it never
   stops early), so more budget = strictly more time/tokens with *no* gain past the knee at depth. *(MEASURED)*
@@ -117,7 +117,7 @@ did not get better and did not run again. Re-grading only replaces a broken *rul
 The **same 120 frozen answers**, measured twice — the voided run vs the clean re-grade. Shown so the
 incident is auditable; **used nowhere else.**
 
-![Incident record — voided grade vs clean re-grade (this chart is the ONLY place the voided numbers appear)](charts/detailed/d9_correction.svg)
+![Incident record — voided grade vs clean re-grade (this chart is the ONLY place the voided numbers appear)](../../../campaigns/quality/2026-07-13-1657-27b-quality-at-depth/results/charts/detailed/d9_correction.svg)
 
 | cell | voided grade TS% | clean re-grade TS% |
 |------|:---:|:---:|
@@ -169,7 +169,7 @@ incident is auditable; **used nowhere else.**
 
 ## 2. Capability — per task vs the haiku/sonnet/opus ladder
 
-![Capability per task — 27B vs haiku/sonnet/opus](charts/detailed/d1_capability_by_task.svg)
+![Capability per task — 27B vs haiku/sonnet/opus](../../../campaigns/quality/2026-07-13-1657-27b-quality-at-depth/results/charts/detailed/d1_capability_by_task.svg)
 
 **Reference lines are apples-to-apples** — the haiku/sonnet/opus one-shots were graded when vitest
 worked (their calibration `tests`/`edge` are non-zero), same as our re-grade.
@@ -197,7 +197,7 @@ worked (their calibration `tests`/`edge` are non-zero), same as our re-grade.
 
 ### 3.1 🧠 Reasoning budget × depth → quality
 
-![Reasoning budget × depth → quality, per task](charts/detailed/d2_budget_depth_quality.svg)
+![Reasoning budget × depth → quality, per task](../../../campaigns/quality/2026-07-13-1657-27b-quality-at-depth/results/charts/detailed/d2_budget_depth_quality.svg)
 
 - **At 64k, more thinking helps** — especially on the hard tasks:
   - `lru-cache` 58→66→**81%**, `rate-limiter` 64→74→**84%**, `expr-eval` 55→61→**64%**,
@@ -214,7 +214,7 @@ worked (their calibration `tests`/`edge` are non-zero), same as our re-grade.
 
 ### 3.2 💸 …and what that budget costs
 
-![Reasoning budget × depth → output-token cost, per task](charts/detailed/d3_budget_depth_cost.svg)
+![Reasoning budget × depth → output-token cost, per task](../../../campaigns/quality/2026-07-13-1657-27b-quality-at-depth/results/charts/detailed/d3_budget_depth_cost.svg)
 
 - Output tokens (and thus time) rise **≈ linearly with budget** — because thinking = budget.
 - Compare with §3.1: on flat tasks (e.g. `store-remove` at 128k) you pay **2× the tokens for 0%
@@ -225,7 +225,7 @@ worked (their calibration `tests`/`edge` are non-zero), same as our re-grade.
 
 ### 3.3 📉 KV precision f16 vs q8_0
 
-![KV f16 vs q8 → quality, per task](charts/detailed/d5_kv_by_task.svg)
+![KV f16 vs q8 → quality, per task](../../../campaigns/quality/2026-07-13-1657-27b-quality-at-depth/results/charts/detailed/d5_kv_by_task.svg)
 
 At 128k, budget 2048 *(MEASURED)*:
 
@@ -250,7 +250,7 @@ At 128k, budget 2048 *(MEASURED)*:
 
 ### 3.4 🤖 Model — unsloth vs jackrong
 
-![Model unsloth vs jackrong → quality, per task](charts/detailed/d6_model_by_task.svg)
+![Model unsloth vs jackrong → quality, per task](../../../campaigns/quality/2026-07-13-1657-27b-quality-at-depth/results/charts/detailed/d6_model_by_task.svg)
 
 - **Quality is close** (128k f16 b2048: unsloth **73** vs jackrong **67** mean). Neither dominates
   every task — jackrong wins `rate-limiter`/`store-remove`, unsloth wins `deep-equal`/`expr-eval`.
@@ -262,7 +262,7 @@ At 128k, budget 2048 *(MEASURED)*:
 
 ## 4. Where it fails — the strict lint + types wall
 
-![Objective heatmap — where each task fails](charts/detailed/d8_objective_by_task.svg)
+![Objective heatmap — where each task fails](../../../campaigns/quality/2026-07-13-1657-27b-quality-at-depth/results/charts/detailed/d8_objective_by_task.svg)
 
 Mean objective across all configs *(MEASURED)*:
 
@@ -281,11 +281,11 @@ Mean objective across all configs *(MEASURED)*:
   `exactOptionalPropertyTypes`). *(MEASURED — the recurring `fails:` in every task table.)*
 - This is exactly the "**TDD + linting bottleneck**" the eval was built to expose — and where even
   Opus fails `expr-eval` one-shot. So "below sonnet on the hard tasks" means **"doesn't write
-  strict-clean code in one shot,"** not "can't do the problem." *(MEASURED + [eval-design.md](eval-design.md).)*
+  strict-clean code in one shot,"** not "can't do the problem." *(MEASURED + [eval-design.md](../../../campaigns/quality/2026-07-13-1657-27b-quality-at-depth/eval-design.md).)*
 - **Design quality is high regardless:** the blind judge averages **~4.0–4.6 / 5** on
   design/clarity/robustness across every task — the code *reads* well even when it trips a strict rule.
 
-![Blind-judge design/clarity/robustness per task](charts/detailed/d7_judge_axes_by_task.svg)
+![Blind-judge design/clarity/robustness per task](../../../campaigns/quality/2026-07-13-1657-27b-quality-at-depth/results/charts/detailed/d7_judge_axes_by_task.svg)
 
 **Consequence for deployment:** pair the 27B with a **lint/type auto-fix loop** (feed `eslint --fix`
 + `tsc` errors back for one repair turn). That converts its already-correct logic into strict-clean
@@ -301,7 +301,7 @@ honest **per-task** cost is the **generation** it does itself — `(thinking + a
 — which excludes that one-time prefill. That is the x-axis below. *(MEASURED; the cold prefill is a
 per-session fixed cost, reported in `analysis.md`.)*
 
-![Efficiency frontier — quality vs generation time, per task](charts/detailed/d4_efficiency_by_task.svg)
+![Efficiency frontier — quality vs generation time, per task](../../../campaigns/quality/2026-07-13-1657-27b-quality-at-depth/results/charts/detailed/d4_efficiency_by_task.svg)
 
 *Bubble = output tokens · color = budget (blue 1k → amber 2k → red 4k) · up-and-left wins.*
 
@@ -575,7 +575,7 @@ list is from the clean re-grade.
   generous floor for a strong model — "matches sonnet" means "matches one-shot sonnet."
 - **`lint` is binary** (clean / not). A fractional (error-count) lint would show the 27B is *close*
   on many replies rather than a hard 0. This understates it on the lint-wall tasks. *(from
-  [eval-design.md](eval-design.md); a proposed grader refinement.)*
+  [eval-design.md](../../../campaigns/quality/2026-07-13-1657-27b-quality-at-depth/eval-design.md); a proposed grader refinement.)*
 - **GTT host-RAM spill** (from `analysis.md`, still valid): every cell spilled 785–2049 MiB into GTT
   at 64–128k on this 32 GB card — a freeze risk to watch, and the likely environment behind the
   vitest failure. Prefer q8 at 128k for headroom.
@@ -604,8 +604,8 @@ list is from the clean re-grade.
 
 ## Appendix
 
-- **Per-task charts:** [`charts/detailed/appendix.md`](charts/detailed/appendix.md) (all 9 SVGs).
-- **Cell-level charts & full original verdict table:** [`charts/appendix.md`](charts/appendix.md).
+- **Per-task charts:** [`charts/detailed/appendix.md`](../../../campaigns/quality/2026-07-13-1657-27b-quality-at-depth/results/charts/detailed/appendix.md) (all 9 SVGs).
+- **Cell-level charts & full original verdict table:** [`charts/appendix.md`](../../../campaigns/quality/2026-07-13-1657-27b-quality-at-depth/results/charts/appendix.md).
 - **Corrected per-task data:** `out/summary_by_task.json` (from `aggregate.py --by-task --scores scores_typescript_regraded.jsonl`).
 - **Reproduce the correction:**
   ```

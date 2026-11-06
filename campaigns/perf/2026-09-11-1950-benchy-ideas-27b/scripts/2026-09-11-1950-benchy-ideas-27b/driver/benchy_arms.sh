@@ -20,18 +20,18 @@ run_arm() {  # NAME BUILD KV SPEC...
   local name=$1 build=$2 kv=$3; shift 3; local spec="$*" t0=$SECONDS out
   [ -f "$CAMP/$name.done" ] && { echo "skip $name (done)"; return 0; }
   echo "=== $name  build=$build kv=$kv spec=[$spec]  $(date +%T)"
-  "$REPO/bench/lib/gpu_exclusive.sh" 28000 >/dev/null || { echo "$name: GPU not free" | tee -a "$CAMP/failures.txt"; return 1; }
+  "$REPO/stack/gpu/gpu_exclusive.sh" 28000 >/dev/null || { echo "$name: GPU not free" | tee -a "$CAMP/failures.txt"; return 1; }
   if ! GGML_VK_ALLOW_GRAPHICS_QUEUE=1 LLAMA_SERVER="$REPO/build/$build/bin/llama-server" MODEL="$MODEL" \
        CTX=163840 NP=1 UB=2048 B=4096 FA=on KV="$kv" MTP=0 PORT=$PORT WAIT=300 \
-       EXTRA_ARGS="$BASE $spec" "$REPO/bench/engine-bench/serve_llamacpp.sh" start; then
+       EXTRA_ARGS="$BASE $spec" "$REPO/stack/serve/llamacpp/serve_llamacpp.sh" start; then
     echo "$name: server failed to start" | tee -a "$CAMP/failures.txt"
-    cp "$REPO/bench/.servers/$PORT.log" "$CAMP/$name.server.log" 2>/dev/null; return 1
+    cp "$REPO/stack/serve/var/servers/$PORT.log" "$CAMP/$name.server.log" 2>/dev/null; return 1
   fi
   out=$(USE_BENCHY=1 SAMPLE_VRAM=1 SLUG="benchy-$name" ENGINES_LIST="$name|http://127.0.0.1:$PORT/v1|qwen38-27b" \
-        BENCHY_ARGS="$BENCHY_BASE --save-result $CAMP/$name.json" timeout 420 "$REPO/bench/engine-bench/run.sh" 2>&1)
-  PORT=$PORT "$REPO/bench/engine-bench/serve_llamacpp.sh" stop
-  cp "$REPO/bench/.servers/$PORT.log" "$CAMP/$name.server.log"
-  cp "$REPO/bench/.servers/$PORT.cmdline" "$CAMP/$name.cmdline"
+        BENCHY_ARGS="$BENCHY_BASE --save-result $CAMP/$name.json" timeout 420 "$REPO/bench/perf/engine-bench/run.sh" 2>&1)
+  PORT=$PORT "$REPO/stack/serve/llamacpp/serve_llamacpp.sh" stop
+  cp "$REPO/stack/serve/var/servers/$PORT.log" "$CAMP/$name.server.log"
+  cp "$REPO/stack/serve/var/servers/$PORT.cmdline" "$CAMP/$name.cmdline"
   echo "$out" | sed -n 's/^→ results: //p' > "$CAMP/$name.rundir"
   if [ -s "$CAMP/$name.json" ]; then touch "$CAMP/$name.done"
   else echo "$name: no benchy result" | tee -a "$CAMP/failures.txt"; echo "$out" | tail -5; fi
@@ -52,9 +52,9 @@ i=0
 for b in b10909-vulkan b10909-rmkq1-vulkan b10909-vulkan b10909-rmkq1-vulkan; do
   i=$((i + 1)); [ -f "$CAMP/rmkq-$i.done" ] && continue
   echo "=== rmkq-$i $b  $(date +%T)"
-  "$REPO/bench/lib/gpu_exclusive.sh" 28000 >/dev/null || { echo "rmkq-$i: GPU not free" | tee -a "$CAMP/failures.txt"; continue; }
+  "$REPO/stack/gpu/gpu_exclusive.sh" 28000 >/dev/null || { echo "rmkq-$i: GPU not free" | tee -a "$CAMP/failures.txt"; continue; }
   out=$(GGML_VK_ALLOW_GRAPHICS_QUEUE=1 LLAMA_BENCH="$REPO/build/$b/bin/llama-bench" MODEL="$MODEL" SLUG="rmkq$i-$b" \
-        PP=512 TG=128 DEPTH=0 UB=2048 BATCH=4096 CTK=f16 CTV=f16 REPS=5 timeout 300 "$REPO/bench/model-bench/run.sh" 2>&1)
+        PP=512 TG=128 DEPTH=0 UB=2048 BATCH=4096 CTK=f16 CTV=f16 REPS=5 timeout 300 "$REPO/bench/perf/model-bench/run.sh" 2>&1)
   echo "$out" | sed -n 's/^→ results: //p' > "$CAMP/rmkq-$i.rundir"
   [ -s "$(cat "$CAMP/rmkq-$i.rundir")/llama-bench.json" ] && touch "$CAMP/rmkq-$i.done" \
     || { echo "rmkq-$i: failed" | tee -a "$CAMP/failures.txt"; echo "$out" | tail -5; }

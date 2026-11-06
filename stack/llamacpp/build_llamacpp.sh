@@ -5,7 +5,7 @@
 #   builds/<ver>-<backend>    CMake binary dir, backend = vulkan|rocm: bin/ + BUILD_INFO
 #   builds/latest-<backend>   symlink → the promoted <ver>-<backend>; llama-swap serves
 #                             builds/latest-<backend>/bin/llama-server (generate.py VULKAN_BIN/ROCM_BIN)
-#   (setup_vulkan.sh manages the self-contained Vulkan SDK under llamacpp/vulkansdk/)
+#   (setup_vulkan.sh manages the self-contained Vulkan SDK under stack/llamacpp/var/vulkansdk/)
 #
 # Usage:
 #   build_llamacpp.sh status                        latest-* targets, newest upstream tag, builds, disk, SDK
@@ -19,7 +19,7 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BUILD="$REPO/llamacpp/builds"
+BUILD="$REPO/stack/llamacpp/var/builds"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SDK_SETUP="$SCRIPT_DIR/setup_vulkan.sh"
 UPSTREAM="https://github.com/ggml-org/llama.cpp.git"
@@ -135,7 +135,7 @@ build_one() {  # VER BACKEND JOBS
         vulkan)
             echo "glslc=$(glslc --version | head -1)"
             echo "vulkan_sdk=${SDK_VER:-system}"
-            [ "${SDK_VER:-system}" != "system" ] && echo "vulkan_sdk_path=$REPO/llamacpp/vulkansdk/$SDK_VER"
+            [ "${SDK_VER:-system}" != "system" ] && echo "vulkan_sdk_path=$REPO/stack/llamacpp/var/vulkansdk/$SDK_VER"
             ;;
         rocm) echo "hip=$(hipconfig --version)" ;;
     esac
@@ -154,8 +154,8 @@ cmd_build() {
   # Init Vulkan SDK if building Vulkan backend
   if echo "$list" | grep -q "vulkan"; then
     # Ensure glslc is available: local SDK first, then system fallback
-    if [ -L "$REPO/llamacpp/vulkansdk/latest" ]; then
-      local sdk="$(readlink -f "$REPO/llamacpp/vulkansdk/latest")"
+    if [ -L "$REPO/stack/llamacpp/var/vulkansdk/latest" ]; then
+      local sdk="$(readlink -f "$REPO/stack/llamacpp/var/vulkansdk/latest")"
       local glslc_path
       glslc_path=$(find "$sdk" -name glslc -type f -executable 2>/dev/null | head -1)
       if [ -n "$glslc_path" ]; then
@@ -186,7 +186,7 @@ cmd_build() {
   (( free >= MIN_FREE_GB )) || die "only ${free} GB free on $BUILD (need ${MIN_FREE_GB})"
   fetch_src "$tag"
   for b in $list; do build_one "$tag" "$b" "${jobs:-$(auto_jobs "$b")}"; done
-  echo "DONE $tag [$list] — next: bench/model-bench/compare_builds.py run --new $tag"
+  echo "DONE $tag [$list] — next: bench/build-check/compare_builds.py run --new $tag"
 }
 
 cmd_promote() {

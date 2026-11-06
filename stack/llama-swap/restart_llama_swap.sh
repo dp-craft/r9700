@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Manage llama-swap router: kill all llama-swap/llama-server instances and start/stop/restart
+# Manage llama-swap router: kill all stack/llama-swap/llama-server instances and start/stop/restart
 set -euo pipefail
 
 BIN="$HOME/.local/bin/llama-swap"

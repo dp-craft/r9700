@@ -45,7 +45,7 @@ takeaway: On gfx1201/RDNA4, AITER's C++/ASM kernels don't run (VLLM_ROCM_USE_AIT
 
 Mixed/hybrid: **64 layers = 16 groups of (3× Gated-DeltaNet → 1× Gated Attention)**. Gated-DeltaNet
 (a linear-attention/SSM form) keeps a fixed-size state (no growing KV); only the ~16 gated-attention
-layers cache KV → the 64 KiB/tok f16 figure our `bench/gguf_kv.py` reports. FP8 is attractive because
+layers cache KV → the 64 KiB/tok f16 figure our `bench/core/gguf_kv.py` reports. FP8 is attractive because
 Gated-DeltaNet is numerically stable under quantization — but **FP8 block-wise is gated to NVIDIA
 compute capability > 8.9 (Ada/Hopper+)**, which is exactly why RDNA4 falls back.
 

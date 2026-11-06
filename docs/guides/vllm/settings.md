@@ -33,7 +33,7 @@ an issue cross-links to `known-issues.md`. `HIP_FORCE_DEV_KERNARG=0` is **not** 
 ## `--moe-backend triton_unfused` (MXFP4 MoE on Sly)
 - **what-for:** replaces the `EMULATION` backend vLLM picks for `amd/Qwen3.5-35B-A3B-MXFP4`.
 - **how-to-use:** `EXTRA_ARGS="--moe-backend triton_unfused"`. It is not the `sly-amd` profile default; the archived starters in
-  `bench/engine-bench/vllm/archive/` pass it. It cannot load with `method: mtp` on a checkpoint whose MTP layer is unquantized.
+  `stack/serve/vllm/retired/` pass it. It cannot load with `method: mtp` on a checkpoint whose MTP layer is unquantized.
 - **side-effect:** decode rises from 16.6 to 110.2 tok/s at 10k and KV capacity from 305,666 to 448,702 tokens; prefill drops
   14–21% (MEASURED, DFlash K=7). It runs BF16 activations, and no AMD or vLLM source recommends it. See `known-issues.md`.
 - **version measured:** sly 1.9.1 (vLLM 0.32.0), short replies only.

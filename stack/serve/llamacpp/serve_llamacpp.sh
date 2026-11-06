@@ -24,21 +24,21 @@
 #                         fluctuation (6/6 distinct replies at every level). Do not set it for speed.
 # Also: any penalty sampler on the request (presence/frequency/repeat) costs a fixed ~2 ms/token of
 # host work, worst under MTP — keep them at 0 for coding.
-# Full account: bench/runs/2026-07-16-1111-spec-draft-pmin-mtp/analysis.md +
-# docs/research/2026-07-16-1016-spec-draft-p-min-mtp.md.
+# Full account: campaigns/perf/2026-07-16-0927-mtp-sampler-tax/results/2026-07-16-1111-spec-draft-pmin-mtp/analysis.md +
+# docs/research/llamacpp/2026-07-16-1016-spec-draft-p-min-mtp.md.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
-source "$REPO/bench/lib/gpu_env.sh"; gpu_setup_env
+source "$REPO/stack/gpu/gpu_env.sh"; gpu_setup_env
 
 : "${BACKEND:=rocm}"
-if [ "$BACKEND" = vulkan ]; then DEFBIN="$REPO/bench/llamacpp-vulkan/llama-server"
-else DEFBIN="$REPO/bench/llamacpp/llama-server"; fi
+if [ "$BACKEND" = vulkan ]; then DEFBIN="$REPO/stack/llamacpp/var/builds/b9950-vulkan/bin/llama-server"
+else DEFBIN="$REPO/stack/llamacpp/var/builds/b9949-rocm/bin/llama-server"; fi
 : "${LLAMA_SERVER:=$DEFBIN}"
 : "${PORT:=8080}"
 : "${WAIT:=420}"
 
-RUNDIR="$REPO/bench/.servers"; mkdir -p "$RUNDIR"
+RUNDIR="$REPO/stack/serve/var/servers"; mkdir -p "$RUNDIR"
 PIDFILE="$RUNDIR/$PORT.pid"; LOGFILE="$RUNDIR/$PORT.log"; CMDFILE="$RUNDIR/$PORT.cmdline"
 
 case "${1:-start}" in

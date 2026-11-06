@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """build_p3.py: blind grading set judge-p3 = base, dp, dpr notes per report under random labels (seed 20261106)."""
 import json,os,random,shutil
-RUN='/home/dev/work/dp-craft/amd/bench/runs/2026-11-05-0320-ornith-usecases'; SP='/tmp/claude-1001/-home-dev-work-dp-craft-amd/bf832afa-1002-41d9-a4b8-4b201a1bc43c/scratchpad'
+RUN='/home/dev/work/dp-craft/amd/campaigns/workers/2026-11-05-0320-ornith-usecases/results/2026-11-05-0320-ornith-usecases'; SP='/tmp/claude-1001/-home-dev-work-dp-craft-amd/bf832afa-1002-41d9-a4b8-4b201a1bc43c/scratchpad'
 OLD=f'{SP}/judge-p2'; NEW=f'{SP}/judge-p3'
 REP={'buildcmp':'2026-09-15-stew675-buildcmp.analysis.md','sharp':'2026-10-31-redhat-sharp-w208-blind.analysis.md',
      'depth':'2026-10-30-0900-vllm-redhat-mxfp4-depth-transposed.md','hardest':'2026-07-14-hardest-tasks-27b-vs-35b.analysis.md'}

@@ -15,7 +15,7 @@ SLUG="$1"; CTX="$2"; MTP="$3"; NP="$4"; KVD="$5"
 A="$R/${SLUG}-rerun"; mkdir -p "$A"
 IMG=stilldeadcode/vllm-radiance:0.9.3
 MODEL=/home/dev/models/vllm/Qwen3.8-27B-INT4
-CACHE=/home/dev/work/dp-craft/amd/bench/dl/radiance-cache
+CACHE=/home/dev/work/dp-craft/amd/stack/serve/var/models/radiance-cache
 NAME=radiance-bootprobe
 RG=$(getent group render | cut -d: -f3); VG=$(getent group video | cut -d: -f3)
 FLOOR=${FLOOR:-29000}
@@ -27,7 +27,7 @@ trap cleanup EXIT INT TERM
 snap() { if docker logs "$NAME" > "$A/.log.tmp" 2>&1; then mv "$A/.log.tmp" "$A/server.log"; else rm -f "$A/.log.tmp"; fi; }
 
 echo "########## ${SLUG} RERUN (ctx=$CTX mtp=$MTP np=$NP kv=$KVD)  ($(date +%T))"
-if ! bash bench/lib/gpu_exclusive.sh "$FLOOR" > "$A/gpu_exclusive.log" 2>&1; then
+if ! bash stack/gpu/gpu_exclusive.sh "$FLOOR" > "$A/gpu_exclusive.log" 2>&1; then
   echo "   SKIPPED — GPU not exclusive:"; tail -3 "$A/gpu_exclusive.log" | sed 's/^/      /'; exit 0
 fi
 cleanup

@@ -32,14 +32,14 @@ PROFILE=sly-radiance/qwen38-mxfp4 PORT=8000 ./serve_vllm.sh    # boot: gpu_exclu
 PORT=8000 ./serve_vllm.sh stop|status|logs
 IMAGE=ghcr.io/slybase/vllm-sly-radiance:<new-tag> PROFILE=... ./serve_vllm.sh   # try a new image
 ```
-Every boot writes `bench/.servers/<port>.cmdline`: argv, image digest, model repo+revision, vLLM version.
+Every boot writes `stack/serve/var/servers/<port>.cmdline`: argv, image digest, model repo+revision, vLLM version.
 While booting, a **VRAM watchdog** polls sysfs every 0.2 s and `docker kill`s the container if free
-VRAM drops below `WATCHDOG_MIB` (default 256; the desktop shares the card — see `docs/vllm/workflows.md`, A2).
+VRAM drops below `WATCHDOG_MIB` (default 256; the desktop shares the card — see `docs/guides/vllm/workflows.md`, A2).
 
 ## Monitoring
 
 A live server exposes three data sources (no extra setup): vLLM `/metrics` (Prometheus), `amd-smi`,
-and the log (`bench/.servers/<port>.log`).
+and the log (`stack/serve/var/servers/<port>.log`).
 
 **Quick check (one-liner):**
 ```bash
@@ -49,9 +49,9 @@ watch -n 2 'curl -s http://127.0.0.1:8000/metrics \
 ```
 Prefix-cache hit rate = `hits / queries` — watch it go >0 after a prefix-caching boot.
 
-**Live view (`bench/lib/monitor.py`):** zero-install (Python + rocm-smi; on radiance also docker access), read-only. Polls
+**Live view (`stack/gpu/monitor.py`):** zero-install (Python + rocm-smi; on radiance also docker access), read-only. Polls
 `/metrics` + rocm-smi every 2 s and shows live blocks (top→bottom) — what each shows is in
-`python3 bench/lib/monitor.py --help` (usage + blocks):
+`python3 stack/gpu/monitor.py --help` (usage + blocks):
 - **GPU** — VRAM/GTT + 5 colored bars (GPU use / power / VRAM / edge temp / mem temp) + fan + clocks; green→yellow→red thresholds (red over 80/90 C)
 - **cache/queue/spec** — KV %, prefix-cache hit % + cached-token counts, block hit %, on radiance `recomputed` (tokens the attention cache held but no linear checkpoint let it skip, since server start; they count in `comp`), spec acceptance % + draft-token counts, running/waiting (idle collapses to one line)
 - **server** — cumulative since server start (title shows `up Xm, since HH:MM:SS`) (req, in/cached/comp/out tokens, TTFT, prefill/decode TPS, gap = inter-token latency, queue, full = mean full round trip)
@@ -66,13 +66,13 @@ prompt tokens are not counted. Values are colored green/yellow/red by threshold 
 `--history N` sets the past request rows (default 15); `--out` appends one JSONL row per poll.
 It is the "observe" half of the bench 3-task model (probe / monitor / report).
 ```bash
-python3 bench/lib/monitor.py --port 8000 --out session.jsonl   # live, records the session
-python3 bench/lib/monitor.py --port 8000 --once               # single snapshot
-python3 bench/lib/monitor.py --port 8000 --history 50         # show 50 history rows
+python3 stack/gpu/monitor.py --port 8000 --out session.jsonl   # live, records the session
+python3 stack/gpu/monitor.py --port 8000 --once               # single snapshot
+python3 stack/gpu/monitor.py --port 8000 --history 50         # show 50 history rows
 ```
 
-**Log:** `tail -f bench/.servers/8000.log` (like llama-swap `status`).
+**Log:** `tail -f stack/serve/var/servers/8000.log` (like llama-swap `status`).
 
 > The track's **plan**, **deviations from the Sly README quickstart**, and **known issues** moved
-> to the vLLM knowledge base: `docs/vllm/` (workflows.md, settings.md, known-issues.md). This
+> to the vLLM knowledge base: `docs/guides/vllm/` (workflows.md, settings.md, known-issues.md). This
 > README is the tool doc (Layout / Models / Usage / Monitoring) only.

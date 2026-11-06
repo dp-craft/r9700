@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Unit + stub end-to-end tests for gen_campaign.py (vllm `env`, `kind: "agentic"`).
 
-Run:  python3 bench/test_gen_campaign.py -v
+Run:  python3 bench/core/test_gen_campaign.py -v
 
 No GPU, docker, network or real `claude`: the generated agentic run.sh is executed against stub
 tools (SERVE_VLLM, SERVE_LLAMASWAP, GPU_EXCLUSIVE, VRAM_SAMPLER, DOCKER, CURL, CLAUDE_BIN), in a temp

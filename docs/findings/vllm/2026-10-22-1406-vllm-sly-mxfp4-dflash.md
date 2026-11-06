@@ -9,10 +9,10 @@ takeaway: Adding the **DFlash2 k=7 drafter** (`syvai/Qwen3.8-27B-DFlash2-W4A16`)
 
 - **Date:** 2026-10-22 14:13–14:26 local (first launch 14:06 aborted by a session teardown, see Methodology) · **Track:** engine-bench campaign (`gen_campaign.py`, `engine: vllm`)
 - **GPU/Host:** AMD Radeon AI PRO R9700, 32624 MiB, power cap **210 W** (`POWER_SAVING`, −100 mV, −21 MHz — user tuning, unchanged) · Ryzen 5 3600, 31 GB RAM · kernel 7.0.0-38
-- **Runtime:** `ghcr.io/slybase/vllm-sly-radiance:1.6.0-rocm10.1` @ `sha256:bf153fa38868…7506` (reports vLLM 0.31.0) · `bench/engine-bench/vllm/serve_vllm.sh`, profile `sly-radiance/qwen38-mxfp4-dflash`
+- **Runtime:** `ghcr.io/slybase/vllm-sly-radiance:1.6.0-rocm10.1` @ `sha256:bf153fa38868…7506` (reports vLLM 0.31.0) · `stack/serve/vllm/serve_vllm.sh`, profile `sly-radiance/qwen38-mxfp4-dflash`
 - **Model:** `amd/Qwen3.8-27B-Quark-AWQ-MXFP4` @ `5233554c` · drafter **`syvai/Qwen3.8-27B-DFlash2-W4A16` @ `4d30ec73`**, `num_speculative_tokens 7`, `draft_sample_method greedy`, drafter attention `TRITON_ATTN`, cudagraph sizes `[8]` · KV **fp8** · ctx **150000** · max-num-seqs 1 · gpu-mem-util 0.90
-- **Baseline (the one variable removed):** `campaigns/2026-10-22-vllm-sly-mxfp4-depth/` — same image, model, KV, ctx, fixtures, sampler
-- **Data:** `bench/runs/2026-10-22-vllm-sly-mxfp4-dflash/` (consolidated `results.jsonl`, per-probe dirs `bench/runs/2026-10-22-14{17,18,19,22}-engine-dx-*`) · server log of the aborted boot: `aborted-boot-1.server.log`
+- **Baseline (the one variable removed):** `campaigns/perf/2026-10-22-1324-vllm-sly-mxfp4-depth/` — same image, model, KV, ctx, fixtures, sampler
+- **Data:** `campaigns/perf/2026-10-22-1406-vllm-sly-mxfp4-dflash/` (consolidated `results.jsonl`, per-probe dirs `bench/runs/2026-10-22-14{17,18,19,22}-engine-dx-*`) · server log of the aborted boot: `aborted-boot-1.server.log`
 
 ## Summary
 
@@ -25,7 +25,7 @@ The drafter does what the baseline was missing: **single-stream decode goes from
 | DFlash2 | block-diffusion drafter: a small model proposes 7 tokens per step, conditioned on the target's hidden states; the target verifies all 7 + 1 in one forward | decode 3–6× faster cold, up to ~10× on deep conversation turns (MEASURED) | on (this campaign) vs off (baseline), all else fixed |
 | lookup draft | Sly's n-gram matcher: proposes a continuation copied from context > 2048 tokens back (`[radiance] lookup draft: active (enter 8 stay 3 hot 3, sources > 2048 tokens back, greedy draft, steps 7)`, server log) | likely helps copy-heavy replies; **not separable** from DFlash2 in the counters (OPEN) | image default, left on |
 | k | `num_speculative_tokens` = drafted tokens per step | 7 in every step (draft tokens = 7 × drafts exactly, MEASURED); the image's `RADIANCE_DYNAMIC_DRAFT` controller is for MTP only | fixed (Sly README recipe) |
-| acceptance | accepted ÷ drafted tokens (vLLM spec-decode counters, diffed per probe, warm-ups included) | 30.6–52.9 % cold, 66.9 % conversation (MEASURED) | `bench/lib/spec_metrics.py` |
+| acceptance | accepted ÷ drafted tokens (vLLM spec-decode counters, diffed per probe, warm-ups included) | 30.6–52.9 % cold, 66.9 % conversation (MEASURED) | `stack/gpu/spec_metrics.py` |
 | τ (mean accept len) | tokens emitted per verify step = 1 + accepted/drafts | 3.14–4.71 cold, 5.68 conversation (MEASURED) | same |
 | verify-step rate | decode tok/s ÷ τ ≈ target forwards per second (INFERRED, approximate: τ is per probe incl. warm-up, decode per request) | 29.0 → 24.3 steps/s from 8k to 136k (k −0.06) vs AR 33.8 → 17.9 (k −0.23) | derived |
 | KV `fp8` | 8-bit E4M3 KV cache | pool **345,297 tokens** in 12.5 GiB (2.30 × 150k), vs 433,957 in 13.74 GiB without the drafter | fixed — user decision |
@@ -70,11 +70,11 @@ Speed-up = mean of the two reps ÷ baseline mean. ◦ = first measured request a
 
 The decode fits are poor because decode no longer follows depth. It follows acceptance (finding 2). The tool's cold "p50" over 2 reps is the minimum per metric, so read the per-request table.
 
-**Decode vs depth** — ![Decode vs depth](charts/depth_decode.svg)
+**Decode vs depth** — ![Decode vs depth](../../../campaigns/perf/2026-10-22-1406-vllm-sly-mxfp4-dflash/results/charts/depth_decode.svg)
 
 > DFlash series only (report.py cannot overlay two campaigns yet — see Proposals). The baseline was 33.8 / 31.0 / 27.5 / 17.9 tok/s at the same depths. The curve is not monotone: the 20k fixture accepts worst (30.6 %), and 8k accepts best (52.9 %). MEASURED.
 
-**Prefill vs depth** — ![Prefill vs depth](charts/depth_prefill.svg)
+**Prefill vs depth** — ![Prefill vs depth](../../../campaigns/perf/2026-10-22-1406-vllm-sly-mxfp4-dflash/results/charts/depth_prefill.svg)
 
 > Within ±3 % of the baseline's clean reps at every depth (2,788 vs 2,870 · 2,641 vs 2,574 · 2,357 vs 2,291 · 1,504 vs 1,504). The drafter does not tax prefill. MEASURED.
 
@@ -94,15 +94,15 @@ The decode fits are poor because decode no longer follows depth. It follows acce
 
 Both reps completed all 9 turns (the baseline's rep 1 died at turn 8). Each rep's wall time was **108.3 s and 109.5 s, against the baseline's 184.8 s** (rep 0). Of that, TTFT took 93.6 / 93.8 s (baseline 92.9) and decode 14.7 / 15.7 s (baseline 91.9). 5 of 18 replies ended with `stop` inside 256 tokens; the rest hit `length`. VRAM 30,425–30,442 MiB, GTT ≤ 98 MiB.
 
-**Conversation: decode per turn** — ![Conversation decode](charts/conv_decode.svg)
+**Conversation: decode per turn** — ![Conversation decode](../../../campaigns/perf/2026-10-22-1406-vllm-sly-mxfp4-dflash/results/charts/conv_decode.svg)
 
 > Decode *rises* with depth here (baseline: falls 32.9 → 18.3). Per-turn acceptance is not recorded, so the per-probe 66.9 % is the only acceptance figure. That this rise is driven by acceptance is INFERRED from finding 2. Rep-to-rep spread on the same turn reaches 45 % (turn 3: 148 vs 203), so single-turn decode figures are noisy. MEASURED.
 
-**Conversation: TTFT per turn** — ![Conversation TTFT](charts/conv_ttft.svg)
+**Conversation: TTFT per turn** — ![Conversation TTFT](../../../campaigns/perf/2026-10-22-1406-vllm-sly-mxfp4-dflash/results/charts/conv_ttft.svg)
 
 > Same as the baseline within ~1 s per turn: prefill now dominates the agent-facing cost. MEASURED.
 
-**Power by phase** — ![Power by phase](charts/power_phase.svg)
+**Power by phase** — ![Power by phase](../../../campaigns/perf/2026-10-22-1406-vllm-sly-mxfp4-dflash/results/charts/power_phase.svg)
 
 > Prefill 205–216 W, decode 203–220 W per probe. Nothing was flagged (threshold 150 W). Decode mclk was 1,258 MHz in 100 % of cold-decode samples and 96 % in the conversation (median 1,258, min 1,124). Prefill mclk median was 456–1,124 MHz at sclk 2.1–2.5 GHz, i.e. power-limited as in the baseline. MEASURED.
 
@@ -122,7 +122,7 @@ Both reps completed all 9 turns (the baseline's rep 1 died at turn 8). Each rep'
 
 ## Consequences & root causes
 
-1. **Decode is no longer this engine's weak side.** 136.6 tok/s at 8k and 100.5 at 136k cold, and 145–203 tok/s on conversation turns past 55k (MEASURED). Against the repo's earlier llama.cpp + MTP (67.4 @ 8k / 35.4 @ 98k; `bench/runs/2026-09-12-1943-vllm-bigwindow-depthcurve`, MEASURED there), that is ~2× at 8k and ~3× at ~100k, *on top of* 3.1× / 2.4× faster prefill. Not like-for-like: older llama.cpp build b10909, a GGUF Q4 quant, an unknown power profile then, so this is a direction, not a ranking.
+1. **Decode is no longer this engine's weak side.** 136.6 tok/s at 8k and 100.5 at 136k cold, and 145–203 tok/s on conversation turns past 55k (MEASURED). Against the repo's earlier llama.cpp + MTP (67.4 @ 8k / 35.4 @ 98k; `campaigns/perf/2026-09-12-1844-vllm-window-budgets/results/2026-09-12-1943-vllm-bigwindow-depthcurve`, MEASURED there), that is ~2× at 8k and ~3× at ~100k, *on top of* 3.1× / 2.4× faster prefill. Not like-for-like: older llama.cpp build b10909, a GGUF Q4 quant, an unknown power profile then, so this is a direction, not a ranking.
    **→ On this workload shape (code review with thinking, single stream), vLLM + MXFP4 + DFlash2 is the fastest serving config this repo has measured, in both phases.**
 
 2. **Decode is now acceptance-bound, not depth-bound.** The baseline's AR decode fell with depth at k −0.23. With DFlash, the implied verify-step rate barely moves: 29.0 → 24.3 steps/s from 8k to 136k, k −0.06, R² 0.93 (INFERRED from MEASURED decode ÷ τ). Decode tok/s is therefore set by τ. The 20k fixture accepts worst (τ 3.14 → 86.7 tok/s), and the 8k fixture best among the cold probes (τ 4.71 → 136.6). A notable side result: at 136k, one verify step (8 query tokens + a drafter pass) runs at 24.3/s, while one AR step in the baseline ran at only 17.9/s. INFERRED explanation: the baseline's depth decay was mostly the q_len=1 decode-attention path losing efficiency (baseline finding 2 measured it at ~54 % of the KV-read roofline at 131k). Sly installs a separate verify-batch decode-attention tune (`[radiance] decode attn tune installed (verify-batch config …)`, server log), which that path avoids.
@@ -147,11 +147,11 @@ Both reps completed all 9 turns (the baseline's rep 1 died at turn 8). Each rep'
 ## Recommended config
 
 ```bash
-PROFILE=sly-radiance/qwen38-mxfp4-dflash PORT=8000 bench/engine-bench/vllm/serve_vllm.sh
+PROFILE=sly-radiance/qwen38-mxfp4-dflash PORT=8000 stack/serve/vllm/serve_vllm.sh
 # = qwen38-mxfp4 (MAXLEN=150000 KV_DTYPE=fp8 MAXSEQS=1 util 0.90) + --speculative-config.method dflash
 #   --speculative-config.model /draft (syvai/Qwen3.8-27B-DFlash2-W4A16@4d30ec73) num_speculative_tokens 7
 #   draft_sample_method greedy attention_backend TRITON_ATTN, cudagraph sizes [8]
-# exact docker argv + image digest + model/drafter revisions: bench/.servers/8000.cmdline
+# exact docker argv + image digest + model/drafter revisions: stack/serve/var/servers/8000.cmdline
 ```
 Use it for **single-agent coding/review loops up to 150k** with a client-side timeout. It wins both phases on this box. Hold back for (a) long unattended runs, until the MXFP4 prefill fault is bisected (1 in 57 requests so far); (b) long generations, until #164 is checked with captured reply text; (c) windows > 150k, which were not tested on vLLM. llama.cpp's Q4 GGUF path still covers 262k on Ornith/35B-A3B.
 
@@ -175,4 +175,4 @@ Sly README (radiance 1.5.1, 300 W, util 0.98, fp8 KV, DFlash2 k=7): **149.6 tok/
 - A lookup-draft-off A/B to attribute the conversation speed-up; then the fault bisect from the baseline (`RADIANCE_MXFP4_A_TILED_MIN_M`, repeat deep conversation ×N, 1.5.x image), fault watch in the harness, and an upstream report (outward-facing — ask first).
 - A like-for-like llama.cpp + MTP rerun on the current build (b11448) with these fixtures and power profile, to replace the old reference numbers.
 
-Full chart appendix: [`appendix.md`](appendix.md) (adds `memory.svg`, `conv_prefill_new.svg`).
+Full chart appendix: [`appendix.md`](../../../campaigns/perf/2026-10-22-1406-vllm-sly-mxfp4-dflash/results/appendix.md) (adds `memory.svg`, `conv_prefill_new.svg`).

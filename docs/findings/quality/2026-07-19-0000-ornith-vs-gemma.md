@@ -7,7 +7,7 @@ takeaway: Ornith-1.0-35B (qwen35moe hybrid, MTP off, Vulkan) on the hardest-task
 
 # Ornith-1.0-35B @ 120k depth (vs Qwen3.6-35B-A3B) — Gemma blocked on Vulkan
 
-- **Date:** 2026-07-19 · **Harness:** TS-TDD hardest-tasks (real `tsc + eslint + vitest`, self-check gated), copied from `campaigns/2026-07-14-hardest-tasks-27b-vs-35b`.
+- **Date:** 2026-07-19 · **Harness:** TS-TDD hardest-tasks (real `tsc + eslint + vitest`, self-check gated), copied from `campaigns/quality/2026-07-14-0000-hardest-tasks-27b-vs-35b`.
 - **Substrate (MEASURED):** llama.cpp Vulkan **b9950**, `-ub 2048 -b 4096 -fa on`, ctx 163840, `--reasoning-budget 4096`, Qwen coding sampler temp 0.6 / top_p 0.95 / top_k 20 / min_p 0. Ornith **KV f16, MTP off** (qwen35moe has 0 nextn tensors → MTP impossible). 3 reps × 5 tasks = 15 replies, 0 capture/grade errors.
 - **Comparison cell:** `a3b-d128-f16-rb4096` from the 2026-07-14 campaign — **identical** tasks/depth/sampler/KV/budget; differs only in model and **MTP-on** (35B has a nextn layer). So quality is a clean model comparison; speed carries an MTP asymmetry.
 
@@ -60,7 +60,7 @@ haiku 81% · sonnet 91% · opus 94% (one-shot, ~550–620-token prompts). The lo
 
 ## Gemma-4-31B-it-qat — Vulkan-blocked, ROCm-viable (MEASURED)
 
-**The driver decides.** On **Vulkan/RADV** (b9950) deep Gemma is non-viable: `llama-server` dies mid-prefill with `decode() failed: vk::Queue::submit: ErrorDeviceLost` → `vk::DeviceLostError`, a GPU device-loss that **crashes the whole Ubuntu desktop** — MEASURED at n_tokens **~65.5k @ctx163840** and **~24.5k @ctx140000** (lowering ctx doesn't help; no `allocation failed` line — a RADV hang, not OOM, though a concurrent 31 GiB stray server turns it into a hard OOM). On **ROCm/HIP** (`bench/llamacpp/llama-server` b1-049326a, `HSA_OVERRIDE_GFX_VERSION=12.0.1`) the **same q8_0/ctx150000 config runs clean end-to-end** — MEASURED: prefilled the full ~140k context and generated all 5 replies, **no device-loss, no GUI crash**, past the exact ~65k point where Vulkan died. So the crash is a **RADV driver bug, not a hardware/memory limit**. The stale repo "ROCm ~92× slower" figure did NOT hold: ROCm prefill was ~650→200 tok/s (decays with depth). The real ROCm cost is **decode: ~11.6 t/s (~6× slower than Vulkan's 70.9)** and long TTFA (351.6s).
+**The driver decides.** On **Vulkan/RADV** (b9950) deep Gemma is non-viable: `llama-server` dies mid-prefill with `decode() failed: vk::Queue::submit: ErrorDeviceLost` → `vk::DeviceLostError`, a GPU device-loss that **crashes the whole Ubuntu desktop** — MEASURED at n_tokens **~65.5k @ctx163840** and **~24.5k @ctx140000** (lowering ctx doesn't help; no `allocation failed` line — a RADV hang, not OOM, though a concurrent 31 GiB stray server turns it into a hard OOM). On **ROCm/HIP** (`stack/llamacpp/var/builds/b9949-rocm/bin/llama-server` b1-049326a, `HSA_OVERRIDE_GFX_VERSION=12.0.1`) the **same q8_0/ctx150000 config runs clean end-to-end** — MEASURED: prefilled the full ~140k context and generated all 5 replies, **no device-loss, no GUI crash**, past the exact ~65k point where Vulkan died. So the crash is a **RADV driver bug, not a hardware/memory limit**. The stale repo "ROCm ~92× slower" figure did NOT hold: ROCm prefill was ~650→200 tok/s (decays with depth). The real ROCm cost is **decode: ~11.6 t/s (~6× slower than Vulkan's 70.9)** and long TTFA (351.6s).
 
 **Gemma quality (ROCm, q8_0, ctx150000, n=1, temp 1.0 / top_k 64):** **56.6% TS** (CI [32.9, 80.4]), **0/5 hard-pass**, think 1,357 tok (thinks less than Ornith). Objective: tests 0.60 · edge **0.80** · lint **0.12** · types **0.20** · reuse 1.00 — logic/edge competitive but it hits the **lint/types wall harder than Ornith** (0.12/0.20 vs 0.33/0.33) → no strict clean pass.
 
@@ -75,7 +75,7 @@ haiku 81% · sonnet 91% · opus 94% (one-shot, ~550–620-token prompts). The lo
 | pricing-deferred | 67.6 | **74** |
 | **mean** | **62.2** | **56.6** |
 
-Ornith leads the mean by ~6 pts and gets the only hard-pass, but **Gemma's single rep at temp 1.0 has a CI of [33, 80] — this is not yet a real comparison.** Gemma wins 2 of 5 tasks. To make it fair, Gemma needs ≥3 reps on ROCm (each ~8 min of decode). Memory is clean on ROCm (GTT only 90 MiB). Full detail: CLAUDE.md "Errors & fixes" + `docs/research/2026-07-19-1821-ornith-35b-gemma-4-31b-configs.md`.
+Ornith leads the mean by ~6 pts and gets the only hard-pass, but **Gemma's single rep at temp 1.0 has a CI of [33, 80] — this is not yet a real comparison.** Gemma wins 2 of 5 tasks. To make it fair, Gemma needs ≥3 reps on ROCm (each ~8 min of decode). Memory is clean on ROCm (GTT only 90 MiB). Full detail: CLAUDE.md "Errors & fixes" + `docs/research/models-sampling/2026-07-19-1821-ornith-35b-gemma-4-31b-configs.md`.
 
 ## Caveats
 

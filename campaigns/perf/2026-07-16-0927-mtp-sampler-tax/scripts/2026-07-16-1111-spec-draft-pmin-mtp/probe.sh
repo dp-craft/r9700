@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # probe.sh — does --spec-draft-p-min do ANYTHING on the MTP path? (user hypothesis: it lowers 35B fluctuation)
 #
-# CHALLENGE UNDER TEST: research (docs/research/2026-07-16-1016-spec-draft-p-min-mtp.md) says p_min is
+# CHALLENGE UNDER TEST: research (docs/research/llamacpp/2026-07-16-1016-spec-draft-p-min-mtp.md) says p_min is
 # NOT consulted on --spec-type draft-mtp (PR #22673 TODO; MTP drafts greedy top_k=1, stops on n_max).
 # And speculative decoding is distribution-EXACT (sampling.cpp accepts a draft token only if it equals
 # the token the target sampler would emit), so a draft-length knob cannot change the OUTPUT distribution
@@ -24,9 +24,9 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../../.." && pwd)"
-SERVE="$REPO/bench/engine-bench/serve_llamacpp.sh"
-SAMPLER="$REPO/bench/lib/vram_sampler.py"
-ROW="$REPO/bench/runs/2026-07-16-0927-mtp-sampler-probe/row.py"   # reuse the 0927 row emitter verbatim
+SERVE="$REPO/stack/serve/llamacpp/serve_llamacpp.sh"
+SAMPLER="$REPO/stack/gpu/vram_sampler.py"
+ROW="$REPO/campaigns/perf/2026-07-16-0927-mtp-sampler-tax/scripts/2026-07-16-0927-mtp-sampler-probe/row.py"   # reuse the 0927 row emitter verbatim
 OUT="$HERE/results.jsonl"
 PORT="${PORT:-8099}"
 : > "$OUT"
@@ -44,7 +44,7 @@ boot () { # boot(model, mtp, extra_args)
 ask () {
   local label="$1" arch="$2" mtp="$3" nmax="$4" maxtok="$5" frag="$6"
   local pid csv resp cpu0 cpu1 t0 t1
-  pid=$(cat "$REPO/bench/.servers/$PORT.pid")
+  pid=$(cat "$REPO/stack/serve/var/servers/$PORT.pid")
   csv="$HERE/gpu_${label}.csv"
   python3 "$SAMPLER" --out "$csv" --interval 0.5 & local spid=$!
   sleep 1

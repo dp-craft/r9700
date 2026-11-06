@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# ornith_rad_mtp.sh — start/stop native Radiance serving keptn/ornith-1.5-35b-a3b-w4a8 (own MTP head, K=3) on one card.
-#   ornith_rad_mtp.sh start|stop|status|logs        then: claude --settings ~/.config/claude/local_vllm_direct/settings-redhat.json
+# stack/serve/radiance/ornith_rad_mtp.sh — start/stop native Radiance serving keptn/ornith-1.5-35b-a3b-w4a8 (own MTP head, K=3) on one card.
+#   stack/serve/radiance/ornith_rad_mtp.sh start|stop|status|logs        then: claude --settings ~/.config/claude/local_vllm_direct/settings-redhat.json
 # Flags = the creator's deploy/compose/ornith-1.5-35b-a3b-w4a8-tp1.yaml (codeberg.org/StillDeadcode/radiance) verbatim.
 # Deviations from that compose file, none of them model-facing:
 #   --host 127.0.0.1 instead of :: (local only, so no API key); no restart policy (a reboot must not hold VRAM);
@@ -11,11 +11,11 @@
 # VRAM: Radiance claims all free VRAM minus the headroom, whatever --max-model-len is; the KV cache takes the rest.
 # The default 96 left about 232 MiB free (MEASURED), which crashed the desktop once, so the headroom is 500 MiB higher;
 # not measured yet. Close Chrome if VRAM gets tight.
-# EXTRA_ARGS="--gpu-headroom-mib 2048" is recommended only (docs/vllm/known-issues.md).
+# EXTRA_ARGS="--gpu-headroom-mib 2048" is recommended only (docs/guides/vllm/known-issues.md).
 # For precise coding the creator suggests --temp 0.6 --presence-penalty 0 (EXTRA_ARGS=... appended last, later flag wins).
 # Thinking stays on (operator's rule; added to the compose flags): explicit default, and reasoning_effort none/minimal is
 # remapped. A request's own chat_template_kwargs {"enable_thinking":false} still wins; no server flag blocks that.
-# Fetch: bench/engine-bench/vllm/fetch_model.sh keptn/ornith-1.5-35b-a3b-w4a8 cfed0f8f07d0ef8d0c7dcf4d29a07eeb6a402472
+# Fetch: stack/serve/vllm/fetch_model.sh keptn/ornith-1.5-35b-a3b-w4a8 cfed0f8f07d0ef8d0c7dcf4d29a07eeb6a402472
 # serve_vllm.sh does not cover this: it builds vLLM arguments, native Radiance has its own CLI.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

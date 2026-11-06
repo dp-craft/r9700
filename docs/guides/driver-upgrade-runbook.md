@@ -24,7 +24,7 @@ removed 0, and left every Mesa/Vulkan package at the same version (`05-rocm10-up
 | Mesa support libs | `libdrm* 2.4.134-3~kisak~n`, `libllvm21 1:21.1.8`, `libllvm20`, `mesa-libgallium`, `libgl1-mesa-dri`, `xwayland` … (amd64 **and** i386) | kisak-mesa PPA | Mesa | no |
 | Vulkan loader + tools | `libvulkan1` / `vulkan-tools` `1.4.313.0~rc1-1lunarg24.04-1` | LunarG apt repo | any Vulkan program | no |
 | ROCm / HIP | **`10.0.0~pre4` (HIP 7.15.26333) and `7.13.0~pre2` side by side** | `repo.radeon.com/rocmradeon/apt/26.14` | hipfire (built against `core-10.0`) | **yes** |
-| llama.cpp ROCm row | vendored HIP 7.15 (`bench/llamacpp-b10375`, `bench/llamacpp`) | bundled with the build | llama-swap `rocm` rows | no — does not use system ROCm |
+| llama.cpp ROCm row | vendored HIP 7.15 (`bench/llamacpp-b10375`, `stack/llamacpp/var/builds/b9949-rocm/bin`) | bundled with the build | llama-swap `rocm` rows | no — does not use system ROCm |
 | AMD graphics/installer repos | `amdgpu-install 31.30`, `graphics/26.12` | `repo.radeon.com` | — | no |
 
 **What each upgrade can change:** a **Mesa** upgrade changes llama.cpp-Vulkan speed and stability;
@@ -80,7 +80,7 @@ single decode run; take ≥ 3 and quote the spread (`05` §24.4, §28.5).
 ### 1.3 Free the GPU the sanctioned way
 
 ```bash
-bash ~/work/dp-craft/amd/bench/lib/gpu_exclusive.sh 26000
+bash ~/work/dp-craft/amd/stack/gpu/gpu_exclusive.sh 26000
 ```
 
 It unloads llama-swap, kills the whole hipfire process shape, and fails loudly naming the holder if
@@ -190,7 +190,7 @@ the first run after the upgrade — it includes shader compilation.
 
 The served Vulkan binary is `bench/llamacpp-vulkan-6fdd0ac/llama-server` (`VULKAN_BIN` in
 `~/.config/llama-swap/generate.py`; `--version` → `0.3.0-dev (build 200, commit 6fdd0ac)`). The
-older `bench/llamacpp-vulkan` tree is build 9950. Rebuild llama.cpp only when you want a newer
+older `stack/llamacpp/var/builds/b9950-vulkan/bin` tree is build 9950. Rebuild llama.cpp only when you want a newer
 llama.cpp, not for a driver change:
 
 ```bash
@@ -227,7 +227,7 @@ That downgrades every kisak package to the Ubuntu archive version and disables t
 Full record: `hipfire-engine-evaluation/05-rocm10-upgrade-log.md` §§1–14. Scripts:
 `hipfire-engine-evaluation/rocm-upgrade/install-rocm-10.sh` and `purge-rocm-7.13.sh`. **The scripts'
 header comments still say `docs/test/rocm-upgrade/`** — they live under
-`docs/research/2026-09-10-0100-hipfire-engine-evaluation/rocm-upgrade/`; call them by that path.
+`stack/install/rocm-upgrade/`; call them by that path.
 
 ### 3.1 Find what is actually available — do not trust the directory index
 
@@ -274,7 +274,7 @@ not remove the working stack; rollback is repointing consumers at the old tree.
 Run the install detached and follow the log:
 
 ```bash
-sudo nohup bash ~/work/dp-craft/amd/docs/research/2026-09-10-0100-hipfire-engine-evaluation/rocm-upgrade/install-rocm-10.sh \
+sudo nohup bash ~/work/dp-craft/amd/stack/install/rocm-upgrade/install-rocm-10.sh \
   > /tmp/rocm10.log 2>&1 &
 tail -f /tmp/rocm10.log
 ```
@@ -309,7 +309,7 @@ grep -o '"rocm_root"[^,]*' ~/.hipfire/install.json     # must name core-10.0, no
 - **Pin `--rocm-root` to the versioned tree.** The 7.13 build recorded `"rocm_root": "/opt/rocm"`;
   with several `core-*` trees under it, which one a fresh build picks is ambiguous.
 - **Pin `--commit`** so the engine source does not move at the same time as the runtime.
-- **`install.sh` exits 0 even when the build fails** — gate on `hipfire --version` + `hipfire diag`.
+- **`stack/install/install.sh` exits 0 even when the build fails** — gate on `hipfire --version` + `hipfire diag`.
 
 The llama.cpp **ROCm** row loads its own vendored HIP through a per-row `LD_LIBRARY_PATH` set by
 `generate.py`, so it needs nothing. `ldconfig -p | grep libamdhip64` returning nothing is the proof
@@ -337,7 +337,7 @@ Two dpkg-installed ROCm versions is the configuration most likely behind the ear
 (`05` §7). The purge script is dry-run by default and refuses to run unless 10.0 is installed:
 
 ```bash
-S=~/work/dp-craft/amd/docs/research/2026-09-10-0100-hipfire-engine-evaluation/rocm-upgrade/purge-rocm-7.13.sh
+S=~/work/dp-craft/amd/stack/install/rocm-upgrade/purge-rocm-7.13.sh
 sudo bash "$S"            # dry run: lists the 7.13 and gfx120x packages it would purge
 sudo bash "$S" --apply    # purge + autoremove
 dpkg -l | awk '/^ii +amdrocm/{print $3}' | sort -u     # expect only 10.0.0~pre4
@@ -346,7 +346,7 @@ dpkg -l | awk '/^ii +amdrocm/{print $3}' | sort -u     # expect only 10.0.0~pre4
 Do this only after hipfire is rebuilt against `core-10.0` (done — `install.json` names it). Keep
 `~/.hipfire_kernels.hip713.bak` until you are sure you will not roll back.
 
-**Never delete** `bench/llamacpp` or `bench/llamacpp-b10375` while cleaning up: the first is the
+**Never delete** `stack/llamacpp/var/builds/b9949-rocm/bin` or `bench/llamacpp-b10375` while cleaning up: the first is the
 second entry of `ROCM_LIB_PATH` in `generate.py` and supplies HIP 7.15 to the live llama-swap `rocm`
 row. Safe to delete (dead weight, 4.8 GB): `/usr/local/lib/ollama/rocm_v7_2` and
 `/home/dev/work2/amd-bench/llamacpp` — see `05` §7.4 before doing so.
@@ -361,7 +361,7 @@ row. Safe to delete (dead weight, 4.8 GB): `/usr/local/lib/ollama/rocm_v7_2` and
 | 2 | Install script stopped silently after step 4, twice | log ended at the `apt-cache policy` table; no `apt-get` ever ran | `set -euo pipefail` + `cmd \| head -4`: `head` closes the pipe, `apt-cache` dies of SIGPIPE (141), `pipefail` + `set -e` abort | never pipe into `head`/`grep -q` under `pipefail`; capture into a variable, match with `case`; use `sed -n '1,4p'` (reads all input) |
 | 3 | The fix inverted the gate: "10.0.0~pre4 not offered" printed right under the line showing it | abort branch taken | same bug in `\| grep -q`: the better the match, the sooner SIGPIPE | same fix — `POLICY=$(…); case "$POLICY" in *'10.0.0~pre4'*) …` |
 | 4 | First diagnosis was "download timed out" | looked plausible for 1 GB | invented to fit; no timeout was ever observed | check `pgrep apt-get` and `/var/log/apt/history.log` before theorising |
-| 5 | hipfire build "succeeded" but was broken | `install.sh` exit 0 | script does not propagate the build failure | gate on `hipfire --version` + `hipfire diag` |
+| 5 | hipfire build "succeeded" but was broken | `stack/install/install.sh` exit 0 | script does not propagate the build failure | gate on `hipfire --version` + `hipfire diag` |
 | 6 | Every Rust/C build failed at link | `error: linking with 'cc' failed` | `/home/dev/scripts/cc` (Claude launcher) shadows `/usr/bin/cc` | `PATH=/usr/bin:$PATH CC=/usr/bin/cc CXX=/usr/bin/c++` |
 | 7 | Ambiguous ROCm picked by a rebuild | `install.json` `rocm_root: "/opt/rocm"` | several `core-*` trees under one root | `--rocm-root /opt/rocm/core-10.0` |
 | 8 | Worse numbers straight after the runtime bump | — | hipfire kernel cache compiled for the old HIP | move `~/.hipfire_kernels` aside, rebuild |
@@ -409,12 +409,12 @@ row. Safe to delete (dead weight, 4.8 GB): `/usr/local/lib/ollama/rocm_v7_2` and
 ## 8. Sources
 
 **This box's records**
-- `docs/research/2026-09-10-0100-hipfire-engine-evaluation/05-rocm10-upgrade-log.md` — §1–4 survey and pre-state, §5–8 steps and rollback, §7 multi-version audit, §10–13 four install attempts, §14 rebuild, §16–17 re-measurement, §28.3 memory fault, §28.14 loader spin.
+- `notes/hipfire/2026-09-10-0100-rocm10-upgrade-log.md` — §1–4 survey and pre-state, §5–8 steps and rollback, §7 multi-version audit, §10–13 four install attempts, §14 rebuild, §16–17 re-measurement, §28.3 memory fault, §28.14 loader spin.
 - `…/hipfire-engine-evaluation/02-rollout-plan.md` — the `cc` shim trap, kernel-version risk.
 - `…/hipfire-engine-evaluation/rocm-upgrade/` — `install-rocm-10.sh`, `purge-rocm-7.13.sh`, `pre-upgrade-state.txt`.
-- `docs/research/2026-07-10-rdna4-llamacpp-ollama-backend-tuning.md` §3 — Vulkan vs ROCm on RDNA4, RADV vs AMDVLK, Vulkan install and llama.cpp Vulkan build.
-- `docs/research/2026-07-19-1821-ornith-35b-gemma-4-31b-configs.md` — the RADV device-lost crash.
-- `dp-craft/amd/CLAUDE.md` rules 14–15 and `bench/lib/gpu_exclusive.sh` — GPU exclusivity, the `/unload` trap.
+- `docs/research/llamacpp/2026-07-10-0000-rdna4-llamacpp-ollama-backend-tuning.md` §3 — Vulkan vs ROCm on RDNA4, RADV vs AMDVLK, Vulkan install and llama.cpp Vulkan build.
+- `docs/research/models-sampling/2026-07-19-1821-ornith-35b-gemma-4-31b-configs.md` — the RADV device-lost crash.
+- `dp-craft/amd/CLAUDE.md` rules 14–15 and `stack/gpu/gpu_exclusive.sh` — GPU exclusivity, the `/unload` trap.
 
 **AMD / ROCm**
 - ROCm 10.0 documentation: https://rocm.docs.amd.com/en/docs-10.0.0/

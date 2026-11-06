@@ -40,4 +40,4 @@ secondary coverage.
   it is `stilldeadcode/vllm-radiance` + `libr4d` (the 0.9.3 image, now a dead image).
 - The FP8/attention gap: `gfx1201` is missing from AITER's `_ARCH_TO_DEVICE` table, so FP8 silently
   falls back to FP32 (~18–22 vs ~35–40 tok/s) — revisit when upstream merges gfx1201 into AITER and
-  vLLM supports FP8 for RDNA4. See `docs/research/2026-07-12-2300-rdna4-vllm-aiter-fp8-status.md`.
+  vLLM supports FP8 for RDNA4. See `docs/research/vllm/2026-07-12-2300-rdna4-vllm-aiter-fp8-status.md`.

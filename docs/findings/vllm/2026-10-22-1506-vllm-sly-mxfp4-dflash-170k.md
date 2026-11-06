@@ -11,7 +11,7 @@ takeaway: vLLM (Sly radiance 1.6.0) + MXFP4 + fp8 KV + DFlash2 at **max-model-le
 - **GPU/Host:** AMD Radeon AI PRO R9700, 32624 MiB, power cap 210 W (user tuning, unchanged), desktop GUI on the same card · Ryzen 5 3600, 31 GB RAM · kernel 7.0.0-38
 - **Runtime:** `ghcr.io/slybase/vllm-sly-radiance:1.6.0-rocm10.1` @ `sha256:bf153fa38868…7506` (vLLM 0.31.0) · profile `sly-radiance/qwen38-mxfp4-dflash` with **MAXLEN 170000**
 - **Model:** `amd/Qwen3.8-27B-Quark-AWQ-MXFP4` @ `5233554c` + drafter `syvai/Qwen3.8-27B-DFlash2-W4A16` @ `4d30ec73` (k=7) · KV fp8 · max-num-seqs 1 · gpu-mem-util 0.90
-- **Data:** `bench/runs/2026-10-22-vllm-sly-mxfp4-dflash-170k/` (probe dir `bench/runs/2026-10-22-1513-engine-fill170k/`, 1 s `gpu_samples.csv`, 453 samples over 504 s)
+- **Data:** `campaigns/perf/2026-10-22-1506-vllm-sly-mxfp4-dflash-170k/` (probe dir `campaigns/perf/2026-10-22-1506-vllm-sly-mxfp4-dflash-170k/results/2026-10-22-1513-engine-fill170k/`, 1 s `gpu_samples.csv`, 453 samples over 504 s)
 
 ## Summary
 
@@ -63,11 +63,11 @@ Rep 0 turns 6–7, 9–12 and 14–17 are omitted, as they lie between the rows 
 
 **KV pool occupancy** — vLLM's `kv_cache_usage_perc` scales linearly with context: (context + generated) ÷ 332,822 matches it within ~3k tokens on every turn (e.g. 0.5114 × 332,822 = 170,205 vs 169,167). The ~3k gap is INFERRED to be block rounding at the 880-token cache granularity plus the drafter's slots. Between turns the gauge falls to 0. Finished requests' blocks stay cached but count as free.
 
-**Conversation: decode per turn** — ![Conversation decode](charts/conv_decode.svg)
+**Conversation: decode per turn** — ![Conversation decode](../../../campaigns/perf/2026-10-22-1506-vllm-sly-mxfp4-dflash-170k/results/charts/conv_decode.svg)
 
 > Two regimes, explained in finding 3: ~65 tok/s while the model reasons from scratch (1024-token `length` turns), ~171–179 tok/s once it reproduces its earlier answer (`stop` turns with identical 876/821-token lengths). MEASURED.
 
-**Power by phase** — ![Power by phase](charts/power_phase.svg)
+**Power by phase** — ![Power by phase](../../../campaigns/perf/2026-10-22-1506-vllm-sly-mxfp4-dflash-170k/results/charts/power_phase.svg)
 
 > Prefill 207 W, decode 210 W on average, peaks 318 / 240 W. Decode mclk was 1,258 MHz in 98 % of samples; prefill mclk median 456 MHz at sclk ~2.6 GHz (power-limited, as before). No phase flagged. MEASURED.
 
@@ -100,7 +100,7 @@ Rep 0 turns 6–7, 9–12 and 14–17 are omitted, as they lie between the rows 
 ## Recommended config
 
 ```bash
-MAXLEN=170000 PROFILE=sly-radiance/qwen38-mxfp4-dflash PORT=8000 bench/engine-bench/vllm/serve_vllm.sh   # util 0.90, fp8 KV
+MAXLEN=170000 PROFILE=sly-radiance/qwen38-mxfp4-dflash PORT=8000 stack/serve/vllm/serve_vllm.sh   # util 0.90, fp8 KV
 # optional desktop headroom (INFERRED, untested): GPU_UTIL=0.85 → pool ≈ 288k tokens, still > 1.6 × 170k
 ```
 
@@ -108,10 +108,10 @@ Memory-safe at 170k with no creep (MEASURED). Use it with a client-side timeout 
 
 ## Methodology & caveats
 
-- One server: the DFlash profile from `campaigns/2026-10-22-vllm-sly-mxfp4-dflash/` with only MAXLEN changed (150000 → 170000). Boot took 408 s (the new max length triggered a recompile; INFERRED from the 236 s warm boot).
+- One server: the DFlash profile from `campaigns/perf/2026-10-22-1406-vllm-sly-mxfp4-dflash/` with only MAXLEN changed (150000 → 170000). Boot took 408 s (the new max length triggered a recompile; INFERRED from the 236 s warm boot).
 - Turn 0 = 148,642 tokens of `codereview-200000.txt` (the tool targets 150,000 from a sampled chars/token ratio). Turns ≥ 1 = `thinking-hard.prompt.txt` + the previous reply in history, temperature 0.2, `reasoning_effort: high`. The new-token counts (~2–2.9k per turn for ~1.2k of genuinely new text) include the re-prefill from the 880-token cache granularity (see the DFlash 150k analysis, finding 6).
 - VRAM is device-wide and includes the desktop GUI. Per-process residency (`amd-smi process`) was not sampled.
 - Tool changes made for this run (approved): `capture_engine.py conversation --turn-prompt` and `kv_usage_peak`; `engine-bench/run.sh` `TURN_PROMPT`; `gen_campaign.py` probe key `turn_prompt`. They were stress-tested on a mock vLLM (turn cycling, stop rule never overflows, KV polling, no `/metrics` → null) and run end-to-end through `run.sh`. Regression: all 7 emittable campaign specs re-emit byte-identically, and conversation mode without `--turn-prompt` sends identical requests and rows.
 - Not measured: util other than 0.90, MAXLEN > 170000, concurrency > 1, reply text.
 
-Full chart appendix: [`appendix.md`](appendix.md) (adds `conv_prefill_new.svg`, `conv_ttft.svg`). Proposed tool extension: a `report.py` VRAM/GTT-over-time chart from `gpu_samples.csv` with turn boundaries.
+Full chart appendix: [`appendix.md`](../../../campaigns/perf/2026-10-22-1506-vllm-sly-mxfp4-dflash-170k/results/appendix.md) (adds `conv_prefill_new.svg`, `conv_ttft.svg`). Proposed tool extension: a `report.py` VRAM/GTT-over-time chart from `gpu_samples.csv` with turn boundaries.

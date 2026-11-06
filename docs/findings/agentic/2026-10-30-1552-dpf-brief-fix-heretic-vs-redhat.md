@@ -44,7 +44,7 @@ Run key (the first five rows are the configuration; everything not listed is ide
 | Context per request, median · max | 103k · 134k (W2-08) | **223k · 239k** (whole run) | 90k · 136k | 88k · 132k |
 | Time on W2-08 | ~12 min | — | ~111 min (104 min of session time) | **87 min** |
 
-All counts and speeds are MEASURED from the run dir (`bench/runs/2026-10-30-0947-dpf-brief-ab/`). "Found", "real" and
+All counts and speeds are MEASURED from the run dir (`campaigns/agentic/2026-10-30-0947-dpf-brief-ab/`). "Found", "real" and
 "rejected with reasons" are INFERRED: graded by Opus 5.5 against the Opus reviews and the code, evidence quoted per row in
 `*/grading.md`. The Opus reviews are the reference, not ground truth. A "window" is one 10-s row of the vLLM log with
 generation > 5 tok/s. The new column changes four things at once (image, Cactus, template, RUNBOOK): its speed and
@@ -257,7 +257,7 @@ and the key quotes were re-checked with grep. What each model did on W2-08 comes
 
 **What ran.** Same model, drafter, inputs, prompt, client settings, 3 h cap and resume policy as the δ 0 W2-08 run; four
 things changed at once:
-- **Image:** Sly 1.9.1, smoke-tested first (`bench/runs/2026-10-30-1745-sly-1.9.1-smoke/`).
+- **Image:** Sly 1.9.1, smoke-tested first (`campaigns/perf/2026-10-30-1745-sly-1.9.1-smoke/`).
 - **Cactus:** δ 0.5 with the 1.9.x fade (δ falls linearly from 4,096 to 0 at 16,384 output tokens of one response) and
   cap R 0.5. These are the code defaults, read from the image's `rejection_sampler_utils.py`.
 - **Template:** `v22.5-sly2`.
@@ -350,7 +350,7 @@ median error identifies the template:
 
 ## unsloth Q4_K_XL on llama-swap, W2-08 blind review only (run added 2026-10-31)
 
-Full write-up: `campaigns/2026-10-31-q4kxl-sharp-w208-blind/analysis.md`.
+Full write-up: `docs/findings/agentic/2026-10-31-0000-q4kxl-sharp-w208-blind.md`.
 
 **Setup:**
 - llama.cpp b11448 Vulkan via llama-swap, row `qwen38-27b-q4kxl-q8-mtp-kvq8-mtp-sharp-planning` as is: q8_0 KV, ctx 260000,
@@ -379,7 +379,7 @@ All "found/real" values are INFERRED (grading); work counts are MEASURED.
 
 ### RedHat δ 0 + sharp template, W2-08 blind review only (run added 2026-10-31)
 
-Full write-up: `campaigns/2026-10-31-redhat-sharp-w208-blind/analysis.md`.
+Full write-up: `docs/findings/agentic/2026-10-31-0000-redhat-sharp-w208-blind.md`.
 
 **Setup:**
 - The RedHat δ 0 server (same image digest, model, draft, `RADIANCE_*` env, argv) with only `--chat-template` swapped to
@@ -436,7 +436,7 @@ RedHat δ 0 W2-08 extra findings (INFERRED):
 - real: the test block's import order;
 - **wrong** (corrected 2026-10-31): "a stale base sha, move it to `de110510`". `tools/dpf` exists at neither commit, and
   `git diff --stat 36ffe5b4 de110510 -- tools/` is empty, so moving the base fixes nothing. Found by the blind re-grade
-  in `campaigns/2026-10-31-q4kxl-sharp-w208-blind/` (finding X14); RedHat δ 0's W2-08 precision is 13/14, not 14/14.
+  in `campaigns/agentic/2026-10-31-0000-q4kxl-sharp-w208-blind/` (finding X14); RedHat δ 0's W2-08 precision is 13/14, not 14/14.
 
 It looked at O9 (drop every goal) and ruled it not a finding. On W2-06 (δ 0.5, before the loops took over) RedHat found 3/9
 like heretic, including O5 (the 4-param/C7 conflict), which heretic missed.
@@ -499,7 +499,7 @@ The one RedHat δ 0.5 fix that landed (W2-06) was a one-line import path; its pr
 - **Grading.** One grader (Opus 5.5) with Opus reviews as the reference: "real", "found" and "defensible" are INFERRED.
   The two rejected Opus findings were not adjudicated further.
 - **Speed.** Compared from 10 s server windows of different content and depth (INFERRED). For controlled RedHat decode
-  numbers see `docs/analysis/2026-10-30-0900-vllm-redhat-mxfp4-depth-transposed.md` (DFlash2 k = 7, ctx 110000, 256-token
+  numbers see `docs/findings/radiance/2026-10-30-0900-vllm-redhat-mxfp4-depth-transposed.md` (DFlash2 k = 7, ctx 110000, 256-token
   probes, slower of 2 reps: Sly 1.8.1 δ 0.5 122.27/84.76/87.36 tok/s and Sly 1.9.1 δ 0.5 + fade/cap 122.72/86.34/86.24
   tok/s at 10k/50k/100k - the same within the rep noise; INFERRED from that: the 1.9.1 session's faster non-loop
   windows, 102.0 vs 74.5 tok/s for δ 0 on 1.8.1, come mostly from δ 0.5 vs δ 0, not from the new engine).
@@ -547,7 +547,7 @@ The one RedHat δ 0.5 fix that landed (W2-06) was a one-line import path; its pr
 
 ## Data
 
-All under `bench/runs/2026-10-30-0947-dpf-brief-ab/` (`README.md` has the layout and a status table):
+All under `campaigns/agentic/2026-10-30-0947-dpf-brief-ab/` (`README.md` has the layout and a status table):
 - `heretic/`, `redhat/`: the full arms. `grading.md`, `metrics.json`, `session-*.jsonl`, `server-container.log`, outputs.
 - `redhat-loop-research.md`: log forensics, server signature, engine knobs, ranked fixes, sources (Sly #164, Sly releases,
   model cards).

@@ -7,12 +7,12 @@ takeaway: SOLVED 2026-10-23 (see 2026-10-23-0023-vllm-gpu-fault-solved-hip-kerna
 
 # Sly radiance vLLM under llama-swap / Claude Code — A-tiled GEMM fault, RAM-tier sizing, fp8-KV claims — R9700 (gfx1201)
 
-> **SOLVED 2026-10-23 → `docs/analysis/2026-10-23-0023-vllm-gpu-fault-solved-hip-kernarg.md`.** The fault is NOT in Sly's kernels: a kernel-argument pointer arrives with bit 44 cleared; `HIP_FORCE_DEV_KERNARG=0` (now the default in the vLLM profiles) gives 3/3 boots × 4 Claude turns clean at full speed. The "over-read" hypothesis below was tested and ruled out (padding did not help).
+> **SOLVED 2026-10-23 → `docs/findings/vllm/2026-10-23-0023-vllm-gpu-fault-solved-hip-kernarg.md`.** The fault is NOT in Sly's kernels: a kernel-argument pointer arrives with bit 44 cleared; `HIP_FORCE_DEV_KERNARG=0` (now the default in the vLLM profiles) gives 3/3 boots × 4 Claude turns clean at full speed. The "over-read" hypothesis below was tested and ruled out (padding did not help).
 
 - **Date:** 2026-10-22 13:55–16:43 local · **Track:** serving incident + config investigation (no campaign)
 - **GPU/Host:** AMD Radeon AI PRO R9700, 32624 MiB, 210 W cap (unchanged) · Ryzen 5 3600, 31 GB RAM, no swap · kernel 7.0.0-38
 - **Runtime:** `ghcr.io/slybase/vllm-sly-radiance:1.6.0-rocm10.1` (vLLM 0.31.0) · profile `sly-radiance/qwen38-mxfp4-dflash`
-  (`bench/engine-bench/vllm/profiles/sly-radiance/`) · launched by llama-swap via `serve_vllm.sh run`
+  (`stack/serve/vllm/profiles/sly-radiance/`) · launched by llama-swap via `serve_vllm.sh run`
 - **Model:** `amd/Qwen3.8-27B-Quark-AWQ-MXFP4` + DFlash2 drafter `syvai/Qwen3.8-27B-DFlash2-W4A16` (k=7) · fp8 KV · util 0.90 ·
   max-model-len 180000 · `max_num_batched_tokens` 2048 · `max_num_seqs` 1 · attention R4D_HYBRID · sharp template · RAM KV tier 8 GiB
 - **Data:** llama-swap log `~/.config/llama-swap/logs/llama-swap.log`; upstream (container) log captured from llama-swap's
@@ -62,7 +62,7 @@ whether it fires depends on GPU memory layout. **No fix exists yet for the fast 
 3. Report upstream to SlyBase with the exact kernel, grid, M and the `claudetest.sh` repro (draft only, the user decides).
 4. Until then, use a fallback, or accept the fault on the fast config.
 
-**Test method changes (2026-10-22):** the fault gate is now `docs/plans/2026-10-22-mxfp4-qwen38-options/claudetest.sh`
+**Test method changes (2026-10-22):** the fault gate is now `campaigns/investigation/2026-10-22-1925-vllm-mxfp4-gpu-fault/claudetest.sh`
 (boots like `vllmtest.sh`, then runs a real `claude -p` session). Real Claude requests hit the fault far more reliably
 than the fixtures. A PASS only counts if the exact baseline layout passes it again.
 
@@ -154,7 +154,7 @@ Sly with the log excerpt and the `data_ptr` hypothesis is worthwhile (outward-fa
 - Apply fix 1 (needs OK), then test manually.
 - Lower `CLAUDE_CODE_MAX_OUTPUT_TOKENS` to 28000 (needs OK).
 - Persist the upstream log: llama-swap's buffer is 100 KB and the container is `--rm`. Teeing `serve_vllm.sh run` output to
-  `bench/.servers/<name>.log` would keep fault evidence.
+  `stack/serve/var/servers/<name>.log` would keep fault evidence.
 - Fault watchdog: `/health` stays OK during the hang (as hipfire, CLAUDE.md rule 15). A watcher on the upstream log for
   `MEMORY_FAULT` that kills the container would cut the ~16 min hang to seconds.
 - fp8 KV quality at depth (finding 11): the user does not want custom needle/quality tests. Desk research only if wanted.
@@ -165,7 +165,7 @@ Sly with the log excerpt and the `data_ptr` hypothesis is worthwhile (outward-fa
 
 - **Fault #4** (MEASURED, llama-swap upstream buffer): a boot at 16:48 local, still on the old profile (`a_tiled_min_m=513`),
   faulted in the same kernel on its **first** Claude Code request. Tally with the A-tiled path on: **4 faults**, 3 of them
-  in llama-swap/Claude Code serving or campaign boots, 2 on the first long request of a boot.
+  in stack/llama-swap/Claude Code serving or campaign boots, 2 on the first long request of a boot.
 - **Fix applied:** profile `sly-radiance/qwen38-mxfp4-dflash-noatiled` (sources `qwen38-mxfp4-dflash.env`, sets
   `RADIANCE_MXFP4_A_TILED_MIN_M=0`). The llama-swap row `qwen38-27b-mxfp4-dflash-kvfp8-vllm-sharp` now uses it (id unchanged).
   Generator tests: 252 passed.

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# validate-vllm-35b.sh — MANUAL GPU validation for the new amd/Qwen3.5-35B-A3B-MXFP4 + z-lab DFlash setup.
+# stack/serve/vllm/tests/validate-vllm-35b.sh — MANUAL GPU validation for the new amd/Qwen3.5-35B-A3B-MXFP4 + z-lab DFlash setup.
 #
 #   ./validate-vllm-35b.sh            -> prints what it will do, exits (dry-run, nothing touched)
 #   ./validate-vllm-35b.sh --yes      -> runs the validation (GPU; takes a long time)
@@ -7,7 +7,7 @@
 # WHAT IT DOES (in order):
 #   1. STOPS whatever vLLM container is on port 8000 -- that is likely the 27b server (qwen38-27b-redhat-
 #      mxfp4-dflash) which powers the interactive Claude session. Your session will go down. The 27b server
-#      comes back with the old launcher (vllm.sh) after this, the 35b one with bench/engine-bench/vllm/archive/qwen35_sly_dflash.sh.
+#      comes back with the old launcher (vllm.sh) after this, the 35b one with stack/serve/vllm/retired/qwen35_sly_dflash.sh.
 #   2. Fetches the two PINNED checkpoints (resumable; ~25 GB + 772 MB, nice 19 / idle IO):
 #        amd/Qwen3.5-35B-A3B-MXFP4@2e19c657  z-lab/Qwen3.5-35B-A3B-DFlash@52cb554b (exact-release drafter)
 #   3. Boots profile sly-amd/qwen35-35b-a3b-mxfp4-dflash (Sly 1.9.1, same engine layer as the 27b):
@@ -19,7 +19,7 @@
 #   5. Prints PASS/FAIL per step. On failure the last log lines are dumped -- do NOT treat a green
 #      "container up" as success (iron rule 15): check the residency and the counters below.
 #
-# AFTER A PASS, to get the 27b back:  PORT=8000 bench/engine-bench/vllm/serve_vllm.sh stop  (then the
+# AFTER A PASS, to get the 27b back:  PORT=8000 stack/serve/vllm/serve_vllm.sh stop  (then the
 # 27b vllm.sh as usual). To A/B the CROSS-release drafter (z-lab/Qwen3.6-35B-A3B-DFlash, trained on
 # Qwen3.6 weights -- see the profile comment): fetch it
 # (fetch_model.sh z-lab/Qwen3.6-35B-A3B-DFlash f181eece646affea2c38b2765f1aaa01a9734ccd), then relaunch with

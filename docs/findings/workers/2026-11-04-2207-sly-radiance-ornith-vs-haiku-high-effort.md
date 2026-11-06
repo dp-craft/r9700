@@ -9,9 +9,9 @@ takeaway: Local-agent Ornith 1.5 on native Radiance is eligible for high-volume 
 - **GPU/Host:** R9700, 32624 MiB, power cap 210 W (`MEASURED`, hwmon `power1_cap`), kernel 7.0.0-38-generic, CPU governor `powersave`
 - **Local arm:** `keptn/ornith-1.5-35b-a3b-w4a8` @ `cfed0f8f` on **native Radiance** `stilldeadcode/radiance:1.16.0` @ `sha256:b1017ce0e615…`, MTP K=3, KV fp8, `--max-model-len 262144`, `--temp 1.0 --top-p 0.95 --top-k 20 --presence-penalty 1.5`, thinking on, Claude Code 2.1.312 via `local-agent.sh`
 - **Remote arms:** `claude-haiku-5-5` as `general-purpose` subagents, effort `high`, `medium` and `low`
-- **Data:** `bench/runs/2026-11-04-2207-docanalysis-ornith-vs-haiku/`
+- **Data:** `campaigns/workers/2026-11-04-2207-docanalysis-ornith-vs-haiku/`
 
-**Naming:** this was requested as "sly-radiance Ornith". `ornith_rad_mtp.sh` serves native Radiance, not vLLM Sly, so that is the engine measured here.
+**Naming:** this was requested as "sly-radiance Ornith". `stack/serve/radiance/ornith_rad_mtp.sh` serves native Radiance, not vLLM Sly, so that is the engine measured here.
 
 **Arm names:** an arm is a model plus a session size. S, L and X say how much one session read; they are not quality or effort levels.
 
@@ -115,7 +115,7 @@ An Opus judge scored shuffled, anonymised notes against the sources, without see
 
 ### Haiku as a third grader
 
-Added 2026-11-05. Haiku at high effort graded the same 40 notes blind, with the same prompt and labels as Opus pass 2 (`MEASURED`, data in `bench/runs/2026-11-05-0320-ornith-usecases/grader-check/`).
+Added 2026-11-05. Haiku at high effort graded the same 40 notes blind, with the same prompt and labels as Opus pass 2 (`MEASURED`, data in `campaigns/workers/2026-11-05-0320-ornith-usecases/results/2026-11-05-0320-ornith-usecases/grader-check/`).
 
 | Field (40 notes) | Exact match with Opus | Within 1 | Mean Haiku − Opus |
 |---|---:|---:|---:|
@@ -174,7 +174,7 @@ Budget per session (`MEASURED` inputs, `INFERRED` result): **content + 9.2k × d
 ```bash
 # One batch: at most ~100k tokens and ~7 documents. Chain batches for more.
 cd <directory holding the output> && \
-MAX_TURNS=80 .claude/skills/local-agent/scripts/local-agent.sh "<brief>" \
+MAX_TURNS=80 clients/local-agent/local-agent.sh "<brief>" \
   --tools "Read,Grep,Glob,Write" --strict-mcp-config --setting-sources "" --disable-slash-commands
 # Also set CLAUDE_CODE_DISABLE_CLAUDE_MDS=1 in the settings passed through LOCAL_AGENT_SETTINGS.
 ```
@@ -186,7 +186,7 @@ MAX_TURNS=80 .claude/skills/local-agent/scripts/local-agent.sh "<brief>" \
 
 ## Starter change
 
-`ornith_rad_mtp.sh` now passes `--chat-template-kwargs '{"enable_thinking":true}' --reasoning-effort-map none=high,minimal=high`, as the operator asked. All benchmark runs above ran before this change, with thinking on by default.
+`stack/serve/radiance/ornith_rad_mtp.sh` now passes `--chat-template-kwargs '{"enable_thinking":true}' --reasoning-effort-map none=high,minimal=high`, as the operator asked. All benchmark runs above ran before this change, with thinking on by default.
 
 | Request after restart (temp 0) | Generated | Reasoning tokens |
 |---|---:|---:|

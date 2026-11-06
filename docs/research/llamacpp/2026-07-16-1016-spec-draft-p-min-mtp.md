@@ -2,13 +2,13 @@
 date: 2026-07-16 10:16
 slug: spec-draft-p-min-mtp
 title: llama.cpp --spec-draft-p-min and the MTP path (default, semantics, applicability)
-takeaway: ⚠ CORRECTED 2026-07-16 by measurement — the original "p_min is inert on MTP" conclusion (from source-reading) is FALSE on our build. Test bench/runs/2026-07-16-1111-spec-draft-pmin-mtp/ shows --spec-draft-p-min IS live on the --spec-type draft-mtp path at b9950: raising it 0->0.99 cuts drafted-tok/pass 2.98->0.46, lifts acceptance 69%->100%, changes the output, and LOWERS decode 160->106 t/s. It does NOT reduce run-to-run fluctuation (6/6 distinct replies at every level, both 35B and 27B). Still true: default at our commit is 0.0f (NOT 0.75 — that was the b6000 default; history 0.9→0.75→0.0). Corrected recommendation: do NOT set --spec-draft-p-min for throughput (it costs decode) and it is not a fluctuation remedy; --spec-draft-n-max remains the draft-depth lever (peaks 2-3). Penalty samplers still cost ~2 ms/token host work under MTP; keep them 0 for coding.
+takeaway: ⚠ CORRECTED 2026-07-16 by measurement — the original "p_min is inert on MTP" conclusion (from source-reading) is FALSE on our build. Test campaigns/perf/2026-07-16-0927-mtp-sampler-tax/results/2026-07-16-1111-spec-draft-pmin-mtp/ shows --spec-draft-p-min IS live on the --spec-type draft-mtp path at b9950: raising it 0->0.99 cuts drafted-tok/pass 2.98->0.46, lifts acceptance 69%->100%, changes the output, and LOWERS decode 160->106 t/s. It does NOT reduce run-to-run fluctuation (6/6 distinct replies at every level, both 35B and 27B). Still true: default at our commit is 0.0f (NOT 0.75 — that was the b6000 default; history 0.9→0.75→0.0). Corrected recommendation: do NOT set --spec-draft-p-min for throughput (it costs decode) and it is not a fluctuation remedy; --spec-draft-n-max remains the draft-depth lever (peaks 2-3). Penalty samplers still cost ~2 ms/token host work under MTP; keep them 0 for coding.
 -->
 
 # Research: llama.cpp `--spec-draft-p-min` and the MTP path
 
 > ## ⚠ ERRATUM — 2026-07-16, corrected by measurement
-> **This report's central claim ("`--spec-draft-p-min` is inert on the MTP path") is WRONG on our build.** It was a source-reading (PR #22673 TODO + master `speculative.cpp`); a direct test on b9950 (`bench/runs/2026-07-16-1111-spec-draft-pmin-mtp/analysis.md`) refutes it. Measured, 35B-A3B, `--spec-type draft-mtp`, seed 42:
+> **This report's central claim ("`--spec-draft-p-min` is inert on the MTP path") is WRONG on our build.** It was a source-reading (PR #22673 TODO + master `speculative.cpp`); a direct test on b9950 (`campaigns/perf/2026-07-16-0927-mtp-sampler-tax/results/2026-07-16-1111-spec-draft-pmin-mtp/analysis.md`) refutes it. Measured, 35B-A3B, `--spec-type draft-mtp`, seed 42:
 >
 > | p_min | draft tok/pass | acceptance | decode t/s | reply |
 > |--:|--:|--:|--:|--|
@@ -24,7 +24,7 @@ takeaway: ⚠ CORRECTED 2026-07-16 by measurement — the original "p_min is ine
 
 ## Summary
 
-`--spec-draft-p-min` is **not set anywhere in our active stack** — `bench/engine-bench/serve_llamacpp.sh:86` passes only `--spec-type draft-mtp` when `MTP=1`, so p_min (and n_max, n_min) fall back to llama.cpp's compiled-in defaults. The `0.75` in the question is a **stale default**: llama.cpp's `p_min` default has moved `0.9f → 0.75f → 0.0f` over 2025, and at **our exact build b9950 (commit `961e4b26a`) it is already `0.0f`** [CLAIMED, source line quoted below]. More decisively, **`--spec-draft-p-min` has no effect on the MTP path at all**: the PR that added MTP (`#22673`) lists "re-enable `--spec-draft-p-min` support for `mtp`" as a *post-merge TODO*, the MTP draft loop stops purely on the `n_max` quota, and it drafts greedily (`top_k = 1`). So for every Qwen3.6 MTP config we run, the only live draft-length lever is **`--spec-draft-n-max`** (default 3). Our own local probe (`bench/runs/2026-07-16-0927-mtp-sampler-probe/`, MEASURED) shows decode t/s peaks at n_max 2–3 and collapses by n_max 8 as acceptance falls — which is the exact tradeoff p_min *would* govern if it were wired up. **Recommendation: do not set `--spec-draft-p-min`; sweep `--spec-draft-n-max` instead if we want to tune MTP draft depth.**
+`--spec-draft-p-min` is **not set anywhere in our active stack** — `stack/serve/llamacpp/serve_llamacpp.sh:86` passes only `--spec-type draft-mtp` when `MTP=1`, so p_min (and n_max, n_min) fall back to llama.cpp's compiled-in defaults. The `0.75` in the question is a **stale default**: llama.cpp's `p_min` default has moved `0.9f → 0.75f → 0.0f` over 2025, and at **our exact build b9950 (commit `961e4b26a`) it is already `0.0f`** [CLAIMED, source line quoted below]. More decisively, **`--spec-draft-p-min` has no effect on the MTP path at all**: the PR that added MTP (`#22673`) lists "re-enable `--spec-draft-p-min` support for `mtp`" as a *post-merge TODO*, the MTP draft loop stops purely on the `n_max` quota, and it drafts greedily (`top_k = 1`). So for every Qwen3.6 MTP config we run, the only live draft-length lever is **`--spec-draft-n-max`** (default 3). Our own local probe (`campaigns/perf/2026-07-16-0927-mtp-sampler-tax/results/2026-07-16-0927-mtp-sampler-probe/`, MEASURED) shows decode t/s peaks at n_max 2–3 and collapses by n_max 8 as acceptance falls — which is the exact tradeoff p_min *would* govern if it were wired up. **Recommendation: do not set `--spec-draft-p-min`; sweep `--spec-draft-n-max` instead if we want to tune MTP draft depth.**
 
 ## Key findings
 
@@ -124,7 +124,7 @@ The chain includes `llama_sampler_init_penalties(...)` and temperature, so on th
 
 ### 7. Local corroboration — the n_max sweep (MEASURED-BY-US)
 
-`bench/runs/2026-07-16-0927-mtp-sampler-probe/results.jsonl`, 35B-A3B MoE, MTP on, pp=0, ctx 4096, KV f16, b9950, Vulkan, seed 42:
+`campaigns/perf/2026-07-16-0927-mtp-sampler-tax/results/2026-07-16-0927-mtp-sampler-probe/results.jsonl`, 35B-A3B MoE, MTP on, pp=0, ctx 4096, KV f16, b9950, Vulkan, seed 42:
 
 | n_max | draft acceptance % | k drafted/pass | decode t/s |
 |------:|-------------------:|---------------:|-----------:|
@@ -147,12 +147,12 @@ Issue **#23251** "MTP gguf models do not release the GPU load" is filed on an "A
 - **Exact PR for 0.9→0.75 and 0.75→0.0** — not line-verified (0.75→0.0 attributed to #23269 via web search, medium confidence). End state at our commit is verified, so this does not affect any recommendation.
 - **Verbatim `common/arg.cpp` help block** — the file truncated on fetch; help-string wording taken from the auto-generated `tools/server/README.md`. Low impact.
 - **Whether re-enabling p_min for MTP has landed since b9950** — the TODO was open as of the fetched master; not tracked forward. Irrelevant unless we upgrade past b9950 (see below).
-- **Depth** — our n_max sweep is at ctx 4096; MTP's benefit grows with depth (per `docs/analysis/2026-07-11-2200-deep-context-35b.md`), so the optimal n_max at ~133k is not established here.
+- **Depth** — our n_max sweep is at ctx 4096; MTP's benefit grows with depth (per `docs/findings/llamacpp/2026-07-11-2200-deep-context-35b.md`), so the optimal n_max at ~133k is not established here.
 
 ## Actionable for this repo
 
 1. **Do not add `--spec-draft-p-min` to any MTP config.** It is inert on `--spec-type draft-mtp` (Finding 4). Adding it would be cargo-cult tuning and would falsely imply the draft is confidence-gated. If anyone saw "0.75" as a would-be setting, note it is also a stale default — our build's is 0.0.
-2. **If we want to tune MTP draft depth, sweep `--spec-draft-n-max`** — the *only* live lever (Finding 5). `bench/engine-bench/serve_llamacpp.sh` already accepts `EXTRA_ARGS`, so `EXTRA_ARGS="--spec-draft-n-max N"` works with no code change. Candidate grid: {2, 3, 4}; the default 3 is at the shallow-ctx peak, but re-check at ~133k where MTP's depth benefit shifts the optimum.
+2. **If we want to tune MTP draft depth, sweep `--spec-draft-n-max`** — the *only* live lever (Finding 5). `stack/serve/llamacpp/serve_llamacpp.sh` already accepts `EXTRA_ARGS`, so `EXTRA_ARGS="--spec-draft-n-max N"` works with no code change. Candidate grid: {2, 3, 4}; the default 3 is at the shallow-ctx peak, but re-check at ~133k where MTP's depth benefit shifts the optimum.
 3. **Document the default explicitly** in `serve_llamacpp.sh` header comment: MTP inherits `n_max=3, n_min=0, p_min=0.0` at b9950; p_min unused on MTP. Prevents the next person re-deriving this. (Proposed one-line comment; not applied — needs approval per repo rules.)
 4. **Watch for a llama.cpp upgrade past b9950** re-enabling p_min for MTP (PR #22673 TODO). If it lands, an adaptive p_min could beat a static n_max on mixed-difficulty decode — worth an A/B at that point, not before.
 5. **Ties into the open pp×MTP item** (the hardest-tasks campaign correction): Finding 6 confirms verification applies penalties, so the campaign's "pp rejects drafts" mechanism is *code-plausible* but *empirically wrong at small pp* per our probe — the cost is host-side sampler compute. Cite this report there.
@@ -169,4 +169,4 @@ Issue **#23251** "MTP gguf models do not release the GPU load" is filed on an "A
 - Issue #23251 "MTP gguf models do not release the GPU load" — https://github.com/ggml-org/llama.cpp/issues/23251 — accessed 2026-07-16 — Tier 1 — gfx1201/R9700 MTP idle-load report.
 - Discussion #23809 (p_min cumulative-product proposal) — https://github.com/ggml-org/llama.cpp/discussions/23809 — accessed 2026-07-16 — Tier 2 (flagged) — no maintainer numeric tuning guidance; classic path only.
 - Discussion #21043 "RDNA4 Llama Experiments (R9700)" — https://github.com/ggml-org/llama.cpp/discussions/21043 — accessed 2026-07-16 — Tier 2 (anecdotal, flagged) — community MTP acceptance-vs-depth numbers, directionally consistent with Finding 7.
-- Local: `bench/runs/2026-07-16-0927-mtp-sampler-probe/results.jsonl` + `meta.txt` — MEASURED-BY-US — n_max sweep + pp mechanism probe (b9950, R9700).
+- Local: `campaigns/perf/2026-07-16-0927-mtp-sampler-tax/results/2026-07-16-0927-mtp-sampler-probe/results.jsonl` + `meta.txt` — MEASURED-BY-US — n_max sweep + pp mechanism probe (b9950, R9700).

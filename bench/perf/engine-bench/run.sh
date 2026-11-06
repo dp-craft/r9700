@@ -8,7 +8,7 @@
 #   2. llama-benchy    — standardized synthetic pp/tg/depth curves with concurrency
 #      (install: see README). Set USE_BENCHY=1. Complements, does not replace, the probe.
 #
-# You start the engine servers yourself (docs/GUIDE.md, or engine-bench/serve_llamacpp.sh);
+# You start the engine servers yourself (docs/guides/GUIDE.md, or engine-bench/serve_llamacpp.sh);
 # this script only drives them. Engine list: edit ENGINES below or set ENGINES_LIST
 # (semicolon-separated "name|base-url-with-/v1|model" entries).
 #
@@ -66,7 +66,7 @@ fi
 #     memory-at-load, peak VRAM, and peak GTT (host-RAM spill = freeze risk). Best-effort. ---
 SAMPLER_PID=""
 if [ "${SAMPLE_VRAM:-0}" = "1" ] && { command -v rocm-smi >/dev/null 2>&1 || command -v nvidia-smi >/dev/null 2>&1; }; then
-  python3 "$REPO/bench/lib/vram_sampler.py" --out "$OUT/gpu_samples.csv" --interval 1 &
+  python3 "$REPO/stack/gpu/vram_sampler.py" --out "$OUT/gpu_samples.csv" --interval 1 &
   SAMPLER_PID=$!
   # wait (≤2s) for the sampler to initialize (handler installed + first sample written) so a fast
   # probe can't kill it mid-startup and lose the memory row
@@ -97,11 +97,11 @@ for e in "${ENGINES[@]}"; do
   else
     PF_ARGS=(); for f in $PROMPT_FILE; do PF_ARGS+=(--prompt-file "$f"); done
     # speculative-decoding acceptance for THIS probe (vLLM counters; no-op for engines without them)
-    python3 "$REPO/bench/lib/spec_metrics.py" snap "$url" > "$OUT/.spec_before_${name}.json" 2>/dev/null || echo '{}' > "$OUT/.spec_before_${name}.json"
-    spec_row () { python3 "$REPO/bench/lib/spec_metrics.py" diff "$OUT/.spec_before_${name}.json" "$url" "$SLUG" "$name" \
+    python3 "$REPO/stack/gpu/spec_metrics.py" snap "$url" > "$OUT/.spec_before_${name}.json" 2>/dev/null || echo '{}' > "$OUT/.spec_before_${name}.json"
+    spec_row () { python3 "$REPO/stack/gpu/spec_metrics.py" diff "$OUT/.spec_before_${name}.json" "$url" "$SLUG" "$name" \
                     >> "$OUT/results.jsonl" 2>/dev/null || true; rm -f "$OUT/.spec_before_${name}.json"; }
     if [ "${MODE:-probe}" = conversation ]; then
-      python3 "$REPO/bench/lib/capture_engine.py" conversation --url "$url" --model "$model" "${PF_ARGS[@]}" \
+      python3 "$REPO/bench/core/capture_engine.py" conversation --url "$url" --model "$model" "${PF_ARGS[@]}" \
         --start-tokens "${START_TOKENS:-10000}" --step-tokens "${STEP_TOKENS:-15000}" \
         --max-depth "${MAX_DEPTH:?MODE=conversation needs MAX_DEPTH}" --max-tokens "$MAX_TOKENS" \
         --reps "$REPS" --chat-template-kwargs "${CHAT_KWARGS:-}" ${TURN_PROMPT:+--turn-prompt "$TURN_PROMPT"} \
@@ -109,7 +109,7 @@ for e in "${ENGINES[@]}"; do
       spec_row
       continue
     fi
-    python3 "$REPO/bench/lib/capture_engine.py" probe --url "$url" --model "$model" "${PF_ARGS[@]}" \
+    python3 "$REPO/bench/core/capture_engine.py" probe --url "$url" --model "$model" "${PF_ARGS[@]}" \
       --max-tokens "$MAX_TOKENS" --concurrency "$CONCURRENCY" --reps "$REPS" \
       --warmup "$WARMUP" --prefix-mode "$PREFIX_MODE" --api "$API" \
       --engine "$name" --label "$SLUG" >> "$OUT/results.jsonl" || { echo "  probe failed for $name"; PROBE_FAILED=1; }
@@ -136,7 +136,7 @@ if last:
         "avg_power_w": float(g["avg_power_w"]) if "avg_power_w" in g else None}))
 PY
   # per-phase power (prefill vs decode) from the requests' wall-clock phase boundaries
-  python3 "$REPO/bench/lib/phase_power.py" "$OUT" > "$OUT/.power.jsonl" 2>/dev/null \
+  python3 "$REPO/stack/gpu/phase_power.py" "$OUT" > "$OUT/.power.jsonl" 2>/dev/null \
     && cat "$OUT/.power.jsonl" >> "$OUT/results.jsonl"; rm -f "$OUT/.power.jsonl"
   python3 -c "import json
 for l in open('$OUT/results.jsonl'):

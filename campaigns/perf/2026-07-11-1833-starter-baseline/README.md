@@ -5,7 +5,7 @@ A self-contained run plan. A fresh session executes it top to bottom without gue
 
 **v2 (2026-07-11 evening):** rewritten for the adaptive harness. v1's flaws — padding source too
 small for ≥32K prompts, MTP missing from every server command, q8_0 baked in as KV baseline —
-are fixed in the harness itself; see `docs/GUIDE.md`.
+are fixed in the harness itself; see `docs/guides/GUIDE.md`.
 
 ## Goal
 Answer four questions with MEASURED, bracketed numbers on the **35B-A3B** (the main work model):
@@ -21,7 +21,7 @@ Answer four questions with MEASURED, bracketed numbers on the **35B-A3B** (the m
 ## Fixed parameters
 - Model: `Qwen3.6-35B-A3B-UD-Q4_K_M.gguf` (embedded MTP layer) · decode sample 256 tok ·
   temperature 0.2 · llama.cpp build b9950 (record if different!)
-- Repo root `$ROOT=/home/dev/work/dp-craft/amd`; GPU/vendor env auto via `bench/lib/gpu_env.sh`.
+- Repo root `$ROOT=/home/dev/work/dp-craft/amd`; GPU/vendor env auto via `stack/gpu/gpu_env.sh`.
 
 ```bash
 export ROOT=/home/dev/work/dp-craft/amd
@@ -50,7 +50,7 @@ Expected: 9 files; builder errors out if any target can't be filled ≥97%.
 cd "$ROOT/bench/model-bench"
 ./sweep.py --model /home/dev/models/gguf/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf --slug 35b-rocm
 ./sweep.py --model /home/dev/models/gguf/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf \
-  --llama-bench "$ROOT/bench/llamacpp-vulkan/llama-bench" --slug 35b-vulkan
+  --llama-bench "$ROOT/stack/llamacpp/var/builds/b9950-vulkan/bin/llama-bench" --slug 35b-vulkan
 ```
 Expected: two `bench/runs/<stamp>-sweep-35b-*/sweep-summary.json`, each with interior-peak
 curves for ub/batch, fa verdict, **KV verdict (ACCEPT q8_0 / KEEP f16)** at depth 32768 with
@@ -66,7 +66,7 @@ UB=2048 B=8192 FA=on ./campaign.sh          # backends × MTP(0/1) × KV(f16/q8_
 ```
 Expected: `results.jsonl` with aggregate rows per {config × cr8000/cr32000/cr64000/thinking ×
 agentic-c1/c2/c4}; server cmdline+props per config in `servers/`; failed combos (e.g. MTP
-mid-stream crash — known upstream issue, see `bench/engine-bench/README.md`) in `failures.txt`,
+mid-stream crash — known upstream issue, see `bench/perf/engine-bench/README.md`) in `failures.txt`,
 never silently averaged.
 
 ## Phase 4 — write it up (/benchmark-results skill)
@@ -77,10 +77,10 @@ never silently averaged.
 
 ## Run matrix (tick as you go)
 - [x] 1: fixtures built (9 files)
-- [x] 2: sweep 35B ROCm → summary + KV verdict (`bench/runs/2026-07-11-1833-sweep-35b-rocm/`; KEEP f16)
-- [x] 2: sweep 35B Vulkan → summary + KV verdict (`bench/runs/2026-07-11-1837-sweep-35b-vulkan/`; KEEP f16)
+- [x] 2: sweep 35B ROCm → summary + KV verdict (`campaigns/perf/2026-07-11-1833-starter-baseline/results/2026-07-11-1833-sweep-35b-rocm/`; KEEP f16)
+- [x] 2: sweep 35B Vulkan → summary + KV verdict (`campaigns/perf/2026-07-11-1833-starter-baseline/results/2026-07-11-1837-sweep-35b-vulkan/`; KEEP f16)
 - [x] 3: campaign Part A (8 configs × depth curve + thinking) — `cr64000` overflows 65536 ctx (FAILED ×8, documented)
-- [x] 3: campaign Part B (8 configs × concurrency 1/2/4) — `bench/runs/2026-07-11-1844-campaign-combo35b/`
+- [x] 3: campaign Part B (8 configs × concurrency 1/2/4) — `campaigns/perf/2026-07-11-1833-starter-baseline/results/2026-07-11-1844-campaign-combo35b/`
 - [x] 4: two analysis docs + INDEX + README TL;DR refresh (2026-07-11)
 
 ## Out of scope (later, targeted)

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# setup_vulkan.sh — manage self-contained Vulkan SDK under llamacpp/vulkansdk/
+# setup_vulkan.sh — manage self-contained Vulkan SDK under stack/llamacpp/var/vulkansdk/
 #
 # Uses the official Lunarg Vulkan SDK (https://vulkan.lunarg.com/sdk/home).
 # Latest version via: https://vulkan.lunarg.com/sdk/latest/linux.txt
@@ -12,14 +12,14 @@
 #   setup_vulkan.sh update [VERSION]   download & install latest (or specific) SDK
 #
 # SDK layout after install:
-#   llamacpp/vulkansdk/1.4.357.1/     ← versioned directory
-#   llamacpp/vulkansdk/latest → 1.4.357.1
+#   stack/llamacpp/var/vulkansdk/1.4.357.1/     ← versioned directory
+#   stack/llamacpp/var/vulkansdk/latest → 1.4.357.1
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$SCRIPT_DIR/.." && pwd)"
-SDK_BASE="$REPO/llamacpp/vulkansdk"
+SDK_BASE="$REPO/stack/llamacpp/var/vulkansdk"
 DOWNLOADS="$SDK_BASE/.downloads"
 CACHE_TARBALL="$DOWNLOADS/vulkan_sdk.tar.xz"
 
