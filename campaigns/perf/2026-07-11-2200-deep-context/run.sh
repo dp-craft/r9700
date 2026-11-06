@@ -4,7 +4,7 @@
 # regenerate, or hand-edit this file. Requires the servers' llama.cpp builds present.
 set -uo pipefail
 ROOT="${ROOT:-/home/dev/work/dp-craft/amd}"
-CAMPAIGN_DIR="${CAMPAIGN_DIR:-$ROOT/bench/runs/2026-07-11-deep-context}"
+CAMPAIGN_DIR="${CAMPAIGN_DIR:-$ROOT/campaigns/perf/2026-07-11-2200-deep-context}"
 EB="$ROOT/bench/engine-bench"
 GEN="$ROOT/bench/workloads/tmp"
 export MODEL='/home/dev/models/gguf/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf'

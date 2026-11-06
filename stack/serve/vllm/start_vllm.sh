@@ -13,7 +13,7 @@
 # vLLM runs an EngineCore child process → the server gets its own process group and every exit path kills
 # the whole group (killing only the API-server pid would orphan the engine and its VRAM — rule 14).
 set -euo pipefail
-REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)"
 
 : "${VENV:=$REPO/stack/serve/var/venvs/vllm-venv}"
 : "${MODEL:=$HOME/models/vllm/amd/Qwen3.8-27B-Quark-AWQ-MXFP4}"

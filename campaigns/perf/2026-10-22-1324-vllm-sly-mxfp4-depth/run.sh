@@ -13,7 +13,7 @@
 # NOTE: speculative decoding OFF (drafter evaluated separately)
 set -uo pipefail
 ROOT="${ROOT:-/home/dev/work/dp-craft/amd}"
-CAMPAIGN_DIR="${CAMPAIGN_DIR:-$ROOT/bench/runs/2026-10-22-vllm-sly-mxfp4-depth}"
+CAMPAIGN_DIR="${CAMPAIGN_DIR:-$ROOT/campaigns/perf/2026-10-22-1324-vllm-sly-mxfp4-depth}"
 EB="$ROOT/bench/engine-bench"
 GEN="$ROOT/bench/workloads/tmp"
 export MODEL='/mnt/Lin1/work/vllm/sly-radiance/models/amd__Qwen3.8-27B-Quark-AWQ-MXFP4@5233554c'

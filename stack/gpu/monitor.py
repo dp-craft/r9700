@@ -851,7 +851,7 @@ def _row(snap):
 
 def _default_log_path(port):
     """The engine log under stack/serve/var/servers, independent of the current directory."""
-    return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".servers", f"{port}.log")
+    return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "serve", "var", "servers", f"{port}.log")
 
 
 def main():

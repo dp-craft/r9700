@@ -14,7 +14,7 @@
 # NOTE: same profile as campaigns/perf/2026-10-22-1406-vllm-sly-mxfp4-dflash except MAXLEN 170000
 set -uo pipefail
 ROOT="${ROOT:-/home/dev/work/dp-craft/amd}"
-CAMPAIGN_DIR="${CAMPAIGN_DIR:-$ROOT/bench/runs/2026-10-22-vllm-sly-mxfp4-dflash-170k}"
+CAMPAIGN_DIR="${CAMPAIGN_DIR:-$ROOT/campaigns/perf/2026-10-22-1506-vllm-sly-mxfp4-dflash-170k}"
 EB="$ROOT/bench/engine-bench"
 GEN="$ROOT/bench/workloads/tmp"
 export MODEL='/mnt/Lin1/work/vllm/sly-radiance/models/amd__Qwen3.8-27B-Quark-AWQ-MXFP4@5233554c'

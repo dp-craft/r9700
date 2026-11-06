@@ -28,7 +28,7 @@
 # docs/research/llamacpp/2026-07-16-1016-spec-draft-p-min-mtp.md.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO="$(cd "$HERE/../.." && pwd)"
+REPO="$(git -C "$HERE" rev-parse --show-toplevel)"
 source "$REPO/stack/gpu/gpu_env.sh"; gpu_setup_env
 
 : "${BACKEND:=rocm}"

@@ -15,7 +15,7 @@
 set -uo pipefail
 ROOT="${ROOT:-/home/dev/work/dp-craft/amd}"
 EB="$ROOT/bench/engine-bench"; LIB="$ROOT/bench/lib"
-RUN_DIR="${RUN_DIR:-$ROOT/bench/runs/2026-10-31-redhat-sharp-w208-blind}"
+RUN_DIR="${RUN_DIR:-$ROOT/campaigns/agentic/2026-10-31-0000-redhat-sharp-w208-blind}"
 SERVE_VLLM="${SERVE_VLLM:-$EB/vllm/serve_vllm.sh}"
 GPU_EXCLUSIVE="${GPU_EXCLUSIVE:-$LIB/gpu_exclusive.sh}"
 VRAM_SAMPLER="${VRAM_SAMPLER:-$LIB/vram_sampler.py}"

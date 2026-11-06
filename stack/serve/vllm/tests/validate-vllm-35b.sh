@@ -27,8 +27,9 @@
 # below, and compare accept lengths between the two drafters.
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SERVE="$HERE/bench/engine-bench/vllm/serve_vllm.sh"
-FETCH="$HERE/bench/engine-bench/vllm/fetch_model.sh"
+REPO="$(git -C "$HERE" rev-parse --show-toplevel)"
+SERVE="$REPO/stack/serve/vllm/serve_vllm.sh"
+FETCH="$REPO/stack/serve/vllm/fetch_model.sh"
 PORT=8000
 PROFILE=sly-amd/qwen35-35b-a3b-mxfp4-dflash
 SERVED_EXPECTED=qwen35-35b-a3b-mxfp4-dflash
@@ -72,7 +73,7 @@ if PROFILE=$PROFILE PORT=$PORT MAXLEN=262000 MAXSEQS=1 KV_DTYPE=fp8 WATCHDOG_MIB
    CACTUS_DELTA=0 "$SERVE" start; then
   pass "server up"
 else
-  fail "boot failed -- last log lines:"; tail -30 "$HERE/bench/.servers/$PORT.log" >&2 || true
+  fail "boot failed -- last log lines:"; tail -30 "$REPO/stack/serve/var/servers/$PORT.log" >&2 || true
   echo "(fix the cause, then re-run this script; it is resumable)"; exit 1
 fi
 
@@ -106,10 +107,10 @@ curl -s -m 5 "http://127.0.0.1:$PORT/metrics" | grep -E 'spec_decode_num_(draft|
 echo
 if [ "$FAILURES" -eq 0 ]; then
   echo "ALL CHECKS PASSED -- the 35b + DFlash setup is validated. Interactive use:"
-  echo "  $HERE/bench/engine-bench/vllm/archive/qwen35_sly_dflash.sh start"
+  echo "  $REPO/stack/serve/vllm/retired/qwen35_sly_dflash.sh start"
   echo "  headless tasks:"
-  echo "  $HERE/.claude/skills/local-agent/scripts/local-agent.sh \"your brief\""
+  echo "  $REPO/clients/local-agent/local-agent.sh \"your brief\""
 else
-  warn "$FAILURES check(s) failed. Server left RUNNING for inspection: 'PORT=$PORT $SERVE logs', 'tail $HERE/bench/.servers/$PORT.log'"
+  warn "$FAILURES check(s) failed. Server left RUNNING for inspection: 'PORT=$PORT $SERVE logs', 'tail $REPO/stack/serve/var/servers/$PORT.log'"
 fi
 exit $([ "$FAILURES" -eq 0 ] && echo 0 || echo 1)

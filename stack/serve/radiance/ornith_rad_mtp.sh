@@ -39,7 +39,7 @@ case "${1:-start}" in
     if ss -ltn | grep -q ":$PORT "; then echo "port $PORT is in use -- stop that server first" >&2; exit 1; fi
     [ -f "$MODEL_DIR/ornith-1.5-35b-a3b-w4a8.rad" ] || { echo "checkpoint missing in $MODEL_DIR (see Fetch above)" >&2; exit 1; }
     docker rm -f "$NAME" >/dev/null 2>&1 || true
-    "$HERE/bench/lib/gpu_exclusive.sh" "$FREE_MIB_FLOOR"
+    "$(git -C "$HERE" rev-parse --show-toplevel)/stack/gpu/gpu_exclusive.sh" "$FREE_MIB_FLOOR"
     # shellcheck disable=SC2086
     docker run -d --name "$NAME" --init --network host --user "$(id -u):$(id -g)" \
       --device /dev/kfd --device /dev/dri \

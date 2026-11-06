@@ -11,7 +11,7 @@
 # NOTE: one warm-up on the first shape (Triton JIT bias)
 set -uo pipefail
 ROOT="${ROOT:-/home/dev/work/dp-craft/amd}"
-CAMPAIGN_DIR="${CAMPAIGN_DIR:-$ROOT/bench/runs/2026-10-30-vllm-heretic-sly-depth}"
+CAMPAIGN_DIR="${CAMPAIGN_DIR:-$ROOT/campaigns/perf/2026-10-30-0759-vllm-heretic-sly-depth}"
 EB="$ROOT/bench/engine-bench"
 GEN="$ROOT/bench/workloads/tmp"
 export MODEL='/mnt/Lin1/work/vllm/sly-radiance/models/slybase__Swift-1.5-Qwen3.8-27B-heretic-MXFP4-GPTQ@3bb379dc'

@@ -11,7 +11,7 @@
 # NOTE: + token economy, NOT context. ctx 32768 is far above task need and keeps VRAM comparable.
 set -uo pipefail
 ROOT="${ROOT:-/home/dev/work/dp-craft/amd/.claude/worktrees/unify-harness}"
-CAMPAIGN_DIR="${CAMPAIGN_DIR:-$ROOT/campaigns/2026-07-12-27b-finetune-quality}"
+CAMPAIGN_DIR="${CAMPAIGN_DIR:-$ROOT/campaigns/quality/2026-07-12-1736-27b-finetune-quality}"
 LIB="$ROOT/bench/lib"; EB="$ROOT/bench/engine-bench"
 OUT="$CAMPAIGN_DIR/out"; mkdir -p "$OUT/done"
 OUTF="$OUT/outputs.jsonl"; VRAMF="$OUT/vram.jsonl"

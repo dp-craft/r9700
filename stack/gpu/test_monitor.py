@@ -944,7 +944,7 @@ class TestEntryPoints(unittest.TestCase):
     def test_default_log_path(self):
         p = monitor._default_log_path(8000)
         self.assertTrue(os.path.isabs(p))
-        self.assertTrue(p.endswith(os.path.join("bench", ".servers", "8000.log")))
+        self.assertTrue(p.endswith(os.path.join("stack", "serve", "var", "servers", "8000.log")))
         cwd = os.getcwd()
         try:
             os.chdir(tempfile.gettempdir())

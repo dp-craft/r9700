@@ -312,7 +312,7 @@ if [ "${1:-start}" = run ]; then
     amd-smi process -g 0 >&2 2>/dev/null || true; exit 1
   fi
 else
-  "${EXCLUSIVE:-$REPO/bench/lib/gpu_exclusive.sh}" "$FREE_MIB_FLOOR"   # iron rule 14: free-VRAM floor or refuse (EXCLUSIVE = unit-test stub)
+  "${EXCLUSIVE:-$REPO/stack/gpu/gpu_exclusive.sh}" "$FREE_MIB_FLOOR"   # iron rule 14: free-VRAM floor or refuse (EXCLUSIVE = unit-test stub)
 fi
 for m in "${CACHE_MOUNTS[@]}"; do mkdir -p "$CACHE_DIR/${m%%:*}"; done   # profile-driven, dev-owned
 

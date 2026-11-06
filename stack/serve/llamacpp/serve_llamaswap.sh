@@ -19,7 +19,7 @@
 # /unload is GET -- POST returns 405 and `curl -sf` hides it (iron rule 14, same trap as gpu_exclusive.sh).
 set -uo pipefail
 HERE="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
-REPO="$(cd "$HERE/../.." && pwd)"
+REPO="$(git -C "$HERE" rev-parse --show-toplevel)"
 
 : "${PORT:=9292}"
 : "${CONFIG:=$HOME/.config/llama-swap/config.yaml}"

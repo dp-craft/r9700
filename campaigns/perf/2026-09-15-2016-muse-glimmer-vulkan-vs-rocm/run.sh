@@ -13,7 +13,7 @@
 # Knobs: REPS=1 quick pass · MAX_TOKENS= · PREFIX_MODE= · API=  (override the defaults)
 set -uo pipefail
 ROOT="${ROOT:-/home/dev/work/dp-craft/amd}"
-CAMPAIGN_DIR="${CAMPAIGN_DIR:-$ROOT/bench/runs/2026-09-15-muse-glimmer-vulkan-vs-rocm}"
+CAMPAIGN_DIR="${CAMPAIGN_DIR:-$ROOT/campaigns/perf/2026-09-15-2016-muse-glimmer-vulkan-vs-rocm}"
 EB="$ROOT/bench/engine-bench"
 WL="$ROOT/bench/workloads"
 GEN="$WL/generated"

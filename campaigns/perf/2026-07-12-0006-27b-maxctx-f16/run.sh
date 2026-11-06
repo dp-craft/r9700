@@ -10,7 +10,7 @@
 # deterministic OOM just re-fails cheaply and moves on).
 set -uo pipefail
 ROOT="${ROOT:-/home/dev/work/dp-craft/amd}"
-CAMPAIGN_DIR="${CAMPAIGN_DIR:-$ROOT/bench/runs/2026-07-12-27b-maxctx-f16}"
+CAMPAIGN_DIR="${CAMPAIGN_DIR:-$ROOT/campaigns/perf/2026-07-12-0006-27b-maxctx-f16}"
 EB="$ROOT/bench/engine-bench"
 GEN="$ROOT/bench/workloads/tmp"
 export MODEL='/home/dev/models/gguf/Qwen3.6-27B-Q4_K_S.gguf'

@@ -10,7 +10,7 @@
 # NOTE: same probes/ctx as vllm-redhat-sly-depth (no-spec baseline); one variable = speculative method
 set -uo pipefail
 ROOT="${ROOT:-/home/dev/work/dp-craft/amd}"
-CAMPAIGN_DIR="${CAMPAIGN_DIR:-$ROOT/bench/runs/2026-10-30-vllm-redhat-sly-mtp-depth}"
+CAMPAIGN_DIR="${CAMPAIGN_DIR:-$ROOT/campaigns/perf/2026-10-30-0835-vllm-redhat-sly-mtp-depth}"
 EB="$ROOT/bench/engine-bench"
 GEN="$ROOT/bench/workloads/tmp"
 export MODEL='/mnt/Lin1/work/vllm/sly-radiance/models/RedHatAI__Qwen3.8-27B-MXFP4@16a86728'

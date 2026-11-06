@@ -10,7 +10,7 @@
 # NOTE: Round-1 (quality-independent) substrate. Runs on the unsloth-MTP build because it uniquely carries the MTP axis; the prefill/KV/cache substrate is arch+quant-determined and transfers to jackrong (confirmed in Campaign 2 B0). All probes measure throughput/latency only (no judge). Depths 8/32/64K per user. Cache-reuse KV-shift variant + HIP spot-check are documented EXTRA_ARGS / BACKEND re-runs in the README (backend + server flags are global, not per-server).
 set -uo pipefail
 ROOT="${ROOT:-/home/dev/work/dp-craft/amd}"
-CAMPAIGN_DIR="${CAMPAIGN_DIR:-$ROOT/bench/runs/2026-07-12-27b-serving-substrate}"
+CAMPAIGN_DIR="${CAMPAIGN_DIR:-$ROOT/campaigns/perf/2026-07-13-0733-27b-serving-substrate}"
 EB="$ROOT/bench/engine-bench"
 GEN="$ROOT/bench/workloads/tmp"
 export MODEL='/home/dev/models/gguf/Qwen3.6-27B-MTP-Q4_K_M.gguf'

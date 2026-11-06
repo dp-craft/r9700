@@ -18,7 +18,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO="$(cd "$SCRIPT_DIR/.." && pwd)"
+REPO="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
 SDK_BASE="$REPO/stack/llamacpp/var/vulkansdk"
 DOWNLOADS="$SDK_BASE/.downloads"
 CACHE_TARBALL="$DOWNLOADS/vulkan_sdk.tar.xz"

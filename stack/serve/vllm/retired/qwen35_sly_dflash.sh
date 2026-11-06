@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # qwen35_sly_dflash.sh — start/stop the vLLM server for amd/Qwen3.5-35B-A3B-MXFP4 + z-lab DFlash drafter
 # (profile sly-amd/qwen35-35b-a3b-mxfp4-dflash, Sly 1.9.1), then run claude against it.
-# ARCHIVED 2026-11-04: slower than stack/serve/radiance/ornith_rad_mtp.sh at the repo root.
+# ARCHIVED 2026-11-04: slower than stack/serve/radiance/ornith_rad_mtp.sh.
 #   stack/serve/vllm/retired/qwen35_sly_dflash.sh start|stop|status|logs        then: claude --settings stack/serve/vllm/settings/settings-35b.json
 # Settings = same as the 27b (settings-redhat.json): port 8000, MAX_CONTEXT 262000 / MAX_OUTPUT 64000 /
 # AUTO_COMPACT 220000, Cactus delta 0, util 0.93, one seq, fp8 KV. Chat template = the model's own
