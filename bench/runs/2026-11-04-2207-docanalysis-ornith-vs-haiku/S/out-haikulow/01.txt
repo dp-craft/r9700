@@ -1,0 +1,15 @@
+DOC: 2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md
+TOPIC: Compares Ornith 1.5 35B w4a8 on native Radiance with MTP K=3 against Ornith 1.5 MXFP4 on Sly and Qwen 27B/35B arms on Sly, across 10k/50k/100k depths.
+VERDICT: Ornith 1.5 on native Radiance is the fastest 35B option measured on this card, at 2.1-2.5x the 27B on Sly decode. Ornith on Sly cannot reach that level, and MTP does not load there; coding quality is untested.
+CONFIG: Ornith-1.5-35B-A3B w4a8 (keptn) ; Radiance 1.16.0 (stilldeadcode/radiance) ; MTP K=3, KV fp8, ctx 262144, max-num-seqs 8, max-num-batched-tokens 2048, power cap 210 W, gpu-headroom default 96 MiB ; comparison arms Qwen3.8-27B MXFP4 and Qwen3.5-35B MXFP4 on vLLM Sly 1.9.1 with DFlash drafters
+PATHS: bench/runs/2026-11-04-1730-ornith15-w4a8-radiance/, bench/runs/2026-11-04-1740-27b-sly-baseline/, bench/runs/2026-11-04-1557-35b-perf-10k-50k-100k/, bench/runs/2026-11-04-1802-ornith15-sly-dflash/, bench/runs/2026-11-04-1740-27b-sly-baseline/comparison/charts/depth_decode.svg, bench/runs/2026-11-04-1740-27b-sly-baseline/comparison/charts/depth_prefill.svg, campaigns/2026-07-19-ornith-vs-gemma/analysis.md
+FACT|40|219.8 t/s|Ornith 1.5 w4a8 Radiance decode at 10k depth, mean
+FACT|40|13,059 t/s|Ornith 1.5 w4a8 Radiance prefill at 10k depth, mean
+FACT|47|86.9 t/s|Qwen3.8-27B Sly decode at 10k depth, mean
+FACT|28|50.0% (1522/3042)|Ornith MTP K=3 draft acceptance on Radiance
+FACT|40|113 MiB|Radiance minimum free VRAM during the run
+INCIDENT|110|Chrome and GNOME Shell crashed about 7 minutes after probe; cause VRAM inferred
+INCIDENT|113|MTP failed to load on Sly for triton_unfused, triton and aiter (three boots)
+INCIDENT|120|Afternoon block dropped after room passed 34 C and hotspot hit throttle; re-measured overnight
+INCIDENT|164|Ornith DFlash K=7 Sly arm stopped on request; quarantined as ornith-k7-s8-INTERRUPTED
+OPEN: Why no CUDA graph was captured on the Sly no-drafter and MTP arms (line 106), and whether Radiance's step time gap is engine, MoE kernel, weights or activations (line 107).

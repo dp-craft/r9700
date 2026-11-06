@@ -1,0 +1,5 @@
+ornith-mtp-k3-s8 boot_rc=1
+ornith-mtp-k3-s8 FAILED at load with triton_unfused: unquantized MTP-layer experts reject that backend
+ornith-mtp-k3-triton boot_rc=1
+ornith-mtp-k3-aiter boot_rc=1
+DONE

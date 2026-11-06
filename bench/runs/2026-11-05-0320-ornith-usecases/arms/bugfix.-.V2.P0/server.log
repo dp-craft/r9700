@@ -1,0 +1,9 @@
+I req msg_7926d0c1da2bdf3525861c9f done from 127.0.0.1:36292 finish=tool_calls prompt=4779 (cache 2048) gen=124 reason=14 ttft=0.32s 212.3 tok/s 0.90s
+I req msg_67f7335ee87ec9e9ab89bacc done from 127.0.0.1:36292 finish=tool_calls prompt=5073 (cache 4096) gen=207 reason=13 ttft=0.12s 221.8 tok/s 1.05s
+I req msg_19f6810087b846c308ee3912 done from 127.0.0.1:36292 finish=tool_calls prompt=5676 (cache 4096) gen=1183 reason=1111 ttft=0.17s 146.7 tok/s 8.22s
+I req msg_bbc57aeffdf95c8032b5e54d done from 127.0.0.1:36292 finish=tool_calls prompt=7072 (cache 4096) gen=775 reason=90 ttft=0.31s 185.9 tok/s 4.48s
+I req msg_01ec23e9d4d4f21198b64dc8 done from 127.0.0.1:36292 finish=tool_calls prompt=7957 (cache 6144) gen=890 reason=348 ttft=0.19s 170.1 tok/s 5.42s
+I req msg_e27d8eec72dea219b82481ef done from 127.0.0.1:36292 finish=tool_calls prompt=8958 (cache 6144) gen=122 reason=53 ttft=0.31s 190.3 tok/s 0.94s
+I req msg_d282ad065ac479c2dc82bb52 done from 127.0.0.1:36292 finish=tool_calls prompt=9113 (cache 8192) gen=208 reason=27 ttft=0.15s 160.0 tok/s 1.45s
+I req msg_0e842add35df632288e799b1 done from 127.0.0.1:36292 finish=tool_calls prompt=9360 (cache 8192) gen=124 reason=70 ttft=0.15s 169.5 tok/s 0.88s
+I req msg_447c8452425c0522747767fd done from 127.0.0.1:36292 finish=stop prompt=10240 (cache 8192) gen=565 reason=354 ttft=0.21s 130.5 tok/s 4.54s

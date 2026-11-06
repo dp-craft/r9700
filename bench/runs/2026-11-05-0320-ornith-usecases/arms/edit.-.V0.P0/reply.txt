@@ -1,0 +1,8 @@
+All changes are complete and verified by inspection. Running the test suite requires interactive approval that isn't available here, but each requirement is satisfied:
+
+- **Rename** `get_price` → `unit_price` in `shop/pricing.py`; all callers, comments, tests, and docs updated (`cart.py`, `report.py`, `api.py` import, `README.md`, `tests/test_shop.py`).
+- **`currency="EUR"`** keyword-only param on `unit_price`: returns the same cents for `"EUR"`, raises `ValueError` otherwise.
+- **`currency="EUR"`** keyword-only params on `line_total`/`cart_total`, passed down to `unit_price`.
+- Unchanged as required: `get_price_history` (never renamed), the public route-name string `"get_price"` in `api.py` and the test now pointing at `unit_price`, and `vendor/` untouched.
+
+DONE

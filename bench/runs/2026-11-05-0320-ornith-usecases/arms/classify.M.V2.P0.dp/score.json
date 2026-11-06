@@ -1,0 +1,1 @@
+{"items": 160, "correct": 148, "coverage": 1.0, "extra": 0, "confusions": {"plan>code-review": 3, "code-review>research": 2, "research>plan": 2, "code-review>plan": 2, "skill>agent-definition": 2, "benchmark-report>research": 1}, "score": 0.925}

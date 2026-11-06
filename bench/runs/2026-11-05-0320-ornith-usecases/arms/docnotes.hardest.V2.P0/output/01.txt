@@ -1,0 +1,14 @@
+DOC: 2026-07-14-hardest-tasks-27b-vs-35b.analysis.md
+TOPIC: Tested hardest coding tasks at ~132.9k tokens on a Qwen3.6-27B quant ladder, a 4096/16384/unlimited reasoning-budget sweep, and 35B-A3B sampling settings on an AMD R9700.
+VERDICT: No precision level in the Qwen3.6-27B quant ladder won significantly (a bounded null), and more budget helped only the MoE 35B, not the dense 27B. Qwen's whole coding recipe (temp 0.6, presence_penalty 0) was the best sampling setting while reruns bought real gains, but unexplained GTT spill across all cells makes unattended use unsafe.
+CONFIG: Qwen3.6-27B-MTP (Q4_K_M/UD-Q4_K_XL/Q5_K_M/Q6_K) and Qwen3.6-35B-A3B; llama.cpp Vulkan b9950, -ub 2048 -b 4096 -fa on, MTP on, ctx 163840.
+PATHS: bench/runs/2026-07-16-0927-mtp-sampler-probe/, bench/runs/2026-07-16-0927-mtp-sampler-probe/depth_probe.sh
+FACT|23|78.3 to 80.9 TS%|27B precision ladder cell means; no level wins significantly
+FACT|57|−4.3 pts (t=−5.45)|35B budget 4096 vs 16384 paired delta, significant
+FACT|202|77.5 TS%|35B temp 0.6 Qwen coding recipe, best sampling point
+FACT|48|+4.6 to +17.5 pts|rerun gain (best-of-3 vs mean) across cells
+FACT|49|1551–2841 MiB|GTT spill in all 14 cells; freeze risk
+INCIDENT|185|First rep discarded after GPU hit 104°C and throttled; data re-collected after intake cleared
+INCIDENT|493|First pass discarded — run used a debug build by mistake
+INCIDENT|796|Overnight block cut short by UPS power event; partial rows quarantined and unused
+OPEN: What causes the ~1551–2841 MiB GTT spill in all 14 cells despite VRAM headroom, and is it safe on this no-swap host?

@@ -1,0 +1,189 @@
+diff --git a/src/logfmt.ts b/src/logfmt.ts
+new file mode 100644
+index 0000000..e82741b
+--- /dev/null
++++ b/src/logfmt.ts
+@@ -0,0 +1,183 @@
++export class LogfmtError extends Error {
++  column: number;
++
++  constructor(message: string, column: number) {
++    super(message);
++    this.name = "LogfmtError";
++    this.column = column;
++  }
++}
++
++interface Pair {
++  key: string;
++  value: string | true;
++  end: number; // index in `line` just past this pair.
++}
++
++function isSpace(c: string | undefined): boolean {
++  return c === " " || c === "\t";
++}
++
++// Reads one complete field starting at `start`, advancing `i.value` past it.
++// Quote-aware: spaces/tabs inside a quoted value are consumed as part of the
++// value rather than treated as separators (needed for parse(format(x)) === x).
++function readPair(line: string, n: number, start: number, i: { value: number }): Pair {
++  const p = i.value;
++
++  // Scan the key up to '=', space, tab, or end.
++  while (i.value < n && line[i.value] !== "=" && !isSpace(line[i.value])) {
++    i.value++;
++  }
++  const key = line.slice(p, i.value);
++
++  if (i.value >= n || isSpace(line[i.value])) {
++    // Bare key -> true.
++    return { key, value: true, end: i.value };
++  }
++
++  // Here line[i.value] === '='.
++  if (i.value === p) {
++    throw new LogfmtError("empty key", i.value);
++  }
++  const valuePos = i.value + 1;
++
++  if (valuePos >= n) {
++    // "key=" at end of line -> empty string.
++    return { key, value: "", end: n };
++  }
++
++  if (line[valuePos] === '"') {
++    const openQuote = valuePos;
++    let q = openQuote + 1;
++    let val = "";
++    while (q < n) {
++      const c = line[q];
++      if (c === "\\") {
++        if (q + 1 >= n) {
++          // Backslash at EOF -> the quote never closes.
++          throw new LogfmtError("unterminated quoted value", openQuote);
++        }
++        const next = line[q + 1];
++        if (next === '"') {
++          val += '"';
++          q += 2;
++        } else if (next === "\\") {
++          val += "\\";
++          q += 2;
++        } else if (next === "n") {
++          val += "\n";
++          q += 2;
++        } else {
++          throw new LogfmtError("unknown escape", q);
++        }
++      } else if (c === '"') {
++        const closing = q;
++        // After the closing quote must be whitespace or end of line.
++        if (closing + 1 < n && !isSpace(line[closing + 1])) {
++          throw new LogfmtError("unexpected character after quoted value", closing + 1);
++        }
++        return { key, value: val, end: closing + 1 };
++      } else {
++        val += c;
++        q++;
++      }
++    }
++    // Ran off the end without a closing quote.
++    throw new LogfmtError("unterminated quoted value", openQuote);
++  }
++
++  // Bare value runs until the next space or tab (may contain '=').
++  const vstart = valuePos;
++  let r = valuePos;
++  while (r < n && !isSpace(line[r])) {
++    r++;
++  }
++  return { key, value: line.slice(vstart, r), end: r };
++}
++
++function isKeyBad(c: string): boolean {
++  return c === " " || c === "\t" || c === "=" || c === '"';
++}
++
++export function parse(line: string): Record<string, string | true> {
++  const n = line.length;
++  const i = { value: 0 };
++  const out: Record<string, string | true> = {};
++
++  while (i.value < n) {
++    // Skip whitespace separating pairs.
++    while (i.value < n && isSpace(line[i.value])) {
++      i.value++;
++    }
++    if (i.value >= n) {
++      break;
++    }
++
++    const pair = readPair(line, n, i.value, i);
++    out[pair.key] = pair.value;
++  }
++
++  return out;
++}
++
++function needsQuote(v: string): boolean {
++  if (v.length === 0) {
++    return true;
++  }
++  for (const c of v) {
++    if (c === " " || c === "\t" || c === '"' || c === "\\" || c === "=" || c === "\n") {
++      return true;
++    }
++  }
++  return false;
++}
++
++function encodeQuoted(v: string): string {
++  let out = "";
++  for (const c of v) {
++    if (c === "\\") {
++      out += "\\\\";
++    } else if (c === '"') {
++      out += '\\"';
++    } else if (c === "\n") {
++      out += "\\n";
++    } else {
++      out += c;
++    }
++  }
++  return out;
++}
++
++export function format(fields: Record<string, string | true>): string {
++  const parts: string[] = [];
++  for (const key of Object.keys(fields)) {
++    if (key.length === 0) {
++      throw new LogfmtError("invalid empty key", -1);
++    }
++    let badChar: string | undefined;
++    for (const c of key) {
++      if (isKeyBad(c)) {
++        badChar = c;
++        break;
++      }
++    }
++    if (badChar !== undefined) {
++      throw new LogfmtError(`invalid key containing '${badChar === "\\" ? "\\\\" : badChar === '"' ? '\\"' : badChar}'`, -1);
++    }
++
++    const value = fields[key];
++    if (value === true) {
++      parts.push(key);
++      continue;
++    }
++    // `key` comes from Object.keys, so the property exists at runtime; the
++    // undefined here is only a type-checking artifact of indexing.
++    const str: string = value ?? "";
++    if (needsQuote(str)) {
++      parts.push(key + '"' + encodeQuoted(str) + '"');
++    } else {
++      parts.push(key + str);
++    }
++  }
++  return parts.join(" ");
++}

@@ -1,0 +1,1 @@
+{"requests": 9, "prompt_first": 3520, "prompt_peak": 26936, "gen": 19939, "reason": 15501, "server_s": 137.1, "ttft_s": 4.1, "gen_rate_weighted": 145.4, "cache_hit_pct": 74.8, "prompt_drops": 0, "finish": ["stop", "tool_calls"]}

@@ -1,0 +1,27 @@
+{
+ "arm": "log.M.V2.P0",
+ "profile": "read",
+ "wall_s": 99.0,
+ "turns": 13,
+ "gen": 15020,
+ "reason": 12487,
+ "prompt_first": 3520,
+ "prompt_peak": 22831,
+ "drops": 0,
+ "rate": 152.9,
+ "peak_vram": 32527.0,
+ "peak_gtt": 129.0,
+ "score": 1.0,
+ "detail": {
+  "rows": 19,
+  "classes": 19,
+  "class_recall": 1.0,
+  "first_exact": 19,
+  "count_exact": 19,
+  "planted": 6,
+  "planted_total": 6,
+  "extra": 0,
+  "format_deviation": 19,
+  "score": 1.0
+ }
+}

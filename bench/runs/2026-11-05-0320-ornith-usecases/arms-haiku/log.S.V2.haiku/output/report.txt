@@ -1,0 +1,17 @@
+scheduler.py:912|64|1|ERROR|Sequence 41 aborted: decode watchdog expired after 600 s
+api_server.py:233|118|1|ERROR|Client stream closed while writing chunk 88
+config.py:871|152|1|WARNING|Qwen3.5 model specifies mamba_ssm_dtype='float32' in its config, but --mamba-ssm-cache-dtype='bfloat16' was passed.
+vllm.py:2276|155|2|WARNING|max_num_scheduled_tokens is set to 4096 based on the speculative decoding settings.
+none|173|1|ERROR|Memory Fault: GPU node 1 page 0x7f31a0 not present, queue evicted
+activation.py:816|183|1|WARNING|[ROCm] PyTorch's native GELU with tanh approximation is unstable.
+compilation.py:1348|193|1|WARNING|Op 'sparse_attn_indexer' not present in model, enabling with '+sparse_attn_indexer' has no effect
+utils.py:333|223|1|WARNING|Attempted to load weight fc.weight_scale with dtype torch.float16 into parameter with dtype torch.bfloat16
+utils.py:333|224|5|WARNING|Attempted to load weight layers.0.mlp.down_proj.weight_scale with dtype torch.float16 into parameter with dtype torch.bfloat16
+utils.py:333|225|5|WARNING|Attempted to load weight layers.0.self_attn.o_proj.weight_scale with dtype torch.float16 into parameter with dtype torch.bfloat16
+none|227|1|ERROR|Segmentation fault (core dumped) in worker 3
+speculator.py:243|237|1|WARNING|Draft model DFlash2Qwen3ForCausalLM does not support external multimodal embeddings.
+none|282|1|ERROR|RuntimeError: KV pool exhausted at 31204 MiB
+kv_cache_utils.py:1493|321|2|WARNING|Add 3 padding layers, may waste at most 60.00% KV cache memory
+kv_cache_utils.py:2123|322|2|WARNING|Speculative decoding (method=dflash) is enabled but no KV cache group could be identified as the draft model's.
+core.py:540|337|1|CRITICAL|Engine core died unexpectedly, restarting
+model.py:1904|415|1|WARNING|Default vLLM sampling parameters have been overridden by the model's generation_config.json

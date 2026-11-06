@@ -1,0 +1,12 @@
+DOC: 2026-07-16-0927-mtp-sampler-tax.md
+TOPIC: Scouted and refuted the penalty-sampler mechanism: enabling any penalty sampler adds a fixed ~2 ms/token of host work independent of draft acceptance, measured shallow at ctx 4096 and confirmed depth-invariant at ~133k.
+VERDICT: Enabling any penalty sampler costs a fixed ~2 ms/token of host work regardless of MTP (Amdahl), so the campaign's 'presence_penalty rejects MTP drafts' mechanism is refuted — pp=0.01 emits a byte-identical reply yet loses ~29% decode while min_p is free. The campaign's larger +4.16 ms/tok was a pp=1.5 figure that stacks this fixed tax plus real draft rejection.
+CONFIG: llama.cpp b9950 Vulkan/RADV, -ub 2048 -b 4096 -fa on -ngl 99 -np 1, ctx 4096/163840, KV f16, seed 42; Qwen3.6-27B-MTP and Qwen3.6-35B-A3B (both carry an MTP head)
+PATHS: bench/runs/2026-07-16-0927-mtp-sampler-probe/, campaigns/2026-07-14-hardest-tasks-27b-vs-35b/analysis.md, ../../bench/runs/2026-07-16-1111-spec-draft-pmin-mtp/, ../../bench/runs/2026-07-16-1111-spec-draft-pmin-mtp/analysis.md, bench/runs/2026-07-16-0927-mtp-sampler-probe/results.jsonl, campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/outputs.jsonl
+FACT|46|+1.97/+2.07/+1.95 ms/tok host Δ|fixed penalty-sampler tax across 3 configs (the finding)
+FACT|44|-28.6% decode, identical reply|pp off to 0.01 loses ~29% decode with output unchanged
+FACT|140|+1.94/+1.69 ms/tok at 133k|tax is depth-invariant, same as shallow probe
+FACT|151|+3.35/+3.72 ms/tok pp 0 to 1.5|pp-1.5 stacks tax plus genuine draft rejection
+FACT|99|159.6 t/s (n-max 3)|MTP decode peaks at the llama.cpp default
+INCIDENT|104|fan controller failed mid-session at 91 C; session abandoned and repeated next morning
+OPEN: Why do the penalties branches cost ~2 ms/token (inferred as a per-position vocabulary scan but never verified)?

@@ -1,0 +1,126 @@
+diff --git a/src/logfmt.ts b/src/logfmt.ts
+new file mode 100644
+index 0000000..869184a
+--- /dev/null
++++ b/src/logfmt.ts
+@@ -0,0 +1,120 @@
++export class LogfmtError extends Error {
++  column: number;
++
++  constructor(message: string, column: number) {
++    super(message);
++    this.column = column;
++    this.name = "LogfmtError";
++    Object.setPrototypeOf(this, new.target.prototype);
++  }
++}
++
++type Field = string | true;
++
++export function parse(line: string): Record<string, Field> {
++  const result: Record<string, Field> = {};
++  const n = line.length;
++  let i = 0;
++
++  while (i < n) {
++    while (i < n && isSeparator(line.charAt(i))) i++;
++    if (i >= n) break;
++
++    const pairStart = i;
++    while (i < n && !isSeparator(line.charAt(i)) && line.charAt(i) !== "=") i++;
++    const key = line.slice(pairStart, i);
++
++    if (key === "") {
++      throw new LogfmtError("empty key", pairStart);
++    }
++
++    if (i >= n || isSeparator(line.charAt(i))) {
++      result[key] = true;
++      continue;
++    }
++
++    // line.charAt(i) === "="
++    i++;
++    const start = i;
++
++    if (i < n && line.charAt(i) === '"') {
++      const quoteCol = i;
++      i++;
++      let value = "";
++      let closed = false;
++      while (i < n) {
++        const c = line.charAt(i);
++        if (c === '"') {
++          i++;
++          closed = true;
++          break;
++        }
++        if (c === "\\") {
++          if (i + 1 >= n) {
++            throw new LogfmtError("unterminated quote", quoteCol);
++          }
++          const next = line.charAt(i + 1);
++          switch (next) {
++            case '"':
++              value += '"';
++              i += 2;
++              break;
++            case "\\":
++              value += "\\";
++              i += 2;
++              break;
++            case "n":
++              value += "\n";
++              i += 2;
++              break;
++            default:
++              throw new LogfmtError("unknown escape", i);
++          }
++          continue;
++        }
++        value += c;
++        i++;
++      }
++      if (!closed) {
++        throw new LogfmtError("unterminated quote", quoteCol);
++      }
++      if (i < n && !isSeparator(line.charAt(i))) {
++        throw new LogfmtError("unexpected character after quoted value", i);
++      }
++      result[key] = value;
++    } else {
++      while (i < n && !isSeparator(line.charAt(i))) i++;
++      result[key] = line.slice(start, i);
++    }
++  }
++
++  return result;
++}
++
++function isSeparator(c: string): boolean {
++  return c === " " || c === "\t";
++}
++
++export function format(fields: Record<string, Field>): string {
++  const parts: string[] = [];
++  for (const key of Object.keys(fields)) {
++    if (key === "" || / \t"=/.test(key)) {
++      throw new LogfmtError("invalid key", -1);
++    }
++
++    const value: Field = fields[key] ?? "";
++    if (value === true) {
++      parts.push(key);
++      continue;
++    }
++
++    if (value === "" || /[ \t"\n=\\/]/.test(value)) {
++      parts.push(
++        key + "=" + '"' + value.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n") + '"'
++      );
++    } else {
++      parts.push(key + "=" + value);
++    }
++  }
++  return parts.join(" ");
++}

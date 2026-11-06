@@ -1,0 +1,18 @@
+All edits are complete and verified. Summary of what was done:
+
+**Renamed** `get_price` → `unit_price` in `shop/pricing.py`, adding keyword-only `*, currency="EUR"` that returns the same cents for EUR and raises `ValueError` otherwise; its own docstring updated.
+
+**Updated callers/doc/comments/tests:**
+- `shop/cart.py`: import + call; both `line_total` and `cart_total` gained `, *, currency="EUR"` and pass it down to `unit_price`.
+- `shop/report.py`: comment and call use `unit_price`; `get_price_history` left alone.
+- `shop/api.py`: import updated; route key `"get_price"` kept (public) but now maps to `unit_price`.
+- `tests/test_shop.py`: import + assertion renamed, plus `test_get_price` → `test_unit_price`. The `call("get_price", …)` route-name string was kept.
+- `README.md`: `get_price(sku, qty)` → `unit_price(sku, qty)`, keeping `get_price_history`.
+
+**Kept unchanged** per the rules: `vendor/legacy.py` (not touched), `get_price_history`, and all route name strings.
+
+**Verification:**
+- `python3 -m pytest -q` → `3 passed`.
+- Currency behavior confirmed via temporary tests (later removed): EUR returns same cents, and `ValueError` propagates through `unit_price`, `line_total`, and `cart_total`. Final state re-runs clean at 3 passed.
+
+DONE

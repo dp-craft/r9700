@@ -1,0 +1,14 @@
+DOC: 2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md
+TOPIC: compared decode throughput of Ornith 1.5-35B-A3B and Qwen models on native Radiance versus Sly engines on an R9700, at 10k/50k/100k depths with MTP and DFlash drafting.
+VERDICT: Ornith 1.5 w4a8 on native Radiance with MTP K=3 is the fastest arm (about 220 tok/s decode at 10k, roughly 2.1-2.5x the 27B on Sly), but its MTP head fails to load on Sly and the EMULATION MoE backend makes the Qwen 35B crawl. Coding quality is untested.
+CONFIG: keptn/ornith-1.5-35b-a3b-w4a8 (plus z-lab/ornith DFlash); amd/Qwen3.5-35B-A3B-MXFP4, Capicua25x Ornith MXFP4 + ornith DFlash; engines stilldeadcode/radiance 1.16.0 and Sly radiance vLLM 1.9.1; MTP K=3, DFlash K=3/K=7, triton_unfused versus EMULATION backends; ctx ~262000, temperature 1.0, 3 reps
+PATHS: bench/runs/2026-11-04-1730-ornith15-w4a8-radiance/, bench/runs/2026-11-04-1740-27b-sly-baseline/, bench/runs/2026-11-04-1557-35b-perf-10k-50k-100k/, bench/runs/2026-11-04-1802-ornith15-sly-dflash/, campaigns/2026-07-19-ornith-vs-gemma/analysis.md
+FACT|40|219.8 tok/s|Ornith 1.5 w4a8 decode at 10k on native Radiance, fastest arm
+FACT|98|2.5x / 2.1x / 2.1x decode ratio|Ornith-on-Radiance versus 27B-on-Sly across depths
+FACT|53|16.6 tok/s|EMULATION backend decodes Qwen3.5-35B far slower at 10k
+FACT|43|95.2 tok/s|Ornith Sly DFlash K=3 decode at 10k
+FACT|100|6.6x / 6.0x / 4.3x decode ratio|triton_unfused versus EMULATION on the 35B, backend change only
+INCIDENT|46|Ornith Sly MTP K=3 failed at load on triton_unfused, triton and aiter (three boots)
+INCIDENT|120|afternoon block dropped when hotspot hit throttle limit, measured again overnight
+INCIDENT|164|Ornith DFlash K=7 arm stopped while starting, quarantined as INTERRUPTED
+OPEN: Why no full-model CUDA/graph was captured on the no-drafter and MTP Sly arms?

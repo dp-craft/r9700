@@ -1,0 +1,129 @@
+diff --git a/src/logfmt.ts b/src/logfmt.ts
+new file mode 100644
+index 0000000..9712a45
+--- /dev/null
++++ b/src/logfmt.ts
+@@ -0,0 +1,123 @@
++export class LogfmtError extends Error {
++  column: number;
++
++  constructor(message: string, column: number) {
++    super(message);
++    this.name = "LogfmtError";
++    this.column = column;
++  }
++}
++
++function isWhitespace(ch: string): boolean {
++  return ch === " " || ch === "\t";
++}
++
++export function parse(line: string): Record<string, string | true> {
++  const result: Record<string, string | true> = {};
++  let i = 0;
++  const n = line.length;
++
++  while (i < n) {
++    // Skip the one-or-more space/tab separators between pairs.
++    while (i < n && isWhitespace(line[i]!)) i++;
++    if (i >= n) break;
++
++    // Read the key until '=', space, tab, or end of line.
++    const keyStart = i;
++    while (i < n && line[i] !== "=" && !isWhitespace(line[i]!)) i++;
++    const key = line.slice(keyStart, i);
++
++    if (key === "") {
++      // Pair began with '=' — the offending character is the '=' itself.
++      throw new LogfmtError("empty key", keyStart);
++    }
++
++    if (i >= n || isWhitespace(line[i]!)) {
++      // Bare key with no value.
++      result[key] = true;
++      continue;
++    }
++
++    // line[i] === '='
++    i++;
++
++    if (i < n && line[i] === '"') {
++      let value = "";
++      const quoteStart = i;
++      i++; // consume opening quote
++      let closed = false;
++      while (i < n) {
++        const c = line[i]!;
++        if (c === "\\") {
++          const next = line[i + 1];
++          if (next === '"' || next === "\\" || next === "n") {
++            value += next === "n" ? "\n" : next;
++            i += 2;
++          } else {
++            throw new LogfmtError("unknown escape", i); // backslash
++          }
++        } else if (c === '"') {
++          i++; // consume closing quote
++          closed = true;
++          break;
++        } else {
++          value += c;
++          i++;
++        }
++      }
++      if (!closed) {
++        throw new LogfmtError("unterminated quote", quoteStart);
++      }
++      // Anything other than whitespace right after the closing quote is an error.
++      if (i < n && !isWhitespace(line[i]!)) {
++        throw new LogfmtError("unexpected character after quote", i);
++      }
++      result[key] = value;
++    } else {
++      // Bare value: runs until the next space or tab (may contain '=').
++      const valueStart = i;
++      while (i < n && !isWhitespace(line[i]!)) i++;
++      result[key] = line.slice(valueStart, i);
++    }
++  }
++
++  return result;
++}
++
++function needsQuoting(value: string): boolean {
++  return (
++    value === "" || /[ \t"\\=\n]/.test(value)
++  );
++}
++
++export function format(fields: Record<string, string | true>): string {
++  const parts: string[] = [];
++
++  for (const [key, v] of Object.entries(fields)) {
++    if (
++      key === "" ||
++      key.includes(" ") ||
++      key.includes("\t") ||
++      key.includes("=") ||
++      key.includes('"')
++    ) {
++      throw new LogfmtError("invalid key", -1);
++    }
++
++    if (v === true) {
++      parts.push(key);
++    } else {
++      if (needsQuoting(v)) {
++        const encoded = v
++          .replace(/\\/g, "\\\\")
++          .replace(/"/g, '\\"')
++          .replace(/\n/g, "\\n");
++        parts.push(`${key}="${encoded}"`);
++      } else {
++        parts.push(`${key}=${v}`);
++      }
++    }
++  }
++
++  return parts.join(" ");
++}

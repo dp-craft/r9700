@@ -1,0 +1,13 @@
+DOC: 2026-10-23-0023-vllm-gpu-fault-solved-hip-kernarg.md
+TOPIC: Investigated and resolved a random HSA_STATUS_ERROR_MEMORY_FAULT under Sly vLLM MXFP4 plus DFlash on the R9700, tracing it to corrupted device-memory kernel-argument pointers.
+VERDICT: A recurring memory fault from a pointer with bit 44 cleared, caused by kernel args placed in device memory, is fixed by HIP_FORCE_DEV_KERNARG=0 and now gives clean boots at full speed (decode median 111-150 tok/s, prefill median 2.4-3.0k tok/s); it is the default in every vLLM profile. The evidence rests on few runs, so kernel 7.0.0-38 is still untested with the fix and which component clears bit 44 is unknown.
+CONFIG: amd Qwen3.8-27B-Quark AWQ MXFP4 plus DFlash2 k=7 drafter; Sly vLLM 1.6.0 (vLLM 0.31.0) with R4D_HYBRID attention, fp8 KV cache, ctx 180000, gpu-memory-utilization 0.90; fix HIP_FORCE_DEV_KERNARG=0
+PATHS: none
+FACT|21|~12 of ~21 boots | boots this session without the fix that faulted with MEMORY_FAULT
+FACT|57|3/3 clean, 0 faults | boots with HIP_FORCE_DEV_KERNARG=0 across four Claude turns each
+FACT|22|111-150 tok/s | decode median server speed with the fix
+FACT|22|2.4-3.0k tok/s | prefill median server speed with the fix (max 5.6k)
+FACT|22|4.8-6.2 | DFlash draft token acceptance per step with the fix
+INCIDENT|21|HSA_STATUS_ERROR_MEMORY_FAULT faulted most boots without the fix, about 12 of ~21 boots
+INCIDENT|64|Loop cooler pump seized and the card hit 98 C so the second attempt was scrapped and redone
+OPEN: Which part of the kernel-argument path (PCIe link, BAR write-combining, or firmware) clears bit 44 and corrupts the pointer?

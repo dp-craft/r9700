@@ -1,0 +1,7 @@
+Validation complete:
+- **a.** `items.txt` has 40 `=== ITEM` headers; `labels.txt` has 40 `^[0-9]+\|` lines — they match, no missing/duplicate entries.
+- **b.** All 40 labels are among the 8 allowed words (every line matched the valid-label check).
+- **c.** Re-tested the hesitant items against their definitions: 011 (own empirical run findings, not external → benchmark-report), 024 (findings-based review of existing plan docs mapped to evidence → code-review), 026 (own direct measurements of the live vault — explicitly excluded from research by its "not our measurements" clause → benchmark-report), 031 (goal + scope for implementation work, no task IDs → plan), 035 (inventory/study of existing IRs with line references, not a phased work plan → research).
+- **d.** No changes needed.
+
+DONE

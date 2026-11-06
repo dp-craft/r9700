@@ -1,0 +1,111 @@
+{
+  "notes": [
+    {"report": "2026-09-15-stew675-buildcmp.analysis.md", "label": "A", "verdict": 3, "config": 2, "facts_decision_relevant": 5, "facts_wrong_meaning": 0, "incidents_total": 3, "incidents_unsupported": 0, "incidents_missed": 0, "open": 2, "critical_error": null},
+    {"report": "2026-09-15-stew675-buildcmp.analysis.md", "label": "B", "verdict": 3, "config": 2, "facts_decision_relevant": 5, "facts_wrong_meaning": 0, "incidents_total": 3, "incidents_unsupported": 0, "incidents_missed": 0, "open": 2, "critical_error": null},
+    {"report": "2026-09-15-stew675-buildcmp.analysis.md", "label": "C", "verdict": 3, "config": 2, "facts_decision_relevant": 4, "facts_wrong_meaning": 0, "incidents_total": 2, "incidents_unsupported": 0, "incidents_missed": 0, "open": 2, "critical_error": null},
+    {"report": "2026-09-15-stew675-buildcmp.analysis.md", "label": "D", "verdict": 3, "config": 2, "facts_decision_relevant": 5, "facts_wrong_meaning": 0, "incidents_total": 1, "incidents_unsupported": 0, "incidents_missed": 2, "open": 2, "critical_error": null},
+    {"report": "2026-09-15-stew675-buildcmp.analysis.md", "label": "E", "verdict": 3, "config": 2, "facts_decision_relevant": 5, "facts_wrong_meaning": 0, "incidents_total": 1, "incidents_unsupported": 0, "incidents_missed": 2, "open": 2, "critical_error": null},
+    {"report": "2026-09-15-stew675-buildcmp.analysis.md", "label": "F", "verdict": 3, "config": 2, "facts_decision_relevant": 5, "facts_wrong_meaning": 0, "incidents_total": 3, "incidents_unsupported": 0, "incidents_missed": 0, "open": 2, "critical_error": null},
+
+    {"report": "2026-10-23-0023-vllm-gpu-fault-solved-hip-kernarg.md", "label": "A", "verdict": 3, "config": 2, "facts_decision_relevant": 5, "facts_wrong_meaning": 0, "incidents_total": 4, "incidents_unsupported": 0, "incidents_missed": 7, "open": 2, "critical_error": null},
+    {"report": "2026-10-23-0023-vllm-gpu-fault-solved-hip-kernarg.md", "label": "B", "verdict": 3, "config": 2, "facts_decision_relevant": 5, "facts_wrong_meaning": 0, "incidents_total": 4, "incidents_unsupported": 0, "incidents_missed": 7, "open": 2, "critical_error": null},
+    {"report": "2026-10-23-0023-vllm-gpu-fault-solved-hip-kernarg.md", "label": "C", "verdict": 3, "config": 2, "facts_decision_relevant": 5, "facts_wrong_meaning": 0, "incidents_total": 5, "incidents_unsupported": 0, "incidents_missed": 6, "open": 2, "critical_error": null},
+    {"report": "2026-10-23-0023-vllm-gpu-fault-solved-hip-kernarg.md", "label": "D", "verdict": 3, "config": 1, "facts_decision_relevant": 4, "facts_wrong_meaning": 0, "incidents_total": 2, "incidents_unsupported": 0, "incidents_missed": 9, "open": 2, "critical_error": null},
+    {"report": "2026-10-23-0023-vllm-gpu-fault-solved-hip-kernarg.md", "label": "E", "verdict": 3, "config": 2, "facts_decision_relevant": 5, "facts_wrong_meaning": 0, "incidents_total": 6, "incidents_unsupported": 0, "incidents_missed": 5, "open": 2, "critical_error": null},
+    {"report": "2026-10-23-0023-vllm-gpu-fault-solved-hip-kernarg.md", "label": "F", "verdict": 2, "config": 1, "facts_decision_relevant": 4, "facts_wrong_meaning": 1, "incidents_total": 1, "incidents_unsupported": 0, "incidents_missed": 10, "open": 2, "critical_error": "It lists kernel 7.0.0-34/38 beside the fix without saying the fix is untested on -38, and says the ~3% luck figure rules out a random cause, overstating evidence the report calls strong but not final."},
+
+    {"report": "2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md", "label": "A", "verdict": 3, "config": 2, "facts_decision_relevant": 5, "facts_wrong_meaning": 0, "incidents_total": 3, "incidents_unsupported": 0, "incidents_missed": 1, "open": 2, "critical_error": null},
+    {"report": "2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md", "label": "B", "verdict": 2, "config": 1, "facts_decision_relevant": 5, "facts_wrong_meaning": 0, "incidents_total": 4, "incidents_unsupported": 0, "incidents_missed": 1, "open": 2, "critical_error": null},
+    {"report": "2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md", "label": "C", "verdict": 3, "config": 2, "facts_decision_relevant": 5, "facts_wrong_meaning": 0, "incidents_total": 4, "incidents_unsupported": 0, "incidents_missed": 1, "open": 2, "critical_error": null},
+    {"report": "2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md", "label": "D", "verdict": 1, "config": 1, "facts_decision_relevant": 5, "facts_wrong_meaning": 0, "incidents_total": 3, "incidents_unsupported": 0, "incidents_missed": 2, "open": 2, "critical_error": "It says the same 35B falls to the EMULATION backend at about 16 t/s on Sly, but that figure is Qwen3.5-35B; Ornith on Sly measured 95/71/67 t/s on triton_unfused and EMULATION was never tested for it."},
+    {"report": "2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md", "label": "E", "verdict": 3, "config": 2, "facts_decision_relevant": 5, "facts_wrong_meaning": 0, "incidents_total": 4, "incidents_unsupported": 0, "incidents_missed": 1, "open": 2, "critical_error": null},
+    {"report": "2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md", "label": "F", "verdict": 3, "config": 2, "facts_decision_relevant": 5, "facts_wrong_meaning": 0, "incidents_total": 5, "incidents_unsupported": 0, "incidents_missed": 0, "open": 2, "critical_error": null},
+
+    {"report": "2026-10-31-redhat-sharp-w208-blind.analysis.md", "label": "A", "verdict": 3, "config": 2, "facts_decision_relevant": 5, "facts_wrong_meaning": 0, "incidents_total": 3, "incidents_unsupported": 0, "incidents_missed": 0, "open": 2, "critical_error": null},
+    {"report": "2026-10-31-redhat-sharp-w208-blind.analysis.md", "label": "B", "verdict": 3, "config": 2, "facts_decision_relevant": 4, "facts_wrong_meaning": 0, "incidents_total": 3, "incidents_unsupported": 0, "incidents_missed": 0, "open": 2, "critical_error": null},
+    {"report": "2026-10-31-redhat-sharp-w208-blind.analysis.md", "label": "C", "verdict": 3, "config": 2, "facts_decision_relevant": 5, "facts_wrong_meaning": 0, "incidents_total": 1, "incidents_unsupported": 0, "incidents_missed": 2, "open": 2, "critical_error": null},
+    {"report": "2026-10-31-redhat-sharp-w208-blind.analysis.md", "label": "D", "verdict": 3, "config": 2, "facts_decision_relevant": 4, "facts_wrong_meaning": 0, "incidents_total": 2, "incidents_unsupported": 0, "incidents_missed": 1, "open": 2, "critical_error": null},
+    {"report": "2026-10-31-redhat-sharp-w208-blind.analysis.md", "label": "E", "verdict": 3, "config": 2, "facts_decision_relevant": 3, "facts_wrong_meaning": 0, "incidents_total": 3, "incidents_unsupported": 0, "incidents_missed": 0, "open": 2, "critical_error": null},
+    {"report": "2026-10-31-redhat-sharp-w208-blind.analysis.md", "label": "F", "verdict": 2, "config": 2, "facts_decision_relevant": 5, "facts_wrong_meaning": 0, "incidents_total": 1, "incidents_unsupported": 0, "incidents_missed": 2, "open": 2, "critical_error": null},
+
+    {"report": "2026-10-30-0900-vllm-redhat-mxfp4-depth-transposed.md", "label": "A", "verdict": 2, "config": 1, "facts_decision_relevant": 5, "facts_wrong_meaning": 0, "incidents_total": 4, "incidents_unsupported": 0, "incidents_missed": 1, "open": 2, "critical_error": null},
+    {"report": "2026-10-30-0900-vllm-redhat-mxfp4-depth-transposed.md", "label": "B", "verdict": 2, "config": 2, "facts_decision_relevant": 5, "facts_wrong_meaning": 0, "incidents_total": 5, "incidents_unsupported": 0, "incidents_missed": 0, "open": 2, "critical_error": null},
+    {"report": "2026-10-30-0900-vllm-redhat-mxfp4-depth-transposed.md", "label": "C", "verdict": 2, "config": 2, "facts_decision_relevant": 5, "facts_wrong_meaning": 0, "incidents_total": 6, "incidents_unsupported": 0, "incidents_missed": 0, "open": 2, "critical_error": null},
+
+    {"report": "2026-07-14-hardest-tasks-27b-vs-35b.analysis.md", "label": "A", "verdict": 2, "config": 2, "facts_decision_relevant": 5, "facts_wrong_meaning": 0, "incidents_total": 4, "incidents_unsupported": 0, "incidents_missed": 1, "open": 2, "critical_error": null},
+    {"report": "2026-07-14-hardest-tasks-27b-vs-35b.analysis.md", "label": "B", "verdict": 3, "config": 1, "facts_decision_relevant": 5, "facts_wrong_meaning": 0, "incidents_total": 3, "incidents_unsupported": 0, "incidents_missed": 2, "open": 2, "critical_error": null},
+    {"report": "2026-07-14-hardest-tasks-27b-vs-35b.analysis.md", "label": "C", "verdict": 2, "config": 1, "facts_decision_relevant": 4, "facts_wrong_meaning": 0, "incidents_total": 4, "incidents_unsupported": 0, "incidents_missed": 1, "open": 2, "critical_error": null}
+  ],
+  "synth": [
+    {
+      "label": "P",
+      "conflicts_total": 3,
+      "conflicts_valid": 2,
+      "conflicts_missed": [
+        "07-14 states no swap; 11-04 measured 4.7 GiB swap",
+        "09-15 recommends a ROCm build (with -fa on) with no kernarg setting; 10-23 says every ROCm engine should set HIP_FORCE_DEV_KERNARG=0 and reports a ROCm -fa on fault",
+        "07-14 recommends budget 4096 for the 35B (line 451) while its corrected finding says the 35B gains significantly at 16384 (lines 57, 328)"
+      ],
+      "recommend": 1,
+      "recommend_reason": "It states the speed-versus-graded-quality trade-off, but its rationale of best-graded is unsupported, since 35B rb4096 scored 73.3 against Q6_K 80.9 with no resolvable ranking, and it omits the report's warning that nothing is safe unattended until the GTT spill is explained."
+    },
+    {
+      "label": "Q",
+      "conflicts_total": 2,
+      "conflicts_valid": 1,
+      "conflicts_missed": [],
+      "recommend": 3,
+      "recommend_reason": "Ornith on Radiance, the headroom or Chrome handling and the 27B on Sly as the stable fallback all match the 11-04 report, and it states the decisive trade-off of top speed against untested coding quality."
+    },
+    {
+      "label": "R",
+      "conflicts_total": 1,
+      "conflicts_valid": 1,
+      "conflicts_missed": [],
+      "recommend": 1,
+      "recommend_reason": "It states the trade-off and the small n, but its rationale of the only blind-graded setup is false because Q4_K_XL scored 12/19 in the same grade, and the kernarg fix was checked on a different checkpoint and image (amd Quark on Sly 1.6.0)."
+    },
+    {
+      "label": "S",
+      "conflicts_total": 4,
+      "conflicts_valid": 4,
+      "conflicts_missed": [
+        "07-14 recommends budget 4096 for the 35B (line 451) while its corrected finding says the 35B gains significantly at 16384 (lines 57, 328)"
+      ],
+      "recommend": 2,
+      "recommend_reason": "Fastest-but-ungraded Ornith and grading it before adoption are well supported with the trade-off stated, but calling Qwen3.6-35B-A3B the only local model with graded coding quality ignores the graded 27B cells in 07-14 and 10-31."
+    },
+    {
+      "label": "T",
+      "conflicts_total": 0,
+      "conflicts_valid": 0,
+      "conflicts_missed": [
+        "07-16 refutes the pp x MTP mechanism in 07-14, and 07-14 lines 76, 261 and 332 still differ from 07-16's real acceptance loss at pp 1.5 (lines 147-151)",
+        "07-14 says never set presence_penalty above 0 for coding; 11-04 uses presence-penalty 1.5 for Ornith",
+        "07-14 recommends Qwen3.6-35B-A3B on Vulkan as default; 11-04 recommends Ornith 1.5 on Radiance",
+        "09-15 recommends a ROCm build with no kernarg setting; 10-23 says every ROCm engine should set HIP_FORCE_DEV_KERNARG=0",
+        "07-14 and 07-16 state no swap; 11-04 measured 4.7 GiB swap",
+        "07-14 recommends budget 4096 for the 35B (line 451) while its corrected finding says the 35B gains significantly at 16384 (lines 57, 328)"
+      ],
+      "recommend": 1,
+      "recommend_reason": "The claim of cost-neutral quality against Qwen's preset appears in no report, the note that draft inference only loads on Radiance misstates a Sly MTP load failure (DFlash loads there), and it never says Ornith's coding quality is untested."
+    },
+    {
+      "label": "U",
+      "conflicts_total": 0,
+      "conflicts_valid": 0,
+      "conflicts_missed": [
+        "09-15 recommends a ROCm build (with -fa on) with no kernarg setting; 10-23 says every ROCm engine should set HIP_FORCE_DEV_KERNARG=0 and reports a ROCm -fa on fault"
+      ],
+      "recommend": 2,
+      "recommend_reason": "The picks are supported and it notes Ornith's quality is untested, but it omits the desktop crash at default headroom and offers ROCm plus stew675 without the kernarg fix or any link to the workload the 09-15 report named."
+    }
+  ],
+  "observations": [
+    "Stand-alone one-sentence incidents were caught by nearly all notes, while faults recorded only in test tables were mostly missed, most sharply in the kernarg notes D and F.",
+    "On the multi-phase depth report, notes A, B and C all led with the earlier phases and left the Cactus delta 0 result out of their verdicts.",
+    "Weak FACT choices were usually true but peripheral numbers such as peak VRAM or wall time, as in the sharp notes B, D and E, rather than wrong ones.",
+    "The most serious verdict error came from carrying a number across arms, as in Ornith note D applying the Qwen3.5-35B EMULATION speed to Ornith on Sly.",
+    "Syntheses P, R and S overclaimed with words like best-graded or only, and T and U reported no conflicts although in-scope reports clearly disagree."
+  ]
+}

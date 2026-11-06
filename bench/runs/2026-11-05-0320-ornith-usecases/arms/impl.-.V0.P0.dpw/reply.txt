@@ -1,0 +1,11 @@
+The implementation is complete and verified. `src/logfmt.ts` implements all three exports per SPEC.md:
+
+- **`LogfmtError`** — extends `Error`, public numeric `column`, constructor `(message, column)`.
+- **`parse`** — handles bare keys (`true`), `key=` (empty string), bare values (stop at space/tab, allow `=`), quoted values with `\"`/`\\`/`\n` decoding; last-value-wins with first-seen insertion order; empty/whitespace lines → `{}`. Throws `LogfmtError` at the correct 0-based column for empty keys, unterminated quotes (opening quote), unknown escapes (backslash), and chars after a closing quote.
+- **`format`** — joins in insertion order; encodes values needing quotes (empty/space/tab/`"`/`\`/`=`/newline) with proper escaping while keeping tabs literal; throws `LogfmtError` column -1 for invalid keys.
+
+One real bug was caught and fixed during verification: the quoted-value branch originally wrapped the *key* inside quotes (`"a=…`) — logfmt format is `key=value`, only the value is quoted, so it produces `key="value"` (e.g. `a=""`).
+
+Type-checks clean under strict `tsc` and passes the smoke test (plus my thorough round-trip/edge-case suite, since removed).
+
+DONE

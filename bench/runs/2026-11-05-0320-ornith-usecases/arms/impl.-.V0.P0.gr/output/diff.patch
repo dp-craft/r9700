@@ -1,0 +1,188 @@
+diff --git a/src/logfmt.ts b/src/logfmt.ts
+new file mode 100644
+index 0000000..8b62185
+--- /dev/null
++++ b/src/logfmt.ts
+@@ -0,0 +1,182 @@
++/**
++ * logfmt parsing and formatting.
++ *
++ * See SPEC.md for the full contract. The round-trip invariant is:
++ * parse(format(x)) === x for any valid x.
++ */
++
++export class LogfmtError extends Error {
++  column: number;
++
++  constructor(message: string, column: number) {
++    super(message);
++    this.name = "LogfmtError";
++    this.column = column;
++  }
++}
++
++export function parse(line: string): Record<string, string | true> {
++  const result: Record<string, string | true> = {};
++  const len = line.length;
++  let i = 0;
++
++  while (i < len) {
++    // Skip separators: one or more spaces/tabs.
++    if (line.charAt(i) === " " || line.charAt(i) === "\t") {
++      i++;
++      continue;
++    }
++
++    const pairStart = i;
++
++    // Scan the key until "=", space, tab, or end of line.
++    let j = pairStart;
++    while (j < len) {
++      const d = line.charAt(j);
++      if (d === "=" || d === " " || d === "\t") break;
++      j++;
++    }
++
++    if (j < len && line.charAt(j) === "=") {
++      // Key/value pair. The separator is at index j.
++      if (j === pairStart) {
++        throw new LogfmtError("empty key", j);
++      }
++      const key = line.slice(pairStart, j);
++      const valueStart = j + 1;
++
++      let value: string;
++      let nextI: number;
++
++      if (valueStart > len) {
++        // "=" was the last character: key= gives the empty string.
++        value = "";
++        nextI = len;
++      } else if (line.charAt(valueStart) === '"') {
++        const quoted = readQuoted(line, valueStart);
++        value = quoted.value;
++        nextI = quoted.i;
++        // After a closing quote the line must end or continue with whitespace.
++        if (nextI < len) {
++          const afterQuote = line.charAt(nextI);
++          if (afterQuote !== " " && afterQuote !== "\t") {
++            throw new LogfmtError(
++              "unexpected character after quoted value",
++              nextI,
++            );
++          }
++        }
++      } else {
++        // Bare value runs until the next space, tab, or end (may contain "=").
++        let k = valueStart;
++        while (k < len) {
++          const d = line.charAt(k);
++          if (d === " " || d === "\t") break;
++          k++;
++        }
++        value = line.slice(valueStart, k);
++        nextI = k;
++      }
++
++      result[key] = value;
++      i = nextI;
++    } else {
++      // No "=" for this token: a bare key with value true.
++      const key = line.slice(pairStart, j);
++      result[key] = true;
++      i = j;
++    }
++  }
++
++  return result;
++}
++
++interface QuotedResult {
++  value: string;
++  /** index immediately after the closing quote */
++  i: number;
++}
++
++function readQuoted(line: string, open: number): QuotedResult {
++  const len = line.length;
++  let out = "";
++  let k = open + 1; // skip the opening quote
++  for (;;) {
++    if (k >= len) {
++      throw new LogfmtError("unterminated quoted value", open);
++    }
++    const c = line.charAt(k);
++    if (c === "\\") {
++      const n = k + 1;
++      if (n >= len) {
++        throw new LogfmtError("unknown escape", k);
++      }
++      const e = line.charAt(n);
++      if (e === '"') {
++        out += '"';
++        k += 2;
++        continue;
++      }
++      if (e === "\\") {
++        out += "\\";
++        k += 2;
++        continue;
++      }
++      if (e === "n") {
++        out += "\n";
++        k += 2;
++        continue;
++      }
++      throw new LogfmtError("unknown escape", k);
++    } else if (c === '"') {
++      return { value: out, i: k + 1 };
++    } else {
++      out += c;
++      k++;
++    }
++  }
++}
++
++export function format(fields: Record<string, string | true>): string {
++  const parts: string[] = [];
++  for (const key of Object.keys(fields)) {
++    if (
++      key.length === 0 ||
++      key.includes(" ") ||
++      key.includes("\t") ||
++      key.includes("=") ||
++      key.includes('"')
++    ) {
++      throw new LogfmtError("invalid key", -1);
++    }
++    const value = fields[key];
++    if (value === true) {
++      parts.push(key);
++    } else {
++      parts.push(key + "=" + formatValue(value));
++    }
++  }
++  return parts.join(" ");
++}
++
++function formatValue(value: string): string {
++  const needsQuoting =
++    value.length === 0 ||
++    value.includes(" ") ||
++    value.includes("\t") ||
++    value.includes('"') ||
++    value.includes("\\") ||
++    value.includes("=") ||
++    value.includes("\n");
++
++  if (!needsQuoting) {
++    return value;
++  }
++
++  // Escape order matters: backslashes first, then the rest.
++  const escaped = value
++    .replace(/\\/g, "\\\\")
++    .replace(/"/g, '\\"')
++    .replace(/\n/g, "\\n");
++  return '"' + escaped + '"';
++}

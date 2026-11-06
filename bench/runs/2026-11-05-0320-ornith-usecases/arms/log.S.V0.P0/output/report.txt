@@ -1,0 +1,16 @@
+WATCHDOG_EXPIRED|64|1|ERROR|Sequence 41 aborted: decode watchdog expired after 600 s
+CLIENT_STREAM_CLOSED|118|1|ERROR|Client stream closed while writing chunk 88
+MAMBA_DTYPE_MISMATCH|152|1|WARNING|Qwen3.5 mamba_ssm_dtype float32 but --mamba-ssm-cache-dtype bfloat16 passed
+SUBOPTIMAL_MAX_NUM_SCHEDULED_TOKENS|155|2|WARNING|max_num_scheduled_tokens set to 4096 from speculative decoding may hurt performance
+MEMORY_FAULT|173|1|ERROR|GPU node 1 page not present, queue evicted
+GELU_FALLBACK|183|1|WARNING|[ROCm] native GELU tanh approximation unstable, falling back to GELU(approximate none)
+OP_NOT_PRESENT|193|1|WARNING|Op 'sparse_attn_indexer' not present in model, enabling has no effect
+WEIGHT_DTYPE_MISMATCH|223|11|WARNING|Attempted to load weight with dtype torch.float16 into parameter with dtype torch.bfloat16
+SEGFAULT|227|1|CRITICAL|Segmentation fault (core dumped) in worker 3
+DRAFT_MULTIMODAL_UNSUPPORTED|237|1|WARNING|Draft model does not support external multimodal embeddings; using text-only draft inputs
+CUBIN_RELOAD_FAILED|255|8|WARNING|Failed to reload statically launchable autotuner cubin file (Cubin file not found)
+KV_POOL_EXHAUSTED|282|1|CRITICAL|KV pool exhausted at 31204 MiB
+KV_CACHE_PADDING_WASTE|321|2|WARNING|Add 3 padding layers, may waste at most 60.00% KV cache memory
+SPEC_DECODE_NO_KV_GROUP|322|2|WARNING|Speculative decoding (method=dflash) enabled but no KV cache group identified as the draft model's
+ENGINE_CORE_DIED|337|1|CRITICAL|Engine core died unexpectedly, restarting
+SAMPLING_PARAM_OVERRIDE|415|1|WARNING|Default vLLM sampling parameters overridden by the model's generation_config.json

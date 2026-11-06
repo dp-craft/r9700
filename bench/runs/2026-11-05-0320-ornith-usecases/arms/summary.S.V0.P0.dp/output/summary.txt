@@ -1,0 +1,9 @@
+GOAL: Benchmark a deep-context 35B-A3B model (Qwen3.6-35B-A3B, Q4_K_M) on Vulkan/Radeon R9700 to its native 262144-token ceiling, sweeping the depth curve and evaluating MTP-by-depth, q8_0 KV, and parallel throughput.
+RESULT: f16 KV is the only sane choice — VRAM isn't the limit (the RoPE cap is), and q8_0 is rejected as a catastrophic, depth-amplified regression. MTP's decode gain grows with depth (+35% at 200K) but is a net wall-time loss whenever prefill dominates, so it should be ON only for generation-heavy turns and OFF for RAG-style deep-prefill/short-answer work; parallel slots add TTFT, not throughput.
+KEY: 1254 tok/s | minimum prefill throughput across the 8K→200K f16 depth curve (Qwen3.6-35B-A3B, Vulkan R9700)
+  KEY: -16.7 s | net wall-time loss at 200K when MTP is ON vs OFF over a 256-token generation (Qwen3.6-35B-A3B, f16); decode +35% but prefill tax dominates
+  KEY: +66% | TTFT regression (+113.8 s) from q8_0 KV vs f16 at 200K — REJECTED; also -40% prefill / -22% decode (Qwen3.6-35B-A3B)
+  KEY: 262144 tokens | native RoPE ceiling; f16 KV (~3.9 GiB) runs to ~200K with no OOM on the 32 GB R9700
+  KEY: 49.4 s | TTFT p95 doubling from 24.3 s at np2, with aggregate only 6.0 tok/s at np4 for parallel 32K prompts (prefill-bound)
+CAVEAT: Every headline finding rests on minimal sampling — REPS=2, a single confirmatory q8_0 point, and VRAM was not re-sampled this run (the "no OOM at 200K" is served-path evidence only); additionally the parallel run is prefill-bound with early-EOS prompts, which under-measures true aggregate decode throughput at depth.
+OPEN: Whether a future Mesa/llama.cpp build narrows the unoptimized Vulkan q8_0 KV kernel (the ROCm path's smaller -7.5% decode penalty hints it is the specific weak point).

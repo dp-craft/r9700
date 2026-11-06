@@ -1,0 +1,15 @@
+DOC: 2026-10-30-0900-vllm-redhat-mxfp4-depth-transposed.md
+TOPIC: Benchmarked RedHatAI Qwen3.8-27B-MXFP4 decode throughput on vLLM Sly radiance 1.8.1 and 1.9.1 with its own MTP head and the DFlash2 drafter, plus a radiance 0.9.3 comparison, across 10k to 100k (+150k) depth.
+VERDICT: Both speculative methods run on Sly 1.8.1 without patches; DFlash2 is fastest at every depth but its acceptance falls with depth while Sly 1.9.1 changes nothing measurable over 1.8.1 within the n=2 rep noise. Upstream radiance 0.9.3 loads the same checkpoint yet decodes only ~4.9 tok/s, and why is slow stays open.
+CONFIG: RedHatAI/Qwen3.8-27B-MXFP4 (+ syvai/Qwen3.8-27B-DFlash2-W4A16 drafter); vLLM Sly radiance 1.8.1 / 1.9.1 (vLLM 0.32.0) and stilldeadcode/vllm-radiance 0.9.3; single stream, max_tokens 256, fp8 KV, ctx up to 262000, Cactus delta 0.5 / 0, WATCHDOG_MIB=32
+PATHS: bench/runs/2026-10-30-vllm-redhat-sly-depth/, bench/runs/2026-10-30-vllm-redhat-sly-mtp-depth/, bench/runs/2026-10-30-vllm-redhat-sly-dflash-depth/, bench/runs/2026-10-30-vllm-heretic-sly-depth/, bench/runs/2026-10-30-vllm-redhat-sly191-depth/, bench/runs/2026-10-30-vllm-redhat-sly191-mtp-depth/, bench/runs/2026-10-30-vllm-redhat-sly191-dflash-depth/, bench/runs/2026-10-30-vllm-redhat-sly191-d0-mtp-depth/, bench/runs/2026-10-30-vllm-redhat-sly191-d0-dflash-depth/, bench/runs/2026-10-30-vllm-redhat-radiance-depth/, bench/runs/2026-10-30-vllm-redhat-sly-depth/failures.txt, bench/runs/2026-10-30-sly191-depth-reruns.log, bench/runs/2026-10-30-sly191-d0-depth.log, bench/runs/2026-10-30-sly191-d0-power-state.log, campaigns/2026-10-30-vllm-redhat-sly191-d0-dflash-depth/analysis.md, campaigns/2026-10-30-vllm-redhat-sly-mtp-depth/run.sh, campaigns/2026-10-30-vllm-heretic-sly-depth/run.sh, campaigns/2026-10-30-vllm-redhat-sly191-depth/run.sh, campaigns/2026-10-30-vllm-redhat-sly191-d0-dflash-depth/run.sh, campaigns/2026-10-30-vllm-redhat-sly191-d0-mtp-depth/run.sh, campaigns/2026-10-30-vllm-redhat-radiance-depth/run.sh
+FACT|39|122.27 tok/s (DFlash2, p50)|fastest decode at 10k, DFlash2 drafter
+FACT|39|73.07 tok/s (MTP k=4 own head)|speculative speed from MTP head at 10k
+FACT|39|18.03 tok/s (no spec)|plain decode baseline at 10k depth
+FACT|16|4.93 tok/s (radiance 0.9.3 no spec)|slowest decode, upstream radiance image
+FACT|19|0.5494-0.3671 acceptance (DFlash2)|spec acceptance falls as depth grows
+INCIDENT|166|system update restarted the container mid-pass; that pass rerun from scratch
+INCIDENT|305|first boot watchdog kill: VRAM nearly full, container killed, reran with WATCHDOG_MIB=32
+INCIDENT|307|MTP and DFlash probes returned HTTP 404: served-name mismatch, failed runs quarantined redone
+INCIDENT|312|MTP boot watchdog kill: VRAM nearly full, fixed WATCHDOG_MIB=32 reran
+OPEN: What drives the observed peak-GTT level (161-499 MiB) when there is no pre-boot VRAM baseline to subtract?

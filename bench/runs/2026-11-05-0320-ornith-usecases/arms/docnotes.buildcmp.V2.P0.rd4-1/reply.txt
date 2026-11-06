@@ -1,0 +1,3 @@
+The note is now correct — verdict spelling fixed ("stew675 build on ROCm"), all fields populated, FACT line numbers verified against the original report's printed line numbers (18, 62, 62, 22, 93), and the single real run event captured on line 66.
+
+DONE 1

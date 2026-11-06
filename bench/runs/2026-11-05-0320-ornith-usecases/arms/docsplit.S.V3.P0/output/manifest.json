@@ -1,0 +1,14 @@
+{"files":[
+{"path":"00-intro.md","ranges":[[1,12]]},
+{"path":"01-summary.md","ranges":[[13,27]]},
+{"path":"02-legend.md","ranges":[[28,43]]},
+{"path":"03-results-single-stream.md","ranges":[[44,59]]},
+{"path":"04-results-q8-0-confirmatory.md","ranges":[[60,66]]},
+{"path":"05-results-parallel.md","ranges":[[67,75]]},
+{"path":"06-kv-decision.md","ranges":[[76,85]]},
+{"path":"07-what-moved-the-needle.md","ranges":[[86,97]]},
+{"path":"08-consequences-and-root-causes.md","ranges":[[98,156]]},
+{"path":"09-recommended-config.md","ranges":[[157,169]]},
+{"path":"10-methodology-and-caveats.md","ranges":[[170,190]]},
+{"path":"11-external-prior-comparison.md","ranges":[[191,199]]}
+]}

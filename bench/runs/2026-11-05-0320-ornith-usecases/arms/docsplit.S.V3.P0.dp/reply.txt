@@ -1,0 +1,9 @@
+All steps complete and verified:
+
+- **Split**: `doc_apply.py` wrote 12 files (intro + 11 sections), 0 lines unassigned, 0 of them non-blank.
+- **Check**: `doc_check.py` printed **PASS** — source 166 lines, output 166 lines, 0 lost/altered, 0 added/duplicated.
+- **README.md**: written after PASS, one line per file in order with section headings as links.
+
+Output files in `out/`: `00-intro.md` … `11-external-prior-comparison.md`, plus `manifest.json` and `README.md`.
+
+DONE

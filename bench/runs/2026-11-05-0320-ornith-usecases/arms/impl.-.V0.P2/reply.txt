@@ -1,0 +1,3 @@
+The implementation is complete. `src/logfmt.ts` exports `parse`, `format`, and `LogfmtError`, type-checks cleanly under the project's strict `tsconfig.json`, and satisfies every rule in SPEC.md (parsing of bare/empty/quoted values with `\"` `\\` `\n` escapes, first-seen key order with last-value-wins, all four error columns, format quoting/encoding rules, invalid-key throw at column -1, and the `parse(format(x))` round-trip including literal tabs in quoted values). The temporary verification artifacts have been cleaned up.
+
+DONE

@@ -1,0 +1,21 @@
+{
+ "arm": "json.L.V3.P0.gr",
+ "profile": "data",
+ "wall_s": 18.0,
+ "turns": 6,
+ "gen": 2038,
+ "reason": 581,
+ "prompt_first": 4123,
+ "prompt_peak": 7268,
+ "drops": 0,
+ "rate": 118.2,
+ "peak_vram": 29481.0,
+ "peak_gtt": 57.0,
+ "score": 1.0,
+ "detail": {
+  "correct": 10,
+  "total": 10,
+  "wrong": [],
+  "score": 1.0
+ }
+}

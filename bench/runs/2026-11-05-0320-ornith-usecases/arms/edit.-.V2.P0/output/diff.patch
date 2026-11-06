@@ -1,0 +1,117 @@
+diff --git a/README.md b/README.md
+index 3f7906d..c0ec189 100644
+--- a/README.md
++++ b/README.md
+@@ -1,3 +1,3 @@
+ # shop
+ 
+-Call `get_price(sku, qty)` for a price in cents. Use `get_price_history(sku)` for past prices.
++Call `unit_price(sku, qty)` for a price in cents. Use `get_price_history(sku)` for past prices.
+diff --git a/shop/api.py b/shop/api.py
+index 99441bc..68af560 100644
+--- a/shop/api.py
++++ b/shop/api.py
+@@ -1,8 +1,8 @@
+ """Route table. Route names are public and clients depend on them."""
+-from .pricing import get_price, get_price_history
++from .pricing import unit_price, get_price_history
+ 
+ ROUTES = {
+-    "get_price": get_price,
++    "get_price": unit_price,
+     "get_price_history": get_price_history,
+ }
+ 
+diff --git a/shop/cart.py b/shop/cart.py
+index 05a456f..99eb5f8 100644
+--- a/shop/cart.py
++++ b/shop/cart.py
+@@ -1,11 +1,11 @@
+ """Cart totals."""
+-from .pricing import get_price
++from .pricing import unit_price
+ 
+ 
+-def line_total(sku, qty):
+-    return get_price(sku, qty)
++def line_total(sku, qty, *, currency="EUR"):
++    return unit_price(sku, qty, currency=currency)
+ 
+ 
+-def cart_total(items):
++def cart_total(items, *, currency="EUR"):
+     """items: list of (sku, qty)."""
+-    return sum(line_total(sku, qty) for sku, qty in items)
++    return sum(line_total(sku, qty, currency=currency) for sku, qty in items)
+diff --git a/shop/pricing.py b/shop/pricing.py
+index 251af71..07713d5 100644
+--- a/shop/pricing.py
++++ b/shop/pricing.py
+@@ -3,8 +3,10 @@ PRICES = {"apple": 100, "pear": 150}
+ HISTORY = {"apple": [90, 95, 100], "pear": [150]}
+ 
+ 
+-def get_price(sku, qty=1):
++def unit_price(sku, qty=1, *, currency="EUR"):
+     """Return the total price of qty units of sku, in cents."""
++    if currency != "EUR":
++        raise ValueError(f"unsupported currency: {currency}")
+     return PRICES[sku] * qty
+ 
+ 
+diff --git a/shop/report.py b/shop/report.py
+index 44db7cc..8cb3fda 100644
+--- a/shop/report.py
++++ b/shop/report.py
+@@ -3,8 +3,8 @@ from . import pricing
+ 
+ 
+ def price_line(sku):
+-    # get_price is in cents; show it as is
+-    return f"{sku}: {pricing.get_price(sku)}"
++    # unit_price is in cents; show it as is
++    return f"{sku}: {pricing.unit_price(sku)}"
+ 
+ 
+ def history_line(sku):
+diff --git a/tests/test_shop.py b/tests/test_shop.py
+index a856690..a10b210 100644
+--- a/tests/test_shop.py
++++ b/tests/test_shop.py
+@@ -1,15 +1,33 @@
++import pytest
++
+ from shop.api import call
+ from shop.cart import cart_total
+-from shop.pricing import get_price
++from shop.pricing import unit_price
++
++
++def test_unit_price():
++    assert unit_price("apple", 2) == 200
++
+ 
++def test_currency_default():
++    assert unit_price("apple") == 100
++    assert unit_price("apple", 2, currency="EUR") == 200
+ 
+-def test_get_price():
+-    assert get_price("apple", 2) == 200
++
++def test_bad_currency():
++    with pytest.raises(ValueError):
++        unit_price("apple", currency="USD")
+ 
+ 
+ def test_cart():
+     assert cart_total([("apple", 1), ("pear", 2)]) == 400
+ 
+ 
++def test_cart_passes_currency():
++    assert cart_total([("apple", 1)], currency="EUR") == 100
++    with pytest.raises(ValueError):
++        cart_total([("apple", 1)], currency="USD")
++
++
+ def test_route():
+     assert call("get_price", "pear") == 150

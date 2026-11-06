@@ -1,0 +1,159 @@
+diff --git a/src/logfmt.ts b/src/logfmt.ts
+new file mode 100644
+index 0000000..ebb93b7
+--- /dev/null
++++ b/src/logfmt.ts
+@@ -0,0 +1,153 @@
++/**
++ * logfmt parsing and formatting.
++ *
++ * A logfmt line is a sequence of pairs separated by one or more spaces or
++ * tabs. Each pair is either a bare `key`, or `key=value`. The value is either
++ * bare (running until the next separator) or double-quoted with the escapes
++ * `\"`, `\\` and `\n`.
++ */
++
++/** An error raised during parsing or formatting, carrying a 0-based column. */
++export class LogfmtError extends Error {
++  column: number;
++
++  constructor(message: string, column: number) {
++    super(message);
++    this.name = "LogfmtError";
++    this.column = column;
++  }
++}
++
++/** Parse a single logfmt line into an ordered map of key to `string | true`. */
++export function parse(line: string): Record<string, string | true> {
++  const result: Record<string, string | true> = {};
++  const n = line.length;
++  let i = 0;
++
++  while (i < n) {
++    // Skip one or more separators before the next pair.
++    while (i < n && (line[i] === " " || line[i] === "\t")) i++;
++    if (i >= n) break;
++
++    const start = i;
++    let eq = -1;
++    while (i < n && line[i] !== " " && line[i] !== "\t" && line[i] !== "=") i++;
++    if (i < n && line[i] === "=") eq = i;
++
++    const key = eq === -1 ? line.slice(start, i) : line.slice(start, eq);
++
++    if (eq === -1) {
++      // Bare key with no `=`.
++      result[key] = true;
++      continue;
++    }
++
++    if (eq === start) {
++      // Empty key: the offending character is the `=`.
++      throw new LogfmtError("empty key", eq);
++    }
++
++    const vstart = eq + 1;
++    let j = vstart;
++
++    if (vstart < n && line[vstart] === '"') {
++      // Quoted value with `\"`, `\\` and `\n` escapes.
++      let value = "";
++      j = vstart + 1;
++      for (;;) {
++        if (j >= n) throw new LogfmtError("unterminated quote", vstart);
++        const c = line[j];
++        if (c === '"') {
++          j++;
++          break;
++        }
++        if (c === "\\") {
++          if (j + 1 >= n) throw new LogfmtError("unterminated quote", vstart);
++          const e = line[j + 1];
++          if (e === '"') {
++            value += '"';
++            j += 2;
++            continue;
++          }
++          if (e === "\\") {
++            value += "\\";
++            j += 2;
++            continue;
++          }
++          if (e === "n") {
++            value += "\n";
++            j += 2;
++            continue;
++          }
++          throw new LogfmtError("unknown escape", j);
++        }
++        value += c;
++        j++;
++      }
++      // Anything non-whitespace right after the closing quote is an error.
++      if (j < n && line[j] !== " " && line[j] !== "\t") {
++        throw new LogfmtError("unexpected data after quoted value", j);
++      }
++      result[key] = value;
++    } else {
++      // Bare value, running until the next separator.
++      while (j < n && line[j] !== " " && line[j] !== "\t") j++;
++      result[key] = line.slice(vstart, j);
++    }
++
++    i = j;
++  }
++
++  return result;
++}
++
++/** Whether a value must be quoted when formatted. */
++function needsQuote(value: string): boolean {
++  if (value === "") return true;
++  for (const ch of value) {
++    if (ch === " " || ch === "\t" || ch === '"' || ch === "\\" || ch === "=" || ch === "\n") {
++      return true;
++    }
++  }
++  return false;
++}
++
++/** Encode the contents of a quoted value. */
++function encodeValue(value: string): string {
++  // Backslash first so it is not double-escaped by the later replacements.
++  return value
++    .replace(/\\/g, "\\\\")
++    .replace(/"/g, '\\"')
++    .replace(/\n/g, "\\n");
++}
++
++/** Validate a key for formatting; throws with column -1 when invalid. */
++function assertKey(key: string): void {
++  if (key === "") throw new LogfmtError("empty key", -1);
++  for (const ch of key) {
++    if (ch === " " || ch === "\t" || ch === "=" || ch === '"') {
++      throw new LogfmtError("invalid key", -1);
++    }
++  }
++}
++
++/** Format an ordered map of fields back into a logfmt line. */
++export function format(fields: Record<string, string | true>): string {
++  const parts: string[] = [];
++
++  for (const key of Object.keys(fields)) {
++    assertKey(key);
++    // Fields are `string | true` by contract; noUncheckedIndexedAccess adds undefined.
++    const value: string | true = fields[key] as string | true;
++
++    if (value === true) {
++      parts.push(key);
++    } else if (needsQuote(value)) {
++      parts.push(`${key}="${encodeValue(value)}"`);
++    } else {
++      parts.push(`${key}=${value}`);
++    }
++  }
++
++  return parts.join(" ");
++}

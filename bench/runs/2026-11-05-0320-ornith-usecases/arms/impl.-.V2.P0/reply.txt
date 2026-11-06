@@ -1,0 +1,9 @@
+Everything is verified:
+
+- **vitest**: 23/23 tests pass (including the pre-existing smoke test).
+- **tsc --noEmit**: clean, no errors.
+- **git status**: only `src/logfmt.ts` and `tests/logfmt.test.ts` were added (the empty `src/` directory is tracked now that it holds a file); no other files modified.
+
+I implemented the hand-written scanner in `src/logfmt.ts` tracking an explicit index for exact columns, then went through SPEC.md to add a test for each rule — value shapes (`key`, `key=`, bare-with-`=`), quoted escapes, last-wins/insertion-order, empty lines, every error case with its exact column (`=`, opening quote, backslash, post-quote junk), all quoting triggers in `format`, invalid-key columns of `-1`, and roundtrip (including a literal tab). I corrected two test expectations that misread the spec (an input is two pairs; the opening quote sits at index 2).
+
+DONE

@@ -1,0 +1,26 @@
+{
+ "arm": "bugfix.-.V0.P0.dpc",
+ "profile": "code",
+ "wall_s": 32.7,
+ "turns": 12,
+ "gen": 3909,
+ "reason": 1558,
+ "prompt_first": 4872,
+ "prompt_peak": 10030,
+ "drops": 0,
+ "rate": 124.6,
+ "peak_vram": 29670.0,
+ "peak_gtt": 65.0,
+ "score": 1.0,
+ "detail": {
+  "hidden_pass": 11,
+  "hidden_fail": 0,
+  "hidden_error": 0,
+  "hidden_total": 11,
+  "own_pass": 2,
+  "own_fail": 0,
+  "diff": " 1 file changed, 7 insertions(+), 10 deletions(-)",
+  "score": 1.0,
+  "max_unchanged": true
+ }
+}

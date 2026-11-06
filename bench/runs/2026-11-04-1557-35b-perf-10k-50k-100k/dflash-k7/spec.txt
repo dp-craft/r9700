@@ -1,0 +1,4 @@
+vllm:spec_decode_num_drafts_total 807.0
+vllm:spec_decode_num_draft_tokens_total 5649.0
+vllm:spec_decode_num_accepted_tokens_total 1518.0
+non_bundler_fault_lines=0

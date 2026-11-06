@@ -1,0 +1,12 @@
+DOC: 2026-10-31-redhat-sharp-w208-blind.analysis.md
+TOPIC: Tested whether swapping only the sharp (terse) chat template onto the RedHat Qwen3.8-27B-MXFP4 δ 0 server changes four-way blind W2-08 review quality versus RedHat δ 0, Q4_K_XL and heretic.
+VERDICT: The sharp terseness template cut step-A work by roughly a third (thinking -38%, tool calls -35%, generated tokens about -28%) with no measurable quality loss, but its +2 Opus findings over δ 0 sits below the pre-registered threshold so the gain is not proven. With the template held equal, Q4_K_XL and RedHat tie on quality and most of Q4_K_XL's earlier efficiency edge traces to the template rather than the model (n = 1).
+CONFIG: model RedHatAI/Qwen3.8-27B-MXFP4 (+ syvai draft Qwen3.8-27B-DFlash2-W4A16); engine vLLM 0.32.0 on Sly image vllm-sly-radiance:1.8.1-rocm10.1 (DFlash2 spec decoding, k = 7, δ 0); settings --chat-template sharp-chat_template.jinja, max-model-len 262000, gpu-memory-utilization 0.93, kv-cache-dtype fp8, RADIANCE_CACTUS_DELTA=0, tool-call-parser qwen3_xml
+PATHS: bench/runs/2026-10-31-redhat-sharp-w208-blind/pre-launch-provenance.txt, campaigns/2026-10-31-redhat-sharp-w208-blind/sharp-chat_template.jinja, bench/runs/2026-10-31-redhat-sharp-w208-blind/, bench/runs/2026-10-30-0947-dpf-brief-ab/, campaigns/2026-10-31-q4kxl-sharp-w208-blind/analysis.md, campaigns/2026-10-31-redhat-sharp-w208-blind/run.sh, /home/dev/work/dp-craft/amd/campaigns/2026-10-31-redhat-sharp-w208-blind/sharp-chat_template.jinja, bench/runs/2026-10-31-redhat-sharp-w208-blind/rep1/redhat-d0-sharp/server.txt
+FACT|41|11/19|blind Opus findings found by RedHat + sharp (of 19)
+FACT|43|22|severity-weighted Opus coverage, max 38
+FACT|184|−38 % (304k vs 489k)|thinking chars in step A, sharp vs δ 0
+FACT|185|−35 % (101 vs 156)|tool calls in step A, sharp vs δ 0
+FACT|186|about −28 % (~144.4k vs ~200k)|server-generated tokens in step A, sharp vs δ 0
+INCIDENT|152|first grading pass used a stale prompt fixture, then was deleted and repeated
+OPEN: Would a second run of RedHat + sharp reproduce the about -third work cut at equal quality, or is the +2 finding within grader noise (currently n = 1)?

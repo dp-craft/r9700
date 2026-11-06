@@ -1,0 +1,14 @@
+DOC: 2026-09-15-stew675-buildcmp.analysis.md
+TOPIC: Stock versus stew675 rdna-boosts-patched llama.cpp builds on Vulkan and ROCm, measured with llama-bench PG request shapes on Qwen3.8-27B UD-Q4_K_XL.
+VERDICT: The stew675 patch gives about +14 to +20 percent prefill on ROCm and is flat or slightly worse on Vulkan, with decode unchanged on both. The run used REPS=1, so the deltas are point estimates with no noise band.
+CONFIG: Qwen3.8-27B-UD-Q4_K_XL; llama.cpp b10969 (stock Vulkan, 391fac1), b10909 (stock ROCm, a2878d3), b16 (stew675 Vulkan 67492c9 and ROCm b862fc3); -ub 2048 -b 4096 -fa on -ctk q8_0 -ctv q8_0 -ngl 99; --no-warmup; REPS=1; Vulkan SDK 1.4.357.1; ROCm 7.8.0; Mesa 26.2.2; kernel 7.0.0-31.
+PATHS: bench/runs/2026-09-15-1029-buildcmp-stew675/
+FACT|18|+14-20%|stew675 ROCm prefill gain over stock ROCm at moderate shapes and 32768
+FACT|62|994.1 tok/s|stew675 ROCm prefill at 32768 (stock ROCm 827.6 tok/s)
+FACT|62|-11.9%|stew675 Vulkan prefill change at 32768 versus stock Vulkan
+FACT|50|+0.4%|stew675 ROCm decode change at 32768 (decode flat)
+FACT|78|-5 to -9%|Stock ROCm decode versus stock Vulkan, across shapes
+INCIDENT|52|stew675 ROCm decode at (128,64) dropped 20.0 to 16.4 tok/s (cold start); excluded.
+INCIDENT|64|(128,64) prefill cold-start anomaly on stew675 builds excluded from deltas.
+INCIDENT|66|Disk-full errors killed the sampler mid-attempt; that attempt was repeated.
+OPEN: Why does stew675 Vulkan prefill regress 11.9 percent at 32768: shader compilation, a driver regression, or patch dispatch for large tiles? (line 95 says OPEN)

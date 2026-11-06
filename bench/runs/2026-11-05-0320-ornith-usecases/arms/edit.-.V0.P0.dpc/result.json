@@ -1,0 +1,27 @@
+{
+ "arm": "edit.-.V0.P0.dpc",
+ "profile": "code",
+ "wall_s": 44.5,
+ "turns": 23,
+ "gen": 5908,
+ "reason": 2975,
+ "prompt_first": 4868,
+ "prompt_peak": 12749,
+ "drops": 0,
+ "rate": 136.9,
+ "peak_vram": 29672.0,
+ "peak_gtt": 65.0,
+ "score": 1.0,
+ "detail": {
+  "hidden_pass": 9,
+  "hidden_fail": 0,
+  "hidden_error": 0,
+  "hidden_total": 9,
+  "own_pass": 4,
+  "own_fail": 0,
+  "diff": " 6 files changed, 27 insertions(+), 15 deletions(-)",
+  "score": 1.0,
+  "vendor_unchanged": true,
+  "old_name_left": []
+ }
+}

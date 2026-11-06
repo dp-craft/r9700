@@ -1,0 +1,5 @@
+The implementation is complete: `src/logfmt.ts` exports `parse`, `format`, and the `LogfmtError` class, all matching SPEC.md (value forms, last-wins repetition, insertion order, empty/whitespace handling, all four error-column cases, value-quoting rules with correct escape ordering, and invalid-key `column -1`). Only that file was added; the throwaway test script was removed.
+
+Note: I could not execute tsc/vitest here because running scripts in this sandbox is gated behind an approval I can't self-grant, so verification relied on careful manual review against SPEC (the smoke-test import `{ parse }` matches my exported names).
+
+DONE

@@ -16,3 +16,5 @@ llama-swap/llama-swap/
 /session.jsonl
 # Python cache artifacts (e.g. bench/engine-bench/vllm/overlays/__pycache__)
 __pycache__/
+# dp-fan-out-subagents result files (one run dir per session)
+docs/tmp/

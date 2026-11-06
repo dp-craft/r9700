@@ -1,0 +1,9 @@
+GOAL: Benchmark a Qwen3.6-35B-A3B model on an AMD Radeon R9700 over Vulkan to its 200K token context ceiling, testing the depth curve, MTP x depth, a confirmatory q8_0 KV test, and parallel concurrency at the limit.
+RESULT: On this 32 GB box f16 KV is the only sane choice to 200K tokens (ran with no OOM — VRAM is not binding, the RoPE cap is); MTP's decode gain grows with depth but is a net wall loss whenever prefill dominates, so it wins only in decode-heavy chat. q8_0 KV is catastrophic and rejected at depth (its penalty scales with context), and parallel 32K-prompt concurrency adds TTFT rather than throughput.
+KEY: 3077 -> 1254 tok/s (-59%) | prefill throughput decay from 8K to 200K, deep-mtp0-cr f16 KV / MTP off single-stream
+KEY: +35.1% decode but -16.7 s wall at 200K | MTP net loss when prefill dominates: deep-mtp1-cr200000 vs deep-mtp0-cr200000 (Qwen3.6-35B-A3B)
+KEY: -39.8% prefill (677 vs 1125 tok/s), +113.8 s TTFT (+66%) | q8_0 KV REJECTED at 200K: deep-mtp1q8-cr200000 vs f16 baseline
+KEY: x2 TTFT p95 (24 -> 49 s), aggregate 5.5 -> 6.0 tok/s | np2 -> np4 at 32K prompts prefill-bound: deep-par-np2 vs deep-par-np4
+KEY: -1.5 s wall | MTP net WIN in decode-dominated case: deep-mtp1-think vs deep-mtp0-think (chat, ~236-tok prompt, 1024 gen)
+CAVEAT: The parallel-at-ceiling prompts end-of-sequence early (16-256 gen tokens), so the run is ~99% prefill and aggregate decode scaling at depth is under-measured — the true decode-batching win at 32K is not isolated and is filed for a follow-up.
+OPEN: Will a future Mesa/llama.cpp build narrow the q8_0 penalty, given the ROCm path's smaller -7.5% decode penalty hints the Vulkan q8_0 KV kernel is the specific weak point (would need a rebuild to confirm)?

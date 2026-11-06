@@ -1,0 +1,5 @@
+Answer the questions in /tmp/claude-1001/-home-dev-work-dp-craft-amd/bf832afa-1002-41d9-a4b8-4b201a1bc43c/scratchpad/uc/runs/json.S.V0.P0/questions.txt about the JSONL file /tmp/claude-1001/-home-dev-work-dp-craft-amd/bf832afa-1002-41d9-a4b8-4b201a1bc43c/scratchpad/uc/runs/json.S.V0.P0/results.jsonl (one JSON object per line).
+Write /tmp/claude-1001/-home-dev-work-dp-craft-amd/bf832afa-1002-41d9-a4b8-4b201a1bc43c/scratchpad/uc/runs/json.S.V0.P0/out/answers.txt with one line per question, in this format:
+Q<n>|<answer>
+Answers are a bare number or a bare label, with no unit or explanation.
+Then reply with only: DONE

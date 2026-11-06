@@ -1,0 +1,14 @@
+DOC: 2026-09-15-stew675-buildcmp.analysis.md
+TOPIC: Stock versus stew675 rdna-boosts patched llama.cpp builds on Vulkan and ROCm, measured with llama-bench PG request shapes on Qwen3.8-27B Q4_K_XL.
+VERDICT: The stew675 patch raises ROCm prefill by 14-20% with flat decode and does not help Vulkan, where large-shape prefill regressed. The run used REPS=1 with no warmup, so the deltas are point estimates.
+CONFIG: Qwen3.8-27B-UD-Q4_K_XL; llama.cpp b10969 (Vulkan, Vulkan SDK 1.4.357.1) and b10909 (ROCm) stock, b16 stew675-patched; -ub 2048 -b 4096 -fa on; KV q8_0; ngl 99; no-warmup; REPS=1; ROCm 7.8.0; Mesa 26.2.2; kernel 7.0.0-31.
+PATHS: bench/runs/2026-09-15-1029-buildcmp-stew675/
+FACT|59|1122.6 tok/s|stew675-ROCm prefill at (512,256), stock ROCm 981.4
+FACT|59|+14.4%|stew675 ROCm prefill gain at (512,256)
+FACT|62|+20.1%|stew675 ROCm prefill gain at (32768,2048)
+FACT|62|-11.9%|stew675 Vulkan prefill change at (32768,2048)
+FACT|50|+0.4%|stew675 ROCm decode change at (32768,2048)
+INCIDENT|52|First-shape cold-start artifact on stew675 builds, excluded from deltas
+INCIDENT|64|(128,64) prefill rows excluded as cold-start artifact
+INCIDENT|66|Disk-full on log volume killed sampler; that attempt was repeated
+OPEN: Why does stew675 Vulkan prefill drop 12% at 32768, and does the ROCm gain hold with warmup and REPS greater than 1?

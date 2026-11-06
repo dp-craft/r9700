@@ -1,0 +1,9 @@
+All three files are assembled correctly and logically:
+
+- **topic-a.md**: Summary → Recommended sampling → llama.cpp knobs → Harder agentic eval → Sources
+- **topic-b.md**: numbered 1→7 in order, ending with the Verdict (conclusion)
+- **topic-c.md**: Summary → Key findings → Detail → Conflicts & unknowns → Actionable → Sources
+
+`doc_apply` assigned all 330 lines with none left unassigned, and `doc_check` printed PASS (255 nonblank lines preserved exactly across the 3 files, no losses or additions). Only the three target files named in TOPICS.txt were written; no README was required since the check passes without one.
+
+DONE

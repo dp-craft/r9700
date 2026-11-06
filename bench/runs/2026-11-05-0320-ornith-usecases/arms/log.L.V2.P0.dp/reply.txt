@@ -1,0 +1,3 @@
+All counts validated against `output_mode: count` greps (matches=1 each except max_num_scheduled_tokens=2, kv_cache_padding=2, kv_cache_group_missing=2, weight mlp.down_proj=5, weight self_attn.o_proj=5). No corrections needed.
+
+DONE

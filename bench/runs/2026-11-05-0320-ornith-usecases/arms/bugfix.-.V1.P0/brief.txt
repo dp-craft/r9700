@@ -1,0 +1,15 @@
+Fix the bug described in BUG.md.
+
+HOW
+1. Read BUG.md, movstats.py and tests/test_movstats.py.
+2. Run: python3 -m pytest -q
+3. For each symptom, find the root cause in the code before editing. Look for more than one cause: the failing test can hide a second bug.
+4. Make the smallest fix that removes each root cause. Do not change rolling_max.
+5. Run the tests again.
+
+RULES
+- Change only what the task names. No refactors, new dependencies or new files beyond those it asks for.
+- Follow the style of the surrounding code.
+- Run the commands below and fix what fails. Never report success without running them.
+- Think briefly: decide, write and test, instead of drafting the code in your reasoning.
+Then reply with only: DONE

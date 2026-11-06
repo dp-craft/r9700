@@ -1,0 +1,13 @@
+DOC: 2026-10-23-0023-vllm-gpu-fault-solved-hip-kernarg.md
+TOPIC: diagnosed and solved a recurring HSA_STATUS_ERROR_MEMORY_FAULT on vLLM Sly radiance MXFP4 with DFlash on the R9700, traced to a corrupted device-memory kernel-argument pointer and fixed with HIP_FORCE_DEV_KERNARG=0.
+VERDICT: The fault (a valid-pointer address with bit 44 cleared) is fixed by HIP_FORCE_DEV_KERNARG=0, giving three clean boots x four Claude turns with zero faults at unchanged speed (~111-150 tok/s decode, ~2.4-3.0k tok/s prefill); the fix is now default in every vLLM profile but still needs a gate run on kernel 7.0.0-38.
+CONFIG: amd/Qwen3.8-27B-Quark-AWQ-MXFP4 plus syvai Qwen3.8-27B-DFlash2-W4A16 drafter k=7; engine ghcr.io/slybase/vllm-sly-radiance 1.6.0 (vLLM 0.31.0) with the RADIANCE_MXFP4_ knobs and HIP_FORCE_DEV_KERNARG=0; max-model-len 180000, fp8 KV, R4D_HYBRID, cudagraph FULL_DECODE_ONLY; kernel 7.0.0-34
+PATHS: none
+FACT|21|0 faults|hostka-1 to -3 clean across three boots x four Claude turns with the fix
+FACT|21|8%|chance of three clean boots by luck at the ~12-of-21 fault rate
+FACT|76|150 tok/s|hostka-1 decode median with the fix
+FACT|77|5580 tok/s|max hostka-2 prefill window (5.6k) with the fix
+FACT|78|111 tok/s|hostka-3 decode median, lowest of the three fix boots
+INCIDENT|21|HSA_STATUS_ERROR_MEMORY_FAULT hit ~12 of ~21 boots at first request on any ROCm kernel
+INCIDENT|64|loop-cooler pump seized and card hit 98 C; second attempt scrapped and redone after the cooler was replaced
+OPEN: Which part of the PCIe/BAR path flips bit 44 of the kernel-argument pointer?

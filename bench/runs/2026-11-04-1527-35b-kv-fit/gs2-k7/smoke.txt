@@ -1,0 +1,9 @@
+smoke_s=15.522529606 http=200
+usage {'prompt_tokens': 24, 'total_tokens': 424, 'completion_tokens': 400, 'prompt_tokens_details': {'cached_tokens': 0, 'created_cache_tokens': 0, 'multimodal_tokens': None}, 'completion_tokens_details': {'reasoning_tokens': 71}}
+finish length
+reply '\n\nHere\'s a Python function that merges overlapping intervals, along with a short explanation:\n\n```python\ndef merge_intervals(intervals):\n    """\n    Merge overl'
+vllm:spec_decode_num_drafts_total{engine="0",model_name="qwen35-35b-a3b-mxfp4-dflash"} 87.0
+vllm:spec_decode_num_draft_tokens_total{engine="0",model_name="qwen35-35b-a3b-mxfp4-dflash"} 609.0
+vllm:spec_decode_num_accepted_tokens_total{engine="0",model_name="qwen35-35b-a3b-mxfp4-dflash"} 313.0
+vllm:kv_cache_usage_perc{engine="0",model_name="qwen35-35b-a3b-mxfp4-dflash"} 0.0
+fault_lines=3

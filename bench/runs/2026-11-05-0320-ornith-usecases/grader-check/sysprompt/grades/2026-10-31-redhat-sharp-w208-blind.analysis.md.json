@@ -1,0 +1,43 @@
+{
+  "notes": [
+    {
+      "report": "2026-10-31-redhat-sharp-w208-blind.analysis.md",
+      "label": "P",
+      "verdict": 2,
+      "config": 2,
+      "facts_decision_relevant": 5,
+      "facts_wrong_meaning": 0,
+      "incidents_total": 1,
+      "incidents_unsupported": 0,
+      "incidents_missed": 2,
+      "open": 2,
+      "critical_error": null
+    },
+    {
+      "report": "2026-10-31-redhat-sharp-w208-blind.analysis.md",
+      "label": "Q",
+      "verdict": 2,
+      "config": 2,
+      "facts_decision_relevant": 5,
+      "facts_wrong_meaning": 0,
+      "incidents_total": 1,
+      "incidents_unsupported": 0,
+      "incidents_missed": 2,
+      "open": 2,
+      "critical_error": null
+    },
+    {
+      "report": "2026-10-31-redhat-sharp-w208-blind.analysis.md",
+      "label": "R",
+      "verdict": 2,
+      "config": 1,
+      "facts_decision_relevant": 5,
+      "facts_wrong_meaning": 0,
+      "incidents_total": 1,
+      "incidents_unsupported": 0,
+      "incidents_missed": 2,
+      "open": 2,
+      "critical_error": null
+    }
+  ]
+}

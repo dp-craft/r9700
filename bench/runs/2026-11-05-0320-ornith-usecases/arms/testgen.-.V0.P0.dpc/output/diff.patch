@@ -1,0 +1,170 @@
+diff --git a/tests/semver.test.ts b/tests/semver.test.ts
+new file mode 100644
+index 0000000..66f4268
+--- /dev/null
++++ b/tests/semver.test.ts
+@@ -0,0 +1,164 @@
++import { describe, it, expect } from "vitest";
++import { parse, compare, satisfiesCaret, bump, maxVersion, SemVer, SemVerError } from "../src/semver";
++
++describe("parse", () => {
++  it("parses a plain version", () => {
++    const v: SemVer = parse("1.2.3");
++    expect(v).toEqual({ major: 1, minor: 2, patch: 3, pre: [] });
++  });
++
++  it("parses prerelease identifiers into an array", () => {
++    const v: SemVer = parse("1.2.3-alpha.1");
++    expect(v).toEqual({ major: 1, minor: 2, patch: 3, pre: ["alpha", "1"] });
++  });
++
++  it("allows dot-separated prerelease ids and leading zeros", () => {
++    const v = parse("01.02.03-build.0");
++    expect(v).toEqual({ major: 1, minor: 2, patch: 3, pre: ["build", "0"] });
++  });
++
++  it("accepts an empty prerelease token only when absent (rejects trailing dash)", () => {
++    expect(() => parse("1.2.3-")).toThrow(SemVerError);
++  });
++
++  it.each([
++    "",
++    "1",
++    "1.2",
++    "1.2.3.4",
++    "abc",
++    "v1.2.3",
++    "1.2.x",
++    "-1.2.3",
++  ])("throws SemVerError for invalid input %p", (bad) => {
++    expect(() => parse(bad)).toThrow(SemVerError);
++  });
++});
++
++describe("compare", () => {
++  it("returns 0 for equal versions", () => {
++    expect(compare("1.0.0", "1.0.0")).toBe(0);
++    expect(compare("2.5.9", "2.5.9")).toBe(0);
++  });
++
++  it("orders by major, then minor, then patch", () => {
++    expect(compare("1.0.0", "2.0.0")).toBe(-1);
++    expect(compare("2.0.0", "1.0.0")).toBe(1);
++    expect(compare("1.1.0", "1.2.0")).toBe(-1);
++    expect(compare("1.0.1", "1.0.2")).toBe(-1);
++  });
++
++  it("sorts a prerelease before its release", () => {
++    expect(compare("1.0.0-alpha", "1.0.0")).toBe(-1);
++    expect(compare("1.0.0", "1.0.0-alpha")).toBe(1);
++  });
++
++  it("compares prerelease identifiers lexicographically and numerically", () => {
++    expect(compare("1.0.0-alpha", "1.0.0-beta")).toBe(-1);
++    expect(compare("1.0.0-beta", "1.0.0-alpha")).toBe(1);
++    expect(compare("1.0.0-alpha.1", "1.0.0-alpha.2")).toBe(-1);
++  });
++
++  it("gives numeric identifiers lower precedence than string identifiers", () => {
++    // Per semver: numeric < alphanumeric, so "1" sorts before "alpha".
++    expect(compare("1.0.0-1", "1.0.0-alpha")).toBe(-1);
++  });
++
++  it("uses length as a tie-breaker when identifiers match", () => {
++    expect(compare("1.0.0-alpha", "1.0.0-alpha.1")).toBe(-1);
++    expect(compare("1.0.0-alpha.1", "1.0.0-alpha")).toBe(1);
++  });
++
++  it("is antisymmetric and transitive across a set of versions", () => {
++    const versions = ["1.0.0", "1.0.1", "2.0.0", "2.0.0-rc.1"];
++    for (const a of versions) {
++      for (const b of versions) {
++        // Normalize -0 to 0 so equal-value pairs compare consistently.
++        expect(compare(a, b)).toBe(-compare(b, a) || 0);
++      }
++    }
++    const sorted = [...versions].sort(compare);
++    for (let i = 0; i < sorted.length - 1; i++) {
++      expect(compare(sorted[i] as string, sorted[i + 1] as string)).toBeLessThanOrEqual(0);
++    }
++  });
++});
++
++describe("satisfiesCaret", () => {
++  it("^1.2.3 allows up to <2.0.0", () => {
++    expect(satisfiesCaret("1.2.3", "1.2.3")).toBe(true);
++    expect(satisfiesCaret("1.9.9", "1.2.3")).toBe(true);
++    expect(satisfiesCaret("1.0.0", "1.2.3")).toBe(false); // below base
++    expect(satisfiesCaret("2.0.0", "1.2.3")).toBe(false);
++  });
++
++  it("^0.2.3 allows <0.3.0", () => {
++    expect(satisfiesCaret("0.2.5", "0.2.3")).toBe(true);
++    expect(satisfiesCaret("0.2.3", "0.2.3")).toBe(true);
++    expect(satisfiesCaret("0.3.0", "0.2.3")).toBe(false);
++    expect(satisfiesCaret("1.0.0", "0.2.3")).toBe(false);
++  });
++
++  it("^0.0.3 allows only exactly 0.0.3", () => {
++    expect(satisfiesCaret("0.0.3", "0.0.3")).toBe(true);
++    expect(satisfiesCaret("0.0.4", "0.0.3")).toBe(false);
++    expect(satisfiesCaret("0.1.0", "0.0.3")).toBe(false);
++  });
++
++  it("rejects prereleases that differ from the base x.y.z", () => {
++    expect(satisfiesCaret("1.2.4-foo", "1.2.3")).toBe(false);
++  });
++
++  it("does not treat a bare release prerelease as satisfying a non-prerelease base", () => {
++    // 1.2.3-alpha has the same x.y.z as the base but is a prerelease of it,
++    // so it sorts before the release and does not satisfy the caret range.
++    expect(satisfiesCaret("1.2.3-alpha", "1.2.3")).toBe(false);
++  });
++
++  it("does not accept versions below the base", () => {
++    expect(satisfiesCaret("0.9.0", "1.2.3")).toBe(false);
++  });
++});
++
++describe("bump", () => {
++  it("bumps major / minor / patch and resets lower parts", () => {
++    expect(bump("1.2.3", "major")).toBe("2.0.0");
++    expect(bump("1.2.3", "minor")).toBe("1.3.0");
++    expect(bump("1.2.3", "patch")).toBe("1.2.4");
++  });
++
++  it("resets and drops prerelease state on any bump", () => {
++    expect(bump("1.2.3-alpha.1", "major")).toBe("2.0.0");
++    expect(bump("1.2.3-alpha.1", "minor")).toBe("1.3.0");
++    expect(bump("1.2.3-alpha.1", "patch")).toBe("1.2.4");
++  });
++
++  it("handles zero parts and large numbers", () => {
++    expect(bump("0.0.0", "patch")).toBe("0.0.1");
++    expect(bump("0.0.0", "minor")).toBe("0.1.0");
++    expect(bump("10.20.30", "major")).toBe("11.0.0");
++  });
++
++  it("throws on invalid version input", () => {
++    expect(() => bump("nope", "patch")).toThrow(SemVerError);
++  });
++});
++
++describe("maxVersion", () => {
++  it("returns null for an empty list", () => {
++    expect(maxVersion([])).toBeNull();
++  });
++
++  it("returns the highest version regardless of order", () => {
++    expect(maxVersion(["1.0.0", "2.0.0", "1.5.0"])).toBe("2.0.0");
++    expect(maxVersion(["2.0.0", "1.0.0", "1.5.0"])).toBe("2.0.0");
++  });
++
++  it("prefers the release over its prereleases", () => {
++    expect(maxVersion(["1.0.0-alpha", "1.0.0-beta", "1.0.0"])).toBe("1.0.0");
++  });
++
++  it("handles a single element", () => {
++    expect(maxVersion(["4.5.6"])).toBe("4.5.6");
++  });
++});

@@ -1,0 +1,14 @@
+DOC: 2026-10-23-0023-vllm-gpu-fault-solved-hip-kernarg.md
+TOPIC: Diagnosed random HSA memory faults in vLLM Sly radiance MXFP4 with DFlash on the R9700 and tested whether HIP_FORCE_DEV_KERNARG=0 removes them, across boots and Claude Code turns.
+VERDICT: Setting HIP_FORCE_DEV_KERNARG=0 (kernel arguments in host memory) removed the memory faults in 3 of 3 boots, with decode and prefill at full speed. The fix is now the default in the vLLM profiles, but it is not yet confirmed on kernel 7.0.0-38, and the bit-44 root cause is INFERRED.
+CONFIG: vLLM Sly radiance 1.6.0-rocm10.1 (vLLM 0.31.0), amd/Qwen3.8-27B-Quark-AWQ-MXFP4 with syvai/Qwen3.8-27B-DFlash2-W4A16 drafter k=7; HIP_FORCE_DEV_KERNARG=0; kernel 7.0.0-34-generic; max-model-len 180000; max-num-seqs 1; gpu-memory-utilization 0.90; kv-cache fp8; R4D_HYBRID attention; prefix caching on; greedy; served directly and via llama-swap
+PATHS: none
+FACT|21|3/3 boots x 4 Claude turns, 0 faults|Fix verified: clean boots with HIP_FORCE_DEV_KERNARG=0
+FACT|21|~12 of ~21 boots|Boots that faulted without the fix, this session
+FACT|22|111-150 tok/s|Decode median with the fix, Sly radiance MXFP4 + DFlash
+FACT|22|2.4-3.0k tok/s|Prefill median with the fix (max 5.6k)
+FACT|64|98 C|GPU temperature in the scrapped overheated attempt
+INCIDENT|21|Faults in about 12 of 21 boots before the fix; reboots and restarts needed.
+INCIDENT|64|Loop cooler pump seized, card hit 98 C; attempt scrapped and redone after cooler replacement.
+INCIDENT|74|split-3 run faulted in the decode kernel at turn 3; no fix applied.
+OPEN: Does HIP_FORCE_DEV_KERNARG=0 also clear the memory faults on kernel 7.0.0-38, which is the box's current kernel?

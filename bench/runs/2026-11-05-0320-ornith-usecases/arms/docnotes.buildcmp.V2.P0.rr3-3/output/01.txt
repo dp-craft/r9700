@@ -1,0 +1,12 @@
+DOC: 2026-09-15-stew675-buildcmp.analysis.md
+TOPIC: A/B benchmark of the stew675 rdna-boosts patch versus stock llama.cpp builds (Vulkan + ROCm) measuring prefill and decode throughput on an AMD Radeon AI PRO R9700.
+VERDICT: The stew675 patch raises ROCm prefill throughput by ~14-20% with decode unchanged, becoming the fastest prefill config measured; on Vulkan it is flat or slightly worse (down to -12% at large prompts), so its benefit is ROCm-only.
+CONFIG: Qwen3.8-27B-UD-Q4_K_XL; llama.cpp b10969 (Vulkan) and b10909 (ROCm) stock plus b16 stew675-patched, ROCm 7.8.0 / Mesa 26.2.2, -ub 2048 -b 4096 -fa on CTK q8_0 CTV q8_0 NGL 99, REPS=1 --no-warmup
+PATHS: bench/runs/2026-09-15-1029-buildcmp-stew675/
+FACT|18|+14-20%|ROCm prefill gain vs stock builds from the patch
+FACT|60|1148.1 tok/s|highest ROCm prefill throughput measured (stew675-rocm, 2048 prompt)
+FACT|62|-11.9%|Vulkan prefill change vs stock at 32768 prompt (regression)
+FACT|46|21.7 tok/s|stock-vulkan decode throughput across shapes (flat)
+FACT|97|+20%|stew675-ROCm prefill beats stock-Vulkan at 32768 prompt
+INCIDENT|66|Disk-full on log volume killed the sampler midway; that attempt was redone
+OPEN: Why does Vulkan prefill regress ~12% at 32768 with the patch — a shader compilation or dispatch artifact?

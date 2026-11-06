@@ -1,0 +1,44 @@
+{
+ "score": 0.905,
+ "fact_exact": 5,
+ "fact_wrongline": 0,
+ "fact_fabricated": 0,
+ "facts": 5,
+ "needles_hit": 1,
+ "needles": 1,
+ "paths_found": 20,
+ "paths_want": 28,
+ "paths_invented": 4,
+ "incidents": 4,
+ "doc": {
+  "n": 1,
+  "doc": "2026-10-30-0900-vllm-redhat-mxfp4-depth-transposed.md",
+  "parse_ok": false,
+  "paths_tp": 20,
+  "paths_truncated": 6,
+  "paths_invented": 4,
+  "paths_fn": 8,
+  "dirs_want": 26,
+  "dirs_hit": 19,
+  "invented_list": [
+   "campaigns/2026-10-30-vllm-redhat-sly-depth",
+   "campaigns/2026-10-30-vllm-redhat-sly-dflash-depth",
+   "campaigns/2026-10-30-vllm-redhat-sly191-dflash-depth",
+   "campaigns/2026-10-30-vllm-redhat-sly191-mtp-depth"
+  ],
+  "fact_exact": 5,
+  "fact_wrongline": 0,
+  "fact_fabricated": 0,
+  "fact_malformed": 0,
+  "incidents": 4,
+  "needle_hit": 1,
+  "needles": 1,
+  "needle_detail": [
+   {
+    "id": "update",
+    "line": 166,
+    "hit": true
+   }
+  ]
+ }
+}

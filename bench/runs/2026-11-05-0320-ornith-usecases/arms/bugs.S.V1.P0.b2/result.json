@@ -1,0 +1,26 @@
+{
+ "arm": "bugs.S.V1.P0.b2",
+ "profile": "read",
+ "wall_s": 285.5,
+ "turns": 36,
+ "gen": 28114,
+ "reason": 21460,
+ "prompt_first": 3536,
+ "prompt_peak": 43986,
+ "drops": 0,
+ "rate": 99.3,
+ "peak_vram": 29245.0,
+ "peak_gtt": 56.0,
+ "score": 0.67,
+ "detail": {
+  "rows": 39,
+  "coverage": 1.0,
+  "extra_ids": 0,
+  "kind_acc": 0.718,
+  "sev_acc": 0.59,
+  "sev_within1": 0.949,
+  "path_recall": 0.701,
+  "path_extra": 13,
+  "score": 0.67
+ }
+}

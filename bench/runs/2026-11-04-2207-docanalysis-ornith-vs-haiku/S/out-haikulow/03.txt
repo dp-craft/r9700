@@ -1,0 +1,15 @@
+DOC: 2026-10-23-0023-vllm-gpu-fault-solved-hip-kernarg.md
+TOPIC: Diagnoses a random HSA memory fault in vLLM (Sly radiance MXFP4 + DFlash) on R9700 and tests whether HIP_FORCE_DEV_KERNARG=0 removes it.
+VERDICT: Setting HIP_FORCE_DEV_KERNARG=0 (kernel args in host memory) removed the memory faults in 3 of 3 boots, and it is now the default in the vLLM profiles. The root cause is inferred from a corrupted pointer, and the fix is not yet confirmed on kernel 7.0.0-38.
+CONFIG: vLLM 0.31.0 on ghcr.io/slybase/vllm-sly-radiance 1.6.0-rocm10.1 ; amd/Qwen3.8-27B-Quark-AWQ-MXFP4 + syvai/Qwen3.8-27B-DFlash2-W4A16 k=7 greedy ; HIP_FORCE_DEV_KERNARG=0 ; max-model-len 180000, max-num-seqs 1, gpu-memory-utilization 0.90, kv fp8 ; kernel 7.0.0-34-generic
+PATHS: none
+FACT|21|0 faults|Memory faults in 3 boots x 4 Claude turns with HIP_FORCE_DEV_KERNARG=0
+FACT|21|~12 of ~21 boots|Boots that faulted without the fix this session
+FACT|21|8 %|Chance of 3 clean boots by luck at observed fault rate (INFERRED)
+FACT|22|111-150 tok/s|Decode median with the fix (vLLM 10 s stats windows)
+FACT|22|2.4-3.0k tok/s|Prefill median with the fix (vLLM 10 s stats windows)
+INCIDENT|21|Random HSA memory faults on about 12 of 21 boots without the fix
+INCIDENT|64|Loop cooler pump seized, card hit 98 C; attempt scrapped and redone
+INCIDENT|72|ptrlog-4 boot faulted on first turn (t0)
+INCIDENT|74|split-3 boot faulted at turn 3 in the decode kernel
+OPEN: Whether the fix holds on kernel 7.0.0-38, which is untested (lines 31 and 90), and whether the fault also occurs in llama.cpp ROCm (line 24, untested).

@@ -1,0 +1,7 @@
+All validations pass:
+- **a.** findings.txt has 40 `##` lines but F-156 is duplicated (identical, at lines 93 and 113); after removing that duplicate there are 39 unique finding IDs, matching the 39 rows. No missing or duplicate ids remain (F-156 appears once).
+- **b.** All 39 rows conform to `kind` ∈ {defect, gap, risk, note} and `severity` ∈ {blocking, high, med, low}.
+- **c.** Path columns capture every referenced file token ending in the listed extensions (verified against the extension grep).
+- **d.** No corrections needed; written once.
+
+DONE

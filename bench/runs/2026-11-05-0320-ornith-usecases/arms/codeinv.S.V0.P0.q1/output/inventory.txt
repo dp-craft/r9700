@@ -1,0 +1,11 @@
+capture_engine.py|_post_json|44|Posts a JSON payload to a URL via urllib and returns the parsed JSON response.
+capture_engine.py|count_tokens|52|Counts tokens in text using the server's /tokenize endpoint, falling back to word count.
+capture_engine.py|stream|68|Runs one streamed OpenAI-compatible request and returns a metrics dict of timings, usage, and content.
+capture_engine.py|_pct|144|Computes the p-th percentile value from a list of numbers.
+capture_engine.py|_request_metrics|152|Derives a per-request throughput/latency metrics row from a stream() result.
+capture_engine.py|_wall|179|Builds wall-time phase boundaries for a request so they can be joined against GPU samples.
+capture_engine.py|run_probe|187|Runs probe mode, issuing concurrent prompt waves and emitting request and aggregate JSONL lines.
+capture_engine.py|_kv_poller|278|Polls vLLM's kv_cache_usage_perc gauge in a background thread until stopped.
+capture_engine.py|run_conversation|297|Runs conversation mode, streaming a growing multi-turn chat with cached prior turns.
+capture_engine.py|run_tasks|378|Runs tasks mode, sending a task suite and capturing full response telemetry to an output file.
+capture_engine.py|main|445|Parses command-line arguments and dispatches to the selected mode's runner.

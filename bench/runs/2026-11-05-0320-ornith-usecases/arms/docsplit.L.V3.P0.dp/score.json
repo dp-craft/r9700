@@ -1,0 +1,157 @@
+{
+ "score": 1.0,
+ "zero_loss": true,
+ "clean": true,
+ "src_lines": 803,
+ "out_lines": 803,
+ "out_files": 20,
+ "exact_lines": 803,
+ "recall": 1.0,
+ "precision": 1.0,
+ "lost_lines": 0,
+ "lost_table_rows": 0,
+ "altered_lines": 0,
+ "altered_with_number_change": 0,
+ "added_lines": 0,
+ "duplicated_lines": 0,
+ "numbers_missing": 0,
+ "numbers_invented": 0,
+ "fences_odd": [],
+ "placement": 1.0,
+ "sections": 20,
+ "sections_right": 20,
+ "sections_intact": 20,
+ "source_tokens": 54529,
+ "examples": {
+  "lost": [],
+  "altered": [],
+  "added": []
+ },
+ "section_detail": [
+  {
+   "heading": "(preamble)",
+   "file": "00-intro.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Summary — the five things that survived",
+   "file": "01-summary.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## What is stable vs what is not",
+   "file": "02-stable-vs-not.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Legend — every knob and label, defined once",
+   "file": "03-legend.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Results — all 14 cells",
+   "file": "04-results.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Uncertainty — the design is underpowered, and that is a h",
+   "file": "05-uncertainty.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Axis 1 — the 27B quant ladder (and the KV confound, final",
+   "file": "06-axis-1.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Axis 2 — the reasoning budget: a no-op above ~4k, and a r",
+   "file": "07-axis-2.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Axis 3 — the 35B-A3B sampling sweep: the vendor was right",
+   "file": "08-axis-3.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Combinations across the three axes — what interacts and w",
+   "file": "09-combinations.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## The strict-code wall — cleanliness, not logic",
+   "file": "10-strict-code-wall.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Capability vs the reference ladder — and what \"tier\" actu",
+   "file": "11-capability-vs-reference-ladder.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Fluctuation and rerun value — the mean hides both",
+   "file": "12-fluctuation-rerun-value.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Health — GTT spill in all 14 cells, and the Q5 f16 questi",
+   "file": "13-health.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Recommended config",
+   "file": "14-recommended-config.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Further tests — prioritised",
+   "file": "15-further-tests.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Methodology and caveats",
+   "file": "16-methodology-and-caveats.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Sources",
+   "file": "17-sources.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Appendix A — every rep of every cell",
+   "file": "18-appendix-a.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Appendix B — all generated charts",
+   "file": "19-appendix-b.md",
+   "right": true,
+   "intact": true
+  }
+ ],
+ "one_file_per_section": true,
+ "files_in_doc_order": true,
+ "readme_links": 20,
+ "readme_links_bad": 0,
+ "readme_missing": 0
+}

@@ -1,0 +1,13 @@
+DOC: 2026-10-31-redhat-sharp-w208-blind.analysis.md
+TOPIC: Measured whether swapping only the chat template to the sharp (terse) variant changes RedHat Qwen3.8-27B-MXFP4 quality on the W2-08 blind review task, with four-way blind grading.
+VERDICT: The sharp template cut step-A thinking and tool calls by about a third with no measurable quality loss. The gain in blind-graded findings (11/19 vs 9/19) is inside the pre-registered grey zone and is not demonstrated at n=1.
+CONFIG: RedHatAI/Qwen3.8-27B-MXFP4 with syvai/Qwen3.8-27B-DFlash2-W4A16 drafter k=7; vLLM 0.32.0 on Sly 1.8.1 (rocm10.1); RADIANCE_CACTUS_DELTA=0; fp8 KV; ctx 262000; max-num-seqs 1; gpu-memory-utilization 0.93; power cap 210 W; chat template sharp (v22.5 plus TERSENESS directive) vs froggeric v22.5; Claude Code 2.1.312; agentic W2-08 review task
+PATHS: bench/runs/2026-10-31-redhat-sharp-w208-blind/, bench/runs/2026-10-31-redhat-sharp-w208-blind/pre-launch-provenance.txt, bench/runs/2026-10-31-redhat-sharp-w208-blind/rep1/redhat-d0-sharp/server.txt, bench/runs/2026-10-30-0947-dpf-brief-ab/, campaigns/2026-10-31-redhat-sharp-w208-blind/sharp-chat_template.jinja, campaigns/2026-10-31-redhat-sharp-w208-blind/run.sh, campaigns/2026-10-31-q4kxl-sharp-w208-blind/analysis.md
+FACT|41|11/19|Opus findings found, RedHat + sharp (RedHat delta 0 baseline 9/19)
+FACT|49|304k|Thinking chars in step A, sharp (vs 489k delta 0 baseline)
+FACT|51|~144.4k|Generated tokens in step A, sharp (vs ~200k baseline)
+FACT|52|32,057 MiB|Peak VRAM, RedHat + sharp run
+FACT|45|14/14|Precision (matched + real) for RedHat + sharp findings
+INCIDENT|152|First pass used stale prompt fixture from older build; pass deleted and repeated.
+INCIDENT|293|Delta 0 baseline probe dir may hold post-boundary files; possible contamination.
+OPEN: Does a second rep of RedHat + sharp keep at least 9/19 with 4/6 highs, so the no-quality-loss claim holds across runs?

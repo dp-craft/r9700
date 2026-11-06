@@ -1,0 +1,213 @@
+diff --git a/src/logfmt.ts b/src/logfmt.ts
+new file mode 100644
+index 0000000..376b4d0
+--- /dev/null
++++ b/src/logfmt.ts
+@@ -0,0 +1,207 @@
++/**
++ * A minimal logfmt parser and formatter.
++ *
++ * logfmt lines hold space-separated `key=value` pairs; a bare key carries the
++ * value `true`. Quoted values support the escapes `\"`, `\\` and `\n`.
++ */
++
++export class LogfmtError extends Error {
++  readonly column: number;
++
++  constructor(message: string, column: number) {
++    super(message);
++    this.name = "LogfmtError";
++    this.column = column;
++    // Preserve the prototype chain under older targets.
++    Object.setPrototypeOf(this, LogfmtError.prototype);
++  }
++}
++
++export type LogfmtValue = string | true;
++export type LogfmtFields = Record<string, LogfmtValue>;
++
++/** Characters that separate pairs on a logfmt line. */
++function isSeparator(c: string | undefined): boolean {
++  return c === " " || c === "\t";
++}
++
++/**
++ * Parse a single logfmt line into an ordered map of key/value pairs.
++ *
++ * The result preserves first-seen insertion order and, for repeating keys,
++ * keeps the last value while retaining its original position.
++ */
++export function parse(line: string): LogfmtFields {
++  const fields: LogfmtFields = {};
++  const length = line.length;
++  let i = 0;
++
++  while (i < length) {
++    // Skip runs of separators between (and around) pairs.
++    while (isSeparator(line[i])) {
++      i++;
++      if (i >= length) {
++        break;
++      }
++    }
++    if (i >= length) {
++      break;
++    }
++
++    // Read the key: every character up to `=`, a separator, or end of line.
++    let j = i;
++    while (line[j] !== "=" && !isSeparator(line[j])) {
++      j++;
++      if (j >= length) {
++        break;
++      }
++    }
++
++    const key = line.slice(i, j);
++
++    // A pair starting with `=` has an empty key.
++    if (j === i) {
++      throw new LogfmtError("empty key", i);
++    }
++
++    if (line[j] === "=") {
++      const result = readValue(line, j + 1, length);
++      fields[key] = result.value;
++      // A non-separator character right after a closing quote is an error.
++      if (
++        result.quoted &&
++        result.index < length &&
++        !isSeparator(line[result.index])
++      ) {
++        throw new LogfmtError("unexpected character after quote", result.index);
++      }
++      i = result.index;
++      continue;
++    }
++
++    // No `=` (separator reached or end of line): a bare key with value `true`.
++    fields[key] = true;
++    i = j;
++  }
++
++  return fields;
++}
++
++interface ValueResult {
++  value: LogfmtValue;
++  index: number;
++  quoted: boolean;
++}
++
++/**
++ * Read the value following `key=` starting at `start`.
++ *
++ * Returns the decoded value, the index just past it, and whether it was a
++ * quoted value (so the caller can reject trailing non-separator characters).
++ */
++function readValue(line: string, start: number, length: number): ValueResult {
++  // A bare value runs until a separator or end of line. `start` may already
++  // point at a separator, yielding an empty value (`key=`).
++  if (line[start] === '"') {
++    return readQuoted(line, start, length);
++  }
++
++  let k = start;
++  while (!isSeparator(line[k])) {
++    k++;
++    if (k >= length) {
++      break;
++    }
++  }
++  return { value: line.slice(start, k), index: k, quoted: false };
++}
++
++function readQuoted(line: string, start: number, length: number): ValueResult {
++  let out = "";
++  let i = start + 1;
++
++  while (i < length) {
++    const c = line[i];
++    if (c === '"') {
++      return { value: out, index: i + 1, quoted: true };
++    }
++    if (c === "\\") {
++      const next = line[i + 1];
++      switch (next) {
++        case '"':
++          out += '"';
++          i += 2;
++          break;
++        case "\\":
++          out += "\\";
++          i += 2;
++          break;
++        case "n":
++          out += "\n";
++          i += 2;
++          break;
++        default:
++          throw new LogfmtError("unknown escape", i);
++      }
++      continue;
++    }
++    out += c;
++    i++;
++  }
++
++  // Reached the end of the line without a closing quote.
++  throw new LogfmtError("unterminated string", start);
++}
++
++/** True when `key` cannot appear bare on a logfmt line. */
++function invalidKey(key: string): boolean {
++  return (
++    key.length === 0 ||
++    key.includes(" ") ||
++    key.includes("\t") ||
++    key.includes("=") ||
++    key.includes('"')
++  );
++}
++
++/** Quote and escape a value that must be wrapped in double quotes. */
++function quoteValue(value: string): string {
++  return (
++    '"' +
++    value
++      .replace(/\\/g, "\\\\")
++      .replace(/"/g, '\\"')
++      .replace(/\n/g, "\\n") +
++    '"'
++  );
++}
++
++/**
++ * Serialize a map of fields back into a logfmt line.
++ *
++ * Pairs are joined with a single space in insertion order. The inverse of
++ * {@link parse}: `parse(format(x))` equals `x` for every valid `x`.
++ */
++export function format(fields: LogfmtFields): string {
++  const pairs: string[] = [];
++
++  for (const [key, value] of Object.entries(fields)) {
++    if (invalidKey(key)) {
++      throw new LogfmtError(`invalid key ${JSON.stringify(key)}`, -1);
++    }
++
++    if (value === true) {
++      pairs.push(key);
++      continue;
++    }
++
++    // `value` is narrowed to string here (`true` was handled above).
++    if (value.length === 0 || /[ \t"\\\n=]/.test(value)) {
++      pairs.push(`${key}=${quoteValue(value)}`);
++    } else {
++      pairs.push(`${key}=${value}`);
++    }
++  }
++
++  return pairs.join(" ");
++}

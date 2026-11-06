@@ -1,0 +1,12 @@
+DOC: 2026-09-15-stew675-buildcmp.analysis.md
+TOPIC: build-comparison benchmark of the stem675 rdna-boosts llama.cpp patch on an R9700, comparing stock versus patched builds for Vulkan and ROCm across five llama-bench PG prompt shapes.
+VERDICT: The stem675 patch is a +14 to +20% prefill win on ROCm that grows with prompt size but is flat on Vulkan where it even regresses at the largest shape; decode is unchanged on both backends, so its benefit is ROCm-only and suits prefill-heavy workloads. The Vulkan regression is unexplained and REPS=1 means the deltas carry no noise band.
+CONFIG: amd/Qwen3.8-27B-UD-Q4_K_XL (unsloth); llama.cpp b10969 stock-Vulkan, b10909 stock-ROCm, b16 stem675-patched on both backends (patch set from stem675/llama-cpp-rdna-boosts, 16 blocks); -ub 2048 -b 4096 -fa on, CTK q8_0 CTV q8_0 KV, NGL 99, REPS=1, --no-warmup; ROCm 7.8.0 / Mesa 26.2.2 (kisak), kernel 7.0.0-31, Vulkan SDK 1.4.357.1
+PATHS: bench/runs/2026-09-15-1029-buildcmp-stew675/
+FACT|62|994.1 tok/s|stem675-ROCm prefill at 32768, +20% beats stock-Vulkan
+FACT|60|1148.1 tok/s|stem675-ROCm prefill at 2048-prompt (+14.9%)
+FACT|84|-12% Vulkan prefill Δ at 32768|stem on Vulkan regresses at large prompts, unexplained
+FACT|46|16.4 tok/s|stem675-ROCm decode at (128,64), cold-start artifact to exclude
+FACT|47|+0.6% decode Δ|(512,256) stem675-ROCm decode flat within noise
+INCIDENT|66|disk full on log volume killed sampler mid-attempt; attempt redone
+OPEN: Why does the stem675 patch regress Vulkan prefill by -12% at the 32768 prompt shape?

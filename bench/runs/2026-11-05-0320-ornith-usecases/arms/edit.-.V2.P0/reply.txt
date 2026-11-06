@@ -1,0 +1,9 @@
+All validations pass:
+
+- **a.** `\bget_price\b` now appears only where allowed: the route string in `shop/api.py`, the route string used by the public API test (`call("get_price", ...)`), and `vendor/legacy.py` (untouched). The remaining matches in `CHANGE.md` are the spec text itself, which we don't edit.
+- **b.** `get_price_history` has the same hits as before — unchanged.
+- **c.** Added the three cases: currency default (`test_currency_default`), `ValueError` (`test_bad_currency`), and cart passing currency down (`test_cart_passes_currency`).
+- **d.** Tests pass: **6 passed**.
+- **e.** `git diff --stat` shows no `vendor/` files touched.
+
+DONE

@@ -1,0 +1,28 @@
+== gs5 [KV_GROUP_SIZE=5] rc=1 boot_s=199
+INFO 11-04 14:28:49 [mxfp4.py:709] Using 'EMULATION' Mxfp4 MoE backend.
+INFO 11-04 14:29:58 [model_runner.py:433] Model loading took 20.0 GiB memory and 70.371822 seconds
+INFO 11-04 14:30:16 [monitor.py:91] [backbone] Initial profiling/warmup run took 15.49 s
+INFO 11-04 14:30:20 [model_runner.py:1136] Graph capturing finished in 2 secs, took 1.97 GiB
+INFO 11-04 14:30:20 [gpu_worker.py:759] Available KV cache memory: 3.35 GiB
+ValueError: To serve at least one request with the model's max seq len (262000), (6.48 GiB KV cache is needed, which is larger than the available KV cache memory (3.34 GiB). Based on the available memory, the e
+peak_vram_used=26236 peak_gtt_used=68 (csv units)
+== gs1 [KV_GROUP_SIZE=1] rc=1 boot_s=220
+INFO 11-04 14:32:09 [mxfp4.py:709] Using 'EMULATION' Mxfp4 MoE backend.
+INFO 11-04 14:33:25 [model_runner.py:433] Model loading took 20.0 GiB memory and 76.626068 seconds
+INFO 11-04 14:33:41 [monitor.py:91] [backbone] Initial profiling/warmup run took 14.92 s
+INFO 11-04 14:34:00 [model_runner.py:1136] Graph capturing finished in 17 secs, took 1.90 GiB
+INFO 11-04 14:34:00 [gpu_worker.py:759] Available KV cache memory: 3.43 GiB
+ValueError: To serve at least one request with the model's max seq len (262000), (4.48 GiB KV cache is needed, which is larger than the available KV cache memory (3.43 GiB). Based on the available memory, the e
+peak_vram_used=26218 peak_gtt_used=68 (csv units)
+== gs5-k7 [KV_GROUP_SIZE=5 SPEC_K=7] rc=1 boot_s=385
+INFO 11-04 14:35:48 [mxfp4.py:709] Using 'EMULATION' Mxfp4 MoE backend.
+INFO 11-04 14:36:57 [model_runner.py:433] Model loading took 20.0 GiB memory and 69.943894 seconds
+INFO 11-04 14:39:25 [monitor.py:91] [backbone] Initial profiling/warmup run took 95.55 s
+INFO 11-04 14:40:04 [model_runner.py:1136] Graph capturing finished in 7 secs, took 1.89 GiB
+INFO 11-04 14:40:05 [gpu_worker.py:759] Available KV cache memory: 4.68 GiB
+ValueError: To serve at least one request with the model's max seq len (262000), (5.71 GiB KV cache is needed, which is larger than the available KV cache memory (4.67 GiB). Based on the available memory, the e
+peak_vram_used=29244 peak_gtt_used=90 (csv units)
+== gs5-triton [KV_GROUP_SIZE=5 EXTRA_ARGS=--moe-backend triton] rc=1 boot_s=117
+ValueError: Mxfp4 MoE backend 'TRITON' does not support the deployment configuration since kernel does not support MoEActivation.SILU activation.
+peak_vram_used=1896 peak_gtt_used=62 (csv units)
+SWEEP DONE

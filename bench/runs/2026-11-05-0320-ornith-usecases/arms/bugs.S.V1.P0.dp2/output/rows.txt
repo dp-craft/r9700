@@ -1,0 +1,36 @@
+F-106|defect|high|WAVE-3-LLM-VALIDATION-RUNBOOK.md, tools/scripts/dpf/common.sh
+F-02|risk|med|conditional-artifact-triggers.md, speckit.plan.md
+F-31|defect|med|src/doctor/inputs.ts, flow-map.json, flow-map-stale.json, manifests/plan.json, WAVE-3-LLM-VALIDATION-PRE-FIX.md
+F-144|defect|low|docs/test/2026-09-11-w4-t1-baseline.md
+F-39|defect|med|src/telemetry/project.ts
+F-93|risk|low|manifests/tasks.json
+F-98|defect|med|park.ts, residue.ts
+F-185|gap|med|claude-artifacts/dpf/task-complexity.md, tools/spec-pipeline/prompts/stages/tasks/author.md, attempt-1/prompt.md
+F-86|defect|high|src/driver/report.ts, src/driver/run.ts
+F-66|defect|med|ledger.jsonl
+F-112|defect|med|WAVE-3-LLM-VALIDATION-RUNBOOK.md
+F-80|defect|med|src/diagnose/classify.ts, src/wiring/stage-executor.ts
+F-77|defect|med|loop-ports.ts, row-defect-step.ts, goal-change-step.ts, load-bearing-step.ts, loop-step.ts, render-report.ts
+F-42|defect|med|src/doctor/placement-drift.ts, src/wiring/stage-executor.ts, profile/schema.ts, wiring/env.ts
+F-10|gap|med|tools/spec-pipeline/tests/fixtures/rubric-reference.json, WAVE-1-STATUS.md
+F-118|defect|low|tools/scripts/dpf/create-new-feature.sh, .specify/scripts/bash/create-new-feature.sh, claude-artifacts/dpf/spec-template.md, .specify/templates/spec-template.md, dpf.specify.md
+F-89|risk|med|src/ir/anchor.ts, src/wiring/loop-ports.ts
+F-145|risk|low|docs/test/2026-09-11-w4-t1-baseline.md
+F-50|risk|med|.claude/commands/dpf.constitution.md, tools/scripts/dp-forge.ts, package.json, RUNNER-GUIDE.md, .dp-forge-sync.json
+F-154|defect|med|manifests/tasks.json, docs/test/2026-09-11-w4-t1-restart.md
+F-16|defect|high|src/transport/http.ts, src/transport/direct.ts, spec-pipeline.config.json
+F-140|defect|med|src/wiring/loop-ports.ts, loop-step.ts
+F-161|risk|med|bundler.ts
+F-156|defect|med|src/evidence/excerpts.ts, noun-search.ts, docs/test/2026-09-11-w4-t11-rerun.md
+F-156|defect|med|src/evidence/excerpts.ts, noun-search.ts, docs/test/2026-09-11-w4-t11-rerun.md
+F-56|note|low|WAVE-3-STATUS.md
+F-199|risk|med|none
+F-212|risk|low|.claude/agents/code-reviewer.md, review-chain.md
+F-67|defect|high|src/loop/run.ts, src/stages/critic.ts
+F-152|defect|high|tools/scripts/snapshot-freshness-check.ts, src/stages/spec-resolve.ts, docs/test/2026-09-11-w4-t1-restart.md
+F-193|defect|med|report.md, state.json
+F-55|defect|med|manifests/plan.json, src/contracts/manifest.ts, src/driver/inputs.ts
+F-159|defect|med|src/loop/run.ts, src/wiring/loop-ports.ts, halt-evidence.test.ts
+F-20|gap|med|tools/spec-pipeline/spec-pipeline.config.json
+F-60|risk|med|src/evidence/bundler.ts, ledger.jsonl
+F-190|defect|med|plan.md, CompareStripContainer.tsx

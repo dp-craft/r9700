@@ -1,0 +1,54 @@
+{
+ "arm": "docnotes.depth.V2.P0",
+ "profile": "read",
+ "wall_s": 152.2,
+ "turns": 4,
+ "gen": 22017,
+ "reason": 20324,
+ "prompt_first": 3667,
+ "prompt_peak": 52417,
+ "drops": 0,
+ "rate": 145.2,
+ "peak_vram": 32529.0,
+ "peak_gtt": 131.0,
+ "score": 0.881,
+ "detail": {
+  "score": 0.881,
+  "fact_exact": 5,
+  "fact_wrongline": 0,
+  "fact_fabricated": 0,
+  "facts": 5,
+  "needles_hit": 1,
+  "needles": 1,
+  "paths_found": 18,
+  "paths_want": 28,
+  "paths_invented": 0,
+  "incidents": 5,
+  "doc": {
+   "n": 1,
+   "doc": "2026-10-30-0900-vllm-redhat-mxfp4-depth-transposed.md",
+   "parse_ok": true,
+   "paths_tp": 18,
+   "paths_truncated": 0,
+   "paths_invented": 0,
+   "paths_fn": 10,
+   "dirs_want": 26,
+   "dirs_hit": 17,
+   "invented_list": [],
+   "fact_exact": 5,
+   "fact_wrongline": 0,
+   "fact_fabricated": 0,
+   "fact_malformed": 0,
+   "incidents": 5,
+   "needle_hit": 1,
+   "needles": 1,
+   "needle_detail": [
+    {
+     "id": "update",
+     "line": 166,
+     "hit": true
+    }
+   ]
+  }
+ }
+}

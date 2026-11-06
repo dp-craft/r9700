@@ -1,0 +1,43 @@
+{
+  "notes": [
+    {
+      "report": "2026-07-14-hardest-tasks-27b-vs-35b.analysis.md",
+      "label": "P",
+      "verdict": 1,
+      "config": 2,
+      "facts_decision_relevant": 5,
+      "facts_wrong_meaning": 0,
+      "incidents_total": 3,
+      "incidents_unsupported": 0,
+      "incidents_missed": 3,
+      "open": 2,
+      "critical_error": "Says presence_penalty's decode loss has no clear cause, but the report establishes a fixed ~2 ms/token host tax from the penalties sampler and refutes the MTP-rejection mechanism, so a reader would think the mechanism is unknown."
+    },
+    {
+      "report": "2026-07-14-hardest-tasks-27b-vs-35b.analysis.md",
+      "label": "Q",
+      "verdict": 2,
+      "config": 1,
+      "facts_decision_relevant": 5,
+      "facts_wrong_meaning": 0,
+      "incidents_total": 3,
+      "incidents_unsupported": 0,
+      "incidents_missed": 3,
+      "open": 2,
+      "critical_error": null
+    },
+    {
+      "report": "2026-07-14-hardest-tasks-27b-vs-35b.analysis.md",
+      "label": "R",
+      "verdict": 1,
+      "config": 1,
+      "facts_decision_relevant": 4,
+      "facts_wrong_meaning": 0,
+      "incidents_total": 3,
+      "incidents_unsupported": 0,
+      "incidents_missed": 3,
+      "open": 2,
+      "critical_error": "Says a bigger budget on the MoE buys far more than any quant choice, but the report puts the MoE budget gain at about 4 points and the quant-ladder spread at 11 points (unresolved), so a reader would rank the levers backwards."
+    }
+  ]
+}

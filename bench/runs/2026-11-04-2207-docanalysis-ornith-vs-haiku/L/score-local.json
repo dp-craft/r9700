@@ -1,0 +1,214 @@
+{
+ "root": "L",
+ "arm": "local",
+ "total": {
+  "notes": 6,
+  "parse_ok": 6,
+  "fact": 30,
+  "exact": 30,
+  "wrongline": 0,
+  "fabricated": 0,
+  "needles": 8,
+  "hits": 7,
+  "tp": 20,
+  "fn": 25,
+  "truncated": 7,
+  "invented": 4,
+  "dirs_want": 37,
+  "dirs_hit": 27,
+  "paths_want": 45,
+  "inc": 13,
+  "inc_badline": 0,
+  "fact_malformed": 0
+ },
+ "synthesis": {
+  "q1_expected": [
+   "2026-07-14-hardest-tasks-27b-vs-35b.analysis.md",
+   "2026-10-23-0023-vllm-gpu-fault-solved-hip-kernarg.md",
+   "2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md"
+  ],
+  "q1_tp": 3,
+  "q1_extra": [],
+  "q1_missed": [],
+  "q2_expected": 0,
+  "q2_tp": 0,
+  "q2_fp": [],
+  "q2_missed": [],
+  "conflicts": 0,
+  "conflict_bad_citations": 0,
+  "recommend": true
+ },
+ "docs": [
+  {
+   "n": 1,
+   "doc": "2026-07-14-hardest-tasks-27b-vs-35b.analysis.md",
+   "parse_ok": true,
+   "paths_tp": 1,
+   "paths_truncated": 0,
+   "paths_invented": 0,
+   "paths_fn": 1,
+   "dirs_want": 1,
+   "dirs_hit": 1,
+   "invented_list": [],
+   "fact_exact": 5,
+   "fact_wrongline": 0,
+   "fact_fabricated": 0,
+   "fact_malformed": 0,
+   "incidents": 2,
+   "needle_hit": 2,
+   "needles": 3,
+   "needle_detail": [
+    {
+     "id": "thermal1",
+     "line": 185,
+     "hit": true
+    },
+    {
+     "id": "debug",
+     "line": 493,
+     "hit": false
+    },
+    {
+     "id": "ups",
+     "line": 796,
+     "hit": true
+    }
+   ]
+  },
+  {
+   "n": 2,
+   "doc": "2026-10-30-0900-vllm-redhat-mxfp4-depth-transposed.md",
+   "parse_ok": true,
+   "paths_tp": 10,
+   "paths_truncated": 6,
+   "paths_invented": 4,
+   "paths_fn": 18,
+   "dirs_want": 26,
+   "dirs_hit": 16,
+   "invented_list": [
+    "campaigns/2026-10-30-vllm-redhat-sly-depth",
+    "campaigns/2026-10-30-vllm-redhat-sly-dflash-depth",
+    "campaigns/2026-10-30-vllm-redhat-sly191-dflash-depth",
+    "campaigns/2026-10-30-vllm-redhat-sly191-mtp-depth"
+   ],
+   "fact_exact": 5,
+   "fact_wrongline": 0,
+   "fact_fabricated": 0,
+   "fact_malformed": 0,
+   "incidents": 4,
+   "needle_hit": 1,
+   "needles": 1,
+   "needle_detail": [
+    {
+     "id": "update",
+     "line": 166,
+     "hit": true
+    }
+   ]
+  },
+  {
+   "n": 3,
+   "doc": "2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md",
+   "parse_ok": true,
+   "paths_tp": 5,
+   "paths_truncated": 0,
+   "paths_invented": 0,
+   "paths_fn": 2,
+   "dirs_want": 5,
+   "dirs_hit": 5,
+   "invented_list": [],
+   "fact_exact": 5,
+   "fact_wrongline": 0,
+   "fact_fabricated": 0,
+   "fact_malformed": 0,
+   "incidents": 3,
+   "needle_hit": 1,
+   "needles": 1,
+   "needle_detail": [
+    {
+     "id": "thermal3",
+     "line": 120,
+     "hit": true
+    }
+   ]
+  },
+  {
+   "n": 4,
+   "doc": "2026-10-31-redhat-sharp-w208-blind.analysis.md",
+   "parse_ok": true,
+   "paths_tp": 3,
+   "paths_truncated": 1,
+   "paths_invented": 0,
+   "paths_fn": 4,
+   "dirs_want": 4,
+   "dirs_hit": 4,
+   "invented_list": [],
+   "fact_exact": 5,
+   "fact_wrongline": 0,
+   "fact_fabricated": 0,
+   "fact_malformed": 0,
+   "incidents": 1,
+   "needle_hit": 1,
+   "needles": 1,
+   "needle_detail": [
+    {
+     "id": "fixture",
+     "line": 152,
+     "hit": true
+    }
+   ]
+  },
+  {
+   "n": 5,
+   "doc": "2026-10-23-0023-vllm-gpu-fault-solved-hip-kernarg.md",
+   "parse_ok": true,
+   "paths_tp": 0,
+   "paths_truncated": 0,
+   "paths_invented": 0,
+   "paths_fn": 0,
+   "dirs_want": 0,
+   "dirs_hit": 0,
+   "invented_list": [],
+   "fact_exact": 5,
+   "fact_wrongline": 0,
+   "fact_fabricated": 0,
+   "fact_malformed": 0,
+   "incidents": 2,
+   "needle_hit": 1,
+   "needles": 1,
+   "needle_detail": [
+    {
+     "id": "thermal4",
+     "line": 64,
+     "hit": true
+    }
+   ]
+  },
+  {
+   "n": 6,
+   "doc": "2026-09-15-stew675-buildcmp.analysis.md",
+   "parse_ok": true,
+   "paths_tp": 1,
+   "paths_truncated": 0,
+   "paths_invented": 0,
+   "paths_fn": 0,
+   "dirs_want": 1,
+   "dirs_hit": 1,
+   "invented_list": [],
+   "fact_exact": 5,
+   "fact_wrongline": 0,
+   "fact_fabricated": 0,
+   "fact_malformed": 0,
+   "incidents": 1,
+   "needle_hit": 1,
+   "needles": 1,
+   "needle_detail": [
+    {
+     "id": "disk",
+     "line": 66,
+     "hit": true
+    }
+   ]
+  }
+ ]
+}

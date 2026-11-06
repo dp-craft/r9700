@@ -1,0 +1,1 @@
+4. Code: Bash runs one command at a time and allows only npx vitest run, npx tsc --noEmit, python3 -m pytest, pytest, git diff, git status, and ls; anything else is denied. Exercise every requirement and edge case with a run before reporting done, and report failures as they are.

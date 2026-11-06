@@ -1,0 +1,14 @@
+DOC: 2026-07-14-hardest-tasks-27b-vs-35b.analysis.md
+TOPIC: Tested 14 config cells x 5 tasks x 3 reps on Qwen3.6-27B and 35B-A3B at 128k to rank quant precision, reasoning budget, and sampling settings by quality, speed, and strict-code pass rate.
+VERDICT: Sampling hygiene dominates — use Qwen's whole temp-0.6 coding recipe, because reruns (+4.6..+17.5 pts) and a bigger budget on the MoE buy far more than any quant choice; the reasoning budget is a no-op above ~4k on the dense 27B while the MoE 35B benefits significantly, leaving the quant ladder an unresolvable bounded null. The one unresolved hazard is GTT spill (1551–2841 MiB) in every cell, which blocks unattended use on this no-swap box.
+CONFIG: Qwen3.6-27B-MTP (Q4_K_M/UD-Q4_K_XL/Q5_K_M/Q6_K) and Qwen3.6-35B-A3B-UD-Q4_K_M; llama.cpp Vulkan b9950, MTP on, ctx 163840, -ub 2048 -b 4096 -fa on; budgets 4096/16384/unlimited; temp 0.3/0.6/1.0
+PATHS: bench/runs/2026-07-16-0927-mtp-sampler-probe/
+FACT|25|+0.3 pts|quality gain from raising budget 4096 to 16384 on the 27B
+FACT|27|77.5 TS %|best 35B sampling score at temp 0.6 coding recipe
+FACT|48|+17.5 pts|max rerun gain, best-of-3 versus mean, across all cells
+FACT|57|−4.3 pts|paired quality delta for 35B budget 4096 to 16384
+FACT|104|80.9 TS %|highest cell mean quality in the quant ladder (Q6_K)
+INCIDENT|185|First rep discarded after GPU hit 104°C and throttled; intake cleared then data re-collected
+INCIDENT|493|Debug-build first pass; its rows discarded before the table was produced
+INCIDENT|796|UPS power event cut the overnight block; partial rows quarantined and not used
+OPEN: What causes the 1551–2841 MiB GTT spill in every cell despite VRAM headroom, and can unattended runs be made safe on this no-swap box?

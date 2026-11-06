@@ -1,0 +1,7 @@
+{
+  "notes": [
+    {"report": "2026-10-31-redhat-sharp-w208-blind.analysis.md", "label": "P", "verdict": 3, "config": 1, "facts_decision_relevant": 5, "facts_wrong_meaning": 0, "incidents_total": 1, "incidents_unsupported": 0, "incidents_missed": 4, "open": 2, "critical_error": null},
+    {"report": "2026-10-31-redhat-sharp-w208-blind.analysis.md", "label": "Q", "verdict": 3, "config": 2, "facts_decision_relevant": 4, "facts_wrong_meaning": 1, "incidents_total": 3, "incidents_unsupported": 0, "incidents_missed": 2, "open": 2, "critical_error": null},
+    {"report": "2026-10-31-redhat-sharp-w208-blind.analysis.md", "label": "R", "verdict": 2, "config": 1, "facts_decision_relevant": 5, "facts_wrong_meaning": 0, "incidents_total": 1, "incidents_unsupported": 0, "incidents_missed": 4, "open": 2, "critical_error": "CONFIG applies 'DFlash2 k=7, delta 0, fp8 KV 262000' to all four configs, but the report has Q4_K_XL on llama.cpp MTP with q8_0 KV at 260000 and heretic at delta 0.5 (lines 37-38), and those confounds bear on the Q4_K_XL-vs-RedHat tie."}
+  ]
+}

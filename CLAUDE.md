@@ -86,8 +86,8 @@ above. (Charts are now committed SVGs under `<campaign>/charts/`, embedded in `a
 3. **Sources are Tier-1 first.** External claims cite the whitelist in the research skill
    (llama.cpp/ollama/ROCm/vLLM/Mesa repos, official model cards, Phoronix). Prefer primary
    sources (GitHub issues/PRs, vendor docs) over blog aggregation. Corroborate Tier-2.
-4. **Token policy (this repo burns tokens).** Delegate file reading / web search to **haiku**
-   subagents — one at a time, waiting for each result before the next (rule 19) — and ask for
+4. **Token policy (this repo burns tokens).** Delegate file reading / web search to subagents —
+   the `dp-fan-out-subagents` skill picks the worker, model, effort and parallel cap — and ask for
    compact structured summaries; don't slurp files into the main context.
    Reserve the expensive model for synthesis and judgement. Keep bulk data in JSONL, not prose.
 5. **Documentation is uniform.** Reports → `docs/{research,analysis}/YYYY-MM-DD-HHMM-<slug>.md`,
@@ -183,10 +183,6 @@ above. (Charts are now committed SVGs under `<campaign>/charts/`, embedded in `a
 18. **An interrupted run is not a result.** A cut stream, a killed job, a partial file: quarantine it
     and re-collect. Never let it enter the data as a normal row (2026-07-15: a killed generation was
     graded as a real reply — 0.603 with tests=0.0 — and moved a published cell mean by 1.1 pts).
-19. **One subagent at a time — sequential, no parallel fan-out.** Launch at most one subagent,
-    wait for its result, then launch the next. No parallel/concurrent subagents, no background
-    side-quests running alongside the main thread's file work. (Rule 4's "fan out" means
-    delegating sequentially, not concurrency.)
 
 ## Tools — the deterministic layer (use these, never hand-roll their output)
 

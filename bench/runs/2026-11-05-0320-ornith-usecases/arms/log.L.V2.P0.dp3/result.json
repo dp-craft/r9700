@@ -1,0 +1,27 @@
+{
+ "arm": "log.L.V2.P0.dp3",
+ "profile": "read",
+ "wall_s": 131.8,
+ "turns": 21,
+ "gen": 14136,
+ "reason": 10500,
+ "prompt_first": 3816,
+ "prompt_peak": 22890,
+ "drops": 0,
+ "rate": 107.9,
+ "peak_vram": 29743.0,
+ "peak_gtt": 77.0,
+ "score": 0.0,
+ "detail": {
+  "rows": 0,
+  "classes": 21,
+  "class_recall": 0.0,
+  "first_exact": 0,
+  "count_exact": 0,
+  "planted": 0,
+  "planted_total": 6,
+  "extra": 0,
+  "format_deviation": 0,
+  "score": 0.0
+ }
+}

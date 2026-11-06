@@ -1,0 +1,219 @@
+diff --git a/tests/semver.test.ts b/tests/semver.test.ts
+new file mode 100644
+index 0000000..9549473
+--- /dev/null
++++ b/tests/semver.test.ts
+@@ -0,0 +1,213 @@
++import { describe, expect, it } from "vitest";
++import {
++  parse,
++  compare,
++  satisfiesCaret,
++  bump,
++  maxVersion,
++  SemVerError,
++} from "../src/semver.js";
++
++describe("parse", () => {
++  it("parses a basic version without prerelease", () => {
++    expect(parse("1.2.3")).toEqual({ major: 1, minor: 2, patch: 3, pre: [] });
++  });
++
++  it("parses single-component numbers", () => {
++    expect(parse("0.0.0")).toEqual({ major: 0, minor: 0, patch: 0, pre: [] });
++  });
++
++  it("splits a prerelease into its dot-separated identifiers", () => {
++    expect(parse("1.2.3-alpha.1.beta.2")).toEqual({
++      major: 1,
++      minor: 2,
++      patch: 3,
++      pre: ["alpha", "1", "beta", "2"],
++    });
++  });
++
++  it("treats a purely numeric prerelease identifier as a string element", () => {
++    expect(parse("1.0.0-1")).toEqual({ major: 1, minor: 0, patch: 0, pre: ["1"] });
++  });
++
++  it("parses large numeric components as numbers", () => {
++    const v = parse("12.34.56");
++    expect(v.major).toBe(12);
++    expect(v.minor).toBe(34);
++    expect(v.patch).toBe(56);
++  });
++
++  it.each([
++    "",
++    "1",
++    "1.2",
++    "1.2.3.4",
++    "v1.2.3",
++    "1.2.3-",
++    "1.2.3-_",
++    "alpha.beta.gamma",
++    " 1.2.3",
++    "1.2.3 ",
++    "-1.2.3",
++    "1.2.x",
++  ])("throws SemVerError for invalid input %j", (s) => {
++    expect(() => parse(s)).toThrow(SemVerError);
++    expect(() => parse(s)).toThrow(/invalid version/);
++  });
++
++  it("throws a SemVerError which is also an Error", () => {
++    let caught: unknown;
++    try {
++      parse("nope");
++    } catch (e) {
++      caught = e;
++    }
++    expect(caught).toBeInstanceOf(SemVerError);
++    expect(caught).toBeInstanceOf(Error);
++  });
++});
++
++describe("compare", () => {
++  it("returns 0 for equal versions", () => {
++    expect(compare("1.2.3", "1.2.3")).toBe(0);
++  });
++
++  it("orders by major, then minor, then patch", () => {
++    expect(compare("1.0.0", "2.0.0")).toBe(-1);
++    expect(compare("2.0.0", "1.9.9")).toBe(1);
++    expect(compare("1.2.0", "1.10.0")).toBe(-1);
++    expect(compare("1.1.0", "1.2.0")).toBe(-1);
++    expect(compare("1.1.5", "1.1.9")).toBe(-1);
++  });
++
++  it("is antisymmetric", () => {
++    const a = compare("1.2.3", "4.5.6");
++    expect(compare("4.5.6", "1.2.3")).toBe(-a);
++  });
++
++  it("treats a prerelease as lower precedence than the release", () => {
++    expect(compare("1.0.0-alpha", "1.0.0")).toBe(-1);
++    expect(compare("1.0.0", "1.0.0-alpha")).toBe(1);
++  });
++
++  it("orders prereleases by numeric identifier precedence", () => {
++    expect(compare("1.0.0-1", "1.0.0-2")).toBe(-1);
++    expect(compare("1.0.0-2", "1.0.0-10")).toBe(-1);
++  });
++
++  it("gives numeric identifiers lower precedence than alphanumeric ones", () => {
++    expect(compare("1.0.0-1", "1.0.0-alpha")).toBe(-1);
++  });
++
++  it("orders prerelease identifiers lexicographically when both are non-numeric", () => {
++    expect(compare("1.0.0-alpha", "1.0.0-beta")).toBe(-1);
++    expect(compare("1.0.0-alpha", "1.0.0-Alpha")).toBe(1);
++  });
++
++  it("follows the full semver ordering chain", () => {
++    const seq = [
++      "1.0.0-alpha",
++      "1.0.0-alpha.1",
++      "1.0.0-beta.2",
++      "1.0.0-beta.9",
++      "1.0.0-rc.1",
++      "1.0.0",
++    ];
++    for (let i = 0; i < seq.length; i++) {
++      expect(compare(seq[i], seq[i])).toBe(0);
++      for (let j = i + 1; j < seq.length; j++) {
++        expect(compare(seq[i], seq[j])).toBe(-1);
++        expect(compare(seq[j], seq[i])).toBe(1);
++      }
++    }
++  });
++
++  it("considers trailing identifiers of the same base", () => {
++    expect(compare("1.0.0-alpha", "1.0.0-alpha.1")).toBe(-1);
++    expect(compare("1.0.0-alpha.1", "1.0.0-alpha.beta")).toBe(-1);
++  });
++});
++
++describe("satisfiesCaret", () => {
++  it("^1.2.3 accepts >= 1.2.3 within the same major", () => {
++    expect(satisfiesCaret("1.2.3", "1.2.3")).toBe(true);
++    expect(satisfiesCaret("1.9.9", "1.2.3")).toBe(true);
++    expect(satisfiesCaret("1.5.0", "1.2.3")).toBe(true);
++  });
++
++  it("^1.2.3 rejects versions below base or above the major range", () => {
++    expect(satisfiesCaret("1.2.2", "1.2.3")).toBe(false);
++    expect(satisfiesCaret("0.9.9", "1.2.3")).toBe(false);
++    expect(satisfiesCaret("2.0.0", "1.2.3")).toBe(false);
++  });
++
++  it("^0.2.3 caps at 0.3.0 (minor-level caret)", () => {
++    expect(satisfiesCaret("0.2.3", "0.2.3")).toBe(true);
++    expect(satisfiesCaret("0.2.9", "0.2.3")).toBe(true);
++    expect(satisfiesCaret("0.3.0", "0.2.3")).toBe(false);
++    expect(satisfiesCaret("0.1.0", "0.2.3")).toBe(false);
++  });
++
++  it("^0.0.3 allows only the exact version (patch-level caret)", () => {
++    expect(satisfiesCaret("0.0.3", "0.0.3")).toBe(true);
++    expect(satisfiesCaret("0.0.4", "0.0.3")).toBe(false);
++    expect(satisfiesCaret("0.0.2", "0.0.3")).toBe(false);
++  });
++
++  it("does not let a prerelease below base satisfy the caret", () => {
++    expect(satisfiesCaret("1.2.3-alpha", "1.2.3")).toBe(false);
++    expect(satisfiesCaret("1.2.4-beta", "1.2.3")).toBe(false);
++  });
++
++  it("requires a prerelease to share the base's x.y.z", () => {
++    // Same x.y.z but still lower than the release -> fails the >= base check.
++    expect(satisfiesCaret("2.0.0-rc.1", "2.0.0")).toBe(false);
++  });
++});
++
++describe("bump", () => {
++  it("bumps major and resets lower parts", () => {
++    expect(bump("1.2.3", "major")).toBe("2.0.0");
++  });
++
++  it("bumps minor and resets patch", () => {
++    expect(bump("1.2.3", "minor")).toBe("1.3.0");
++  });
++
++  it("bumps patch", () => {
++    expect(bump("1.2.3", "patch")).toBe("1.2.4");
++  });
++
++  it("drops any prerelease and lower parts when bumping", () => {
++    expect(bump("9.8.7-alpha.1", "major")).toBe("10.0.0");
++    expect(bump("9.8.7-alpha.1", "minor")).toBe("9.9.0");
++    expect(bump("9.8.7-alpha.1", "patch")).toBe("9.8.8");
++  });
++
++  it("bumps from a zero base correctly", () => {
++    expect(bump("0.0.0", "minor")).toBe("0.1.0");
++    expect(bump("0.0.5", "patch")).toBe("0.0.6");
++  });
++});
++
++describe("maxVersion", () => {
++  it("returns null for an empty list", () => {
++    expect(maxVersion([])).toBeNull();
++  });
++
++  it("picks the highest version using numeric, not lexical, ordering", () => {
++    expect(maxVersion(["1.2.3", "1.5.0", "1.10.0"])).toBe("1.10.0");
++  });
++
++  it("handles a single element", () => {
++    expect(maxVersion(["4.5.6"])).toBe("4.5.6");
++  });
++
++  it("handles unsorted input", () => {
++    expect(maxVersion(["3.0.0", "1.0.0", "2.0.0"])).toBe("3.0.0");
++  });
++
++  it("treats a release as higher than its prereleases", () => {
++    expect(maxVersion(["1.0.0-rc.1", "1.0.0-alpha", "1.0.0"])).toBe("1.0.0");
++  });
++});

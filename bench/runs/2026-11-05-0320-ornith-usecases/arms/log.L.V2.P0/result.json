@@ -1,0 +1,27 @@
+{
+ "arm": "log.L.V2.P0",
+ "profile": "read",
+ "wall_s": 137.8,
+ "turns": 28,
+ "gen": 19939,
+ "reason": 15501,
+ "prompt_first": 3520,
+ "prompt_peak": 26936,
+ "drops": 0,
+ "rate": 145.4,
+ "peak_vram": 32529.0,
+ "peak_gtt": 129.0,
+ "score": 0.798,
+ "detail": {
+  "rows": 16,
+  "classes": 21,
+  "class_recall": 0.762,
+  "first_exact": 16,
+  "count_exact": 14,
+  "planted": 6,
+  "planted_total": 6,
+  "extra": 0,
+  "format_deviation": 16,
+  "score": 0.798
+ }
+}

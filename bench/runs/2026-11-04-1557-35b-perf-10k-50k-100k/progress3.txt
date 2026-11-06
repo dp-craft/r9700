@@ -1,0 +1,9 @@
+nospec-unfused boot_rc=0
+nospec-unfused 10000 probe_rc=0 rows=4
+nospec-unfused 50000 probe_rc=0 rows=8
+nospec-unfused 100000 probe_rc=0 rows=12
+dflash-unfused boot_rc=0
+dflash-unfused 10000 probe_rc=0 rows=4
+dflash-unfused 50000 probe_rc=0 rows=8
+dflash-unfused 100000 probe_rc=0 rows=12
+DONE

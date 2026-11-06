@@ -1,0 +1,20 @@
+Classify the findings in /tmp/claude-1001/-home-dev-work-dp-craft-amd/bf832afa-1002-41d9-a4b8-4b201a1bc43c/scratchpad/uc/runs/bugs.M.V1.P0.dp/findings.txt. Each one starts with a line "## <id>".
+Write /tmp/claude-1001/-home-dev-work-dp-craft-amd/bf832afa-1002-41d9-a4b8-4b201a1bc43c/scratchpad/uc/runs/bugs.M.V1.P0.dp/out/rows.txt with one line per finding, in this format:
+<id>|<kind>|<severity>|<paths>
+kind is one of: defect, gap, risk, note. severity is one of: blocking, high, med, low. paths is every file name or path the finding mentions, comma-separated, or none.
+
+HOW
+1. Read the whole file. If Read says it is too large, read it in chunks with offset and limit=400 until the end.
+2. Choose kind from what the text describes:
+   defect = something behaves wrongly now. gap = something needed is missing, such as a test, check or feature. risk = it works now but could fail later. note = information with nothing broken.
+3. Choose severity from the impact:
+   blocking = stops the work or a release. high = wrong results, lost data or a broken main path. med = a limited or workaround-able problem. low = cosmetic or minor.
+4. Decide from the finding's own text only. If unsure between two severities, take the lower.
+5. For paths, copy each token ending in .ts, .tsx, .mjs, .md, .json, .jsonl, .py, .sh, .yml or .yaml.
+
+RULES
+- Use only what the files say. No outside knowledge. Never guess a number, name or path: if you cannot find it, write none.
+- Copy numbers, names and paths exactly as printed.
+- Output files are plain text in exactly the format above: no markdown, no comments, no extra lines.
+- Think briefly. Do not draft the output in your reasoning; write it once with the Write tool.
+Then reply with only: DONE

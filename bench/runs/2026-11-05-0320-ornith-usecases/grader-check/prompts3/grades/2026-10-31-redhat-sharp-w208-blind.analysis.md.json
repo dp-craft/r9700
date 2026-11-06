@@ -1,0 +1,43 @@
+{
+  "notes": [
+    {
+      "report": "2026-10-31-redhat-sharp-w208-blind.analysis.md",
+      "label": "A",
+      "verdict": 3,
+      "config": 2,
+      "facts_decision_relevant": 5,
+      "facts_wrong_meaning": 0,
+      "incidents_total": 1,
+      "incidents_unsupported": 0,
+      "incidents_missed": 5,
+      "open": 2,
+      "critical_error": null
+    },
+    {
+      "report": "2026-10-31-redhat-sharp-w208-blind.analysis.md",
+      "label": "B",
+      "verdict": 2,
+      "config": 2,
+      "facts_decision_relevant": 5,
+      "facts_wrong_meaning": 0,
+      "incidents_total": 1,
+      "incidents_unsupported": 0,
+      "incidents_missed": 5,
+      "open": 0,
+      "critical_error": "Its VERDICT says n = 1 'rules out a loss', but line 201 says n = 1 cannot exclude that a second rep lands lower, so a reader would take the no-quality-loss claim as settled when the report's first recommended step is a second rep to test it."
+    },
+    {
+      "report": "2026-10-31-redhat-sharp-w208-blind.analysis.md",
+      "label": "C",
+      "verdict": 2,
+      "config": 1,
+      "facts_decision_relevant": 5,
+      "facts_wrong_meaning": 0,
+      "incidents_total": 1,
+      "incidents_unsupported": 0,
+      "incidents_missed": 5,
+      "open": 2,
+      "critical_error": null
+    }
+  ]
+}

@@ -1,0 +1,169 @@
+{
+ "arm": "docreorg.M.V3.P0.dp",
+ "profile": "data",
+ "wall_s": 169.9,
+ "turns": 12,
+ "gen": 17217,
+ "reason": 15372,
+ "prompt_first": 5386,
+ "prompt_peak": 37868,
+ "drops": 0,
+ "rate": 101.9,
+ "peak_vram": 29239.0,
+ "peak_gtt": 43.0,
+ "score": 1.0,
+ "detail": {
+  "score": 1.0,
+  "zero_loss": true,
+  "clean": true,
+  "src_lines": 337,
+  "out_lines": 337,
+  "out_files": 3,
+  "exact_lines": 337,
+  "recall": 1.0,
+  "precision": 1.0,
+  "lost_lines": 0,
+  "lost_table_rows": 0,
+  "altered_lines": 0,
+  "altered_with_number_change": 0,
+  "added_lines": 0,
+  "duplicated_lines": 0,
+  "numbers_missing": 0,
+  "numbers_invented": 0,
+  "fences_odd": [],
+  "placement": 1.0,
+  "sections": 20,
+  "sections_right": 20,
+  "sections_intact": 20,
+  "source_tokens": null,
+  "examples": {
+   "lost": [],
+   "altered": [],
+   "added": []
+  },
+  "section_detail": [
+   {
+    "heading": "## Conflicts & unknowns",
+    "file": "topic-c.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Summary",
+    "file": "topic-b.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Summary",
+    "file": "topic-c.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Actionable for this repo",
+    "file": "topic-b.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Key findings",
+    "file": "topic-b.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Summary",
+    "file": "topic-a.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Legend \u2014 knobs & labels in this run",
+    "file": "topic-a.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Conflicts & unknowns",
+    "file": "topic-b.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Key findings",
+    "file": "topic-c.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Methodology & caveats",
+    "file": "topic-a.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Detail",
+    "file": "topic-b.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Results (all MEASURED; memory columns mandatory)",
+    "file": "topic-a.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Actionable for this repo",
+    "file": "topic-c.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Detail",
+    "file": "topic-c.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Recommended config (frozen substrate \u2192 Campaign 2 input)",
+    "file": "topic-a.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Consequences & root causes (ultrathink)",
+    "file": "topic-a.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Sources",
+    "file": "topic-b.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## KV decision \u2014 q8_0 REJECTED (\u22645% rule, decisively)",
+    "file": "topic-a.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Sources",
+    "file": "topic-c.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## What moved the needle",
+    "file": "topic-a.md",
+    "right": true,
+    "intact": true
+   }
+  ],
+  "unknown_files": [],
+  "original_order_agreement": 0.879
+ }
+}

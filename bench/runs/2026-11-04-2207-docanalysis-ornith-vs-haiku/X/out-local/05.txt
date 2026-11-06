@@ -1,0 +1,12 @@
+DOC: 2026-10-31-redhat-sharp-w208-blind.analysis.md
+TOPIC: Blind-graded (four-way) W2-08 review quality on RedHat Qwen3.8-27B-MXFP4 delta 0 and plus sharp chat template, versus Q4_K_XL and heretic, measuring Opus findings found, precision and work.
+VERDICT: Swapping only the sharp terseness chat template on RedHat cuts step-A work by ~35-38% with no demonstrable quality loss (+2 Opus findings is within noise), so it is at least as good and clearly cheaper. With the template held equal, Q4_K_XL and RedHat are a tie on quality, meaning most of Q4_K_XL's earlier efficiency edge was the template, not the model.
+CONFIG: vLLM Sly 1.8.1 (vLLM 0.32.0) RedHat delta 0/plus sharp, llama.cpp b11448 Vulkan Q4_K_XL; RedHatAI/Qwen3.8-27B-MXFP4 (+syvai DFlash2 k=7), UD-Q4_K_XL GGUF, heretic MXFP4-GPTQ; DFlash2 k=7 delta 0, fp8 KV 262000, temp 1.0/top_p 0.95/top_k 20/pp 0
+PATHS: bench/runs/2026-10-31-redhat-sharp-w208-blind/, bench/runs/2026-10-31-redhat-sharp-w208-blind/pre-launch-provenance.txt, bench/runs/2026-10-31-redhat-sharp-w208-blind/rep1/redhat-d0-sharp/server.txt, bench/runs/2026-10-30-0947-dpf-brief-ab/, campaigns/2026-10-31-q4kxl-sharp-w208-blind/analysis.md, campaigns/2026-10-31-redhat-sharp-w208-blind/sharp-chat_template.jinja, campaigns/2026-10-31-redhat-sharp-w208-blind/run.sh
+FACT|184|-38% thinking (304k vs 489k)|sharp template cuts step-A work at equal quality
+FACT|68|+2 Opus findings, not significant|template gain below significance threshold; loss ruled out
+FACT|71|12 vs 11 (Q4_K_XL vs RedHat)|quality tie with the template held equal
+FACT|43|22 vs 20 weighted coverage|RedHat+sharp severity-weighted vs delta 0 baseline
+FACT|41|11/19 Opus findings (RedHat+sharp)|blind coverage vs delta 0's nine and Q4_K_XL's twelve
+INCIDENT|152|stale prompt fixture used for first pass; pass deleted and repeated with correct file
+OPEN: Does the sharp template's work cut and quality hold for a second RedHat + sharp rep, given n = 1, one grader, and an unmatched session shape?

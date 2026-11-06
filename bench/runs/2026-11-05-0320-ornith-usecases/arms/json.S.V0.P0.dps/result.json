@@ -1,0 +1,21 @@
+{
+ "arm": "json.S.V0.P0.dps",
+ "profile": "data",
+ "wall_s": 29.1,
+ "turns": 10,
+ "gen": 3669,
+ "reason": 1263,
+ "prompt_first": 4731,
+ "prompt_peak": 10288,
+ "drops": 0,
+ "rate": 130.2,
+ "peak_vram": 29239.0,
+ "peak_gtt": 43.0,
+ "score": 1.0,
+ "detail": {
+  "correct": 10,
+  "total": 10,
+  "wrong": [],
+  "score": 1.0
+ }
+}

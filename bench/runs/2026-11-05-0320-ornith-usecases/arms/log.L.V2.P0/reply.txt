@@ -1,0 +1,3 @@
+All counts match the report. No changes needed — every multi-occurrence class validates (2, 11, 2, 2, 4) and all single-occurrence classes were individually confirmed. The secondary validation grep surfaced nothing new.
+
+DONE

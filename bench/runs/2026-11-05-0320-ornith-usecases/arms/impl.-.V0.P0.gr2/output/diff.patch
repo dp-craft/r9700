@@ -1,0 +1,146 @@
+diff --git a/src/logfmt.ts b/src/logfmt.ts
+new file mode 100644
+index 0000000..5cd1090
+--- /dev/null
++++ b/src/logfmt.ts
+@@ -0,0 +1,140 @@
++/**
++ * logfmt: parse and format log lines of the form `key=value key2="q val" key3`.
++ */
++
++/** Error thrown for malformed input; `column` is the 0-based index of the bad character. */
++export class LogfmtError extends Error {
++  readonly column: number;
++
++  constructor(message: string, column: number) {
++    super(message);
++    this.name = "LogfmtError";
++    this.column = column;
++  }
++}
++
++type FieldValue = string | true;
++
++const SPACE = ' ';
++const TAB = '\t';
++const QUOTE = '"';
++const BACKSLASH = '\\';
++
++/**
++ * Parse a single logfmt line into an object of key/value pairs.
++ * Insertion order is preserved and the last value wins on duplicate keys.
++ */
++export function parse(line: string): Record<string, FieldValue> {
++  const map = new Map<string, FieldValue>();
++  const n = line.length;
++  let i = 0;
++
++  while (i < n) {
++    // Skip one or more separators between pairs.
++    while (i < n && (line[i] === SPACE || line[i] === TAB)) i++;
++    if (i >= n) break;
++
++    const keyStart = i;
++    while (i < n && line[i] !== '=' && line[i] !== SPACE && line[i] !== TAB) {
++      i++;
++    }
++    const key = line.slice(keyStart, i);
++
++    if (key.length === 0) {
++      // A pair starting with '=' has an empty key; column points at the '='.
++      throw new LogfmtError('empty key', i);
++    }
++
++    if (i < n && line[i] === '=') {
++      i++; // consume '='
++      if (i < n && line[i] === QUOTE) {
++        const quotePos = i;
++        i++; // consume opening quote
++        let value = '';
++        while (i < n && line[i] !== QUOTE) {
++          const c = line[i];
++          if (c === BACKSLASH) {
++            const nx = line[i + 1];
++            if (nx === QUOTE) {
++              value += QUOTE;
++              i += 2;
++            } else if (nx === BACKSLASH) {
++              value += BACKSLASH;
++              i += 2;
++            } else if (nx === 'n') {
++              value += '\n';
++              i += 2;
++            } else if (nx !== undefined) {
++              throw new LogfmtError(`unknown escape: \\${nx}`, i);
++            } else {
++              // Backslash with no closing quote before end-of-line.
++              break;
++            }
++          } else {
++            value += c!; // line[i] is defined because the loop guard guarantees i < n
++            i++;
++          }
++        }
++        if (i >= n || line[i] !== QUOTE) {
++          throw new LogfmtError('unterminated quoted value', quotePos);
++        }
++        i++; // consume closing quote
++        const after = line[i];
++        if (after !== undefined && after !== SPACE && after !== TAB) {
++          throw new LogfmtError('unexpected character after quoted value', i);
++        }
++        map.set(key, value);
++      } else {
++        // Bare value: runs until the next space or tab; may contain '='.
++        let value = '';
++        while (i < n) {
++          const c = line[i];
++          if (c === SPACE || c === TAB || c === undefined) break;
++          value += c;
++          i++;
++        }
++        map.set(key, value);
++      }
++    } else {
++      // No '=': the value is boolean true.
++      map.set(key, true);
++    }
++  }
++
++  return Object.fromEntries(map);
++}
++
++/**
++ * Format a record of key/value pairs as a logfmt line.
++ * Throws LogfmtError (column -1) for an empty or otherwise illegal key.
++ */
++export function format(fields: Record<string, FieldValue>): string {
++  const parts: string[] = [];
++
++  for (const key of Object.keys(fields)) {
++    if (key.length === 0 || key.indexOf(SPACE) >= 0 || key.indexOf(TAB) >= 0 ||
++        key.indexOf('=') >= 0 || key.indexOf(QUOTE) >= 0) {
++      throw new LogfmtError('invalid key', -1);
++    }
++
++    const value = fields[key];
++    if (value === undefined) continue; // defensive: Object.keys always yields present keys
++
++    if (value === true) {
++      parts.push(key);
++      continue;
++    }
++
++    // A value is quoted when empty or containing space, tab, ", \, =, or newline.
++    if (value.length === 0 || /[ \t"=\n\\]/.test(value)) {
++      let encoded = value.replace(/\\/g, '\\\\');
++      encoded = encoded.replace(/"/g, '\\"');
++      encoded = encoded.replace(/\n/g, '\\n');
++      parts.push(QUOTE + encoded + QUOTE);
++    } else {
++      parts.push(value);
++    }
++  }
++
++  return parts.join(SPACE);
++}

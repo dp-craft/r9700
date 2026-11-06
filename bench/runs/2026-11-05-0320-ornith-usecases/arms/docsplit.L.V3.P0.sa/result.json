@@ -1,0 +1,172 @@
+{
+ "arm": "docsplit.L.V3.P0.sa",
+ "profile": "data",
+ "wall_s": 48.4,
+ "turns": 9,
+ "gen": 8277,
+ "reason": 5720,
+ "prompt_first": 4823,
+ "prompt_peak": 13814,
+ "drops": 0,
+ "rate": 174.1,
+ "peak_vram": 32521.0,
+ "peak_gtt": 87.0,
+ "score": 1.0,
+ "detail": {
+  "score": 1.0,
+  "zero_loss": true,
+  "clean": true,
+  "src_lines": 803,
+  "out_lines": 803,
+  "out_files": 20,
+  "exact_lines": 803,
+  "recall": 1.0,
+  "precision": 1.0,
+  "lost_lines": 0,
+  "lost_table_rows": 0,
+  "altered_lines": 0,
+  "altered_with_number_change": 0,
+  "added_lines": 0,
+  "duplicated_lines": 0,
+  "numbers_missing": 0,
+  "numbers_invented": 0,
+  "fences_odd": [],
+  "placement": 1.0,
+  "sections": 20,
+  "sections_right": 20,
+  "sections_intact": 20,
+  "source_tokens": 54529,
+  "examples": {
+   "lost": [],
+   "altered": [],
+   "added": []
+  },
+  "section_detail": [
+   {
+    "heading": "(preamble)",
+    "file": "00-intro.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Summary \u2014 the five things that survived",
+    "file": "01-summary-the-five-things.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## What is stable vs what is not",
+    "file": "02-what-is-stable-vs-what-is-not.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Legend \u2014 every knob and label, defined once",
+    "file": "03-legend-every-knob-and-label.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Results \u2014 all 14 cells",
+    "file": "04-results-all-14-cells.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Uncertainty \u2014 the design is underpowered, and that is a h",
+    "file": "05-uncertainty-underpowered.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Axis 1 \u2014 the 27B quant ladder (and the KV confound, final",
+    "file": "06-axis-1-27b-quant-ladder.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Axis 2 \u2014 the reasoning budget: a no-op above ~4k, and a r",
+    "file": "07-axis-2-reasoning-budget.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Axis 3 \u2014 the 35B-A3B sampling sweep: the vendor was right",
+    "file": "08-axis-3-35b-a3b-sweep.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Combinations across the three axes \u2014 what interacts and w",
+    "file": "09-combinations-across-the-three-axes.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## The strict-code wall \u2014 cleanliness, not logic",
+    "file": "10-strict-code-wall.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Capability vs the reference ladder \u2014 and what \"tier\" actu",
+    "file": "11-capability-vs-reference-ladder.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Fluctuation and rerun value \u2014 the mean hides both",
+    "file": "12-fluctuation-and-rerun-value.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Health \u2014 GTT spill in all 14 cells, and the Q5 f16 questi",
+    "file": "13-health-gtt-spill.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Recommended config",
+    "file": "14-recommended-config.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Further tests \u2014 prioritised",
+    "file": "15-further-tests-prioritised.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Methodology and caveats",
+    "file": "16-methodology-and-caveats.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Sources",
+    "file": "17-sources.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Appendix A \u2014 every rep of every cell",
+    "file": "18-appendix-a-every-rep.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Appendix B \u2014 all generated charts",
+    "file": "19-appendix-b-generated-charts.md",
+    "right": true,
+    "intact": true
+   }
+  ],
+  "one_file_per_section": true,
+  "files_in_doc_order": true,
+  "readme_links": 20,
+  "readme_links_bad": 0,
+  "readme_missing": 0
+ }
+}

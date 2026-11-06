@@ -1,0 +1,27 @@
+{
+ "2026-07-14-hardest-tasks-27b-vs-35b.analysis.md": {
+  "Q": "base",
+  "R": "sa",
+  "P": "dp"
+ },
+ "2026-10-30-0900-vllm-redhat-mxfp4-depth-transposed.md": {
+  "Q": "base",
+  "P": "sa",
+  "R": "dp"
+ },
+ "2026-10-31-redhat-sharp-w208-blind.analysis.md": {
+  "R": "base",
+  "P": "sa",
+  "Q": "dp"
+ },
+ "2026-09-15-stew675-buildcmp.analysis.md": {
+  "P": "base",
+  "R": "sa",
+  "Q": "dp"
+ },
+ "M": {
+  "C": "base",
+  "B": "sa",
+  "A": "dp"
+ }
+}

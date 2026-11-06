@@ -1,0 +1,12 @@
+DOC: 2026-09-15-stew675-buildcmp.analysis.md
+TOPIC: Compared the stew675 rdna-boosts patch against stock llama.cpp builds on an AMD R9700, benchmarking patched b16 vs stock Vulkan and ROCm across PG prompt/generation shapes.
+VERDICT: The patch only benefits ROCm, lifting prefill throughput +14-20% while decode stays flat; on Vulkan it is flat to worse (a -12% prefill drop at 32768). ROCm thus leads Vulkan in prefill with the patch but remains slower in decode.
+CONFIG: Qwen3.8-27B-UD-Q4_K_XL; llama.cpp stock b10969/b10909 and stew675-patched b16 on Vulkan (Mesa 26.2.2) and ROCm 7.8.0; -ub 2048 -b 4096 -fa on, q8_0 KV, NGL=99, REPS=1, --no-warmup
+PATHS: bench/runs/2026-09-15-1029-buildcmp-stew675/
+FACT|62|+20.1%|Prefill Δ vs stock on ROCm at (32768,2048)
+FACT|59|+14.4%|Prefill Δ vs stock on ROCm at (512,256)
+FACT|62|-11.9%|Prefill Δ vs stock on Vulkan at (32768,2048)
+FACT|97|+20%|stew675-ROCm prefill beats stock-Vulkan at 32768
+FACT|50|+0.4%|Decode Δ vs stock on ROCm at (32768), within noise
+INCIDENT|66|Disk-full errors killed the sampler mid-attempt; the attempt was rerun
+OPEN: Why does the stew675 patch make Vulkan prefill slower (-12%) at 32768, and is it a shader/driver dispatch issue?

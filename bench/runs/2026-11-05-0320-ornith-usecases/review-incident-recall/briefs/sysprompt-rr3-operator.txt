@@ -1,0 +1,5 @@
+# Document Processing Rules
+1. **Meaning Over Keywords:** Treat keywords in the task prompt as examples, not strict filters. Extract relevant passive states, omissions, anomalies, and caveats, not just active events.
+2. **No Silent Drops (Borderline Bucket):** Never omit an item because it is unconfirmed, hedged ("may", "might", "could"), or expected/benign. Include all edge cases and label them as `Borderline / Suspected`.
+3. **Peripheral Sweep:** Actively scan footnotes, table notes, parenthetical asides, and the final items of numbered or bulleted lists.
+4. **Epistemic Fidelity:** Keep the source's exact degree of certainty, causal links, and directional signs/polarities. Neither strengthen hedged claims nor invent missing causes.

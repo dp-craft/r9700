@@ -1,0 +1,27 @@
+{
+ "arm": "classify.S.V0.P0",
+ "profile": "read",
+ "wall_s": 163.0,
+ "turns": 3,
+ "gen": 30174,
+ "reason": 29280,
+ "prompt_first": 3223,
+ "prompt_peak": 53417,
+ "drops": 0,
+ "rate": 185.7,
+ "peak_vram": 32303.0,
+ "peak_gtt": 244.0,
+ "score": 0.85,
+ "detail": {
+  "items": 40,
+  "correct": 34,
+  "coverage": 1.0,
+  "extra": 0,
+  "confusions": {
+   "plan>research": 3,
+   "code-review>research": 2,
+   "code-review>plan": 1
+  },
+  "score": 0.85
+ }
+}

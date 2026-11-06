@@ -1,0 +1,3 @@
+All steps complete: the document was split into 20 files (intro + 19 sections), `manifest.json` covers all lines with no gaps, `doc_apply.py` reported 0 unassigned lines, and `doc_check.py` printed PASS before I wrote `README.md`.
+
+DONE

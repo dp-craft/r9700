@@ -1,0 +1,15 @@
+SEQUENCE_WATCHDOG_ABORT|64|1|ERROR|Sequence aborted: decode watchdog expired
+CLIENT_STREAM_CLOSED|118|1|ERROR|Client stream closed while writing chunk
+MAMBA_DTYPE_CONFIG_MISMATCH|152|1|WARNING|Qwen3.5 model specifies mamba_ssm_dtype='float32', but --mamba-ssm-cache-dtype='bfloat16' passed; using user-specified value
+MAX_NUM_SCHEDULED_TOKENS_SUBOPTIMAL|155|2|WARNING|max_num_scheduled_tokens set from speculative decoding settings, may lead to suboptimal performance
+MEMORY_FAULT_QUEUE_EVICTED|173|1|ERROR|Memory Fault: GPU node page not present, queue evicted
+GELU_UNSTABLE_FALLBACK|183|1|WARNING|[ROCm] native GELU with tanh approximation unstable, falling back to GELU(approximate='none')
+SPARSE_ATTN_INDEXER_NOT_PRESENT|193|1|WARNING|Op 'sparse_attn_indexer' not present in model; enabling has no effect
+WEIGHT_DTYPE_MISMATCH|223|11|WARNING|Attempted to load weight with dtype torch.float16 into parameter with dtype torch.bfloat16
+SEGFAULT|227|1|ERROR|Segmentation fault (core dumped) in worker
+MULTIMODAL_EMBEDDINGS_UNSUPPORTED|237|1|WARNING|Draft model DFlash2Qwen3ForCausalLM does not support external multimodal embeddings
+KV_POOL_EXHAUSTED|282|1|ERROR|KV pool exhausted at 31204 MiB
+PADDING_LAYERS_WASTE_KV_CACHE|321|2|WARNING|Add padding layers, may waste at most 60.00% KV cache memory
+SPECULATIVE_DECODING_NO_KV_GROUP|322|2|WARNING|Speculative decoding (method=dflash) enabled but no KV cache group could be identified as the draft model's
+ENGINE_CORE_DIED|337|1|CRITICAL|Engine core died unexpectedly, restarting
+SAMPLING_PARAMS_OVERRIDE|415|1|WARNING|Default vLLM sampling parameters overridden by model's generation_config.json

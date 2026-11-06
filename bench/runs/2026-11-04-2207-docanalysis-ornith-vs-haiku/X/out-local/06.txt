@@ -1,0 +1,12 @@
+DOC: 2026-10-23-0023-vllm-gpu-fault-solved-hip-kernarg.md
+TOPIC: Diagnosed and solved a random HSA_STATUS_ERROR_MEMORY_FAULT on the R9700 in Sly radiance vLLM MXFP4 plus DFlash, caused by a corrupted kernel-argument pointer placed in device memory; fixed with HIP_FORCE_DEV_KERNARG=0.
+VERDICT: A random HSA_STATUS_ERROR_MEMORY_FAULT that hit most boots of Sly radiance MXFP4 + DFlash traces to a corrupted kernel-argument pointer (bit 44 cleared, faults at 0x6 while buffers live at 0x7), and it disappears with HIP_FORCE_DEV_KERNARG=0 keeping kernel args in host memory — 3/3 boots times 4 turns clean at full speed. The fix is now the vLLM default; which path flips bit 44 (PCIe link, BAR write-combining, or firmware) stays unestablished.
+CONFIG: Sly radiance vLLM 1.5.1/1.6.0 (vLLM 0.31.0), ROCm 10.1; amd/Qwen3.8-27B-Quark-AWQ-MXFP4 + syvai Qwen3.8-27B-DFlash2 k=7; --max-model-len 180000, fp8 KV, R4D_HYBRID, gpu-util 0.90; env HIP_FORCE_DEV_KERNARG=0 (fix); kernel 7.0.0-34/38
+PATHS: none
+FACT|21|~12/~21 boots (~8% luck)|without-fix fault rate before the fix
+FACT|19|bit 44 cleared (faults 0x6, buffers 0x7)|root cause = corrupted kernel-argument pointer
+FACT|21|3/3 boots x 4 turns, 0 faults|HIP_FORCE_DEV_KERNARG=0 removes the fault
+FACT|22|111-150 tok/s decode|fixed-config decode median above the >=50 target
+FACT|89|~3% (4 clean boots)|fix-luck chance rules out a random cause
+INCIDENT|64|loop-cooler pump seized; card hit 98 C, attempt scrapped and redone after replacement
+OPEN: What specifically flips bit 44 of the kernel-argument pointer — the PCIe link, BAR write-combining, or firmware?

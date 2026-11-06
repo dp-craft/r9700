@@ -1,0 +1,12 @@
+DOC: 2026-10-31-redhat-sharp-w208-blind.analysis.md
+TOPIC: blind-reviewed the W2-08 agentic review task to measure how swapping only the chat template to "sharp" (a terseness directive) changes RedHat Qwen3.8-27B-MXFP4 delta-0 quality and work, versus a delta-0 baseline, Q4_K_XL and heretic.
+VERDICT: Swapping only the sharp terseness template cuts step-A work by about a third (thinking minus 38%, tool calls minus 35%) with no measurable quality loss, but the plus-2 Opus findings gain is below the pre-registered significance threshold so it is not demonstrated. With the template held equal, Q4_K_XL and RedHat are a tie at n=1.
+CONFIG: RedHatAI/Qwen3.8-27B-MXFP4 with DFlash2 k=7, delta 0, on Sly 1.8.1 vLLM plus the sharp v22.5.0 + TERSENESS chat template; baselines same model delta-0, unsloth UD-Q4_K_XL GGUF (llama.cpp Vulkan b11448 MTP), heretic GPTQ; fp8 KV 262000, one fresh call per config
+PATHS: bench/runs/2026-10-31-redhat-sharp-w208-blind/, campaigns/2026-10-31-redhat-sharp-w208-blind/, bench/runs/2026-10-30-0947-dpf-brief-ab/, campaigns/2026-10-31-q4kxl-sharp-w208-blind/analysis.md
+FACT|41|11/19 findings|RedHat + sharp blind Opus-finding coverage (vs 9 for delta-0, 12 for Q4_K_XL)
+FACT|184|-38%|thinking chars in step A with the sharp template (304k vs 489k)
+FACT|185|-35%|tool calls in step A with the sharp template (101 vs 156)
+FACT|71|12 versus 11 findings|Q4_K_XL versus RedHat with the template held equal, a tie
+FACT|51|~144.4k tokens|server-generated tokens in step A with the sharp template
+INCIDENT|152|stale prompt fixture from a previous build used for first pass; pass deleted and repeated with correct file
+OPEN: Does the plus-2 Opus-finding gain survive a second blind rep, given n=1 per config and about plus-or-minus one finding grader noise?

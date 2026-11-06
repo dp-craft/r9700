@@ -1,0 +1,43 @@
+{
+  "notes": [
+    {
+      "report": "2026-09-15-stew675-buildcmp.analysis.md",
+      "label": "A",
+      "verdict": 1,
+      "config": 2,
+      "facts_decision_relevant": 2,
+      "facts_wrong_meaning": 2,
+      "incidents_total": 1,
+      "incidents_unsupported": 0,
+      "incidents_missed": 1,
+      "open": 2,
+      "critical_error": "FACT|85 gives the ROCm gain as 'monotonic with prompt size', but the report's own table reads 14.4, 14.9, 14.3 and 20.1 percent (flat near 14-15 percent from 512 to 8192 with one step at 32768), so a reader would expect the benefit to keep growing at longer contexts, and the VERDICT's 'flat to slightly worse' Vulkan result understates the -12 percent at 32768."
+    },
+    {
+      "report": "2026-09-15-stew675-buildcmp.analysis.md",
+      "label": "B",
+      "verdict": 2,
+      "config": 1,
+      "facts_decision_relevant": 4,
+      "facts_wrong_meaning": 0,
+      "incidents_total": 1,
+      "incidents_unsupported": 0,
+      "incidents_missed": 1,
+      "open": 2,
+      "critical_error": null
+    },
+    {
+      "report": "2026-09-15-stew675-buildcmp.analysis.md",
+      "label": "C",
+      "verdict": 2,
+      "config": 2,
+      "facts_decision_relevant": 3,
+      "facts_wrong_meaning": 1,
+      "incidents_total": 1,
+      "incidents_unsupported": 0,
+      "incidents_missed": 1,
+      "open": 2,
+      "critical_error": null
+    }
+  ]
+}

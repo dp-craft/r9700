@@ -1,0 +1,9 @@
+GOAL: Benchmark the hardest coding tasks at ~128k tokens on an AMD Radeon AI PRO R9700 to test whether weight-quantisation level, thinking-budget size, and sampling settings change quality for two Qwen models (a 27B dense and a 35B-A3B MoE), giving 210 graded replies.
+RESULT: The quant ladder is a bounded null (not resolvable above ~12 pts) but sampling gives one actionable answer — use Qwen's coding recipe (temp 0.6 / pp 0) whole on the 35B-A3B, whose best point scores 77.5 TS%; only the whole "thinking general" preset beats it significantly (-15.4). Reasoning budget above ~4k is a no-op on the dense 27B (+0.3 pts, ns, +60 s) yet helps the MoE significantly (-4.3), and the strict-code wall is cleanliness (lint 0.36), not logic; presence_penalty costs ~30-40% of decode via a fixed host tax, not MTP rejection.
+KEY: 77.5 TS% | best sampling point — Qwen coding recipe (temp 0.6 / pp 0) on the 35B-A3B at budget rb16384
+KEY: +0.3 pts, t=0.37 ns | reasoning-budget paired delta for the dense 27B Q4_K_M going rb4096 -> rb16384 (+60 s per reply)
+KEY: -4.3 pts, t=-5.45 SIGNIFICANT | 35B-A3B paired delta rb4096 minus rb16384 — the MoE benefits from a bigger thinking budget (~+4 pts at rb16384)
+KEY: 80.9 TS% | highest quant cell (27B Q6_K, q8_0 KV); the whole ladder is a non-resolvable null over an ~11-pt spread
+KEY: 0.36 lint | mean strict-cleanliness objective across all 14 local cells; logic scores are higher (tests 0.84, reuse 0.99)
+CAVEAT: The design is underpowered — only 5 tasks give a resolution of ~>=12 pts, so almost nothing can be resolved and only 2 of 13 printed comparisons are significant; more reps do not help, it needs ~15-60 tasks.
+OPEN: Why does every cell spill 1551-2841 MiB of GTT (host RAM), including one with ~5.4 GiB VRAM headroom? It is unattributed and blocks unattended use on the no-swap host; listed as an OPEN test to bisect but never resolved.

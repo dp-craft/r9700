@@ -1,0 +1,3 @@
+All 59 tests pass. The test file `tests/semver.test.ts` (vitest) covers `parse`, `compare`, `satisfiesCaret`, `bump`, and `maxVersion`, including edge cases like invalid inputs, prerelease precedence, caret boundaries, and the quirk that a single-element `maxVersion` list isn't validated.
+
+DONE

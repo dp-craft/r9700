@@ -1,0 +1,14 @@
+DOC: 2026-10-31-redhat-sharp-w208-blind.analysis.md
+TOPIC: Blind quality review (W2-08 task, 19 Opus findings) of RedHat Qwen3.8-27B-MXFP4 at delta 0 with only the chat template swapped to the sharp terseness template, graded in a four-way blind grade against Q4_K_XL, RedHat delta 0 and heretic.
+VERDICT: The sharp template cut step-A work by about a third (thinking, tool calls, generated tokens) with no measurable quality loss, though the +2 findings gain is within noise at n=1. With the template held equal, Q4_K_XL and RedHat tie on quality, so the earlier Q4_K_XL efficiency edge was mostly the template.
+CONFIG: RedHatAI/Qwen3.8-27B-MXFP4 with DFlash2 k=7 drafter, vLLM 0.32.0 (Sly 1.8.1 image, digest sha256:9b918ac0), delta 0, fp8 KV, window 262000, --max-num-seqs 1, util 0.93, power cap 210 W; sharp chat template (v22.5.0 plus TERSENESS directive); Claude Code 2.1.312; one Opus grader, BLIND_SEED 7311, n=1 per config.
+PATHS: bench/runs/2026-10-31-redhat-sharp-w208-blind/, bench/runs/2026-10-31-redhat-sharp-w208-blind/pre-launch-provenance.txt, bench/runs/2026-10-31-redhat-sharp-w208-blind/rep1/redhat-d0-sharp/server.txt, bench/runs/2026-10-30-0947-dpf-brief-ab/, campaigns/2026-10-31-redhat-sharp-w208-blind/sharp-chat_template.jinja, campaigns/2026-10-31-redhat-sharp-w208-blind/run.sh, campaigns/2026-10-31-q4kxl-sharp-w208-blind/analysis.md
+FACT|41|11/19|RedHat + sharp Opus findings found, blind 4-way grade
+FACT|41|9/19|RedHat delta 0 Opus findings found, same grader
+FACT|49|304k|RedHat + sharp thinking chars in step A, versus 489k for delta 0
+FACT|51|~144.4k|RedHat + sharp generated tokens in step A, versus ~200k for delta 0
+FACT|52|32,057 MiB|RedHat + sharp peak VRAM at ctx 262000
+INCIDENT|152|Stale prompt fixture used for first pass; pass deleted and repeated with correct file.
+INCIDENT|282|Step-A session SIGINTed by stop_when at the Opus read boundary (status stopped, rc 137).
+INCIDENT|293|Baseline probe dirs collected after the boundary and may hold post-boundary files; not checked.
+OPEN: Is the +2 findings gain from the sharp template real or noise at n=1? A second rep is recommended (line 235). (line 201 says n=1 cannot exclude noise)

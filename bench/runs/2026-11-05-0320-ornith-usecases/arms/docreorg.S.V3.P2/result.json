@@ -1,0 +1,157 @@
+{
+ "arm": "docreorg.S.V3.P2",
+ "profile": "data",
+ "wall_s": 98.4,
+ "turns": 11,
+ "gen": 15655,
+ "reason": 13729,
+ "prompt_first": 5086,
+ "prompt_peak": 32487,
+ "drops": 0,
+ "rate": 160.5,
+ "peak_vram": 32515.0,
+ "peak_gtt": 131.0,
+ "score": 1.0,
+ "detail": {
+  "score": 1.0,
+  "zero_loss": true,
+  "clean": true,
+  "src_lines": 255,
+  "out_lines": 255,
+  "out_files": 3,
+  "exact_lines": 255,
+  "recall": 1.0,
+  "precision": 1.0,
+  "lost_lines": 0,
+  "lost_table_rows": 0,
+  "altered_lines": 0,
+  "altered_with_number_change": 0,
+  "added_lines": 0,
+  "duplicated_lines": 0,
+  "numbers_missing": 0,
+  "numbers_invented": 0,
+  "fences_odd": [],
+  "placement": 1.0,
+  "sections": 18,
+  "sections_right": 18,
+  "sections_intact": 18,
+  "source_tokens": 8540,
+  "examples": {
+   "lost": [],
+   "altered": [],
+   "added": []
+  },
+  "section_detail": [
+   {
+    "heading": "## 1. Linux Kernel Version Landscape",
+    "file": "topic-b.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Conflicts & unknowns",
+    "file": "topic-c.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Summary",
+    "file": "topic-a.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Summary",
+    "file": "topic-c.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Recommended sampling (Qwen3.6) \u2014 CLAIMED (Qwen docs/cards",
+    "file": "topic-a.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## 4. Ubuntu 26.04 LTS \"Resolute Raccoon\" Analysis",
+    "file": "topic-b.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Key findings",
+    "file": "topic-c.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## 3. CachyOS Analysis",
+    "file": "topic-b.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## 7. Verdict",
+    "file": "topic-b.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Actionable for this repo",
+    "file": "topic-c.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Detail",
+    "file": "topic-c.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## llama.cpp b9950 serving knobs \u2014 MEASURED (exist in our bu",
+    "file": "topic-a.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## 6. Comparison Summary",
+    "file": "topic-b.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## 5. ROCm System Requirements \u2014 Detailed",
+    "file": "topic-b.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## 2. RDNA4 / gfx1201 Kernel Support",
+    "file": "topic-b.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Harder agentic eval \u2014 the benchmark landscape (CLAIMED)",
+    "file": "topic-a.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Sources",
+    "file": "topic-c.md",
+    "right": true,
+    "intact": true
+   },
+   {
+    "heading": "## Sources",
+    "file": "topic-a.md",
+    "right": true,
+    "intact": true
+   }
+  ],
+  "unknown_files": [],
+  "original_order_agreement": 0.978
+ }
+}

@@ -1,0 +1,8 @@
+Q1|2026-07-14-hardest-tasks-27b-vs-35b.analysis.md
+Q1|2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md
+Q1|2026-10-23-0023-vllm-gpu-fault-solved-hip-kernarg.md
+Q2|none
+CONFLICT|2026-10-30-0900-vllm-redhat-mxfp4-depth-transposed.md:39|2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md:47|Same RedHat Qwen3.8-27B DFlash2 config at 10k: 122.27 decode tok/s in 02, 86.9 in 03.
+CONFLICT|2026-07-14-hardest-tasks-27b-vs-35b.analysis.md:466|2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md:138|01 says never set presence_penalty above 0 for coding; 03 recommends presence-penalty 1.5.
+CONFLICT|2026-07-14-hardest-tasks-27b-vs-35b.analysis.md:439|2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md:118|01 recommends Qwen3.6-35B-A3B on Vulkan MTP as default; 03 recommends Ornith 1.5 on Radiance, with coding quality untested.
+RECOMMEND|For a local coding agent, the reports support Qwen3.6-35B-A3B Q4_K_M on llama.cpp Vulkan with MTP, at Qwen's coding sampling recipe and reasoning budget 4096, as the best-graded local coding configuration in these reports (TypeScript tasks, n=15 per cell). Ornith 1.5 on native Radiance is the fastest 35B measured, but its coding quality is untested and it is speed-only evidence. RedHat Qwen3.8-27B on vLLM Sly with DFlash2 at delta 0 and the sharp template is the reviewed alternative, with quality on one blind review at n=1.

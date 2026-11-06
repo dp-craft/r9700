@@ -1,0 +1,25 @@
+{
+ "arm": "testgen.-.V0.P0.gr",
+ "profile": "code",
+ "wall_s": 136.9,
+ "turns": 15,
+ "gen": 14662,
+ "reason": 10059,
+ "prompt_first": 3996,
+ "prompt_peak": 22998,
+ "drops": 0,
+ "rate": 107.8,
+ "peak_vram": 29513.0,
+ "peak_gtt": 59.0,
+ "score": 0.0,
+ "detail": {
+  "tests": 63,
+  "pass_on_original": false,
+  "src_unchanged": true,
+  "tsc_errors": 1,
+  "mutants_killed": 0,
+  "mutants": 16,
+  "survived": [],
+  "score": 0.0
+ }
+}

@@ -1,0 +1,28 @@
+{
+ "arm": "classify.S.V0.P0.dps",
+ "profile": "read",
+ "wall_s": 118.0,
+ "turns": 3,
+ "gen": 11341,
+ "reason": 10851,
+ "prompt_first": 3630,
+ "prompt_peak": 34944,
+ "drops": 0,
+ "rate": 96.5,
+ "peak_vram": 29239.0,
+ "peak_gtt": 43.0,
+ "score": 0.775,
+ "detail": {
+  "items": 40,
+  "correct": 31,
+  "coverage": 1.0,
+  "extra": 0,
+  "confusions": {
+   "skill>agent-definition": 3,
+   "plan>research": 3,
+   "code-review>research": 2,
+   "code-review>plan": 1
+  },
+  "score": 0.775
+ }
+}

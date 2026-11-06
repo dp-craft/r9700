@@ -1,0 +1,6 @@
+Q1|2026-07-14-hardest-tasks-27b-vs-35b.analysis.md
+Q1|2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md
+Q1|2026-10-23-0023-vllm-gpu-fault-solved-hip-kernarg.md
+Q2|none
+CONFLICT|none
+RECOMMEND|Use amd/Qwen3.8-27B-MXFP4 (RedHat) on the Sly radiance vLLM engine with DFlash2 drafting and fp8 KV cache — it is the most-repeated stack here, runs both MTP and DFlash without patches on the R9700, and HIP_FORCE_DEV_KERNARG=0 removes its recurring memory faults. A sharp terseness template trims thinking and tool-call work about 35% with no measured quality loss, which suits agentic use.

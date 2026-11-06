@@ -32,6 +32,50 @@ an issue lives in `settings.md`; a fix that was version/env-specific lives in `h
 - **report:** `campaigns/2026-10-22-vllm-sly-mxfp4-depth/analysis.md` (setup lesson);
   `docs/vllm/workflows.md` (Roadmap, A2).
 
+## Native Radiance default headroom starves the desktop — **live**
+- **symptom:** with the default `--gpu-headroom-mib` of 96, Radiance claims nearly the whole card: 232.52 MiB free at
+  load (log), 32,511 of 32,624 MiB at peak, 113 MiB free (MEASURED). Chrome crashed at 17:32 and GNOME Shell at 17:33,
+  and the desktop session restarted. The container was not OOM-killed.
+- **status:** **live**. The VRAM cause is INFERRED from timing; the crash reports and `/var/log/kern.log` were not
+  readable from the account that ran the test.
+- **version seen:** `stilldeadcode/radiance:1.16.0`, Ornith 1.5 w4a8, 2026-11-04.
+- **workaround (recommended only, not required):** the operator's choice is to keep the launcher at the default and close
+  Chrome if VRAM gets tight. `EXTRA_ARGS="--gpu-headroom-mib 2048" ./ornith_rad_mtp.sh start` is the optional
+  alternative. **Unmeasured.** It should shrink only the KV cache, from 11.37 GiB to about 9.5 GiB (INFERRED). The launcher
+  has no VRAM watchdog.
+- **not affected:** the 27B on `sly-redhat` is stable as configured and needs no extra headroom (operator report; 1,427 MiB
+  min free at ctx 262000, MEASURED).
+- **report:** `docs/analysis/2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md`.
+
+## MXFP4 MoE `EMULATION` slow path — **live on `sly-amd`**
+- **symptom:** `amd/Qwen3.5-35B-A3B-MXFP4` decodes at about 16 tok/s with DFlash K=7, at any depth. Prefill is healthy.
+- **status:** **live**. The profile default is still `EMULATION`; `--moe-backend triton_unfused` is a working
+  override. No AMD or vLLM source recommends it, but a community checkpoint card does for gfx12 (CLAIMED). The log says it
+  runs BF16 activations instead of the checkpoint's quantized ones (quality effect unmeasured).
+- **version seen:** sly 1.9.1 (vLLM 0.32.0), 2026-11-04.
+- **workaround:** `bench/engine-bench/vllm/archive/qwen35_sly_dflash.sh` passes `--moe-backend triton_unfused`: 110.2 / 92.9 / 67.3 tok/s at 10k / 50k / 100k
+  against 16.6 / 15.4 / 15.8 (MEASURED, DFlash K=7).
+- **trap:** arms without DFlash logged `Capturing CUDA graphs (FULL): 0it`, so they ran with no full-model graph.
+  Their decode (`nospec` 6.2, `nospec-unfused` 8.7, `mtp-k4` 16.8 tok/s at 10k) does not measure backend cost. The cause
+  is open.
+- **report:** `docs/analysis/2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md`;
+  `docs/research/2026-11-04-1702-qwen35-35b-a3b-radiance-config-alternatives.md`.
+
+## MTP does not load on the Ornith 1.5 MXFP4 checkpoint — **live on Sly**
+- **symptom:** `Capicua25x/Ornith-1.5-35B-A3B-MXFP4-Quark-RDNA4` with `method: mtp` fails at load. Its experts are MXFP4 and
+  its MTP layer's experts are unquantized BF16, and no usable backend serves both (MEASURED):
+  `triton_unfused` → `not supported for unquantized MoE`; `triton` → `kernel does not support MoEActivation.SILU activation`;
+  `aiter` → `AITER_TRITON_MXFP4_BF16 ... does not support current device rocm`.
+- **status:** **live**. Only `EMULATION` is left, not tested because it ran the Qwen 35B at about 16 tok/s. A failed load leaves
+  the container up, so the launcher waits until `WAIT` runs out.
+- **version seen:** sly 1.9.1 (vLLM 0.32.0), 2026-11-04.
+- **workaround:** use `ornith_rad_mtp.sh` for MTP. DFlash K=3 does load on Sly (`bench/engine-bench/vllm/archive/ornith_sly_dflash.sh`; its checkpoints were deleted, fetch commands in its header). Native Radiance is not affected: its
+  image has no vLLM, and it measured MTP K=3 at 219.8 tok/s.
+- **not the same as:** vLLM's comment `TRITON_UNFUSED has bug with MTP support` (`oracle/mxfp4.py`:403, :442), whose symptom nobody
+  documents ([#49446](https://github.com/vllm-project/vllm/issues/49446), open).
+- **report:** `docs/analysis/2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md`; raw boots in
+  `bench/runs/2026-11-04-1802-ornith15-sly-dflash/ornith-mtp-k3-*FAILED*`.
+
 ## `.rad`-vs-HF-checkpoint loading distinction — **live (design, not a bug)**
 - **symptom:** not a fault — a loading distinction. **sly loads HF checkpoints only; radiance loads
   `.rad` files.** A `.rad` checkpoint (e.g. the Swift-1.5 heretic "production" checkpoint) loads

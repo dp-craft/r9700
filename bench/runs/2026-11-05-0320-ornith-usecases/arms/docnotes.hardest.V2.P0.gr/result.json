@@ -1,0 +1,64 @@
+{
+ "arm": "docnotes.hardest.V2.P0.gr",
+ "profile": "read",
+ "wall_s": 205.8,
+ "turns": 7,
+ "gen": 18845,
+ "reason": 17090,
+ "prompt_first": 3290,
+ "prompt_peak": 83246,
+ "drops": 0,
+ "rate": 91.9,
+ "peak_vram": 30728.0,
+ "peak_gtt": 73.0,
+ "score": 1.0,
+ "detail": {
+  "score": 1.0,
+  "fact_exact": 5,
+  "fact_wrongline": 0,
+  "fact_fabricated": 0,
+  "facts": 5,
+  "needles_hit": 3,
+  "needles": 3,
+  "paths_found": 2,
+  "paths_want": 2,
+  "paths_invented": 0,
+  "incidents": 3,
+  "doc": {
+   "n": 1,
+   "doc": "2026-07-14-hardest-tasks-27b-vs-35b.analysis.md",
+   "parse_ok": true,
+   "paths_tp": 2,
+   "paths_truncated": 0,
+   "paths_invented": 0,
+   "paths_fn": 0,
+   "dirs_want": 1,
+   "dirs_hit": 1,
+   "invented_list": [],
+   "fact_exact": 5,
+   "fact_wrongline": 0,
+   "fact_fabricated": 0,
+   "fact_malformed": 0,
+   "incidents": 3,
+   "needle_hit": 3,
+   "needles": 3,
+   "needle_detail": [
+    {
+     "id": "thermal1",
+     "line": 185,
+     "hit": true
+    },
+    {
+     "id": "debug",
+     "line": 493,
+     "hit": true
+    },
+    {
+     "id": "ups",
+     "line": 796,
+     "hit": true
+    }
+   ]
+  }
+ }
+}

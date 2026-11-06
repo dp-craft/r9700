@@ -1,0 +1,13 @@
+DOC: 2026-09-15-stew675-buildcmp.analysis.md
+TOPIC: Stock versus stew675 rdna-boosts-patched llama.cpp builds on Vulkan and ROCm, measuring prefill and decode with llama-bench PG shapes on Qwen3.8-27B UD-Q4_K_XL.
+VERDICT: The stew675 patch gives +14-20% prefill on ROCm with decode flat, and no benefit on Vulkan. ROCm plus the patch wins only for prefill-heavy work, since decode stays about 5-9% slower on ROCm than Vulkan.
+CONFIG: Qwen3.8-27B-UD-Q4_K_XL (unsloth); llama.cpp b10969 391fac1 (stock Vulkan, SDK 1.4.357.1), b10909 a2878d3 (stock ROCm), b16 67492c9 and b16 b862fc3 (stew675-patched, fork 790cf51aa); llama-bench -ub 2048 -b 4096 -fa on -ctk q8_0 -ctv q8_0 -ngl 99 --no-warmup; REPS=1; ROCm 7.8.0, Mesa 26.2.2, kernel 7.0.0-31.
+PATHS: bench/runs/2026-09-15-1029-buildcmp-stew675/
+FACT|18|+14-20% prefill on ROCm from the stew675 patch
+FACT|62|994.1 prefill tok/s, stew675-rocm at 32768 prompt
+FACT|47|21.7 decode tok/s, stock-vulkan at (512,256)
+FACT|62|-11.9% Vulkan prefill with stew675 at 32768 prompt
+FACT|24|REPS=1 single repetition, so no noise band on deltas
+INCIDENT|66|Disk-full errors killed the sampler midway; that attempt was repeated
+INCIDENT|64|First shape (128,64) cold-start artifact; excluded from all delta interpretation
+OPEN: Cause of the Vulkan prefill regression at 32768 (-12%) is unexplained (line 95).

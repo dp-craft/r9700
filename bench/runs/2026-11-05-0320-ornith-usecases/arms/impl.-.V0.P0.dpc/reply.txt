@@ -1,0 +1,9 @@
+Done. Implemented `src/logfmt.ts` exporting `parse`, `format`, and the `LogfmtError` class, matching every clause of SPEC.md:
+
+- **LogfmtError** — extends `Error`, public numeric `column` set by `(message, column)`.
+- **parse** — single-pass char scanner; bare keys→`true`, `key=`→`""`, bare values until space/tab (may contain `=`), quoted values with `\" \\ \n` decoded, last-wins dedup and first-seen insertion order via a `Map` (then materialized with `Object.fromEntries`). All four error cases report the correct 0-based column (`=`, opening `"`, backslash, trailing char).
+- **format** — one-space join in key order; `true`→bare key; quotes empty/values containing space/tab/`"`/`\`/`=`/newline with proper escaping; invalid keys (empty or containing space/tab/`=`/`"`) throw at column -1.
+
+Note: the environment's permission mode blocks all script/build execution (`node`, `npx tsc`, `vitest`), so I verified correctness by hand-tracing each spec clause and edge case rather than running a test suite.
+
+DONE

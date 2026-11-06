@@ -14,9 +14,18 @@
 # i.e. its own parent -- but waits up to FLOOR_WAIT s for the same FREE_MIB_FLOOR and refuses below it
 # (iron rule 14). The boot watchdog runs until /health answers. Stop it with `docker rm -f <name>`.
 #
+# Existing-instance handling (all modes): a STOPPED container named vllm-$PORT (crashed boot, host
+# restart) is a dead leftover -- auto-removed, and its bench/.servers/$PORT.container state file with it
+# (a state file without a container is stale and removed the same way), so a new `start` never needs a
+# manual `stop` first. A LIVE instance on the port (our container or a foreign listener) is stopped only
+# after you answer the takeover prompt in `start` mode (TTY only; non-TTY refuses with a message). `run`
+# mode keeps the hard refusal -- a supervisor must never block on a prompt or kill a process it does not
+# own. Unit tests (no GPU): tests/serve_vllm_test.sh.
+#
 # A profile is profiles/<engine>/<model>.env (model layer) + profiles/<engine>/_engine.env (image,
 # shared env + args). Knobs (env, beat the profile): IMAGE MODEL_DIR MAXLEN MAXSEQS GPU_UTIL KV_DTYPE
 #   FREE_MIB_FLOOR PORT(8000) WAIT(1200s; first boot compiles ~10 min) EXTRA_ARGS VLLM_ROOT HF_CACHE
+#   EXCLUSIVE(bench/lib/gpu_exclusive.sh; override in unit tests to stub the free-VRAM floor)
 #   WATCHDOG_MIB(256: kill the container if free VRAM drops below this while booting; 0 = off)
 #   CONTAINER_NAME(vllm-$PORT) FLOOR_WAIT(90, run mode only)
 #   AUTO_PULL(1: `start`/`run` docker-pull a missing IMAGE once, then go on; 0 = refuse instead). Under
@@ -89,6 +98,7 @@ case "${1:-start}" in
       for _ in $(seq 30); do ss -ltn | grep -q ":$PORT " || break; sleep 1; done
       echo "stopped $NAME (log kept: $LOGFILE)"
     else
+      rm -f "$CFILE"   # stale state without a container (crash/restart): stop must leave no state behind
       echo "no container $NAME"
     fi
     exit 0;;
@@ -231,11 +241,68 @@ if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
   echo "image not present: $IMAGE -- pulling once (can take minutes)" >&2
   docker pull "$IMAGE" >&2 || { echo "docker pull $IMAGE failed -- check the tag, registry login and disk (df -h /)" >&2; exit 1; }
 fi
-if [ "${1:-start}" = run ] && docker inspect "$NAME" >/dev/null 2>&1 && ! running; then
-  docker rm -f "$NAME" >/dev/null 2>&1   # a dead leftover of a crashed supervised boot; a LIVE one still refuses below
+# Existing-instance handling. A STOPPED container is a dead leftover (crashed boot, host restart): auto-removed
+# here, so a new `start` never requires a manual `stop` (its state file goes with it; a state file without a
+# container is stale and removed the same way). A LIVE instance on our port (our container or a foreign
+# listener) is stopped only after an explicit takeover answer in `start` mode -- TTY only; non-TTY refuses.
+# `run` mode (supervised) keeps the hard refusal: a supervisor must never block on a prompt or kill a
+# process it does not own.
+container_exists() { docker inspect "$NAME" >/dev/null 2>&1; }
+port_held() { ss -ltn | grep -q ":$PORT "; }
+running_model() {   # what the server on $PORT actually serves (empty if not healthy or no OpenAI endpoint)
+  curl -sf -m 3 "http://127.0.0.1:$PORT/v1/models" \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin)["data"][0]["id"])' 2>/dev/null
+}
+if container_exists && ! running; then
+  echo "$NAME is a dead leftover (crashed boot or host restart) -- removing it + its state file" >&2
+  docker rm -f "$NAME" >/dev/null 2>&1; rm -f "$CFILE"
 fi
-if docker inspect "$NAME" >/dev/null 2>&1; then echo "$NAME exists — PORT=$PORT $0 stop first" >&2; exit 1; fi
-if ss -ltn | grep -q ":$PORT "; then echo "port $PORT held by a foreign process: ss -ltnp | grep :$PORT" >&2; exit 1; fi
+if [ -f "$CFILE" ] && ! container_exists; then rm -f "$CFILE"; fi   # stale state without a container
+
+if [ "${1:-start}" = start ]; then
+  if container_exists || port_held; then
+    model=$(running_model) || true
+    [ -n "$model" ] || model=$(grep -oP '(?<=--served-model-name )\S+' "$CMDFILE" 2>/dev/null | head -1) || true
+    if container_exists; then
+      echo "vllm instance $NAME is running on port $PORT with model '${model:-unknown}'"
+    else
+      echo "a foreign process is holding port $PORT (model: '${model:-unknown}')"
+    fi
+    if [ ! -t 0 ]; then
+      echo "stop it first (PORT=$PORT $0 stop), or rerun from a TTY to confirm the takeover" >&2
+      exit 1
+    fi
+    read -r -p "Stop it and start '$SERVED_NAME' instead? [y/N] " ans || ans=""
+    case "${ans:-N}" in
+      y|Y|yes|YES) ;;
+      *) echo "aborted -- the running instance was not touched" >&2; exit 1;;
+    esac
+    if container_exists; then docker rm -f "$NAME" >/dev/null 2>&1; rm -f "$CFILE"; fi
+    for _ in $(seq 10); do port_held || break; sleep 1; done   # docker releases the port after the rm
+    if port_held; then   # still owned: a foreign container publishing the port, or an orphaned process
+      foreign=$(docker ps -q --filter "publish=$PORT")
+      if [ -n "$foreign" ]; then
+        echo "port $PORT is published by foreign container(s): $(docker ps --format '{{.Names}}' $foreign | tr '\n' ' ')" >&2
+        echo "removing them per your answer" >&2
+        docker rm -f $foreign >/dev/null 2>&1
+      else
+        pid=$(ss -ltnp 2>/dev/null | grep ":$PORT " | grep -oP 'pid=\K[0-9]+' | head -1) || true
+        if [ -n "$pid" ] && [ "$pid" != "$$" ]; then
+          echo "port $PORT held by pid $pid ($(ps -o comm= -p "$pid" 2>/dev/null)) -- killing it per your answer" >&2
+          kill "$pid" 2>/dev/null || true
+        else
+          echo "cannot identify the holder of port $PORT -- aborting (ss -ltnp | grep :$PORT)" >&2
+          exit 1
+        fi
+      fi
+      for _ in $(seq 30); do port_held || break; sleep 1; done
+      port_held && { echo "port $PORT still held -- aborting (ss -ltnp | grep :$PORT)" >&2; exit 1; }
+    fi
+  fi
+else   # run mode: no prompts, no foreign kills -- the supervisor owns the lifecycle
+  container_exists && { echo "$NAME exists — PORT=$PORT $0 stop first" >&2; exit 1; }
+  port_held && { echo "port $PORT held by a foreign process: ss -ltnp | grep :$PORT" >&2; exit 1; }
+fi
 if [ "${1:-start}" = run ]; then
   # The supervisor has just stopped the previous model; give its VRAM time to drain, then refuse.
   for _ in $(seq "${FLOOR_WAIT:-90}"); do [ "$(vram_free_mib)" -ge "$FREE_MIB_FLOOR" ] && break; sleep 1; done
@@ -245,7 +312,7 @@ if [ "${1:-start}" = run ]; then
     amd-smi process -g 0 >&2 2>/dev/null || true; exit 1
   fi
 else
-  "$REPO/bench/lib/gpu_exclusive.sh" "$FREE_MIB_FLOOR"   # iron rule 14: free-VRAM floor or refuse
+  "${EXCLUSIVE:-$REPO/bench/lib/gpu_exclusive.sh}" "$FREE_MIB_FLOOR"   # iron rule 14: free-VRAM floor or refuse (EXCLUSIVE = unit-test stub)
 fi
 for m in "${CACHE_MOUNTS[@]}"; do mkdir -p "$CACHE_DIR/${m%%:*}"; done   # profile-driven, dev-owned
 

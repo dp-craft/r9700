@@ -1,0 +1,28 @@
+{
+ "arm": "testgen.-.V0.P0.dpc",
+ "profile": "code",
+ "wall_s": 64.7,
+ "turns": 15,
+ "gen": 7199,
+ "reason": 3570,
+ "prompt_first": 4883,
+ "prompt_peak": 17575,
+ "drops": 0,
+ "rate": 117.0,
+ "peak_vram": 29685.0,
+ "peak_gtt": 67.0,
+ "score": 0.875,
+ "detail": {
+  "tests": 33,
+  "pass_on_original": true,
+  "src_unchanged": true,
+  "tsc_errors": 0,
+  "mutants_killed": 14,
+  "mutants": 16,
+  "survived": [
+   "if (bn) return 1;",
+   "Math.sign(Number(a) - Number(b))"
+  ],
+  "score": 0.875
+ }
+}
