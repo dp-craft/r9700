@@ -1,0 +1,166 @@
+{
+ "score": 0.9091,
+ "zero_loss": true,
+ "clean": true,
+ "src_lines": 695,
+ "out_lines": 695,
+ "out_files": 3,
+ "exact_lines": 695,
+ "recall": 1.0,
+ "precision": 1.0,
+ "lost_lines": 0,
+ "lost_table_rows": 0,
+ "altered_lines": 0,
+ "altered_with_number_change": 0,
+ "added_lines": 0,
+ "duplicated_lines": 0,
+ "numbers_missing": 0,
+ "numbers_invented": 0,
+ "fences_odd": [],
+ "placement": 0.9091,
+ "sections": 22,
+ "sections_right": 20,
+ "sections_intact": 22,
+ "source_tokens": null,
+ "examples": {
+  "lost": [],
+  "altered": [],
+  "added": []
+ },
+ "section_detail": [
+  {
+   "heading": "## Consequences & root causes",
+   "file": "topic-c.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Legend",
+   "file": "topic-b.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## 7. Reproducing <a name=\"reproducing\"></a>",
+   "file": "topic-a.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Summary",
+   "file": "topic-c.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Consequences & root causes",
+   "file": "topic-b.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## 1. TL;DR — the optimum",
+   "file": "topic-a.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## 2. What moved the needle (deltas)",
+   "file": "topic-a.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Recommended next step",
+   "file": "topic-b.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Legend",
+   "file": "topic-c.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Results per Opus finding",
+   "file": "topic-b.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Summary",
+   "file": "topic-b.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## What differs between Q4_K_XL and RedHat δ 0",
+   "file": "topic-c.md",
+   "right": false,
+   "intact": true
+  },
+  {
+   "heading": "## 3. Sweeps in detail",
+   "file": "topic-a.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Levers — quality and speed, ranked (best first)",
+   "file": "topic-c.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Results — per-step thinking, exploration, compaction (MEA",
+   "file": "topic-c.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Review quality — finding-level Opus coverage (all arms, s",
+   "file": "topic-b.md",
+   "right": false,
+   "intact": true
+  },
+  {
+   "heading": "## 6. Status — all planned cases complete",
+   "file": "topic-a.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Methodology & caveats",
+   "file": "topic-b.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## 4. Exact optimum configurations (per runtime)",
+   "file": "topic-a.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## KV cache: how far is 8-bit \"stable\"? (summary of the rese",
+   "file": "topic-c.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## Methodology & caveats",
+   "file": "topic-c.md",
+   "right": true,
+   "intact": true
+  },
+  {
+   "heading": "## 5. Cross-runtime picture",
+   "file": "topic-a.md",
+   "right": true,
+   "intact": true
+  }
+ ],
+ "unknown_files": [],
+ "original_order_agreement": 0.8
+}

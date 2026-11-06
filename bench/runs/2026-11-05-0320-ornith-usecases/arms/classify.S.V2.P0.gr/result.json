@@ -1,0 +1,28 @@
+{
+ "arm": "classify.S.V2.P0.gr",
+ "profile": "read",
+ "wall_s": 302.3,
+ "turns": 9,
+ "gen": 28734,
+ "reason": 26768,
+ "prompt_first": 3256,
+ "prompt_peak": 51613,
+ "drops": 0,
+ "rate": 95.2,
+ "peak_vram": 29628.0,
+ "peak_gtt": 75.0,
+ "score": 0.9,
+ "detail": {
+  "items": 40,
+  "correct": 36,
+  "coverage": 1.0,
+  "extra": 0,
+  "confusions": {
+   "code-review>plan": 1,
+   "research>benchmark-report": 1,
+   "plan>research": 1,
+   "skill>agent-definition": 1
+  },
+  "score": 0.9
+ }
+}

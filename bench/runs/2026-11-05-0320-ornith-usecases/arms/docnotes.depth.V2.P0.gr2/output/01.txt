@@ -1,0 +1,15 @@
+DOC: 2026-10-30-0900-vllm-redhat-mxfp4-depth-transposed.md
+TOPIC: RedHat Qwen3.8-27B-MXFP4 speculative decoding (baseline, own MTP head k=4, DFlash2 drafter k=7) on Sly radiance 1.8.1 and 1.9.1 versus vllm-radiance 0.9.3 at depths 10k/50k/100k plus a Cactus delta-0 run.
+VERDICT: DFlash2 decodes fastest at every depth but its acceptance falls with length while the checkpoint's own MTP head stays well above baseline; Sly 1.9.1 changes decode only within rep noise (prefill 2-6 % faster at 50k/100k), Cactus delta-0 buys speed through acceptance alone, and upstream radiance 0.9.3 is far slower.
+CONFIG: RedHatAI/Qwen3.8-27B-MXFP4 mxfp4; Sly radiance 1.8.1 / 1.9.1 and vllm-radiance 0.9.3 engines; own MTP head k=4 and DFlash2 drafter k=7; Cactus delta 0.5 + fade/cap (1.9.1) versus delta 0; ctx 110000/262000; max_tokens 256; fp8 KV; 2 reps.
+PATHS: bench/runs/2026-10-30-sly191-d0-power-state.log, bench/runs/2026-10-30-vllm-redhat-sly-depth/, bench/runs/2026-10-30-vllm-redhat-sly-mtp-depth/, bench/runs/2026-10-30-vllm-redhat-sly-dflash-depth/, bench/runs/2026-10-30-vllm-heretic-sly-depth/, bench/runs/2026-10-30-vllm-redhat-sly191-depth/, bench/runs/2026-10-30-vllm-redhat-sly191-mtp-depth/, bench/runs/2026-10-30-vllm-redhat-sly191-dflash-depth/, bench/runs/2026-10-30-vllm-redhat-sly191-d0-mtp-depth/, bench/runs/2026-10-30-vllm-redhat-sly191-d0-dflash-depth/, bench/runs/2026-10-30-vllm-redhat-radiance-depth/, bench/runs/2026-10-30-sly191-depth-reruns.log, campaigns/2026-10-30-vllm-redhat-sly191-d0-dflash-depth/analysis.md, bench/runs/2026-10-30-vllm-redhat-sly-depth/failures.txt, campaigns/2026-10-30-vllm-redhat-sly-mtp-depth/run.sh, campaigns/2026-10-30-vllm-heretic-sly-depth/run.sh, campaigns/2026-10-30-vllm-redhat-sly191-depth/run.sh, campaigns/2026-10-30-vllm-redhat-sly191-d0-dflash-depth/run.sh, campaigns/2026-10-30-vllm-redhat-sly191-d0-mtp-depth/run.sh, campaigns/2026-10-30-vllm-redhat-radiance-depth/run.sh
+FACT|39|122.27 tok/s|DFlash2 decode p50 at 10k on Sly 1.8.1 (fastest)
+FACT|17|6.78|DFlash2-to-no-spec decode ratio at 10k (INFERRED speedup)
+FACT|19|0.5494|DFlash2 spec acceptance rate at 10k, falls with depth
+FACT|39|4.93 tok/s|radiance 0.9.3 no-spec decode p50 at 10k (much slower)
+FACT|16|18.03/18.23/18.87 tok/s|no-spec decode p50 on Sly 1.8.1 at 10k/50k/100k
+INCIDENT|305|Watchdog killed container in boot (VRAM nearly full); rerun with higher floor
+INCIDENT|307|MTP and DFlash probes hit served-name 404; runs quarantined, not graded
+INCIDENT|166|System update restarted container mid-pass; that pass rerun from scratch
+INCIDENT|312|Watchdog killed MTP container in boot (VRAM nearly full); rerun passed
+OPEN: What is the true GTT memory footprint, since none of these runs logged a pre-boot baseline to compare against?

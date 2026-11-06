@@ -1,0 +1,24 @@
+{
+ "arm": "summary.M.V1.P0.gr",
+ "profile": "read",
+ "wall_s": 109.4,
+ "turns": 7,
+ "gen": 9777,
+ "reason": 8396,
+ "prompt_first": 3106,
+ "prompt_peak": 35083,
+ "drops": 0,
+ "rate": 89.9,
+ "peak_vram": 29518.0,
+ "peak_gtt": 69.0,
+ "score": 1.0,
+ "detail": {
+  "format_ok": true,
+  "keys": 5,
+  "numbers": 65,
+  "numbers_absent": 0,
+  "absent": [],
+  "chars": 2371,
+  "score": 1.0
+ }
+}

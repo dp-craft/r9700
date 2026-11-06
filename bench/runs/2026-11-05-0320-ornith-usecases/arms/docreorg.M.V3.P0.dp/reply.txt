@@ -1,0 +1,3 @@
+PASS — 337/337 nonblank lines match exactly across the 3 target files, nothing lost or duplicated. The output contains only the three files named in TOPICS.txt; no README was written since none is needed and the task specified writing only those target files.
+
+DONE

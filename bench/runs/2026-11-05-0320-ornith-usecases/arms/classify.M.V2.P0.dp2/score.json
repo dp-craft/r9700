@@ -1,0 +1,1 @@
+{"items": 160, "correct": 146, "coverage": 1.0, "extra": 0, "confusions": {"code-review>research": 5, "plan>research": 3, "code-review>plan": 2, "task-list>feature-spec": 1, "plan>feature-spec": 1, "research>plan": 1, "research>benchmark-report": 1}, "score": 0.912}

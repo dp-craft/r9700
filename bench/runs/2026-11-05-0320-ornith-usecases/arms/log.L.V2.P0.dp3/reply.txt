@@ -1,0 +1,3 @@
+Counts validated — mlp.down_proj=5, self_attn.o_proj=5, all others confirmed. The report matches every occurrence count.
+
+DONE

@@ -1,0 +1,3 @@
+Validation complete. Count greps for each distinctive phrase matched the reported counts (max_num_scheduled_tokens=2, padding layers=2, no KV cache group=2; mamba dtype/GELU/sparse_attn_indexer/multimodal/sampling/jit-kernels/errors=cross-checked each=1; 11 distinct weight warnings sum to 11). The case-insensitive failure scan (`abort|fatal|died|timeout|exhausted|evicted|core dumped`) confirmed every such line is already represented (line 446's "abort" is a benign route listing, correctly excluded). No changes needed.
+
+DONE

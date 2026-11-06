@@ -1,0 +1,5 @@
+Classify the documents in /tmp/claude-1001/-home-dev-work-dp-craft-amd/bf832afa-1002-41d9-a4b8-4b201a1bc43c/scratchpad/uc/runs/classify.S.V0.P0.dps/items.txt. Each one starts with "=== ITEM <nnn> ===" and shows the start of a document.
+Write /tmp/claude-1001/-home-dev-work-dp-craft-amd/bf832afa-1002-41d9-a4b8-4b201a1bc43c/scratchpad/uc/runs/classify.S.V0.P0.dps/out/labels.txt with one line per item, in this format:
+<nnn>|<label>
+label is one of: benchmark-report, research, feature-spec, task-list, code-review, skill, agent-definition, plan.
+Then reply with only: DONE

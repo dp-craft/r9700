@@ -1,0 +1,24 @@
+{
+ "arm": "impl.-.V0.P0.dpw2",
+ "profile": "code",
+ "wall_s": 242.6,
+ "turns": 54,
+ "gen": 24597,
+ "reason": 14740,
+ "prompt_first": 4799,
+ "prompt_peak": 39214,
+ "drops": 0,
+ "rate": 105.1,
+ "peak_vram": 29567.0,
+ "peak_gtt": 59.0,
+ "score": 0.912,
+ "detail": {
+  "hidden_pass": 31,
+  "hidden_total": 34,
+  "hung": [],
+  "own_tests": 1,
+  "own_pass": 1,
+  "tsc_errors": 0,
+  "score": 0.912
+ }
+}

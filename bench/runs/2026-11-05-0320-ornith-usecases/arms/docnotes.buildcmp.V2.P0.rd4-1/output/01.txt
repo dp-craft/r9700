@@ -1,0 +1,12 @@
+DOC: 2026-09-15-stew675-buildcmp.analysis.md
+TOPIC: Compared stock versus stew675-patched llama.cpp builds (Vulkan and ROCm) on an AMD R9700 gfx1201 with llama-bench PG request shapes across five prompt sizes.
+VERDICT: The stew675 rdna-boosts patch yields a +14-20% prefill throughput gain only on ROCm (largest at 32768) while leaving Vulkan prefill flat and slightly worse, with decode unchanged on both backends. The stew675 build on ROCm is now the fastest prefill config measured, yet decode still stays -5 to -9% slower on ROCm than Vulkan.
+CONFIG: Qwen3.8-27B-UD-Q4_K_XL; llama.cpp builds (Vulkan b10969/b16, ROCm b10909/b16); -ub 2048, -b 4096, -fa on, CTK/CTV q8_0 KV, NGL=99, REPS=1, --no-warmup
+PATHS: bench/runs/2026-09-15-1029-buildcmp-stew675/
+FACT|18|+14-20%|prefill throughput gain on ROCm versus stock builds
+FACT|62|+20.1%|stew675-ROCm prefill gain versus stock at 32768 prompt shape
+FACT|62|-11.9%|Vulkan prefill change versus stock at 32768 shape (regression)
+FACT|22|-5 to -9%|decode slower on ROCm versus Vulkan (memory bandwidth tax)
+FACT|93|±1.5%|decode deltas stay within noise band on both backends
+INCIDENT|66|Disk-full errors killed sampler; that attempt was re-run
+OPEN: Why is the -12% Vulkan prefill regression at 32768 unexplained, and does the Vulkan build share ROCm's kernel selection logic?

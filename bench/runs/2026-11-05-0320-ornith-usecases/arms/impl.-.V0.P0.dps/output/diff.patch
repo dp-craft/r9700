@@ -1,0 +1,125 @@
+diff --git a/src/logfmt.ts b/src/logfmt.ts
+new file mode 100644
+index 0000000..eef7dea
+--- /dev/null
++++ b/src/logfmt.ts
+@@ -0,0 +1,119 @@
++export class LogfmtError extends Error {
++  column: number;
++
++  constructor(message: string, column: number) {
++    super(message);
++    this.column = column;
++    Object.setPrototypeOf(this, LogfmtError.prototype);
++  }
++}
++
++const isSep = (ch: string | undefined): boolean => ch === " " || ch === "\t";
++
++function isValidKey(key: string): boolean {
++  return (
++    key !== "" &&
++    !key.includes(" ") &&
++    !key.includes("\t") &&
++    !key.includes("=") &&
++    !key.includes('"')
++  );
++}
++
++export function parse(line: string): Record<string, string | true> {
++  const result: Record<string, string | true> = {};
++  const n = line.length;
++  let i = 0;
++
++  while (i < n) {
++    // Skip one or more separators between pairs.
++    while (i < n && isSep(line[i])) i++;
++    if (i >= n) break;
++
++    // Read the key up to '=' or a separator.
++    const keyStart = i;
++    while (i < n && line[i] !== "=" && !isSep(line[i])) i++;
++    const key = line.slice(keyStart, i);
++
++    if (i < n && line[i] === "=") {
++      // Empty key: the offending character is the '=' itself.
++      if (key === "") throw new LogfmtError("empty key", keyStart);
++
++      i++; // consume '='
++      let value: string;
++
++      if (i < n && line[i] === '"') {
++        const quoteStart = i;
++        i++; // consume opening '"'
++        let text = "";
++        while (i < n && line[i] !== '"') {
++          const ch = line[i];
++          if (ch === "\\") {
++            if (i + 1 >= n) throw new LogfmtError("unknown escape", i);
++            const next = line[i + 1];
++            if (next === '"') text += '"';
++            else if (next === "\\") text += "\\";
++            else if (next === "n") text += "\n";
++            else throw new LogfmtError("unknown escape", i);
++            i += 2;
++          } else {
++            text += ch;
++            i++;
++          }
++        }
++        if (i >= n) throw new LogfmtError("unterminated quote", quoteStart);
++        i++; // consume closing '"'
++
++        const after = line[i];
++        if (i < n && !isSep(after)) {
++          throw new LogfmtError("unexpected char after quote", i);
++        }
++
++        value = text;
++      } else {
++        const valStart = i;
++        while (i < n && !isSep(line[i])) i++;
++        value = line.slice(valStart, i);
++      }
++
++      result[key] = value;
++    } else {
++      if (key === "") throw new LogfmtError("empty key", keyStart);
++      result[key] = true;
++    }
++  }
++
++  return result;
++}
++
++export function format(fields: Record<string, string | true>): string {
++  const parts: string[] = [];
++
++  for (const key in fields) {
++    if (!isValidKey(key)) throw new LogfmtError("invalid key", -1);
++    const value = fields[key];
++
++    if (value === true) {
++      parts.push(key);
++      continue;
++    }
++
++    // Quote when empty or containing a space, tab, quote, backslash, '=' or newline.
++    const needsQuote =
++      value === "" || /[ \t"\\=\n]/.test(value);
++    if (needsQuote) {
++      let escaped = "";
++      for (const ch of value) {
++        if (ch === "\\") escaped += "\\\\";
++        else if (ch === '"') escaped += '\\"';
++        else if (ch === "\n") escaped += "\\n";
++        else escaped += ch;
++      }
++      parts.push(`${key}="${escaped}"`);
++    } else {
++      parts.push(`${key}=${value}`);
++    }
++  }
++
++  return parts.join(" ");
++}

@@ -1,0 +1,15 @@
+SEQUENCE_ABORTED|64|1|ERROR|Sequence aborted: decode watchdog expired after 600 s
+CLIENT_STREAM_CLOSED|118|1|ERROR|Client stream closed while writing chunk
+DTYPE_MISMATCH_CONFIG|152|1|WARNING|mamba_ssm_dtype='float32' vs --mamba-ssm-cache-dtype='bfloat16'; using config value
+SUBOPTIMAL_SCHED_TOKENS|155|2|WARNING|max_num_scheduled_tokens set to 4096 for speculative decoding, may cause suboptimal performance
+GELU_UNSTABLE|183|1|WARNING|[ROCm] PyTorch native GELU tanh approximation unstable, falling back to approximate='none'
+OP_ABSENT_IN_MODEL|193|1|WARNING|Op 'sparse_attn_indexer' not present in model
+WEIGHT_DTYPE_MISMATCH|223|11|WARNING|Attempted to load weight with dtype float16 into bfloat16 parameter
+SEGFAULT|227|1|CRITICAL|Segmentation fault (core dumped) in worker 3
+DRAFTER_NO_MULTIMODAL_EMBEDS|237|1|WARNING|Draft model does not support external multimodal embeddings; using text-only draft inputs
+CUBIN_NOT_FOUND|255|8|WARNING|Failed to reload statically launchable autotuner cubin: file not found in torch.compile cache
+KV_POOL_EXHAUSTED|282|1|ERROR|RuntimeError: KV pool exhausted at 31204 MiB
+KV_PADDING_WASTE|321|2|WARNING|Added 3 padding layers, may waste up to 60.00% KV cache memory
+NO_DRAFT_KV_CACHE_GROUP|322|2|WARNING|Speculative decoding (dflash) enabled but no KV cache group identified as the draft model's
+ENGINE_CORE_DIED|337|1|CRITICAL|Engine core died unexpectedly, restarting
+SAMPLING_PARAMS_OVERRIDDEN|415|1|WARNING|Default vLLM sampling parameters overridden by generation_config.json

@@ -1,0 +1,16 @@
+CONFIG_MBAMBA_DTYPE_MISMATCH|150|1|WARNING|Qwen3.5 model specifies mamba_ssm_dtype='float32' in its config, but --mamba-ssm-cache-dtype='bfloat16' was passed; using the user-specified value
+MAX_NUM_SCHEDULED_TOKENS_SPECDEC|153|2|WARNING|max_num_scheduled_tokens is set to 4096 based on the speculative decoding settings; may lead to suboptimal performance
+GELU_TANH_UNSTABLE_ROCM|180|1|WARNING|[ROCm] PyTorch's native GELU with tanh approximation is unstable. Falling back to GELU(approximate='none')
+OP_NOT_PRESENT_SPARSE_ATTN_INDEXER|190|1|WARNING|Op 'sparse_attn_indexer' not present in model, enabling with '+sparse_attn_indexer' has no effect
+WEIGHT_DTYPE_MISMATCH_LOAD|220|11|WARNING|Attempted to load weight with dtype torch.float16 into parameter with dtype torch.bfloat16
+DRAFT_NO_MULTIMODAL_EMBEDDINGS|233|1|WARNING|Draft model DFlash2Qwen3ForCausalLM does not support external multimodal embeddings; using text-only draft inputs instead
+KV_CACHE_PADDING_WASTE|316|2|WARNING|Add 3 padding layers, may waste at most 60.00% KV cache memory
+SPECDEC_NO_KV_CACHE_GROUP|317|2|WARNING|Speculative decoding (method=dflash) is enabled but no KV cache group could be identified as the draft model's
+SAMPLING_PARAMS_OVERRIDDEN|409|1|WARNING|Default vLLM sampling parameters have been overridden by the model's generation_config.json
+TRITON_JIT_COMPILE_LATENCY_SPIKE|457|4|WARNING|Triton kernel JIT compilation during inference causes a latency spike; consider extending warmup
+SEQUENCE_WATCHDOG_EXPIRED|616|1|ERROR|Sequence aborted: decode watchdog expired after 600 s
+CLIENT_STREAM_CLOSED|1149|1|ERROR|Client stream closed while writing chunk
+MEMORY_FAULT_QUEUE_EVICTED|1682|1|ERROR|Memory Fault: GPU node 1 page 0x7f31a0 not present, queue evicted
+SEGFAULT_CORE_DUMPED|2215|1|ERROR|Segmentation fault (core dumped) in worker 3
+KV_POOL_EXHAUSTED|2748|1|ERROR|RuntimeError: KV pool exhausted at 31204 MiB
+ENGINE_CORE_DIED|3281|1|CRITICAL|Engine core died unexpectedly, restarting

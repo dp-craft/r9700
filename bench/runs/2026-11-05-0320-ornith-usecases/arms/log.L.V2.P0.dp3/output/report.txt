@@ -1,0 +1,21 @@
+WARNING|150|1|mamba_ssm_dtype='float32' in config but --mamba-ssm-cache-dtype='bfloat16' was passed, using user-specified value
+WARNING|153|2|max_num_scheduled_tokens set to 4096 based on speculative decoding; may lead to suboptimal performance
+WARNING|180|1|[ROCm] PyTorch's native GELU with tanh approximation is unstable, falling back to GELU(approximate='none')
+WARNING|190|1|Op 'sparse_attn_indexer' not present in model; enabling it has no effect
+WARNING|220|1|Attempted to load weight fc.weight_scale with dtype torch.float16 into parameter with dtype torch.bfloat16
+WARNING|221|5|Attempted to load weight layers.N.mlp.down_proj.weight_scale with dtype torch.float16 into parameter with dtype torch.bfloat16
+WARNING|222|5|Attempted to load weight layers.N.self_attn.o_proj.weight_scale with dtype torch.float16 into parameter with dtype torch.bfloat16
+WARNING|233|1|Draft model DFlash2Qwen3ForCausalLM does not support external multimodal embeddings; using text-only draft inputs
+WARNING|316|2|Add 3 padding layers, may waste at most 60.00% KV cache memory
+WARNING|317|2|Speculative decoding (method=dflash) enabled but no KV cache group could be identified as the draft model's
+WARNING|409|1|Default vLLM sampling parameters overridden by the model's generation_config.json
+WARNING|457|1|Triton kernel JIT compilation during inference: _prepare_dflash_inputs_kernel; latency spike
+WARNING|458|1|Triton kernel JIT compilation during inference: _triton_w4a16_skinny_fmt_kernel; latency spike
+ERROR|616|1|Sequence 41 aborted: decode watchdog expired after 600 s
+ERROR|1149|1|Client stream closed while writing chunk 88
+ERROR|1682|1|Memory Fault: GPU node 1 page 0x7f31a0 not present, queue evicted
+ERROR|2215|1|Segmentation fault (core dumped) in worker 3
+ERROR|2748|1|RuntimeError: KV pool exhausted at 31204 MiB
+CRITICAL|3281|1|Engine core died unexpectedly, restarting
+WARNING|3720|1|Triton kernel JIT compilation during inference: kernel_unified_attention_3d; latency spike
+WARNING|3721|1|Triton kernel JIT compilation during inference: reduce_segments; latency spike

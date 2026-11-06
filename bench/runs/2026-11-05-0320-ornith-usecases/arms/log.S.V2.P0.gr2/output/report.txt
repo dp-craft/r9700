@@ -1,0 +1,17 @@
+watchdog_expiry|64|1|ERROR|Sequence aborted: decode watchdog expired
+client_stream_closed|118|1|ERROR|Client stream closed while writing chunk
+mamba_dtype_config_mismatch|152|1|WARNING|mamba_ssm_dtype in config does not match cache-dtype, using user-specified value
+max_num_scheduled_tokens|155|2|WARNING|max_num_scheduled_tokens set for speculative decoding; may lead to suboptimal performance
+memory_fault_evicted|173|1|ERROR|Memory Fault: GPU node page not present, queue evicted
+gelu_unstable_fallback|183|1|WARNING|[ROCm] native GELU with tanh approximation unstable, falling back to GELU(approximate='none')
+sparse_attn_indexer_absent|193|1|WARNING|Op sparse_attn_indexer not present in model
+weight_load_fc_weight_scale|223|1|WARNING|Attempted to load weight fc.weight_scale with dtype torch.float16 into parameter with dtype torch.bfloat16
+weight_load_mlp_down_proj|224|5|WARNING|Attempted to load weight layers.<layer>.mlp.down_proj.weight_scale with dtype torch.float16 into parameter with dtype torch.bfloat16
+weight_load_self_attn_o_proj|225|5|WARNING|Attempted to load weight layers.<layer>.self_attn.o_proj.weight_scale with dtype torch.float16 into parameter with dtype torch.bfloat16
+segmentation_fault_core_dumped|227|1|ERROR|Segmentation fault (core dumped) in worker
+draft_model_no_multimodal_embeds|237|1|WARNING|Draft model does not support external multimodal embeddings; using text-only draft inputs
+kv_pool_exhausted|282|1|ERROR|KV pool exhausted
+padding_layers_kv_cache_waste|321|2|WARNING|Add padding layers, may waste most KV cache memory
+speculative_decoding_no_kv_group|322|2|WARNING|Speculative decoding enabled but no KV cache group identified as the draft model's
+engine_core_died|337|1|CRITICAL|Engine core died unexpectedly, restarting
+sampling_params_overridden_by_config|415|1|WARNING|Default vLLM sampling parameters overridden by generation_config.json

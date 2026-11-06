@@ -1,0 +1,27 @@
+{
+ "arm": "edit.-.V0.P0.gr",
+ "profile": "code",
+ "wall_s": 139.7,
+ "turns": 35,
+ "gen": 13766,
+ "reason": 8321,
+ "prompt_first": 3982,
+ "prompt_peak": 21264,
+ "drops": 0,
+ "rate": 100.0,
+ "peak_vram": 29513.0,
+ "peak_gtt": 55.0,
+ "score": 1.0,
+ "detail": {
+  "hidden_pass": 9,
+  "hidden_fail": 0,
+  "hidden_error": 0,
+  "hidden_total": 9,
+  "own_pass": 3,
+  "own_fail": 0,
+  "diff": " 6 files changed, 16 insertions(+), 14 deletions(-)",
+  "score": 1.0,
+  "vendor_unchanged": true,
+  "old_name_left": []
+ }
+}

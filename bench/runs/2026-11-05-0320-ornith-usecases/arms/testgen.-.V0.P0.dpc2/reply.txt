@@ -1,0 +1,5 @@
+All 32 tests pass and the project type-checks cleanly (`tsc --noEmit` reports no errors).
+
+`tests/semver.test.ts` covers every exported symbol from `src/semver.ts`: `parse` (incl. invalid forms and leading-zero normalization), `compare` (ordering, prerelease-vs-release, numeric vs. alphanumeric identifiers, variable-length comparison), `satisfiesCaret` (all three caret regimes plus prerelease rejection rules), `bump` (per-part resets and prerelease dropping), and `maxVersion` (selection, precedence-aware ordering, empty list). The tests were written to match the implementation's actual semantics rather than assumptions about canonical semver behavior.
+
+DONE

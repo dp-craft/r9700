@@ -1,0 +1,54 @@
+{
+ "arm": "docnotes.buildcmp.V2.P0.gr2",
+ "profile": "read",
+ "wall_s": 456.8,
+ "turns": 46,
+ "gen": 39868,
+ "reason": 31292,
+ "prompt_first": 3286,
+ "prompt_peak": 50339,
+ "drops": 0,
+ "rate": 87.8,
+ "peak_vram": 30823.0,
+ "peak_gtt": 75.0,
+ "score": 1.0,
+ "detail": {
+  "score": 1.0,
+  "fact_exact": 5,
+  "fact_wrongline": 0,
+  "fact_fabricated": 0,
+  "facts": 5,
+  "needles_hit": 1,
+  "needles": 1,
+  "paths_found": 1,
+  "paths_want": 1,
+  "paths_invented": 0,
+  "incidents": 1,
+  "doc": {
+   "n": 1,
+   "doc": "2026-09-15-stew675-buildcmp.analysis.md",
+   "parse_ok": true,
+   "paths_tp": 1,
+   "paths_truncated": 0,
+   "paths_invented": 0,
+   "paths_fn": 0,
+   "dirs_want": 1,
+   "dirs_hit": 1,
+   "invented_list": [],
+   "fact_exact": 5,
+   "fact_wrongline": 0,
+   "fact_fabricated": 0,
+   "fact_malformed": 0,
+   "incidents": 1,
+   "needle_hit": 1,
+   "needles": 1,
+   "needle_detail": [
+    {
+     "id": "disk",
+     "line": 66,
+     "hit": true
+    }
+   ]
+  }
+ }
+}

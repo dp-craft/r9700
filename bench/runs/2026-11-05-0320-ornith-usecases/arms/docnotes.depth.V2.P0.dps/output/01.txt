@@ -1,0 +1,15 @@
+DOC: 2026-10-30-0900-vllm-redhat-mxfp4-depth-transposed.md
+TOPIC: Tested how RedHatAI/Qwen3.8-27B-MXFP4 speculative decodes (its own MTP head k=4 and a syvai DFlash2 drafter k=7) run on Sly radiance 1.8.1/1.9.1 and vs vllm-radiance 0.9.3 across 10k/50k/100k depth, plus a Cactus δ 0 rerun at ctx 262000.
+VERDICT: On Sly, DFlash2 (k=7) decodes fastest at every depth (~122 tok/s at 10k), MTP (k=4) second, both far above the ~18 tok/s plain baseline; DFlash2's lead shrinks with context as its acceptance falls from ~0.55 to ~0.42. Sly 1.9.1 matches 1.8.1 within rep noise and prefills 2-6% faster at 50k/100k, while upstream vllm-radiance 0.9.3 loads the checkpoint but runs about 4x slower.
+CONFIG: RedHatAI/Qwen3.8-27B-MXFP4 (drafter syvai/Qwen3.8-27B-DFlash2-W4A16); Sly radiance 1.8.1 and 1.9.1, vllm-radiance 0.9.3; MTP k=4 own head, DFlash2 k=7 drafter, Cactus δ 0.5 + fade/cap (1.9.1) or δ 0, fp8 KV, single stream, max_tokens 256, 2 reps
+PATHS: bench/runs/2026-10-30-vllm-redhat-sly-depth/, bench/runs/2026-10-30-vllm-redhat-sly-mtp-depth/, bench/runs/2026-10-30-vllm-redhat-sly-dflash-depth/, bench/runs/2026-10-30-vllm-heretic-sly-depth/, bench/runs/2026-10-30-vllm-redhat-sly191-depth/, bench/runs/2026-10-30-vllm-redhat-sly191-mtp-depth/, bench/runs/2026-10-30-vllm-redhat-sly191-dflash-depth/, bench/runs/2026-10-30-vllm-redhat-sly191-d0-mtp-depth/, bench/runs/2026-10-30-vllm-redhat-sly191-d0-dflash-depth/, bench/runs/2026-10-30-vllm-redhat-radiance-depth/, bench/runs/2026-10-30-sly191-depth-reruns.log, bench/runs/2026-10-30-sly191-d0-depth.log, bench/runs/2026-10-30-sly191-d0-power-state.log, campaigns/2026-10-30-vllm-redhat-sly-depth/, campaigns/2026-10-30-vllm-redhat-radiance-depth/, campaigns/2026-10-30-vllm-heretic-sly-depth/, campaigns/2026-10-30-vllm-redhat-sly-mtp-depth/, campaigns/2026-10-30-vllm-redhat-sly-dflash-depth/, campaigns/2026-10-30-vllm-redhat-sly191-depth/, campaigns/2026-10-30-vllm-redhat-sly191-mtp-depth/, campaigns/2026-10-30-vllm-redhat-sly191-dflash-depth/, campaigns/2026-10-30-vllm-redhat-sly191-d0-dflash-depth/, campaigns/2026-10-30-vllm-redhat-sly191-d0-mtp-depth/, campaigns/2026-10-30-vllm-redhat-sly191-d0-dflash-depth/analysis.md
+FACT|39|122.27 tok/s|DFlash2 p50 decode at 10k on Sly 1.8.1 (top speed)
+FACT|39|73.07 tok/s|MTP p50 decode at 10k on Sly 1.8.1
+FACT|39|4.93 tok/s|radiance 0.9.3 p50 decode at 10k (much slower)
+FACT|19|0.5494 / 0.3671 / 0.4231|DFlash2 acceptance rate falls as depth grows to 50k/100k
+FACT|71|87.36 tok/s|DFlash2 p50 decode at 100k on Sly 1.8.1
+INCIDENT|305|watchdog killed container during boot (VRAM nearly full); rerun passed, all probes have rows
+INCIDENT|307|every probe returned HTTP 404 served-name; failed runs quarantined, not graded
+INCIDENT|166|system update restarted container mid-pass; that pass was rerun from scratch
+INCIDENT|312|watchdog killed MTP boot during weight load (VRAM nearly full); rerun passed
+OPEN: The GTT peak has no pre-boot baseline, so its true probe-level memory level is unknown (explicitly marked OPEN), and δ 0 prefill sits slightly lower with power state vs ctx not separable.

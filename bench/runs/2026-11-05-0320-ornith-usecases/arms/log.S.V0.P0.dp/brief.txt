@@ -1,0 +1,4 @@
+Find the problems in the log file /tmp/claude-1001/-home-dev-work-dp-craft-amd/bf832afa-1002-41d9-a4b8-4b201a1bc43c/scratchpad/uc/runs/log.S.V0.P0.dp/app.log.
+Write /tmp/claude-1001/-home-dev-work-dp-craft-amd/bf832afa-1002-41d9-a4b8-4b201a1bc43c/scratchpad/uc/runs/log.S.V0.P0.dp/out/report.txt with one line per distinct problem, in this format:
+CLASS|<line number of first occurrence>|<number of occurrences>|<level>|<short message>
+Then reply with only: DONE

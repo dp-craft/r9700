@@ -1,0 +1,17 @@
+SequenceWatchdogExpired|64|1|ERROR|Sequence 41 aborted: decode watchdog expired after 600 s
+ClientStreamClosedWhileWriting|118|1|ERROR|Client stream closed while writing chunk 88
+MambaSsmDtypeMismatch|152|1|WARNING|mamba_smm_dtype='float32' specified in config but --mamba-ssm-cache-dtype='bfloat16' passed
+MaxNumScheduledTokensSpeculativeDecoding|155|2|WARNING|max_num_scheduled_tokens is set to 4096 based on the speculative decoding settings
+MemoryFaultGPUNodeEvicted|173|1|ERROR|Memory Fault: GPU node 1 page 0x7f31a0 not present, queue evicted
+GeluUnstableFallback|183|1|WARNING|[ROCm] PyTorch's native GELU with tanh approximation is unstable. Falling back to GELU(approximate='none').
+SparseAttnIndexerNotPresentInModel|193|1|WARNING|Op 'sparse_attn_indexer' not present in model, enabling has no effect
+WeightDtypeMismatchFcWeightScale|223|1|WARNING|Attempted to load weight fc.weight_scale with dtype torch.float16 into parameter with dtype torch.bfloat16
+WeightDtypeMismatchMlpDownProj|224|5|WARNING|Attempted to load weight layers.N.mlp.down_proj.weight_scale with dtype torch.float16 into parameter with dtype torch.bfloat16
+WeightDtypeMismatchSelfAttnOProj|225|5|WARNING|Attempted to load weight layers.N.self_attn.o_proj.weight_scale with dtype torch.float16 into parameter with dtype torch.bfloat16
+SegmentationFaultCoreDumped|227|1|ERROR|Segmentation fault (core dumped) in worker 3
+MultimodalEmbeddingsNotPassedToDrafter|237|1|WARNING|Draft model DFlash2Qwen3ForCausalLM does not support external multimodal embeddings.
+KvPoolExhausted|282|1|ERROR|KV pool exhausted at 31204 MiB
+PaddingLayersKVCacheWaste|321|2|WARNING|Add 3 padding layers, may waste at most 60.00% KV cache memory
+SpeculativeDecodingNoKvCacheGroup|322|2|WARNING|Speculative decoding (method=dflash) is enabled but no KV cache group could be identified as the draft model's.
+EngineCoreDiedUnexpectedly|337|1|CRITICAL|Engine core died unexpectedly, restarting
+SamplingParametersOverriddenByConfig|415|1|WARNING|Default vLLM sampling parameters have been overridden by the model's generation_config.json

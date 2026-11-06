@@ -1,0 +1,1 @@
+{"tests": 33, "pass_on_original": true, "src_unchanged": true, "tsc_errors": 0, "mutants_killed": 14, "mutants": 16, "survived": ["if (bn) return 1;", "Math.sign(Number(a) - Number(b))"], "score": 0.875}

@@ -1,0 +1,27 @@
+{
+ "arm": "impl.-.V0.P0.dp3",
+ "profile": "code",
+ "wall_s": 263.5,
+ "turns": 27,
+ "gen": 24743,
+ "reason": 18982,
+ "prompt_first": 4798,
+ "prompt_peak": 31098,
+ "drops": 0,
+ "rate": 94.4,
+ "peak_vram": 29623.0,
+ "peak_gtt": 75.0,
+ "score": 0.824,
+ "detail": {
+  "hidden_pass": 28,
+  "hidden_total": 34,
+  "hung": [
+   "empty value"
+  ],
+  "own_tests": 1,
+  "own_pass": 1,
+  "tsc_errors": 5,
+  "score": 0.824
+ },
+ "note": "rescored after the scorer hung on the arm's infinite loop; wall_s is the session's duration_ms"
+}

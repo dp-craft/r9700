@@ -1,0 +1,13 @@
+DOC: 2026-09-15-stew675-buildcmp.analysis.md
+TOPIC: A/B benchmarked the stew675 rdna-boosts patched llama.cpp build against stock Vulkan and stock ROCm builds on an AMD Radeon R9700 (gfx1201) using llama-bench PG request shapes across five prompt sizes.
+VERDICT: The patch yields +14-20% prefill throughput on ROCm only, with decode unchanged within noise on both backends, making stew675-ROCm the fastest prefill config measured (+20% vs stock-Vulkan at 32768). On Vulkan the patch is flat to slightly worse (-12% at 32768), so Vulkan still favors decode-heavy workloads.
+CONFIG: Qwen3.8-27B-UD-Q4_K_XL (unsloth); llama.cpp b10969 stock-Vulkan, b10909 stock-ROCm, b16 stew675-patched; ROCm 7.8.0 / Vulkan SDK 1.4.357.1 + Mesa 26.2.2 (kisak); -ub 2048 -b 4096 -fa on CTK q8_0 CTV q8_0 NGL 99, PG shapes (128,64)-(32768,2048), REPS=1, --no-warmup
+PATHS: bench/runs/2026-09-15-1029-buildcmp-stew675/
+FACT|18|+14-20%|ROCm prefill throughput gain from patch vs stock (key result)
+FACT|62|-11.9%|Vulkan prefill delta vs stock at 32768 (regression, unexplained)
+FACT|62|994.1 tok/s|stew675-ROCm prefill at 32768; +20% vs stock-Vulkan (fastest config)
+FACT|60|1148.1 tok/s|max measured ROCm prefill at (2048,512) shape
+FACT|93|±1.5%|decode delta band on Vulkan; patch leaves decode flat
+INCIDENT|64|(128,64) first-shape cold-start value excluded from delta interpretation (no warmup, REPS=1)
+INCIDENT|66|Disk-full error on log volume killed sampler mid-attempt; attempt repeated
+OPEN: Why does the stew675 patch cause an unexplained -12% Vulkan prefill regression at 32768 — shader compilation artifact, Vulkan driver regression, or suboptimal large-tile dispatch?

@@ -1,0 +1,33 @@
+diff --git a/movstats.py b/movstats.py
+index da66908..2666647 100644
+--- a/movstats.py
++++ b/movstats.py
+@@ -4,21 +4,18 @@
+ def _median(window):
+     s = sorted(window)
+     mid = len(s) // 2
+-    return s[mid]
++    if len(s) % 2 == 1:
++        return s[mid]
++    return (s[mid - 1] + s[mid]) / 2
+ 
+ 
+-def rolling_median(values, window, _cache={}):
++def rolling_median(values, window):
+     """Median of each full window. Returns one number per window, oldest first."""
+     if window < 1:
+         raise ValueError("window must be >= 1")
+-    key = window
+-    if key in _cache:
+-        return _cache[key]
+-    out = []
+-    for i in range(len(values) - window):
+-        out.append(_median(values[i : i + window]))
+-    _cache[key] = out
+-    return out
++    return [
++        _median(values[i : i + window]) for i in range(len(values) - window + 1)
++    ]
+ 
+ 
+ def rolling_max(values, window):

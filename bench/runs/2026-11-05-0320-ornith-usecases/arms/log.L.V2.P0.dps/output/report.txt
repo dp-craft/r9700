@@ -1,0 +1,21 @@
+CLASS|150|1|WARNING|Qwen3.5 model specifies mamba_ssm_dtype in config but --mamba-ssm-cache-dtype=bfloat16 was passed, using the user-specified value
+CLASS|153|2|WARNING|max_num_scheduled_tokens is set to 4096 based on speculative decoding settings, may lead to suboptimal performance
+CLASS|180|1|WARNING|[ROCm] PyTorch native GELU with tanh approximation is unstable, falling back to GELU(approximate=none)
+CLASS|190|1|WARNING|Op sparse_attn_indexer not present in model, enabling it has no effect
+CLASS|220|1|WARNING|Attempted to load weight fc.weight_scale with dtype torch.float16 into parameter with dtype torch.bfloat16
+CLASS|221|5|WARNING|Attempted to load weight layers.<n>.mlp.down_proj.weight_scale with dtype torch.float16 into parameter with dtype torch.bfloat16
+CLASS|222|5|WARNING|Attempted to load weight layers.<n>.self_attn.o_proj.weight_scale with dtype torch.float16 into parameter with dtype torch.bfloat16
+CLASS|233|1|WARNING|Draft model DFlash2Qwen3ForCausalLM does not support external multimodal embeddings, using text-only draft inputs
+CLASS|316|2|WARNING|Add padding layers, may waste at most 60.00% KV cache memory
+CLASS|317|2|WARNING|Speculative decoding method=dflash is enabled but no KV cache group could be identified as the draft model's
+CLASS|409|1|WARNING|Default vLLM sampling parameters overridden by the model generation_config.json
+CLASS|457|1|WARNING|Triton kernel JIT compilation during inference: _prepare_dflash_inputs_kernel, causes a latency spike
+CLASS|458|1|WARNING|Triton kernel JIT compilation during inference: _triton_w4a16_skinny_fmt_kernel, causes a latency spike
+CLASS|616|1|ERROR|Sequence aborted: decode watchdog expired after 600 s
+CLASS|1149|1|ERROR|Client stream closed while writing chunk
+CLASS|1682|1|ERROR|Memory Fault: GPU node page not present, queue evicted
+CLASS|2215|1|ERROR|Segmentation fault (core dumped) in worker
+CLASS|2748|1|ERROR|RuntimeError: KV pool exhausted at 31204 MiB
+CLASS|3281|1|CRITICAL|Engine core died unexpectedly, restarting
+CLASS|3720|1|WARNING|Triton kernel JIT compilation during inference: kernel_unified_attention_3d, causes a latency spike
+CLASS|3721|1|WARNING|Triton kernel JIT compilation during inference: reduce_segments, causes a latency spike

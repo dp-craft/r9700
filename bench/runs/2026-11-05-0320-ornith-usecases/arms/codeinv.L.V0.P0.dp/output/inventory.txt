@@ -1,0 +1,94 @@
+gen_campaign.py|sh_quote|142|Wrap a value in single quotes so it is shell-safe inside generated run.sh.
+gen_campaign.py|validate_env|146|Validate an env mapping's key/value formats and reject reserved keys, exiting on error.
+gen_campaign.py|validate_image|162|Validate that a vllm image string is a well-formed docker reference.
+gen_campaign.py|merge_env|168|Merge campaign-wide and per-server env dicts with the server winning.
+gen_campaign.py|env_assign|175|Render an env dict as space-separated KEY=value pairs for shell export.
+gen_campaign.py|predict_vram_mib|180|Predict a server's runtime VRAM in MiB from weights, KV at context and overhead, or -1 if unknown.
+gen_campaign.py|emit_runsh|200|Emit the resumable throughput run.sh driver for a spec.
+gen_campaign.py|emit_readme|431|Emit the throughput README.md skeleton describing fixed parameters and matrix.
+gen_campaign.py|emit_quality_runsh|501|Emit the quality model-shootout run.sh with VRAM guard, capture and deterministic scoring.
+gen_campaign.py|emit_quality_plan|626|Emit the quality plan.md runbook splitting Phase A/B/C across manual and Claude steps.
+gen_campaign.py|agentic_helper|916|Return the embedded helper source for run.sh, adding the watch subcommand when stop_when is set.
+gen_campaign.py|_is_int|924|Check a value is a genuine integer (not bool) at least lo.
+gen_campaign.py|_rel|928|Validate a non-empty worktree-relative path without .. , exiting on error.
+gen_campaign.py|_settings_models|934|Extract Claude Code model-name settings entries from a settings dict.
+gen_campaign.py|agentic_arms|943|Resolve each arm's name, profile, image, merged env and server knobs.
+gen_campaign.py|validate_agentic|957|Validate a kind "agentic" spec at emit time, exiting on error.
+gen_campaign.py|_norm_install|1179|Normalize install sources to absolute paths under the repo root.
+gen_campaign.py|_file_sha256|1184|Compute the sha256 hex digest of a file.
+gen_campaign.py|_resolve_base|1192|Resolve a base commit-ish to its full git sha.
+gen_campaign.py|_heredoc_tag|1198|Produce a unique heredoc delimiter that does not appear in the body text.
+gen_campaign.py|emit_agentic_runsh|1634|Emit the agentic run.sh by substituting engine fragments and values into the template.
+gen_campaign.py|_fence|1698|Build a backtick fence long enough to wrap the given text.
+gen_campaign.py|emit_agentic_readme|1703|Emit the agentic README.md describing engines, arms and run statuses.
+gen_campaign.py|validate_spec|1846|Dispatch emit-time validation by kind and return the doc name to write.
+gen_campaign.py|cmd_emit|1905|CLI subcommand that validates a spec and writes run.sh plus its doc skeleton.
+gen_campaign.py|cmd_vram|1930|CLI subcommand computing max context tokens from a VRAM budget.
+gen_campaign.py|main|1998|CLI entry point wiring the emit, vram-ctx and example subcommands.
+report.py|load_jsonl|39|Load and parse a JSONL file, returning an empty list if it is missing.
+report.py|mean|45|Return the mean of numeric entries in a list (excluding bools) or None.
+report.py|esc|50|Escape XML-significant characters for safe SVG output.
+report.py|nice_max|54|Compute a friendly rounded axis maximum slightly above v.
+report.py|_style|67|Emit CSS defining slot colors and light/dark theme variables.
+report.py|svg|79|Wrap an SVG body in the root svg element with styles and background.
+report.py|_title|84|Append title and subtitle text elements to an SVG group.
+report.py|hbar|91|Draw a horizontal bar chart with direct value labels.
+report.py|stacked_tokens|110|Draw thinking-vs-answer stacked token bars per label.
+report.py|dumbbell|130|Draw ttft/ttfa dumbbell charts showing thinking-time gaps.
+report.py|scatter_quality_cost|151|Draw the quality-vs-token-cost frontier scatter plot with decluttered labels.
+report.py|small_multiples|197|Draw several independent bar panels each with its own x-scale.
+report.py|heatmap|226|Draw a status-colored pass/fail heatmap grid over configs and tasks.
+report.py|lines|251|Draw a multi-series line chart with auto-scaled axes and end-point labels.
+report.py|_find|300|Locate an output file in a dir or its out/ subdirectory.
+report.py|detect|307|Infer the run kind (quality, throughput, sweep or agentic) from a run dir.
+report.py|slot_map|319|Assign stable categorical color slots to a first-seen ordering of names.
+report.py|render_quality|324|Render quality-vs-cost, deterministic, judge, token and latency charts.
+report.py|loglog_fit|435|Fit a power law y=a*x^k to positive pairs and return k, R-squared and n.
+report.py|render_throughput|450|Render depth, concurrency, thinking and conversation throughput charts.
+report.py|render_sweep|638|Render ub/b tuning curves and VRAM/f16-vs-q8_0 verdict for a sweep summary.
+report.py|_loop_onset|694|Find the char offset where a thinking loop begins within a block.
+report.py|_utc|712|Parse an ISO timestamp into a naive UTC datetime.
+report.py|_agentic_arm|717|Aggregate per-arm speed, work, loop signals and GPU telemetry from transcripts and logs.
+report.py|agentic_arms|825|List the rep*/<arm>/ claude-project directories in a run dir.
+report.py|render_agentic|830|Render per-arm speed/work and loop-signal charts for agentic runs.
+report.py|process|871|Write SVG charts and an appendix.md snippet for one detected run kind.
+report.py|main|895|CLI entry point writing charts and appendix.md for the given run dirs.
+test_gen_campaign.py|exits|35|Assert a function calls sys.exit with a string message and return that message.
+test_gen_campaign.py|vllm_spec|47|Build a baseline valid vllm throughput spec with servers and probes.
+test_gen_campaign.py|EnvValidators|59|Unit tests for validate_env plus env merging and image validation.
+test_gen_campaign.py|ThroughputEnvEmit|100|Tests emitting vllm run.sh/readme env wiring.
+test_gen_campaign.py|EnvSpecValidation|163|Tests validate_spec rejecting bad vllm env and image values.
+test_gen_campaign.py|bash_n|200|Run bash -n on an emitted script to verify it parses syntactically.
+test_gen_campaign.py|sigint_default|210|Restore default SIGINT handling so subprocesses inherit a normal interrupt.
+test_gen_campaign.py|free_port|215|Bind a localhost socket and return a currently free port number.
+test_gen_campaign.py|write|223|Write text to a path, optionally set its mode, and return the path.
+test_gen_campaign.py|git|232|Run a git subcommand in a repo with a minimal test environment and return stdout.
+test_gen_campaign.py|AgenticBase|317|Base TestCase building a temp-git, stubbed sandbox and baseline agentic spec.
+test_gen_campaign.py|AgenticValidation|448|Tests for agentic spec emit-time validation of required fields and formats.
+test_gen_campaign.py|AgenticScript|567|Tests bash syntax, README and emit behavior of the agentic driver.
+test_gen_campaign.py|AgenticE2E|649|End-to-end stubbed-driver tests covering vllm agentic arms.
+test_gen_campaign.py|AgenticLlamaSwapValidation|913|Tests validation rules specific to the llama-swap engine.
+test_gen_campaign.py|AgenticLlamaSwapScript|965|Tests emitted llama-swap script shape and README contents.
+test_gen_campaign.py|AgenticLlamaSwapE2E|1004|End-to-end tests for llama-swap agentic runs.
+test_gen_campaign.py|tool_line|1098|Build a stream-json assistant tool_use line for stop_when watch tests.
+test_gen_campaign.py|StopWhenValidation|1104|Tests validation of the optional stop_when spec key.
+test_gen_campaign.py|StopWhenWatch|1124|Unit tests for the agentic_helper.py watch subcommand.
+test_gen_campaign.py|StopWhenScript|1210|Tests emitted stop_when run.sh shape and README entries.
+test_gen_campaign.py|StopWhenE2E|1242|End-to-end tests that stop_when halts only matching sessions.
+test_gen_campaign.py|AgenticReuse|1320|Tests reuse_server mode where the driver boots nothing and reports reused port_free.
+test_monitor.py|strip|178|Remove ANSI escape codes from a string for length/line checks.
+test_monitor.py|approx|182|Compare two values within tolerance, treating None specially.
+test_monitor.py|TestPromParse|192|Tests monitor.parse_prom name extraction, label summing and gauge max rules.
+test_monitor.py|TestHelpers|221|Tests small numeric helpers like _diff, _avg, _ratio and trend markers.
+test_monitor.py|TestSources|287|Tests per-call metric sources for computed, prefill and cached tokens.
+test_monitor.py|TestCollect|309|Tests monitor.collect per-call, session and state snapshot calculations.
+test_monitor.py|_per|482|Build a defaulted per-call metrics dict used as fold-test scaffolding.
+test_monitor.py|TestFoldRequest|489|Tests folding poll deltas into finished request rows.
+test_monitor.py|TestLogParse|531|Tests parse_log merging loggers.py and metrics.py lines by timestamp.
+test_monitor.py|TestLogStale|583|Tests the log_stale file-age staleness check.
+test_monitor.py|TestWindow|605|Tests time-weighted window average and sum aggregation helpers.
+test_monitor.py|TestIdleAndAvg|644|Tests server idle detection and equal-width averaged line formatting.
+test_monitor.py|TestTables|682|Tests history/session row generation and JSON output shape.
+test_monitor.py|TestRequestLog|752|Tests request-log parsing, finished rows and container log tailing.
+test_monitor.py|TestRender|876|Tests rendered line-table output across GPU and stale-gpu inputs.
+test_monitor.py|TestEntryPoints|943|Tests the default log path computation and clean Ctrl-C exit.

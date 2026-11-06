@@ -1,0 +1,12 @@
+DOC: 2026-10-31-redhat-sharp-w208-blind.analysis.md
+TOPIC: A blind four-way re-grade of how swapping only the RedHat delta-0 server's chat template to a terseness (sharp) directive changes W2-08 review quality and step-A work.
+VERDICT: Swapping only the chat template to a terseness directive cut step-A thinking, tool calls, and generated tokens by about a third with no demonstrated quality loss; +2 Opus findings sits below the pre-registered significance threshold. With the template held equal, Q4_K_XL and RedHat tie, so most of Q4_K_XL's earlier efficiency edge came from the template rather than the model (n = 1).
+CONFIG: RedHatAI/Qwen3.8-27B-MXFP4 delta-0 + DFlash2 draft (k=7, delta-0); vLLM 0.32.0 via sly-radiance image; sharp chat template (v22.5 + TERSENESS directive); --gpu-memory-utilization 0.93, fp8 KV, --max-model-len 262000, power cap 210 W.
+PATHS: bench/runs/2026-10-31-redhat-sharp-w208-blind/pre-launch-provenance.txt, bench/runs/2026-10-31-redhat-sharp-w208-blind/, bench/runs/2026-10-30-0947-dpf-brief-ab/, campaigns/2026-10-31-q4kxl-sharp-w208-blind/analysis.md, campaigns/2026-10-31-redhat-sharp-w208-blind/sharp-chat_template.jinja, bench/runs/2026-10-31-redhat-sharp-w208-blind/rep1/redhat-d0-sharp/server.txt
+FACT|184|-38 %|thinking chars in step A (RedHat + sharp vs delta-0)
+FACT|185|-35 %|tool calls in step A (101 vs 156)
+FACT|186|about -28 %|server-generated tokens in step A (144.4k vs ~200k)
+FACT|179|+2|Opus findings found blind (11 vs 9), quality coverage
+FACT|180|+2|severity-weighted coverage (22 vs 20)
+INCIDENT|152|stale prompt fixture in first pass; pass deleted and repeated with correct file
+OPEN: Are the about-a-third work cut and equal quality reproducible across reps, given this is n = 1 on W2-08 alone?

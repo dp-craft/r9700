@@ -1,0 +1,27 @@
+{
+ "arm": "testgen.-.V0.P0.dpc2",
+ "profile": "code",
+ "wall_s": 82.4,
+ "turns": 17,
+ "gen": 9951,
+ "reason": 5016,
+ "prompt_first": 4883,
+ "prompt_peak": 17830,
+ "drops": 0,
+ "rate": 127.6,
+ "peak_vram": 29675.0,
+ "peak_gtt": 65.0,
+ "score": 0.938,
+ "detail": {
+  "tests": 32,
+  "pass_on_original": true,
+  "src_unchanged": true,
+  "tsc_errors": 0,
+  "mutants_killed": 15,
+  "mutants": 16,
+  "survived": [
+   "if (bn) return 1;"
+  ],
+  "score": 0.938
+ }
+}

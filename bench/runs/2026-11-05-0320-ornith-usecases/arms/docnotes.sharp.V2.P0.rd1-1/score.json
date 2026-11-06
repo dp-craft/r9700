@@ -1,0 +1,39 @@
+{
+ "score": 0.905,
+ "fact_exact": 5,
+ "fact_wrongline": 0,
+ "fact_fabricated": 0,
+ "facts": 5,
+ "needles_hit": 1,
+ "needles": 1,
+ "paths_found": 5,
+ "paths_want": 7,
+ "paths_invented": 0,
+ "incidents": 1,
+ "doc": {
+  "n": 1,
+  "doc": "2026-10-31-redhat-sharp-w208-blind.analysis.md",
+  "parse_ok": true,
+  "paths_tp": 5,
+  "paths_truncated": 0,
+  "paths_invented": 0,
+  "paths_fn": 2,
+  "dirs_want": 4,
+  "dirs_hit": 3,
+  "invented_list": [],
+  "fact_exact": 5,
+  "fact_wrongline": 0,
+  "fact_fabricated": 0,
+  "fact_malformed": 0,
+  "incidents": 1,
+  "needle_hit": 1,
+  "needles": 1,
+  "needle_detail": [
+   {
+    "id": "fixture",
+    "line": 152,
+    "hit": true
+   }
+  ]
+ }
+}

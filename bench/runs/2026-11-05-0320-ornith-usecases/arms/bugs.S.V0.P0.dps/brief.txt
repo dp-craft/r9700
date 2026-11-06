@@ -1,0 +1,5 @@
+Classify the findings in /tmp/claude-1001/-home-dev-work-dp-craft-amd/bf832afa-1002-41d9-a4b8-4b201a1bc43c/scratchpad/uc/runs/bugs.S.V0.P0.dps/findings.txt. Each one starts with a line "## <id>".
+Write /tmp/claude-1001/-home-dev-work-dp-craft-amd/bf832afa-1002-41d9-a4b8-4b201a1bc43c/scratchpad/uc/runs/bugs.S.V0.P0.dps/out/rows.txt with one line per finding, in this format:
+<id>|<kind>|<severity>|<paths>
+kind is one of: defect, gap, risk, note. severity is one of: blocking, high, med, low. paths is every file name or path the finding mentions, comma-separated, or none.
+Then reply with only: DONE

@@ -1,0 +1,16 @@
+Config dtype|150|1|WARNING|Qwen3.5 model specifies mamba_smm_dtype='float32' but --mamba-ssm-cache-dtype='bfloat16' was passed; using user-specified value.
+max_num_scheduled_tokens|153|2|WARNING|max_num_scheduled_tokens is set to 4096 based on speculative decoding settings; this may lead to suboptimal performance.
+GELU fallback|180|1|WARNING|[ROCm] native GELU with tanh approximation is unstable, falling back to GELU(approximate='none').
+kernel not present|190|1|WARNING|Op 'sparse_attn_indexer' not present in model, enabling it has no effect.
+weight dtype mismatch|220|11|WARNING|Attempted to load weight with dtype torch.float16 into parameter with dtype torch.bfloat16.
+multimodal embeddings|233|1|WARNING|Draft model does not support external multimodal embeddings; using text-only draft inputs instead.
+KV cache padding|316|2|WARNING|Add 3 padding layers, may waste at most 60.00% KV cache memory.
+speculative KV group|317|2|WARNING|Speculative decoding (method=dflash) is enabled but no KV cache group could be identified as the draft model's.
+sampling override|409|1|WARNING|Default vLLM sampling parameters have been overridden by the model's generation_config.json.
+JIT compilation|457|4|WARNING|Triton kernel JIT compilation during inference causes a latency spike; extend warmup to cover this shape/config.
+Sequence abort|616|1|ERROR|Sequence 41 aborted: decode watchdog expired after 600 s.
+stream closed|1149|1|ERROR|Client stream closed while writing chunk 88.
+Memory Fault|1682|1|ERROR|GPU node 1 page 0x7f31a0 not present, queue evicted.
+Segmentation fault|2215|1|ERROR|Segmentation fault (core dumped) in worker 3.
+KV pool exhaustion|2748|1|ERROR|RuntimeError: KV pool exhausted at 31204 MiB.
+core death|3281|1|CRITICAL|Engine core died unexpectedly, restarting.
