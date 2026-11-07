@@ -1,0 +1,28 @@
+{
+ "generated_by": "bench/core/report.py",
+ "provenance": "MEASURED: max over the samples of each GPU sample CSV (stack/gpu/vram_sampler.py); csv paths relative to the campaign dir",
+ "runs": [
+  {
+   "run": "2026-10-07-1215-model-buildcmp-b10969-vulkan-1.4.363.0",
+   "csv": "tmp/2026-10-07-1215-model-buildcmp-b10969-vulkan-1.4.363.0/gpu_samples.csv",
+   "peak_vram_mib": 19282,
+   "peak_gtt_mib": 157,
+   "load_vram_mib": 698,
+   "vram_total_mib": 32624,
+   "samples": 72,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  },
+  {
+   "run": "2026-10-07-1216-model-buildcmp-b11448-vulkan-1.4.363.0",
+   "csv": "tmp/2026-10-07-1216-model-buildcmp-b11448-vulkan-1.4.363.0/gpu_samples.csv",
+   "peak_vram_mib": 19362,
+   "peak_gtt_mib": 237,
+   "load_vram_mib": 691,
+   "vram_total_mib": 32624,
+   "samples": 72,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  }
+ ]
+}

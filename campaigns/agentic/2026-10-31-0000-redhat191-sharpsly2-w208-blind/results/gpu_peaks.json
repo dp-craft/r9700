@@ -1,0 +1,17 @@
+{
+ "generated_by": "bench/core/report.py",
+ "provenance": "MEASURED: max over the samples of each GPU sample CSV (stack/gpu/vram_sampler.py); csv paths relative to the campaign dir",
+ "runs": [
+  {
+   "run": "rep1/r191-sharpsly2-d0",
+   "csv": "tmp/rep1/r191-sharpsly2-d0/gpu_samples.csv",
+   "peak_vram_mib": 32294,
+   "peak_gtt_mib": 190,
+   "load_vram_mib": 30869,
+   "vram_total_mib": 32624,
+   "samples": 1699,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  }
+ ]
+}

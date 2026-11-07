@@ -1,0 +1,162 @@
+{
+ "generated_by": "bench/quality/make_charts.py",
+ "provenance": "MEASURED: max over the samples of each GPU sample CSV (stack/gpu/vram_sampler.py); csv paths relative to the campaign dir",
+ "runs": [
+  {
+   "run": ".",
+   "csv": "tmp/gpu_a3b-d128-f16-rb16384-qwen-gen.csv",
+   "peak_vram_mib": 27345,
+   "peak_gtt_mib": 1645,
+   "load_vram_mib": 27280,
+   "vram_total_mib": 32624,
+   "samples": 1836,
+   "quarantined": false,
+   "provenance": "MEASURED",
+   "label": "a3b-d128-f16-rb16384-qwen-gen"
+  },
+  {
+   "run": ".",
+   "csv": "tmp/gpu_a3b-d128-f16-rb16384-t03.csv",
+   "peak_vram_mib": 27835,
+   "peak_gtt_mib": 1704,
+   "load_vram_mib": 27444,
+   "vram_total_mib": 32624,
+   "samples": 1268,
+   "quarantined": false,
+   "provenance": "MEASURED",
+   "label": "a3b-d128-f16-rb16384-t03"
+  },
+  {
+   "run": ".",
+   "csv": "tmp/gpu_a3b-d128-f16-rb16384-t10.csv",
+   "peak_vram_mib": 27671,
+   "peak_gtt_mib": 1652,
+   "load_vram_mib": 27486,
+   "vram_total_mib": 32624,
+   "samples": 1422,
+   "quarantined": false,
+   "provenance": "MEASURED",
+   "label": "a3b-d128-f16-rb16384-t10"
+  },
+  {
+   "run": ".",
+   "csv": "tmp/gpu_a3b-d128-f16-rb16384-unsloth-reason.csv",
+   "peak_vram_mib": 27344,
+   "peak_gtt_mib": 1643,
+   "load_vram_mib": 27279,
+   "vram_total_mib": 32624,
+   "samples": 2211,
+   "quarantined": false,
+   "provenance": "MEASURED",
+   "label": "a3b-d128-f16-rb16384-unsloth-reason"
+  },
+  {
+   "run": ".",
+   "csv": "tmp/gpu_a3b-d128-f16-rb16384.csv",
+   "peak_vram_mib": 27196,
+   "peak_gtt_mib": 1629,
+   "load_vram_mib": 27146,
+   "vram_total_mib": 32624,
+   "samples": 1320,
+   "quarantined": false,
+   "provenance": "MEASURED",
+   "label": "a3b-d128-f16-rb16384"
+  },
+  {
+   "run": ".",
+   "csv": "tmp/gpu_a3b-d128-f16-rb4096.csv",
+   "peak_vram_mib": 27081,
+   "peak_gtt_mib": 1551,
+   "load_vram_mib": 27030,
+   "vram_total_mib": 32624,
+   "samples": 180,
+   "quarantined": false,
+   "provenance": "MEASURED",
+   "label": "a3b-d128-f16-rb4096"
+  },
+  {
+   "run": ".",
+   "csv": "tmp/gpu_a3b-d128-f16-rbmax.csv",
+   "peak_vram_mib": 30773,
+   "peak_gtt_mib": 1668,
+   "load_vram_mib": 27142,
+   "vram_total_mib": 32624,
+   "samples": 1429,
+   "quarantined": false,
+   "provenance": "MEASURED",
+   "label": "a3b-d128-f16-rbmax"
+  },
+  {
+   "run": ".",
+   "csv": "tmp/gpu_q5-d128-f16-rb4096.csv",
+   "peak_vram_mib": 31415,
+   "peak_gtt_mib": 2829,
+   "load_vram_mib": 31194,
+   "vram_total_mib": 32624,
+   "samples": 2157,
+   "quarantined": false,
+   "provenance": "MEASURED",
+   "label": "q5-d128-f16-rb4096"
+  },
+  {
+   "run": ".",
+   "csv": "tmp/gpu_q5-d128-q8-rb4096.csv",
+   "peak_vram_mib": 27466,
+   "peak_gtt_mib": 1776,
+   "load_vram_mib": 27421,
+   "vram_total_mib": 32624,
+   "samples": 543,
+   "quarantined": false,
+   "provenance": "MEASURED",
+   "label": "q5-d128-q8-rb4096"
+  },
+  {
+   "run": ".",
+   "csv": "tmp/gpu_q6-d128-q8-rb4096.csv",
+   "peak_vram_mib": 30214,
+   "peak_gtt_mib": 1776,
+   "load_vram_mib": 30168,
+   "vram_total_mib": 32624,
+   "samples": 557,
+   "quarantined": false,
+   "provenance": "MEASURED",
+   "label": "q6-d128-q8-rb4096"
+  },
+  {
+   "run": ".",
+   "csv": "tmp/gpu_un-d128-f16-rb16384.csv",
+   "peak_vram_mib": 29864,
+   "peak_gtt_mib": 1901,
+   "load_vram_mib": 29674,
+   "vram_total_mib": 32624,
+   "samples": 2976,
+   "quarantined": false,
+   "provenance": "MEASURED",
+   "label": "un-d128-f16-rb16384"
+  },
+  {
+   "run": ".",
+   "csv": "tmp/gpu_un-d128-f16-rb4096.csv",
+   "peak_vram_mib": 29809,
+   "peak_gtt_mib": 1825,
+   "load_vram_mib": 29751,
+   "vram_total_mib": 32624,
+   "samples": 476,
+   "quarantined": false,
+   "provenance": "MEASURED",
+   "label": "un-d128-f16-rb4096"
+  },
+  {
+   "run": ".",
+   "csv": "tmp/gpu_xl-d128-f16-rb4096.csv",
+   "peak_vram_mib": 30536,
+   "peak_gtt_mib": 1902,
+   "load_vram_mib": 30426,
+   "vram_total_mib": 32624,
+   "samples": 486,
+   "quarantined": false,
+   "provenance": "MEASURED",
+   "label": "xl-d128-f16-rb4096"
+  }
+ ]
+}
