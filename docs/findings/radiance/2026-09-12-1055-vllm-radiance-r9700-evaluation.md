@@ -11,7 +11,7 @@ campaign: campaigns/perf/2026-09-12-1330-depth-curve-mtp
 - **Host venv (reference):** vLLM 0.29.0+rocm723 · torch 2.12.0+git6bbd260 · triton 3.7.1 · transformers 5.17.0 · `HSA_OVERRIDE_GFX_VERSION=12.0.1`
 - **Container:** `stilldeadcode/vllm-radiance:0.9.3` (pushed 2026-08-27, 3.96 GB compressed / **13.7 GB on disk**)
 - **Model:** `RedHatAI/Qwen3.8-27B-INT4` @ `bf08f3db` (compressed-tensors **W4A16**, group 128) · hybrid 64 layers = 48 Gated-DeltaNet + 16 full attention
-- **Data:** `bench/runs/2026-09-11-2047-vllm-qwen38-27b-int4/radiance-*` · `campaigns/perf/2026-09-12-1330-depth-curve-mtp/` (findings 21–24)
+- **Data:** `campaigns/perf/2026-09-11-2047-vllm-qwen38-27b-int4/radiance-*` · `campaigns/perf/2026-09-12-1330-depth-curve-mtp/` (findings 21–24)
 - **Related:** `docs/findings/vllm/2026-09-11-2047-vllm-qwen38-27b-int4.md` (the host-venv vLLM spike this branches from)
 
 ## Summary

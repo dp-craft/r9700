@@ -13,7 +13,7 @@ campaign: campaigns/perf/2026-10-22-1406-vllm-sly-mxfp4-dflash
 - **Runtime:** `ghcr.io/slybase/vllm-sly-radiance:1.6.0-rocm10.1` @ `sha256:bf153fa38868…7506` (reports vLLM 0.31.0) · `stack/serve/vllm/serve_vllm.sh`, profile `sly-radiance/qwen38-mxfp4-dflash`
 - **Model:** `amd/Qwen3.8-27B-Quark-AWQ-MXFP4` @ `5233554c` · drafter **`syvai/Qwen3.8-27B-DFlash2-W4A16` @ `4d30ec73`**, `num_speculative_tokens 7`, `draft_sample_method greedy`, drafter attention `TRITON_ATTN`, cudagraph sizes `[8]` · KV **fp8** · ctx **150000** · max-num-seqs 1 · gpu-mem-util 0.90
 - **Baseline (the one variable removed):** `campaigns/perf/2026-10-22-1324-vllm-sly-mxfp4-depth/` — same image, model, KV, ctx, fixtures, sampler
-- **Data:** `campaigns/perf/2026-10-22-1406-vllm-sly-mxfp4-dflash/` (consolidated `results.jsonl`, per-probe dirs `bench/runs/2026-10-22-14{17,18,19,22}-engine-dx-*`) · server log of the aborted boot: `aborted-boot-1.server.log`
+- **Data:** `campaigns/perf/2026-10-22-1406-vllm-sly-mxfp4-dflash/` (consolidated `results.jsonl`, per-probe dirs `results/2026-10-22-14{17,18,19,22}-engine-dx-*`) · server log of the aborted boot: `aborted-boot-1.server.log`
 
 ## Summary
 

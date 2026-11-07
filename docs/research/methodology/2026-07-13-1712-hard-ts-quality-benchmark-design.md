@@ -86,7 +86,7 @@ takeaway: To make the 27B quality eval DISCRIMINATE, stop chasing pass@1 and sta
 
 ## Actionable for this repo
 
-1. **Extend `campaigns/2026-07-12-27b-finetune-quality/graders/score_deterministic.py`** with two graders: `tsc_strict` (run `tsc --noEmit --strict`, clean=1) and `eslint_clean` (run eslint, 0 errors=1). Compound task score = `AND` of {vitest, tsc, eslint}; keep the three bits for the appendix charts. This is the highest-leverage, lowest-effort discriminator.
+1. **Extend `bench/quality/graders/score_deterministic.py`** with two graders: `tsc_strict` (run `tsc --noEmit --strict`, clean=1) and `eslint_clean` (run eslint, 0 errors=1). Compound task score = `AND` of {vitest, tsc, eslint}; keep the three bits for the appendix charts. This is the highest-leverage, lowest-effort discriminator.
 2. **Vendor the base corpus:** `git clone` Exercism-TS (MIT, ~106 Jest) + type-challenges (MIT, ~190 tsc) into `bench/workloads/` offline; wire a subset (~20 medium/hard) through `capture.py`. Convert Jest→vitest if the harness prefers vitest (drop-in).
 3. **AUTHOR ~10–15 constraint-stacked long-context tasks** (AgentIF shape: 8–12 verifiable rules each) over 64–128K of `bench/workloads/corpus/` TS, including 3–4 **plant-a-util-at-depth + obey-top-rules** probes. Grade retrieval, rule-compliance, and correctness as separate bits.
 4. **Fix sampling first** (temp 0.6 / top_p 0.95 / top_k 20 / min_p 0 per the companion doc) so config differences reflect real quality, not over-temperature noise; then sweep `--reasoning-budget {−1,2048,1024,0}` × temp {0.6,0.7} against the new hard set.

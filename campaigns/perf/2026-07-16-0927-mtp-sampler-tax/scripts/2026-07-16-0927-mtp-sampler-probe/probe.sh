@@ -14,7 +14,7 @@
 #
 # ⚠ SCOUTING PROBE, NOT A CAMPAIGN. Shallow (ctx 4096, ~24-token prompt), n=1-2 per cell.
 #   Decisive on MECHANISM; NOT transferable on MAGNITUDE to the campaign's ~132.9k depth, where
-#   MTP's own benefit is known to grow with depth (docs/analysis/2026-07-11-2200-deep-context-35b).
+#   MTP's own benefit is known to grow with depth (docs/findings/llamacpp/2026-07-11-2200-deep-context-35b.md).
 #
 #   ./probe.sh            # full matrix -> results.jsonl
 set -euo pipefail

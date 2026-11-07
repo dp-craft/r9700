@@ -209,7 +209,7 @@ cmd_promote() {
       target_dir="$ver-$b"
       [ -x "$BUILD/$target_dir/bin/llama-server" ] || die "not built: build/$ver-$b"
     fi
-    [ -e "$BUILD/latest-$b" ] && [ ! -L "$BUILD/latest-$b" ] && die "build/latest-$b is not a symlink"
+    [ -e "$BUILD/latest-$b" ] && [ ! -L "$BUILD/latest-$b" ] && die "$BUILD/latest-$b is not a symlink"
   done
   for b in $list; do
     # Re-resolve target_dir (exact dir name wins, as in the validation pass)

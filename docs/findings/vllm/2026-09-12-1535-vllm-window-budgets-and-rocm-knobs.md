@@ -480,7 +480,7 @@ acceptance (τ) reported per arm.
   llama-swap during Phase A and produced one false REFUSED and two EXITED arms. `gpu_exclusive.sh` gates
   *before* boot only. **Tool debt:** probes need a sentinel that samples residency throughout the arm and
   auto-quarantines — `scripts/bootarm.sh` has a minimal process-count version; it belongs in
-  `bench/lib/`.
+  `stack/gpu/`.
 - **Three script bugs, all found by the runs, all fixed:** `docker run --rm` destroyed exited arms' logs;
   the rerun label was hardcoded; the depth-curve printer and inline fit read `prompt_tok`/`ttft_p50`
   where `capture_engine.py` writes `prompt_tokens`/`ttft_s` (the JSONL was complete; tables come from

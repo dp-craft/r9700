@@ -2,7 +2,7 @@
 # stack/serve/vllm/start_vllm.sh — simple vLLM launcher for the R9700 (host venv, no Docker).
 # Design + rationale for every flag: notes/brainstorm/vllm-qwen38-r9700/vllm-qwen38-r9700.md (Recommendation).
 # Conventions mirror stack/serve/llamacpp/serve_llamacpp.sh (pidfile/log/cmdline in stack/serve/var/servers/<port>.*).
-# (Repo rule 6: no bench/ tool launches vLLM yet — fold this into bench/engine-bench/ if vLLM becomes regular.)
+# (Repo rule 6: no bench/ tool launches vLLM yet — fold this into stack/serve/vllm/serve_vllm.sh if vLLM becomes regular.)
 #
 # Usage:
 #   MTP=0 ./start_vllm.sh            # start (MTP=1 → --speculative-config mtp, k=SPEC_TOKENS)

@@ -10,7 +10,7 @@ campaign: campaigns/build-check/2026-10-07-1214-llamacpp-b11448
 - **GPU/Host:** AMD Radeon AI PRO R9700 (gfx1201), 32624 MiB · kernel 7.0.0-38-generic · HIP 7.16.26385-0000000 · Mesa 26.2.4 - kisak-mesa PPA · `HSA_OVERRIDE_GFX_VERSION=12.0.1`
 - **Model:** `Qwen3.8-27B-UD-Q4_K_XL.gguf` · KV **q8_0** · `-ngl 99 -fa on -ub 2048 -b 4096` · request shapes pp128 + tg64, pp512 + tg256, pp2048 + tg512 · r=2 · warmup pass pp1000 + pg1000,32 (dropped)
 - **Builds:** vulkan `b10969-vulkan-1.4.363.0` (10969 (391fac1)) → `b11448-vulkan-1.4.363.0` (11448 (ab09ea4))
-- **Data:** `campaigns/build-check/2026-10-07-1214-llamacpp-b11448/results/2026-10-07-1214-buildcmp-b11448/arms.json` → per-arm `bench/runs/<stamp>-model-buildcmp-<build>/` (`llama-bench.json`, `meta.txt`, `gpu_samples.csv`)
+- **Data:** `campaigns/build-check/2026-10-07-1214-llamacpp-b11448/results/2026-10-07-1214-buildcmp-b11448/arms.json` → per-arm `results/<stamp>-model-buildcmp-<build>/` (`llama-bench.json`, `meta.txt`) + `tmp/<same>/` (`gpu_samples.csv`, git-ignored) in the campaign
 
 ## Summary
 

@@ -36,7 +36,7 @@ takeaway: ⚠ CORRECTED 2026-07-16 by measurement — the original "p_min is ine
 | 4 | **`p_min` is NOT consulted on the `draft-mtp` path** — explicit post-merge TODO; MTP stops on n_max, drafts greedy top_k=1 | CLAIMED | PR #22673 + speculative.cpp | high (PR TODO + diff quoted) |
 | 5 | `n_max` default 3 (hard cap), `n_min` default 0 (discard-if-shorter); with p_min=0 only n_max limits draft length | CLAIMED | common.h @961e4b26a | high |
 | 6 | Verification **runs the full sampler chain** (penalties + temperature); on the *classic* path a penalty can therefore reject a draft token | CLAIMED | common/sampling.cpp | high |
-| 7 | Our own n_max sweep (35B MoE, ctx 4096): decode peaks at n_max 2–3 (155–160 t/s), acceptance falls 86%→37% as n_max 1→8 | MEASURED-BY-US | bench/runs/2026-07-16-0927-…/results.jsonl | high (n=1/cell, mechanism-grade) |
+| 7 | Our own n_max sweep (35B MoE, ctx 4096): decode peaks at n_max 2–3 (155–160 t/s), acceptance falls 86%→37% as n_max 1→8 | MEASURED-BY-US | campaigns/perf/2026-07-16-0927-mtp-sampler-tax/results/…/results.jsonl | high (n=1/cell, mechanism-grade) |
 | 8 | gfx1201/R9700-specific MTP issue exists (GPU not releasing load with MTP GGUFs) | CLAIMED | Issue #23251 | high (report names "R9700 [GFX 1201]") |
 
 ## Detail

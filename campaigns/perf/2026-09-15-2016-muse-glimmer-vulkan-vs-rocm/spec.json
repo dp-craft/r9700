@@ -42,7 +42,7 @@
     {
       "name": "muse-vulkan",
       "llama_swap_model": "muse-glimmer-30b-q5kl-f16-ctx128k-dflash",
-      "binary": "build/latest-vulkan/bin/llama-server (resolved at load; the measured pass ran b10969-vulkan-system — see build_design)",
+      "binary": "stack/llamacpp/var/builds/latest-vulkan/bin/llama-server (resolved at load; the measured pass ran b10969-vulkan-system — see build_design)",
       "env": [
         "GGML_VK_ALLOW_GRAPHICS_QUEUE=1"
       ],
@@ -96,7 +96,7 @@
     {
       "name": "muse-rocm",
       "llama_swap_model": "muse-glimmer-30b-q5kl-f16-ctx128k-dflash-rocm",
-      "binary": "build/latest-rocm/bin/llama-server",
+      "binary": "stack/llamacpp/var/builds/latest-rocm/bin/llama-server",
       "env": [
         "HSA_OVERRIDE_GFX_VERSION=12.0.1"
       ],
@@ -150,7 +150,7 @@
     {
       "name": "muse-rocm-b10969",
       "llama_swap_model": "muse-glimmer-30b-q5kl-f16-ctx128k-dflash-rocm",
-      "binary": "build/latest-rocm/bin/llama-server (operator flips latest-rocm -> b10969-rocm for this arm)",
+      "binary": "stack/llamacpp/var/builds/latest-rocm/bin/llama-server (operator flips latest-rocm -> b10969-rocm for this arm)",
       "env": [
         "HSA_OVERRIDE_GFX_VERSION=12.0.1"
       ],
@@ -204,7 +204,7 @@
     {
       "name": "muse-vulkan-stew675",
       "llama_swap_model": "muse-glimmer-30b-q5kl-f16-ctx128k-dflash",
-      "binary": "build/latest-vulkan/bin/llama-server (operator flips latest-vulkan -> b790cf51aa-stew675-vulkan-1.4.357.1 for this arm)",
+      "binary": "stack/llamacpp/var/builds/latest-vulkan/bin/llama-server (operator flips latest-vulkan -> b790cf51aa-stew675-vulkan-1.4.357.1 for this arm)",
       "env": [
         "GGML_VK_ALLOW_GRAPHICS_QUEUE=1"
       ],

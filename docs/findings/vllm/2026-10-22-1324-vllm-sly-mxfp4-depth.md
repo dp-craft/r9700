@@ -139,7 +139,7 @@ Boot attempts with MXFP4: 2 smoke/campaign boots, 0 boot failures, **1 of 2 boot
 | 13 | image version | PR #162 says 1.6.0 moved to vLLM 0.32.0; the pulled `1.6.0-rocm10.1` reports 0.31.0 | **OPEN** (recorded by digest) |
 
 Tool changes made in this session (all stress-tested; mock-server end-to-end + real run):
-`bench/engine-bench/vllm/{serve_vllm.sh,fetch_model.sh,profiles/}` (new) · `gen_campaign.py` (`engine: vllm`, `mode: conversation`, per-probe `warmup`) · `capture_engine.py` (`conversation` mode, wall-clock phase times, vLLM `/tokenize` + `delta.reasoning`, cut-stream = interrupted) · `stack/gpu/phase_power.py` (new) · `engine-bench/run.sh` (`MODE=conversation`, phase power, nonzero exit on failure) · `report.py` (conversation charts, power table + flag, per-series log-log fits).
+`stack/serve/vllm/{serve_vllm.sh,fetch_model.sh,profiles/}` (new) · `gen_campaign.py` (`engine: vllm`, `mode: conversation`, per-probe `warmup`) · `capture_engine.py` (`conversation` mode, wall-clock phase times, vLLM `/tokenize` + `delta.reasoning`, cut-stream = interrupted) · `stack/gpu/phase_power.py` (new) · `engine-bench/run.sh` (`MODE=conversation`, phase power, nonzero exit on failure) · `report.py` (conversation charts, power table + flag, per-series log-log fits).
 
 ## Recommended config (what this campaign ran)
 

@@ -8,7 +8,7 @@ forks = a new image tag or a new `profiles/<engine>/` folder; nothing compiles o
 
 | Where | What |
 |---|---|
-| `bench/engine-bench/vllm/` (repo) | `serve_vllm.sh` launcher, `fetch_model.sh`, `profiles/<engine>/{_engine,<model>}.env` |
+| `stack/serve/vllm/` (repo) | `serve_vllm.sh` launcher, `fetch_model.sh`, `profiles/<engine>/{_engine,<model>}.env` |
 | `/mnt/Lin1/work/vllm/sly-radiance/models/<org>__<repo>@<rev8>/` | pinned HF snapshots + `SOURCE.txt`, mounted read-only at `/model` |
 | `/mnt/Lin1/work/vllm/sly-radiance/cache/<image>@<tag>/` | vllm/inductor/triton/aiter compile caches, **one set per image tag** |
 | `/mnt/Lin1/work/vllm/sly-radiance/src/<tag>/` | upstream source checkout (templates, docs, reference scripts) |

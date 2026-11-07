@@ -193,7 +193,7 @@ These are recorded so nobody re-derives them and mistakes them for sourced facts
 **Verified locally (MEASURED, this box):**
 - `stack/llamacpp/var/builds/b9950-rocm/bin/llama-server --version` → `9950 (961e4b26a)` — matches the campaign's `/props` `build_info` exactly
 - `llama-server --help` (b9950) → `--reasoning-budget` legal values; `-rea/--reasoning on|off|auto`; `--spec-type … draft-mtp`
-- `campaigns/2026-07-14-hardest-tasks-27b-vs-35b/out/props_*.json` → `build_info: b9950-961e4b26a`, server default `min_p 0.05`, `reasoning_format: none`
+- `campaigns/quality/2026-07-14-0000-hardest-tasks-27b-vs-35b/tmp/props_*.json` → `build_info: b9950-961e4b26a`, server default `min_p 0.05`, `reasoning_format: none`
 
 **404 / not found:**
 - `unsloth.ai/docs/models/qwen3.6-how-to-run-and-fine-tune` — **404**; `docs.unsloth.ai` 301-redirects to `unsloth.ai/docs/`

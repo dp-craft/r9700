@@ -349,7 +349,7 @@ models:
   # kv_ram_gib -> Sly's KVCACHE=ram GPU->RAM prefix-cache tier. The id MUST equal the profile's
   # served model name (useModelName rewrites `model` to it).
   #
-  # MEASURED (dp-craft campaigns/2026-10-22-vllm-sly-mxfp4-dflash{,-170k}/analysis.md), Sly radiance
+  # MEASURED (dp-craft docs/findings/vllm/2026-10-22-{1406-vllm-sly-mxfp4-dflash,1506-vllm-sly-mxfp4-dflash-170k}.md), Sly radiance
   # 1.6.0 + amd/Qwen3.8-27B-Quark-AWQ-MXFP4 + DFlash2 k=7, fp8 KV, util 0.90: prefill 2,800 -> 1,500
   # tok/s (8k -> 136k), decode 87-137 tok/s cold / ~65 on fresh 1k thinking at 150k; device VRAM
   # peak 30,259 MiB, flat over time (no creep); KV pool 332,822 tok at ctx 170000 (51 % used by one

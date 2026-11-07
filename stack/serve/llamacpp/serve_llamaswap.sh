@@ -11,7 +11,7 @@
 #
 # Knobs (env): PORT(9292) MODEL(llama-swap model id; required for print/start) CONFIG(~/.config/llama-swap/config.yaml)
 #   LLAMASWAP_START(~/.config/llama-swap/start_llama_swap.sh) LOG_OUT(file: upstream llama-server log, captured
-#   from `start` until `stop`; follower pid in bench/.servers/llamaswap-$PORT.logpid) CURL(curl)
+#   from `start` until `stop`; follower pid in stack/serve/var/servers/llamaswap-$PORT.logpid) CURL(curl)
 #   LOAD_TIMEOUT_S(900: the preload request; also bounded by llama-swap's own healthCheckTimeout)
 #
 # Why the preload: llama-swap loads a model on the first request and, with sendLoadingState, streams

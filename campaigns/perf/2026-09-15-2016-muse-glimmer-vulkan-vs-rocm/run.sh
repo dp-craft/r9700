@@ -76,7 +76,7 @@ echo "$running" | grep -q "\"model\":\"$MODEL_ID\"" \
 echo "$running" | grep -q "\"state\":\"ready\"" \
   || { echo "MODEL-STILL-LOADING: '$MODEL_ID' is not ready yet — wait for llama-swap to finish loading, then re-run." >&2; exit 1; }
 # Which binary did the loaded server actually start from? Record it (rule 2) and warn if this
-# arm is not on the matched stew675 tree. The cmd path may be a symlink (build/latest-*), so
+# arm is not on the matched stew675 tree. The cmd path may be a symlink (stack/llamacpp/var/builds/latest-*), so
 # RESOLVE it before matching — 2026-09-15: the first vulkan pass ran b10969 via latest-vulkan
 # and only the literal string was checked, which would have passed a symlink pin silently.
 bin_path="$(MODEL_ID="$MODEL_ID" python3 -c 'import json, os, sys

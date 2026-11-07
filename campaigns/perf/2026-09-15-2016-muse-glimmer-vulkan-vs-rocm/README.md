@@ -20,7 +20,7 @@ why this campaign measures a **2×2 factorial**: {vulkan, rocm} × {b10969 upstr
 
 ## Build design — 2×2 factorial
 
-The llama-swap macros `${vulkan}` / `${rocm}` resolve to `build/latest-<backend>` symlinks, and the
+The llama-swap macros `${vulkan}` / `${rocm}` resolve to `stack/llamacpp/var/builds/latest-<backend>` symlinks, and the
 two are promoted **independently** (as of 2026-09-15: latest-vulkan → b10969-vulkan-system,
 latest-rocm → b790cf51aa-stew675-rocm). The original decision was a matched stew675 pair, but the
 first vulkan pass ran on b10969 anyway (the symlink was never flipped; the config still uses the

@@ -183,7 +183,7 @@ VLLM_KV_DTYPES = {"f16": None, "fp8": "fp8"}
 # measured them -- and llama-swap runs `serve_vllm.sh run`: the container in the FOREGROUND (--rm, no
 # -d), a free-VRAM floor before boot and the boot watchdog, stopped by the same `docker rm -f`. One
 # recipe for bench and serving; nothing is copied here. MEASURED for sly-radiance/qwen38-mxfp4-dflash:
-# dp-craft campaigns/2026-10-22-vllm-sly-mxfp4-dflash{,-170k}/analysis.md.
+# dp-craft docs/findings/vllm/2026-10-22-{1406-vllm-sly-mxfp4-dflash,1506-vllm-sly-mxfp4-dflash-170k}.md.
 # The row `id` MUST equal the profile's SERVED_NAME (passed as SERVED_NAME= too, but a profile may pin
 # it), because useModelName rewrites the request's `model` to the id.
 SERVE_VLLM = f"{REPO}/stack/serve/vllm/serve_vllm.sh"
