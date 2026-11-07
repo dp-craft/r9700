@@ -1,3 +1,9 @@
+<!-- meta
+date: 2026-07-14 00:00
+takeaway: Pre-summary (superseded by hardest-tasks-27b-vs-35b.md): **vendor presets are the worst settings** — `qwen-gen` −16.2 and `t03` −8.3 vs temp 0.6, both sig; budget 16384 is a wash (+0.3); quant ladder unresolvable (81/78/77/70); 35B reruns pay (hard 7%→20%).
+campaign: campaigns/quality/2026-07-14-0000-hardest-tasks-27b-vs-35b
+-->
+
 **Done — 210/210 replies captured, graded, judged, charted. `analysis.md` auto-written.** Nothing failed (`fails 0` across all 14 cells).
 
 ## The headline results

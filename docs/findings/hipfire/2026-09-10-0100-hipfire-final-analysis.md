@@ -1,3 +1,9 @@
+<!-- meta
+date: 2026-09-10 01:00
+takeaway: hipfire 0.3.0-beta on R9700 gfx1201 (Qwen3.8-27B): long-ctx prefill cliff is a dispatcher threshold — two flags recover **1.82×** at 73k, yet it still trails llama.cpp (146.7 vs 594 tok/s @73k), caches one conversation, wedges on 7/19 (37%) draft-free boots.
+campaign: campaigns/investigation/2026-09-10-0100-hipfire-engine-evaluation
+-->
+
 # hipfire — final analysis
 
 **Subject:** hipfire 0.3.0-beta as a local inference engine for agentic coding work

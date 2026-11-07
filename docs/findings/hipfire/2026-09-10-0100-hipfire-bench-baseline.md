@@ -1,3 +1,9 @@
+<!-- meta
+date: 2026-09-10 01:00
+takeaway: Partial (hipfire half pending ROCm): llama.cpp Vulkan baseline, R9700 — Qwen3.6-27B Q4_K_M decode **56.92** / prefill **805.65** tok/s, Qwen3.8-27B Q4_K_XL **54.90** / **843.33** (medians of 3); Qwen3.8 never finished coding (`content_chars = 0`).
+campaign: campaigns/investigation/2026-09-10-0100-hipfire-engine-evaluation
+-->
+
 # Bench: llama.cpp baseline on R9700 (gfx1201) — pre-hipfire reference
 
 **Date:** 2026-09-10 · **Host:** Ubuntu 24.04.4, kernel 7.0.0-30-generic

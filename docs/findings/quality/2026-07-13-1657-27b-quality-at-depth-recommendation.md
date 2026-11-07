@@ -1,3 +1,9 @@
+<!-- meta
+date: 2026-07-13 16:57
+takeaway: Top agentic configs at ~100k ctx, R9700: **27B Q4_K_M f16** (TS 78.3, 46.1 t/s, budget 4096), **27B Q6_K** (TS 80.9, 32.6 t/s), **35B-A3B** (TS 77.5, 120.1 t/s, budget 16384); quant ladder is a statistical null (max |t| 1.98 < 2.776), 35B is 2.6–3.7× faster.
+campaign: campaigns/quality/2026-07-13-1657-27b-quality-at-depth
+-->
+
 # Recommendation — top configs for an agentic dev system (100k ctx) — R9700 (gfx1201)
 
 > **Purpose.** Actionable "which config do I run, and how do I call it?" guidance for an agentic

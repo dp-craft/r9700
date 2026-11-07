@@ -1,3 +1,9 @@
+<!-- meta
+date: 2026-09-10 01:00
+takeaway: hipfire 0.3.0-beta vs llama.cpp Vulkan (R9700, Qwen3.8-27B): hipfire wins decode **120.00** vs **66.32** tok/s (+81%); llama.cpp wins prefill **858.35** vs **497.10** @6.4k and **595.12** vs **292.90** @70k — hipfire long-ctx prefill is single-core CPU-bound.
+campaign: campaigns/investigation/2026-09-10-0100-hipfire-engine-evaluation
+-->
+
 # hipfire vs llama.cpp on R9700 (gfx1201) — final benchmark
 
 **Date:** 2026-09-10 · **GPU:** AMD Radeon AI PRO R9700-class, `gfx1201` (RDNA4), 32 GB, 210 W cap

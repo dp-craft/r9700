@@ -1,3 +1,8 @@
+<!-- meta
+date: 2026-09-10 01:00
+takeaway: hipfire (Rust + HIP, OpenAI-compatible) fits the R9700: gfx1201 is a first-class validated target and llama-swap can front it like any server; the cost is prerequisites, since the box had neither the ROCm HIP SDK nor a Rust toolchain, and hipfire needs both (source build, JIT kernels).
+-->
+
 # Technical Research: hipfire alongside llama-swap
 
 Date: 2026-09-10
