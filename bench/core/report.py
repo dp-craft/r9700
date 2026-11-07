@@ -22,6 +22,9 @@ metrics become separate small-multiple panels, never a dual axis. Every mark is 
 color-independent data table is emitted, so nothing depends on color alone.
 
     python3 report.py RUN_DIR [RUN_DIR ...]          # writes <dir>/charts/*.svg + <dir>/appendix.md
+    python3 report.py CAMPAIGN_DIR                   # two-root campaign (<dir>/results/ exists): rows from results/,
+                                                     #   raw (GPU CSVs, arm dumps, outputs) from tmp/**; writes
+                                                     #   results/charts/*.svg + results/appendix.md + results/gpu_peaks.json
     python3 report.py CAMPAIGN_DIR --charts DIR --appendix FILE
     python3 report.py AGENTIC_RUN --include OTHER_AGENTIC_RUN --charts DIR --appendix FILE
 """
@@ -297,11 +300,54 @@ def lines(title, xlabels, series, ylabel, xlabel, w=720, h=340, sub="", ymin0=Tr
 
 
 # ============================================================ detect + load
+def campaign_layout(d):
+    """(results_dir, tmp_dir) when d is a two-root campaign dir (d/results/ exists), else None (flat legacy run dir)."""
+    r = os.path.join(d, "results")
+    return (r, os.path.join(d, "tmp")) if os.path.isdir(r) else None
+
+
+def _roots(d):
+    """Dirs searched for inputs: a flat run dir itself, or a campaign's results/ (rows) then tmp/ (raw)."""
+    lay = campaign_layout(d)
+    return list(lay) if lay else [d]
+
+
 def _find(d, name):
-    for cand in (os.path.join(d, name), os.path.join(d, "out", name)):
-        if os.path.exists(cand):
-            return cand
+    for root in _roots(d):
+        for cand in (os.path.join(root, name), os.path.join(root, "out", name)):
+            if os.path.exists(cand):
+                return cand
     return None
+
+
+def gpu_peaks(d):
+    """MEASURED peak VRAM / GTT (MiB) per sample CSV under a campaign's tmp/** (one CSV = one run/arm/server), so the
+    memory column survives without the git-ignored CSVs (iron rule 7). Paths are relative to the campaign dir."""
+    import csv, glob
+    lay = campaign_layout(d)
+    if not lay:
+        return []
+    out = []
+    for f in sorted(glob.glob(os.path.join(lay[1], "**", "*.csv"), recursive=True)):
+        if "gpu" not in os.path.basename(f).lower():
+            continue
+        try:
+            with open(f, encoding="utf-8", errors="replace") as fh:
+                rows = [r for r in csv.DictReader(fh) if (r.get("unix_ts") or "")[:1].isdigit()]
+        except (OSError, csv.Error):
+            continue
+        num = lambda r, k: float(r[k]) if (r.get(k) or "").replace(".", "", 1).isdigit() else None
+        vr = [v for v in (num(r, "vram_used_mib") for r in rows) if v is not None]
+        if not vr:
+            continue
+        gt = [v for v in (num(r, "gtt_used_mib") for r in rows) if v is not None]
+        rel = os.path.relpath(f, d)
+        out.append({"run": os.path.relpath(os.path.dirname(f), lay[1]), "csv": rel,
+                    "peak_vram_mib": int(max(vr)), "peak_gtt_mib": int(max(gt)) if gt else None,
+                    "load_vram_mib": int(vr[0]), "vram_total_mib": int(num(rows[0], "vram_total_mib") or 0) or None,
+                    "samples": len(vr), "quarantined": "quarantine" in rel.split(os.sep),
+                    "provenance": "MEASURED"})
+    return out
 
 
 def detect(d):
@@ -564,8 +610,8 @@ def render_throughput(d):
         ])
 
     # --- appendix ---
-    ftxt = os.path.join(d, "failures.txt")
-    fail_lines = [l.strip() for l in open(ftxt, encoding="utf-8")] if os.path.exists(ftxt) else []
+    ftxt = _find(d, "failures.txt") if campaign_layout(d) else os.path.join(d, "failures.txt")
+    fail_lines = [l.strip() for l in open(ftxt, encoding="utf-8")] if ftxt and os.path.exists(ftxt) else []
     fail_lines = [l for l in fail_lines if l]
     ap = []
     errrows = [r for r in ag if r.get("n_err")]
@@ -824,7 +870,8 @@ def _agentic_arm(arm):
 
 def agentic_arms(d):
     import glob
-    return sorted(p for p in glob.glob(os.path.join(d, "rep*", "*")) if os.path.isdir(os.path.join(p, "claude-project")))
+    return sorted(p for r in _roots(d) for p in glob.glob(os.path.join(r, "rep*", "*"))
+                  if os.path.isdir(os.path.join(p, "claude-project")))
 
 
 def render_agentic(d, include=()):
@@ -869,12 +916,25 @@ RENDERERS = {"quality": render_quality, "throughput": render_throughput, "sweep"
 
 # ============================================================ main
 def process(d, charts_dir=None, appendix_path=None, include=()):
+    lay = campaign_layout(d)
+    out_dir = lay[0] if lay else d               # campaign: everything generated goes to results/
+    if lay:
+        peaks = gpu_peaks(d)
+        if peaks:
+            ppath = os.path.join(out_dir, "gpu_peaks.json")
+            with open(ppath, "w", encoding="utf-8") as f:
+                json.dump({"generated_by": "bench/core/report.py",
+                           "provenance": "MEASURED: max over the samples of each GPU sample CSV "
+                                         "(stack/gpu/vram_sampler.py); csv paths relative to the campaign dir",
+                           "runs": peaks}, f, indent=1)
+                f.write("\n")
+            print(f"[gpu] wrote {len(peaks)} peak rows -> {ppath}")
     kind = detect(d)
     if not kind:
         print(f"skip {d}: no outputs.jsonl / results.jsonl / sweep-summary.json / rep*/<arm>/claude-project")
         return False
     files, ap = RENDERERS[kind](d, include) if kind == "agentic" else RENDERERS[kind](d)
-    cdir = charts_dir or os.path.join(d, "charts")
+    cdir = charts_dir or os.path.join(out_dir, "charts")
     os.makedirs(cdir, exist_ok=True)
     for name, content in files.items():
         with open(os.path.join(cdir, name), "w", encoding="utf-8") as f:
@@ -883,7 +943,7 @@ def process(d, charts_dir=None, appendix_path=None, include=()):
               "_Generated by `bench/core/report.py`. One fixed color per entity across all charts; "
               "each chart has a single axis (differently-scaled metrics are separate panels); "
               "SVGs are theme-aware (light/dark)._\n"]
-    apath = appendix_path or os.path.join(d, "appendix.md")
+    apath = appendix_path or os.path.join(out_dir, "appendix.md")
     with open(apath, "w", encoding="utf-8") as f:
         f.write("\n".join(header + ap) + "\n")
     print(f"[{kind}] wrote {len(files)} charts -> {cdir}/  + {apath}")
@@ -895,8 +955,9 @@ def process(d, charts_dir=None, appendix_path=None, include=()):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("run_dirs", nargs="+")
-    ap.add_argument("--charts", help="output dir for SVGs (default: <run_dir>/charts)")
-    ap.add_argument("--appendix", help="output appendix.md path (default: <run_dir>/appendix.md)")
+    ap.add_argument("--charts", help="output dir for SVGs (default: <run_dir>/charts, campaign: <dir>/results/charts)")
+    ap.add_argument("--appendix", help="output appendix.md path (default: <run_dir>/appendix.md, campaign: "
+                                       "<dir>/results/appendix.md)")
     ap.add_argument("--include", action="append", default=[],
                     help="agentic only: another agentic run dir whose arms join the comparison (repeatable; listed first)")
     a = ap.parse_args()

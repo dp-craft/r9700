@@ -147,5 +147,100 @@ class Agentic(unittest.TestCase):
         self.assertTrue(table[1].startswith("| v-arm | vllm |"))
 
 
+GPU_HDR = "unix_ts,vram_used_mib,vram_total_mib,gtt_used_mib,power_w,temp_c,sclk_mhz"
+THROUGHPUT_ROWS = [
+    {"kind": "aggregate", "engine": "llama.cpp", "label": "e-d8192", "concurrency": 1, "prompt_tokens": 8192,
+     "prefill_tok_s_p50": 900.0, "decode_tok_s_per_stream_p50": 40.0, "aggregate_tok_s": 40.0},
+    {"kind": "aggregate", "engine": "llama.cpp", "label": "e-d32768", "concurrency": 1, "prompt_tokens": 32768,
+     "prefill_tok_s_p50": 600.0, "decode_tok_s_per_stream_p50": 35.0, "aggregate_tok_s": 35.0},
+]
+
+
+def _write(path, text):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    open(path, "w").write(text)
+
+
+class Layout(unittest.TestCase):
+    """Two-root campaign dir (results/ + tmp/) vs a flat legacy run dir."""
+
+    def setUp(self):
+        self.root = tempfile.mkdtemp()
+        rows = "\n".join(json.dumps(r) for r in THROUGHPUT_ROWS) + "\n"
+        self.camp = os.path.join(self.root, "campaign")
+        _write(os.path.join(self.camp, "results", "results.jsonl"), rows)
+        _write(os.path.join(self.camp, "results", "failures.txt"), "e-d65536: boot failed\n")
+        _write(os.path.join(self.camp, "tmp", "run-a", "gpu_samples.csv"),
+               "\n".join([GPU_HDR, "1,20000,32624,100,50,40,500", "2,25000,32624,300,250,60,2500",
+                          "3,24000,32624,200,90,50,900", "# load_vram_used_mib=20000 peak_vram_used_mib=25000"]) + "\n")
+        _write(os.path.join(self.camp, "tmp", "out", "gpu_cfg-b.csv"),             # old shape: no gtt column
+               "unix_ts,vram_used_mib,vram_total_mib,power_w\n1,10000,32624,40\n2,12000,32624,80\n")
+        _write(os.path.join(self.camp, "tmp", "quarantine", "x", "gpu_samples.csv"), GPU_HDR + "\n1,31000,32624,5,1,1,1\n")
+        _write(os.path.join(self.camp, "tmp", "run-a", "not-gpu.csv"), "a,b\n1,2\n")  # ignored: not a GPU CSV
+        self.flat = os.path.join(self.root, "flat")
+        _write(os.path.join(self.flat, "results.jsonl"), rows)
+        _write(os.path.join(self.flat, "gpu_samples.csv"), GPU_HDR + "\n1,20000,32624,100,50,40,500\n")
+
+    def tearDown(self):
+        shutil.rmtree(self.root)
+
+    def test_campaign_writes_under_results(self):
+        self.assertTrue(report.process(self.camp))
+        res = os.path.join(self.camp, "results")
+        self.assertTrue(os.path.exists(os.path.join(res, "appendix.md")))
+        self.assertTrue(os.path.exists(os.path.join(res, "charts", "depth_prefill.svg")))
+        for stray in ("charts", "appendix.md", "gpu_peaks.json"):
+            self.assertFalse(os.path.exists(os.path.join(self.camp, stray)), stray)
+            self.assertFalse(os.path.exists(os.path.join(self.camp, "tmp", stray)), stray)
+        ap = open(os.path.join(res, "appendix.md")).read()
+        self.assertIn("](charts/depth_prefill.svg)", ap)              # relative link resolves from results/
+        self.assertIn("boot failed", ap)                               # failures.txt read from results/
+        peaks = json.load(open(os.path.join(res, "gpu_peaks.json")))
+        by = {r["csv"]: r for r in peaks["runs"]}
+        self.assertEqual(set(by), {os.path.join("tmp", "run-a", "gpu_samples.csv"),
+                                   os.path.join("tmp", "out", "gpu_cfg-b.csv"),
+                                   os.path.join("tmp", "quarantine", "x", "gpu_samples.csv")})
+        a = by[os.path.join("tmp", "run-a", "gpu_samples.csv")]
+        self.assertEqual((a["run"], a["peak_vram_mib"], a["peak_gtt_mib"], a["load_vram_mib"], a["samples"]),
+                         ("run-a", 25000, 300, 20000, 3))
+        self.assertEqual((a["provenance"], a["quarantined"], a["vram_total_mib"]), ("MEASURED", False, 32624))
+        b = by[os.path.join("tmp", "out", "gpu_cfg-b.csv")]
+        self.assertEqual((b["peak_vram_mib"], b["peak_gtt_mib"]), (12000, None))
+        self.assertTrue(by[os.path.join("tmp", "quarantine", "x", "gpu_samples.csv")]["quarantined"])
+
+    def test_campaign_quality_reads_outputs_from_tmp(self):
+        q = os.path.join(self.root, "q")
+        _write(os.path.join(q, "tmp", "out", "outputs.jsonl"),
+               json.dumps({"config": "c1", "task": "t1", "total_tokens": 100, "answer_tokens": 80, "think_tokens": 20}) + "\n")
+        _write(os.path.join(q, "results", "scores_deterministic.jsonl"),
+               json.dumps({"config": "c1", "task": "t1", "score": 1.0}) + "\n")
+        self.assertEqual(report.detect(q), "quality")
+        self.assertTrue(report.process(q))
+        self.assertTrue(os.path.exists(os.path.join(q, "results", "appendix.md")))
+        self.assertFalse(os.path.exists(os.path.join(q, "results", "gpu_peaks.json")))   # no GPU CSV: no file
+
+    def test_campaign_agentic_arms_live_in_tmp(self):
+        c = os.path.join(self.root, "ag")
+        os.makedirs(os.path.join(c, "results", "rep1", "a1"))              # committed copy: no transcripts
+        os.makedirs(os.path.join(c, "tmp", "rep1", "a1", "claude-project"))
+        self.assertEqual(report.agentic_arms(c), [os.path.join(c, "tmp", "rep1", "a1")])
+        self.assertEqual(report.detect(c), "agentic")
+
+    def test_flat_legacy_dir_unchanged(self):
+        self.assertIsNone(report.campaign_layout(self.flat))
+        self.assertTrue(report.process(self.flat))
+        self.assertTrue(os.path.exists(os.path.join(self.flat, "appendix.md")))
+        self.assertTrue(os.path.exists(os.path.join(self.flat, "charts", "depth_prefill.svg")))
+        self.assertFalse(os.path.exists(os.path.join(self.flat, "results")))
+        self.assertFalse(os.path.exists(os.path.join(self.flat, "gpu_peaks.json")))
+
+    def test_explicit_outputs_still_win(self):
+        out = os.path.join(self.root, "elsewhere")
+        self.assertTrue(report.process(self.camp, os.path.join(out, "c"), os.path.join(out, "a.md")))
+        self.assertTrue(os.path.exists(os.path.join(out, "a.md")))
+        self.assertTrue(os.path.exists(os.path.join(out, "c", "depth_prefill.svg")))
+        self.assertFalse(os.path.exists(os.path.join(self.camp, "results", "appendix.md")))
+
+
 if __name__ == "__main__":
     unittest.main()

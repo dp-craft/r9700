@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
 """compare_builds.py — llama-bench A/B: a new llama.cpp build vs the previous one, per backend.
 
-Skill: llamacpp-build. Reuses model-bench/run.sh (one invocation per arm) + lib/gpu_exclusive.sh.
+Skill: llamacpp-build. Reuses bench/perf/model-bench/run.sh (one invocation per arm) + stack/gpu/gpu_exclusive.sh.
 
   run --new VER [--backend vulkan|rocm|both] [--prev-vulkan NAME] [--prev-rocm NAME]
       [--reps 1] [--shapes 128:64,512:256,...] [--parallel N] [--model GGUF] [--dry-run]
-      Previous defaults to the build/latest-<backend> symlink target. Per backend: previous arm,
-      then new arm, each after gpu_exclusive.sh. llama-swap is stopped for the whole run and
-      restarted after it (also on failure / Ctrl-C / SIGTERM). Writes
-      bench/runs/<stamp>-buildcmp-<VER>/arms.json, then the report (same as `report`).
+      Previous defaults to the stack/llamacpp/var/builds/latest-<backend> symlink target. Per backend:
+      previous arm, then new arm, each after gpu_exclusive.sh. llama-swap is stopped for the whole run
+      and restarted after it (also on failure / Ctrl-C / SIGTERM). Creates its own campaign
+      campaigns/build-check/<stamp>-llamacpp-<VER>/ (README.md = the exact command; results/arms.json,
+      per-arm results/<stamp>-model-buildcmp-<build>/llama-bench.json, results/verdict.json; raw arm logs
+      + GPU samples under tmp/), then the report (same as `report`).
       --parallel N (optional, off by default): per build also N concurrent copies of the largest
       shape via llama-batched-bench (run.sh NPL=N).
   report CMP_DIR
-      (Re)generates docs/analysis/<stamp>-llamacpp-<VER>-build-check.md from arms.json + the arm run
-      dirs and runs docs/reindex.py. Deterministic: same inputs -> identical report.
+      (Re)generates docs/findings/llamacpp/build-checks/<stamp>-llamacpp-<VER>-build-check.md from arms.json
+      + the arm run dirs and runs docs/reindex.py. CMP_DIR = the campaign dir (or a legacy
+      <stamp>-buildcmp-<VER> dir holding arms.json). Deterministic: same inputs -> identical report.
 
 Each request shape P:G is measured twice in one llama-bench call: `pp P` (prefill t/s) and `-pg P,G`
 (the whole request: P prompt, then G generated). Decode t/s = G / (t_pg - t_pp).
@@ -33,10 +36,10 @@ import subprocess
 import sys
 import time
 
-REPO = pathlib.Path(__file__).resolve().parents[2]
-BUILD = REPO / "build"
-RUNS = REPO / "bench/runs"
-DOCS = REPO / "docs/analysis"
+REPO = next(p for p in pathlib.Path(__file__).resolve().parents if (p / ".git").exists())
+BUILD = REPO / "stack/llamacpp/var/builds"
+CAMPAIGNS = REPO / "campaigns/build-check"
+DOCS = REPO / "docs/findings/llamacpp/build-checks"
 RUN_SH = REPO / "bench/perf/model-bench/run.sh"
 GPU_EXCL = REPO / "stack/gpu/gpu_exclusive.sh"
 BUILD_SH = "stack/llamacpp/build_llamacpp.sh"
@@ -219,7 +222,8 @@ def warmup_shaders(name, cfg, _cmp_dir):
     if ex.returncode:
         die(f"gpu_exclusive.sh refused before shader warmup {label} (GPU not free):\n{ex.stdout}{ex.stderr}")
     env = {**os.environ, "LLAMA_BENCH": str(bench), "MODEL": cfg["model"], "UB": str(cfg["ub"]),
-           "BATCH": str(cfg["batch"]), "CTK": cfg["kv"], "CTV": cfg["kv"], "VRAM_SAMPLE": "0"}
+           "BATCH": str(cfg["batch"]), "CTK": cfg["kv"], "CTV": cfg["kv"], "VRAM_SAMPLE": "0",
+           "CAMPAIGN_DIR": str(_cmp_dir)}
     pps = sorted({p for p, _ in cfg["shapes"]})
     env.update(SLUG=f"warmup-{name}", PP=",".join(map(str, pps)), TG="0", DEPTH="0", NPL="",
                PG=" ".join(f"{p},{g}" for p, g in cfg["shapes"]), WARMUP="0", REPS="1")
@@ -256,7 +260,8 @@ def run_arm(name, be, cfg, cmp_dir, npl=0):
     if ex.returncode:
         die(f"gpu_exclusive.sh refused before arm {label} (GPU not free):\n{ex.stdout}{ex.stderr}")
     env = {**os.environ, "LLAMA_BENCH": str(bench), "MODEL": cfg["model"], "UB": str(cfg["ub"]),
-           "BATCH": str(cfg["batch"]), "CTK": cfg["kv"], "CTV": cfg["kv"], "VRAM_SAMPLE": "1"}
+           "BATCH": str(cfg["batch"]), "CTK": cfg["kv"], "CTV": cfg["kv"], "VRAM_SAMPLE": "1",
+           "CAMPAIGN_DIR": str(cmp_dir)}
     if npl:
         p, g = max(cfg["shapes"], key=sum)
         # DEPTH/REPS/WARMUP pinned to what batched-bench does (no depth, one run, its own warmup): an inherited
@@ -287,12 +292,18 @@ def run_arm(name, be, cfg, cmp_dir, npl=0):
     except BaseException:
         os.killpg(p.pid, signal.SIGKILL)
         raise
-    log = cmp_dir / f"arm-{name}{f'-par{npl}' if npl else ''}.log"
+    log = cmp_dir / "tmp" / f"arm-{name}{f'-par{npl}' if npl else ''}.log"
+    log.parent.mkdir(parents=True, exist_ok=True)
     log.write_text(out[-20000:] + "\n--- stderr ---\n" + err[-20000:])
     arm["secs"] = round(time.time() - t0, 1)
     m = re.search(r"→ results: (\S+)", out)
+    mr = re.search(r"→ raw: (\S+)", out)
     if m:
         arm["run_dir"] = str(pathlib.Path(m.group(1)).relative_to(REPO))
+    if mr:
+        arm["raw_dir"] = str(pathlib.Path(mr.group(1)).relative_to(REPO))
+        # keep the MEASURED memory in the committed arms.json: tmp/ (the sample CSV) is git-ignored
+        arm["mem"] = memory(REPO / arm["raw_dir"] / "gpu_samples.csv")
     if rc or not m:
         arm["failed"] = f"run.sh {rc if isinstance(rc, str) else f'exit {rc}'} — see {log.relative_to(REPO)}"
     print(f"  arm {label}: {'FAILED' if arm.get('failed') else 'ok'} in {arm['secs'] / 60:.1f} min", flush=True)
@@ -315,7 +326,7 @@ def cmd_run(a):
         if not prev_label:
             latest_base = resolve_latest(be)
             if latest_base is None:
-                die(f"no previous build for {be}: build/latest-{be} unset — pass --prev-{be}")
+                die(f"no previous build for {be}: {BUILD.relative_to(REPO)}/latest-{be} unset — pass --prev-{be}")
             prev_label = latest_base
         # Compare version tags (strip backend + SDK suffix) for the "already latest" check
         prev_ver = ver_of(prev_label, be)
@@ -328,9 +339,9 @@ def cmd_run(a):
         for n in (prev_actual, new_actual):
             for tool in ["llama-bench"] + (["llama-batched-bench"] if a.parallel else []):
                 if not os.access(BUILD / n / "bin" / tool, os.X_OK):
-                    die(f"[{be}] build/{n}/bin/{tool} missing — build it first ({BUILD_SH} build)")
+                    die(f"[{be}] {BUILD.relative_to(REPO)}/{n}/bin/{tool} missing — build it first ({BUILD_SH} build)")
             if not has_device(n, be):
-                die(f"[{be}] build/{n} exposes no {DEVICE[be]} device — it would silently run on the CPU "
+                die(f"[{be}] {BUILD.relative_to(REPO)}/{n} exposes no {DEVICE[be]} device — it would silently run on the CPU "
                     "(missing runtime libs?)")
         pairs.append((be, prev_actual, new_actual))
     if not pairs:
@@ -346,8 +357,11 @@ def cmd_run(a):
     if a.dry_run:
         return
     stamp = dt.datetime.now().strftime("%Y-%m-%d-%H%M")
-    cmp_dir = RUNS / f"{stamp}-buildcmp-{a.new}"
+    cmp_dir = CAMPAIGNS / f"{stamp}-llamacpp-{a.new}"
     cmp_dir.mkdir(parents=True, exist_ok=False)
+    (cmp_dir / "results").mkdir()
+    (cmp_dir / "tmp").mkdir()
+    write_readme(cmp_dir, a, pairs)
     doc = {"stamp": stamp, "new": a.new, "config": cfg, "arms": [],
            "env": {"kernel": sh("uname -r"), "hip": sh("hipconfig --version"),
                    "mesa": sh("vulkaninfo --summary 2>/dev/null | grep -m1 driverInfo | sed 's/.*= //'")}}
@@ -358,11 +372,50 @@ def cmd_run(a):
             for npl in [0] + ([a.parallel] if a.parallel else []):
                 for n in (prev, new):
                     doc["arms"].append(run_arm(n, be, run_cfg, cmp_dir, npl))
-                    (cmp_dir / "arms.json").write_text(json.dumps(doc, indent=2) + "\n")
+                    (cmp_dir / "results" / "arms.json").write_text(json.dumps(doc, indent=2) + "\n")
         report(cmp_dir)
     finally:
         if swap_was_up:
             start_swap()
+
+
+def write_readme(cmp_dir, a, pairs):
+    """Campaign recipe: the exact command that produced this campaign (resolved previous builds pinned)."""
+    cmd = (f"bench/build-check/compare_builds.py run --new {a.new} --backend {a.backend} "
+           + " ".join(f"--prev-{be} {prev}" for be, prev, _ in pairs)
+           + f" --reps {a.reps} --shapes {','.join(f'{p}:{g}' for p, g in a.shapes)}"
+           + (f" --parallel {a.parallel}" if a.parallel else "")
+           + (f" --model {a.model}" if a.model != MODEL else ""))
+    rel = cmp_dir.relative_to(REPO)
+    (cmp_dir / "README.md").write_text("\n".join([
+        f"# Build check: llama.cpp {a.new} vs previous", "",
+        f"Created by `bench/build-check/compare_builds.py run` (skill `/llamacpp-build`). "
+        f"Builds: {', '.join(f'{be} `{prev}` → `{new}`' for be, prev, new in pairs)}.", "",
+        "```bash", cmd, "```", "",
+        f"- `results/` — `arms.json` (config, env, per-arm dirs + MEASURED memory), per-arm "
+        "`<stamp>-model-buildcmp-<build>/llama-bench.json` + `meta.txt`, `verdict.json`",
+        "- `tmp/` (git-ignored) — arm logs `arm-<build>.log`, per-arm `llama-bench.err` + `gpu_samples.csv`",
+        f"- Report: `{DOCS.relative_to(REPO)}/{cmp_dir.name}-build-check.md` "
+        f"(regenerate: `bench/build-check/compare_builds.py report {rel}`)", ""]))
+
+
+def campaign_of(cmp_dir):
+    """campaigns/build-check/<stamp>-<slug> holding cmp_dir (itself, or a legacy dir inside its results/), else None."""
+    for p in (cmp_dir, *cmp_dir.parents):
+        if p.parent == CAMPAIGNS:
+            return p
+    return None
+
+
+def arm_dirs(a, camp):
+    """(results dir, raw dir) of one arm. Legacy arms.json rows point at bench/runs/<run>/ (moved by the 2026-11-06
+    restructure into <campaign>/results/<run>/ + <campaign>/tmp/<run>/); fall back there when the recorded path is gone."""
+    rd = REPO / a["run_dir"]
+    raw = REPO / a["raw_dir"] if a.get("raw_dir") else rd
+    if not rd.exists() and camp:
+        name = pathlib.Path(a["run_dir"]).name
+        rd, raw = camp / "results" / name, camp / "tmp" / name
+    return rd, raw
 
 
 # ---------------------------------------------------------------- report
@@ -378,12 +431,12 @@ def memory(path):
             "total": float(rows[0].get("vram_total_mib") or 0)}
 
 
-def load(arm, shapes):
+def load(arm, shapes, camp=None):
     """Arm -> per-shape results. Anything short of a complete result set counts as failed (iron rule 18)."""
     a = dict(arm)
     if a.get("failed"):
         return a
-    rd = REPO / a["run_dir"]
+    rd, raw = arm_dirs(a, camp)
     try:
         rows = json.loads((rd / "llama-bench.json").read_text())
     except (OSError, ValueError) as e:
@@ -406,16 +459,16 @@ def load(arm, shapes):
         tg = g / t_dec
         sd_dec = math.hypot(r_pg["stddev_ns"], r_pp["stddev_ns"]) / 1e9   # propagated; 0 at r=1
         res[(p, g)] = {"pp": (r_pp["avg_ts"], r_pp["stddev_ts"]), "tg": (tg, tg * sd_dec / t_dec), "req": t_pg}
-    return {**a, "shape": res, "mem": memory(rd / "gpu_samples.csv"),
+    return {**a, "shape": res, "mem": memory(raw / "gpu_samples.csv") or a.get("mem"),
             "version": f'{rows[0]["build_number"]} ({rows[0]["build_commit"]})'}
 
 
-def load_par(arm, npl):
+def load_par(arm, npl, camp=None):
     """--parallel arm -> totals over the N streams. Same completeness rule as load()."""
     a = dict(arm)
     if a.get("failed"):
         return a
-    rd = REPO / a["run_dir"]
+    rd, raw = arm_dirs(a, camp)
     try:
         rows = json.loads((rd / "batched-bench.json").read_text())
     except (OSError, ValueError) as e:
@@ -423,7 +476,7 @@ def load_par(arm, npl):
     r = next((r for r in rows if r["pl"] == npl), None)
     if not r:
         return {**a, "failed": f"no pl={npl} row in batched-bench.json"}
-    mem = memory(rd / "gpu_samples.csv")
+    mem = memory(raw / "gpu_samples.csv") or a.get("mem")
     if not mem or mem["peak_vram"] - mem["idle"] < PAR_MIN_RESIDENT_MIB:
         return {**a, "mem": mem, "failed": f"< {PAR_MIN_RESIDENT_MIB} MiB resident in VRAM — CPU fallback?"}
     return {**a, "pp": (r["speed_pp"], 0.0), "tg": (r["speed_tg"], 0.0), "req": r["t"], "mem": mem}
@@ -480,7 +533,14 @@ def pct_txt(e0, e1):
 
 def report(cmp_dir):
     cmp_dir = pathlib.Path(cmp_dir).resolve()
-    doc = json.loads((cmp_dir / "arms.json").read_text())
+    inner = sorted(cmp_dir.glob("results/*/arms.json"))
+    if not (cmp_dir / "results" / "arms.json").exists() and not (cmp_dir / "arms.json").exists():
+        if len(inner) != 1:
+            die(f"no arms.json in {cmp_dir} (looked in ., results/, results/*/)")
+        cmp_dir = inner[0].parent   # a pre-restructure campaign: arms.json sits in results/<stamp>-buildcmp-<ver>/
+    res_dir = cmp_dir / "results" if (cmp_dir / "results" / "arms.json").exists() else cmp_dir   # else legacy flat
+    camp = campaign_of(cmp_dir)
+    doc = json.loads((res_dir / "arms.json").read_text())
     cfg, env, new, stamp = doc["config"], doc["env"], doc["new"], doc["stamp"]
     if "shapes" not in cfg:
         die(f"{cmp_dir.name} is from the pre-shapes depth-sweep version — its report stays as generated")
@@ -490,9 +550,9 @@ def report(cmp_dir):
     per_be, par_be = {}, {}
     for x in doc["arms"]:
         if x.get("kind") == "par":
-            par_be.setdefault(x["backend"], []).append(load_par(x, npl))
+            par_be.setdefault(x["backend"], []).append(load_par(x, npl, camp))
         else:
-            per_be.setdefault(x["backend"], []).append(load(x, shapes))
+            per_be.setdefault(x["backend"], []).append(load(x, shapes, camp))
     res, par = [], {}  # res: (be, prev_arm, new_arm, verdict); par: be -> (prev, new) --parallel arms
     for be, xs in per_be.items():
         n = xs[1] if len(xs) > 1 else {"name": arm_name(new, be), "failed": "arm not run (interrupted)"}
@@ -523,7 +583,8 @@ def report(cmp_dir):
     par_txt = f" · {npl} concurrent × {shape_txt(hl)} (llama-batched-bench)" if npl else ""
 
     L = ["<!-- meta", f"date: {stamp[:10]} {stamp[11:13]}:{stamp[13:15]}",
-         f"takeaway: llama.cpp **{new}** build check on `{model}` / KV {cfg['kv']} — {take}.", "-->", "",
+         f"takeaway: llama.cpp **{new}** build check on `{model}` / KV {cfg['kv']} — {take}.",
+         *([f"campaign: {camp.relative_to(REPO)}"] if camp else []), "-->", "",
          f"# Build check: llama.cpp {new} vs previous — R9700 (gfx1201)", "",
          f"- **Date:** {stamp[:10]} {stamp[11:13]}:{stamp[13:15]} · **Track:** model-bench (llama-bench) · "
          f"generated by `bench/build-check/compare_builds.py` — do not hand-edit; regenerate with "
@@ -536,9 +597,10 @@ def report(cmp_dir):
          "- **Builds:** " + " · ".join(
              f"{be} `{p['name']}` ({p.get('version', '?')}) → `{n['name']}` ({n.get('version', '?')})"
              for be, p, n, _ in res),
-         f"- **Data:** `{cmp_rel}/arms.json` → per-arm `bench/runs/<stamp>-model-buildcmp-<build>/` "
-         "(`llama-bench.json`, `meta.txt`, `gpu_samples.csv`"
-         + ("; `buildcmp-par<N>-<build>/batched-bench.json`" if npl else "") + ")", "",
+         f"- **Data:** `{res_dir.relative_to(REPO)}/arms.json` → per-arm "
+         f"`{(camp or cmp_dir).relative_to(REPO)}/results/<stamp>-model-buildcmp-<build>/` (`llama-bench.json`, `meta.txt`"
+         + ("; `buildcmp-par<N>-<build>/batched-bench.json`" if npl else "")
+         + "); raw `tmp/<same>/` (`llama-bench.err`, `gpu_samples.csv` — git-ignored; memory kept in `arms.json`)", "",
          "## Summary", "",
          f"| Backend | Previous | New | Verdict | {wl} request (MEASURED) | Recommendation |", "|---|---|---|---|---|---|"]
     for be, p, n, v in res:
@@ -643,7 +705,11 @@ def report(cmp_dir):
           "```", ""]
 
     out = DOCS / f"{stamp}-llamacpp-{new}-build-check.md"
+    out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text("\n".join(L))
+    if res_dir != cmp_dir:   # campaign layout: the verdict is a committed result next to arms.json
+        (res_dir / "verdict.json").write_text(json.dumps({"verdict": verdicts, "report": str(out.relative_to(REPO))},
+                                                         indent=1) + "\n")
     ri = subprocess.run([sys.executable, str(REPO / "docs/reindex.py")], cwd=REPO, capture_output=True, text=True)
     print("\n" + "\n".join(L[L.index("## Summary") + 2: L.index("## Legend") - 1]))
     print("\n" + "\n".join(detail[2:]))
@@ -659,8 +725,8 @@ def main():
     r = sub.add_parser("run", help="bench previous vs new build per backend, then report")
     r.add_argument("--new", required=True, help="new build version, e.g. b10906")
     r.add_argument("--backend", choices=["vulkan", "rocm", "both"], default="both")
-    r.add_argument("--prev-vulkan", help="previous vulkan build (default: build/latest-vulkan target)")
-    r.add_argument("--prev-rocm", help="previous rocm build (default: build/latest-rocm target)")
+    r.add_argument("--prev-vulkan", help="previous vulkan build (default: stack/llamacpp/var/builds/latest-vulkan target)")
+    r.add_argument("--prev-rocm", help="previous rocm build (default: stack/llamacpp/var/builds/latest-rocm target)")
     r.add_argument("--reps", type=int, default=1)
     r.add_argument("--shapes", default=SHAPES, help="request shapes P:G,P:G (prompt:generated)",
                    type=lambda s: [tuple(int(x) for x in t.split(":")) for t in s.split(",")])
@@ -668,7 +734,8 @@ def main():
                    help="also run N concurrent copies of the largest shape per build (llama-batched-bench)")
     r.add_argument("--model", default=MODEL)
     r.add_argument("--dry-run", action="store_true", help="print the plan + ETA, run nothing")
-    g = sub.add_parser("report", help="regenerate the report from a bench/runs/<stamp>-buildcmp-<VER> dir")
+    g = sub.add_parser("report", help="regenerate the report from a campaigns/build-check/<stamp>-llamacpp-<VER> dir "
+                                      "(or a legacy <stamp>-buildcmp-<VER> dir holding arms.json)")
     g.add_argument("cmp_dir")
     a = ap.parse_args()
     cmd_run(a) if a.cmd == "run" else report(a.cmp_dir)

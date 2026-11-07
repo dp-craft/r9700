@@ -1,27 +1,32 @@
 #!/usr/bin/env bash
 # model-bench — single-engine tuning microscope via llama.cpp `llama-bench`.
 # Sweeps knobs (comma-separated values are swept by llama-bench in one invocation), holds the rest
-# fixed, emits canonical JSON to bench/runs/. Vendor-neutral: AMD/NVIDIA detected via
+# fixed, emits canonical JSON into a campaign dir: raw (stderr, logs, GPU samples) ->
+# $CAMPAIGN_DIR/tmp/<stamp>-model-<slug>/, results (llama-bench.json / batched-bench.json, meta.txt) ->
+# $CAMPAIGN_DIR/results/<stamp>-model-<slug>/. Vendor-neutral: AMD/NVIDIA detected via
 # stack/gpu/gpu_env.sh — on NVIDIA just point LLAMA_BENCH at a CUDA build.
 #
 # Usage:
-#   MODEL=/home/dev/models/gguf/Qwen3.6-27B-Q4_K_S.gguf SLUG=27b-ubsweep ./run.sh
-#   NPL=2 PP=32768 TG=2048 MODEL=… ./run.sh    # N concurrent requests: llama-batched-bench from the same bin/
+#   CAMPAIGN_DIR=campaigns/perf/<stamp>-<slug> MODEL=/home/dev/models/gguf/Qwen3.6-27B-Q4_K_S.gguf SLUG=27b-ubsweep ./run.sh
+#   NPL=2 PP=32768 TG=2048 CAMPAIGN_DIR=… MODEL=… ./run.sh    # N concurrent requests: llama-batched-bench from the same bin/
 #
 # For the ADAPTIVE optimum search (expands the grid until the peak is interior), use ./sweep.py.
 # Override any knob via env (defaults below). See ./README.md for the full menu.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO="$(cd "$HERE/../.." && pwd)"
+REPO="$(git -C "$HERE" rev-parse --show-toplevel)"
+USAGE="usage: CAMPAIGN_DIR=campaigns/<type>/<stamp>-<slug> MODEL=/path/to/model.gguf [SLUG=…] $0"
+[ -n "${CAMPAIGN_DIR:-}" ] || { echo "CAMPAIGN_DIR is not set — $USAGE" >&2; exit 2; }
+CAMPAIGN_DIR="$(realpath -m "$CAMPAIGN_DIR")"
 
 # --- environment (vendor-aware) ---
 source "$REPO/stack/gpu/gpu_env.sh"
 gpu_setup_env
-# ROCm build by default; Vulkan: LLAMA_BENCH=$REPO/stack/llamacpp/var/builds/b9950-vulkan/bin/llama-bench
+# ROCm build by default; Vulkan: LLAMA_BENCH=$REPO/stack/llamacpp/var/builds/latest-vulkan/bin/llama-bench
 # NVIDIA/other: LLAMA_BENCH=/path/to/cuda-build/llama-bench
-: "${LLAMA_BENCH:=$REPO/stack/llamacpp/var/builds/b9949-rocm/bin/llama-bench}"
-: "${MODEL:?set MODEL=/path/to/model.gguf}"
+: "${LLAMA_BENCH:=$REPO/stack/llamacpp/var/builds/latest-rocm/bin/llama-bench}"
+: "${MODEL:?set MODEL=/path/to/model.gguf — $USAGE}"
 : "${SLUG:=modelbench}"
 
 # --- sweep knobs (comma-separated = swept) ---
@@ -50,8 +55,9 @@ if [ -n "$NPL" ]; then
 fi
 
 STAMP="$(date '+%Y-%m-%d-%H%M')"
-OUT="$REPO/bench/runs/${STAMP}-model-${SLUG}"
-mkdir -p "$OUT"
+OUT="$CAMPAIGN_DIR/results/${STAMP}-model-${SLUG}"   # results: meta.txt + llama-bench.json / batched-bench.json
+RAW="$CAMPAIGN_DIR/tmp/${STAMP}-model-${SLUG}"       # raw: llama-bench.err, batched-bench.log, gpu_samples.csv
+mkdir -p "$OUT" "$RAW"
 
 # Record exact invocation + environment for reproducibility (iron rule #2).
 {
@@ -65,7 +71,7 @@ mkdir -p "$OUT"
 
 SAMPLER_PID=""
 if [ "$VRAM_SAMPLE" = "1" ]; then
-  python3 "$REPO/stack/gpu/vram_sampler.py" --out "$OUT/gpu_samples.csv" --interval 1 &
+  python3 "$REPO/stack/gpu/vram_sampler.py" --out "$RAW/gpu_samples.csv" --interval 1 &
   SAMPLER_PID=$!
 fi
 cleanup() { [ -n "$SAMPLER_PID" ] && kill "$SAMPLER_PID" 2>/dev/null || true; }
@@ -75,16 +81,16 @@ if [ -n "$NPL" ]; then
   # every sequence holds its own prompt + generation (no shared prompt) → ctx = NPL × (PP + TG)
   set -x
   "$BATCHED" -m "$MODEL" -c "$(( NPL * (PP + TG) ))" -npp "$PP" -ntg "$TG" -npl "$NPL" \
-    -ngl "$NGL" -fa "$FA" -ub "$UB" -b "$BATCH" -ctk "$CTK" -ctv "$CTV" > "$OUT/batched-bench.log" 2>&1
+    -ngl "$NGL" -fa "$FA" -ub "$UB" -b "$BATCH" -ctk "$CTK" -ctv "$CTV" > "$RAW/batched-bench.log" 2>&1
   set +x
   "$BATCHED" --version 2>&1 | grep -m1 '^version:' >> "$OUT/meta.txt" || true
   # Markdown result rows → canonical JSON (older builds have no --output-format jsonl).
-  python3 - "$OUT" <<'EOF'
+  python3 - "$OUT" "$RAW" <<'EOF'
 import json, re, sys
-out = sys.argv[1]
+out, raw = sys.argv[1], sys.argv[2]
 keys = ["pp", "tg", "pl", "n_kv", "t_pp", "speed_pp", "t_tg", "speed_tg", "t", "speed"]
 rows = []
-for line in open(f"{out}/batched-bench.log", errors="replace"):
+for line in open(f"{raw}/batched-bench.log", errors="replace"):
     if re.match(r"^\|\s*\d+ \|", line):
         vals = [x.strip() for x in line.strip().strip("|").split("|")]
         rows.append({k: (int(v) if i < 4 else float(v)) for i, (k, v) in enumerate(zip(keys, vals))})
@@ -100,7 +106,7 @@ else
   "$LLAMA_BENCH" -m "$MODEL" \
     -p "$PP" -n "$TG" -d "$DEPTH" -ngl "$NGL" -fa "$FA" \
     -ub "$UB" -b "$BATCH" -ctk "$CTK" -ctv "$CTV" \
-    -r "$REPS" "${EXTRA[@]}" --progress -o json 2> "$OUT/llama-bench.err" | tee "$OUT/llama-bench.json"
+    -r "$REPS" "${EXTRA[@]}" --progress -o json 2> "$RAW/llama-bench.err" | tee "$OUT/llama-bench.json"
   set +x
 
   # llama-bench JSON rows carry build info — surface it into meta.txt (unversioned = noise).
@@ -116,4 +122,5 @@ if rows:
 EOF
 fi
 
+echo "→ raw: $RAW"
 echo "→ results: $OUT"

@@ -12,14 +12,17 @@ KV stage (default on): at the winning config, f16 vs q8_0 KV is measured at --kv
 depth. q8_0 is ACCEPTED only if BOTH prefill and decode lose ≤ --kv-max-loss-pct (default 5%);
 the report includes the measured VRAM saving either way.
 
-Every llama-bench invocation is stored raw (invocations/*.json), every measured point becomes a
-line in sweep-log.jsonl, and sweep-summary.json holds the curves, decisions and the final
-recommended config. GPU VRAM/power is sampled per invocation (stack/gpu/vram_sampler.py).
+Output goes into a campaign dir (--campaign-dir, or env CAMPAIGN_DIR; required): every llama-bench
+invocation is stored raw (stderr, JSON, per-invocation GPU samples) in
+<campaign>/tmp/<stamp>-sweep-<slug>/invocations/; every measured point becomes a line in
+<campaign>/results/<stamp>-sweep-<slug>/sweep-log.jsonl, and sweep-summary.json + meta.txt there hold
+the curves, decisions and the final recommended config. GPU VRAM/power is sampled per invocation
+(stack/gpu/vram_sampler.py); the peak lands in each sweep-log row.
 
 Usage:
-  ./sweep.py --model /home/dev/models/gguf/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf --slug 35b-rocm
-  ./sweep.py --model ... --llama-bench ../llamacpp-vulkan/llama-bench --slug 35b-vulkan
-  ./sweep.py --model ... --pp 8192 --tg 256 --kv-depth 32768 --dry-run
+  ./sweep.py --campaign-dir campaigns/perf/<stamp>-<slug> --model /home/dev/models/gguf/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf --slug 35b-rocm
+  ./sweep.py --campaign-dir … --model ... --llama-bench stack/llamacpp/var/builds/latest-vulkan/bin/llama-bench --slug 35b-vulkan
+  ./sweep.py --campaign-dir … --model ... --pp 8192 --tg 256 --kv-depth 32768 --dry-run
 
 Vendor notes: AMD is auto-detected (HSA_OVERRIDE_GFX_VERSION exported if unset); on NVIDIA just
 pass a CUDA llama-bench via --llama-bench. Pure stdlib.
@@ -27,7 +30,7 @@ pass a CUDA llama-bench via --llama-bench. Pure stdlib.
 import argparse, datetime, json, os, pathlib, shutil, signal, subprocess, sys, time
 
 HERE = pathlib.Path(__file__).resolve().parent
-REPO = HERE.parent.parent
+REPO = next(p for p in HERE.parents if (p / ".git").exists())
 SAMPLER = REPO / "stack/gpu/vram_sampler.py"
 
 UB_CAPS = (64, 16384)
@@ -55,8 +58,8 @@ def gpu_meta_lines():
 class Bench:
     """Runs llama-bench invocations, caches measured points, logs everything."""
 
-    def __init__(self, args, outdir, env):
-        self.args, self.out, self.env = args, outdir, env
+    def __init__(self, args, outdir, env, rawdir):
+        self.args, self.out, self.env, self.raw = args, outdir, env, rawdir
         self.cache = {}          # key -> point dict
         self.n_invocations = 0
         self.log = open(outdir / "sweep-log.jsonl", "a")
@@ -87,7 +90,7 @@ class Bench:
         print(f"  [{tag}] {' '.join(cmd)}", flush=True)
         if a.dry_run:
             return
-        inv_dir = self.out / "invocations"; inv_dir.mkdir(exist_ok=True)
+        inv_dir = self.raw / "invocations"; inv_dir.mkdir(parents=True, exist_ok=True)
         sampler = subprocess.Popen([sys.executable, str(SAMPLER),
                                     "--out", str(inv_dir / f"{tag}.gpu.csv"), "--interval", "1"])
         t0 = time.time()
@@ -206,8 +209,11 @@ def sweep_numeric_axis(bench, axis, grid, fixed, metric, noise_pct, caps):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--campaign-dir", default=os.environ.get("CAMPAIGN_DIR"),
+                    help="campaign dir (default: env CAMPAIGN_DIR; required): raw -> <dir>/tmp/<stamp>-sweep-<slug>/, "
+                         "results -> <dir>/results/<stamp>-sweep-<slug>/")
     ap.add_argument("--model", required=True)
-    ap.add_argument("--llama-bench", default=str(REPO / "stack/llamacpp/var/builds/b9949-rocm/bin/llama-bench"))
+    ap.add_argument("--llama-bench", default=str(REPO / "stack/llamacpp/var/builds/latest-rocm/bin/llama-bench"))
     ap.add_argument("--slug", default="sweep")
     ap.add_argument("--pp", type=int, default=8192, help="prefill size measured (tokens)")
     ap.add_argument("--tg", type=int, default=128, help="decode tokens measured")
@@ -229,13 +235,17 @@ def main():
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
 
+    if not a.campaign_dir:
+        ap.error("no campaign dir — pass --campaign-dir campaigns/<type>/<stamp>-<slug> or set CAMPAIGN_DIR")
     if not pathlib.Path(a.model).is_file():
         sys.exit(f"model not found: {a.model}")
     if not os.access(a.llama_bench, os.X_OK):
         sys.exit(f"llama-bench not executable: {a.llama_bench}")
 
     stamp = datetime.datetime.now().strftime("%Y-%m-%d-%H%M")
-    out = REPO / "bench/runs" / f"{stamp}-sweep-{a.slug}"
+    camp = pathlib.Path(a.campaign_dir).resolve()
+    out = camp / "results" / f"{stamp}-sweep-{a.slug}"     # sweep-log.jsonl, sweep-summary.json, meta.txt
+    raw = camp / "tmp" / f"{stamp}-sweep-{a.slug}"         # invocations/ (stderr, json, gpu csv)
     out.mkdir(parents=True, exist_ok=True)
     env = setup_env()
     meta = [f"date={datetime.datetime.now().isoformat()}",
@@ -244,9 +254,9 @@ def main():
             f"llama_bench={a.llama_bench}", f"model={a.model}",
             f"sweep_args={vars(a)}"]
     (out / "meta.txt").write_text("\n".join(str(m) for m in meta) + "\n")
-    print(f"sweep → {out}")
+    print(f"sweep → {out}  (raw: {raw})")
 
-    bench = Bench(a, out, env)
+    bench = Bench(a, out, env, raw)
     fixed = {"ub": int(a.ub_grid.split(",")[0]), "batch": int(a.batch_grid.split(",")[0]),
              "fa": "on", "kv": "f16", "depth": a.depth}
     summary = {"model": a.model, "llama_bench": a.llama_bench, "pp": a.pp, "tg": a.tg,
