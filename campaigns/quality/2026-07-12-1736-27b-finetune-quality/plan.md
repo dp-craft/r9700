@@ -1,17 +1,20 @@
 # Qwen3.6-27B fine-tune shootout — output quality + token usage (R9700)
 
 *This is the campaign **runbook** (a plan, run across sessions). The results write-up lands in
-`analysis.md` (co-located, registered in `docs/INDEX.md`) after Phase C. Scaffolded from `spec.json`
-by `bench/core/gen_campaign.py` (`kind: quality`) → generated `run.sh`.*
+`docs/findings/quality/2026-07-12-1736-27b-finetune-quality.md` (registered in `docs/INDEX.md`) after
+Phase C. Scaffolded from `spec.json` by `bench/core/gen_campaign.py` (`kind: quality`) → generated
+`run.sh`.*
 
 > **⚠ Reproducing the committed data vs. running fresh (2026-07-16 merge note).** The results in
-> `analysis.md`/`out/` were captured by this dir's own `run_capture.sh` → `capture.py` →
-> `make_charts.py`, which **remain here and are the authoritative reproduction path** — they carry the
-> `--min-p`/`--presence-penalty` passthrough, the incomplete-stream guard (Iron Rule 15), and the
-> row-level resume the committed rows depend on. The `spec.json` → `run.sh` → `bench/core/capture_engine.py`
-> pipeline described below is the **go-forward** path for *new* runs; per the merge review it is **not
-> yet a drop-in reproducer** for the committed rows (capture_engine lacks those three capabilities), so
-> use `run_capture.sh` to reproduce and `run.sh` for fresh work until they are ported.
+> `docs/findings/quality/2026-07-12-1736-27b-finetune-quality.md` (from this dir's `tmp/` + `results/`)
+> were captured by this dir's own `run_capture.sh`, which drives the shared tools
+> `bench/quality/capture.py` + `bench/quality/graders/` — **that is the authoritative reproduction path**: it
+> carries the `--min-p`/`--presence-penalty` passthrough, the incomplete-stream guard (Iron Rule 15), and
+> the row-level resume the committed rows depend on. The `spec.json` → `run.sh` →
+> `bench/core/capture_engine.py` pipeline described below is the **go-forward** path for *new* runs; per the
+> merge review it is **not yet a drop-in reproducer** for the committed rows (capture_engine lacks those
+> three capabilities), so use `run_capture.sh` to reproduce and `run.sh` for fresh work until they are
+> ported.
 
 - **Date:** 2026-07-12 · **Status:** ready to execute
 - **Owner split:** Phase A (downloads + GPU capture + deterministic scoring) is **run manually**;
@@ -58,7 +61,7 @@ Sampling (Qwen3.6 card / GGUF defaults): **temp 1.0, top_p 0.95, top_k 20, seed 
 ctx 32768 is far more than any task needs and keeps VRAM identical across configs so the memory
 column is comparable. MTP via `mtp:1` (`--spec-type draft-mtp`) for `unsloth-mtp-on` only.
 
-## 3. Task set — `tasks/tasks.jsonl`
+## 3. Task set — `inputs/tasks/tasks.jsonl`
 
 **9 deterministic** (auto-graded, objective — no judge) + **3 judge** (open-ended, blind rubric):
 
@@ -83,7 +86,7 @@ block) so grading needs no model.
 
 ## 4. Metrics captured (everything measurable)
 
-Per config × task × rep (`out/outputs.jsonl`, streamed so latency is real) — captured by
+Per config × task × rep (`tmp/outputs.jsonl`, streamed so latency is real) — captured by
 `bench/core/capture_engine.py tasks`:
 - **Tokens / economy:** `prompt/completion/total/cached_tokens`, **`think_tokens`** (headline),
   `answer_tokens`.
@@ -95,7 +98,7 @@ Per config × task × rep (`out/outputs.jsonl`, streamed so latency is real) —
   `max_tokens` mid-`<think>` → no answer; auto-fails grading — a real inefficiency signal).
 - **Provenance + full response text** (saved for re-analysis / the judge).
 
-Per config (`out/vram.jsonl` + `out/gpu_<config>.csv` from `vram_sampler.py`):
+Per config (`tmp/vram.jsonl` + `tmp/gpu_<config>.csv` from `vram_sampler.py`):
 `vram_used_mib_at_load`, `peak_vram_used_mib`, **`peak_gtt_used_mib`** (host-RAM spill), `avg/peak_
 power_w`, `peak_temp_c`, `avg/peak_sclk_mhz`, `load_time_s`, `weights_gib`; plus
 `props_<config>.json` (build + effective settings).
@@ -140,14 +143,14 @@ bash campaigns/quality/2026-07-12-1736-27b-finetune-quality/run.sh          # al
 # ONLY='unsloth*' REPS=3 bash campaigns/quality/2026-07-12-1736-27b-finetune-quality/run.sh
 ```
 The generated `run.sh` serves each config, samples VRAM/GTT/power/thermal across the probe, sends all
-12 tasks via `capture_engine tasks`, stops the server; **resumable** (`out/done/`), **continues past a
-failed config** (`out/failures.txt`), and **skips any model predicted over the VRAM budget**. It ends
+12 tasks via `capture_engine tasks`, stops the server; **resumable** (`tmp/done/`), **continues past a
+failed config** (`results/failures.txt`), and **skips any model predicted over the VRAM budget**. It ends
 by running `bench/quality/graders/score_deterministic.py` (pass% table) and `bench/core/report.py`
-(SVG charts + `appendix.md`). ⚠️ `pyexec` **runs model-generated code** in a subprocess+timeout — fine
+(SVG charts + `results/appendix.md`). ⚠️ `pyexec` **runs model-generated code** in a subprocess+timeout — fine
 on this box; be aware. Est. runtime ≈ **30–60 min** at reps 1.
 
 > **Clean re-run:** if a previous partial run left stale rows, `rm -rf
-> campaigns/quality/2026-07-12-1736-27b-finetune-quality/out` before re-running so every config captures the full
+> campaigns/quality/2026-07-12-1736-27b-finetune-quality/tmp` before re-running so every config captures the full
 > schema uniformly (done-markers would otherwise skip finished configs).
 
 ---
@@ -161,7 +164,7 @@ like "uncensored"/"opus" must not bias the grade):
 python3 bench/quality/graders/prepare_judge.py \
   --outputs campaigns/quality/2026-07-12-1736-27b-finetune-quality/tmp/outputs.jsonl \
   --tasks   campaigns/quality/2026-07-12-1736-27b-finetune-quality/inputs/tasks/tasks.jsonl \
-  --out     campaigns/quality/2026-07-12-1736-27b-finetune-quality/out/judge_bundle.md
+  --out     campaigns/quality/2026-07-12-1736-27b-finetune-quality/tmp/judge_bundle.md
 ```
 
 Paste the **entire** `judge_bundle.md` into a Claude session under this exact prompt:
@@ -180,10 +183,10 @@ cache** while SSM layers keep a **fixed-size state** → sub-linear KV growth / 
 bonus for the recall trade-off of linear attention. `refactor-fn` expects `is not None` (not
 `!= None`), `isinstance`, f-strings/`str()` unification, `urllib.parse.urlencode` or clear naming.
 
-Save Claude's JSON array to `out/judge_raw.json`, then fold it in and re-render:
+Save Claude's JSON array to `tmp/judge_raw.json`, then fold it in and re-render:
 ```bash
 python3 bench/quality/graders/apply_judge_scores.py \
-  --raw campaigns/quality/2026-07-12-1736-27b-finetune-quality/out/judge_raw.json \
+  --raw campaigns/quality/2026-07-12-1736-27b-finetune-quality/tmp/judge_raw.json \
   --out campaigns/quality/2026-07-12-1736-27b-finetune-quality/results/judge_scores.jsonl
 python3 bench/core/report.py campaigns/quality/2026-07-12-1736-27b-finetune-quality   # re-render WITH judge data
 ```
@@ -192,36 +195,42 @@ paste can't silently corrupt the analysis.
 
 ## Phase C — AGGREGATE, CHART & WRITE UP (Claude → benchmark-results skill)
 
-Charts are already generated by `run.sh` / the Phase-B re-render (`bench/core/report.py` → `charts/*.svg`
-+ `appendix.md`): quality-vs-cost scatter (headline efficient frontier), deterministic accuracy, judge
+Charts are already generated by `run.sh` / the Phase-B re-render (`bench/core/report.py` →
+`results/charts/*.svg` + `results/appendix.md`): quality-vs-cost scatter (headline efficient frontier),
+deterministic accuracy, judge
 score, token economy (think vs answer), throughput (decode/prefill), latency (ttft→ttfa dumbbell),
 memory·power·thermal small-multiples, per-task heatmap. One fixed color per config across all charts,
 one axis each, direct labels + data table (validated palette).
 
-Write `analysis.md` (co-located; summary + table first; **memory column mandatory**), one row/config:
+Write the write-up (`docs/findings/quality/2026-07-12-1736-27b-finetune-quality.md`; summary + table
+first; **memory column mandatory**), one row/config:
 
 | config | mtp | det pass% | judge /5 | mean think tok | mean total tok | quality/1k tok | decode tok/s | ttfa s | peak VRAM | peak GTT | avg W |
 |--------|:---:|----------:|---------:|---------------:|---------------:|---------------:|-------------:|-------:|----------:|---------:|------:|
 
 Then: per-dimension judge breakdown; **token-economy finding** (think-token spread on ★ tasks — who
 reasons efficiently vs who rambles); **MTP on/off** decode delta on the unsloth build; truncation rate;
-efficient-frontier read. Rows `MEASURED` (cite `out/…`); judge scores `INFERRED` (blind LLM-judge, temp
-noted). Embed `appendix.md` at the end of `analysis.md`, add a `<!-- meta -->` block, run `docs/reindex.py`.
+efficient-frontier read. Rows `MEASURED` (cite `tmp/` + `results/`); judge scores `INFERRED` (blind
+LLM-judge, temp noted). Embed `results/appendix.md` at the end of the write-up, add a `<!-- meta -->`
+block, run `docs/reindex.py`.
 
 ## File map (campaign dir)
 ```
 spec.json          the campaign definition (configs, serving, vram guard) — edit + regenerate run.sh
 plan.md            this runbook
-tasks/tasks.jsonl  12 tasks + grader specs
+run_capture.sh     Phase-A driver — this dir's own; drives bench/quality/capture.py + bench/quality/graders/
 run.sh             GENERATED by gen_campaign.py — Phase-A driver (serve×config → capture → score → report)
-out/               GENERATED (gitignored): outputs.jsonl, vram.jsonl, gpu_<cfg>.csv, props_<cfg>.json,
-                   scores_deterministic.jsonl, judge_bundle.md + judge_map.json + judge_raw.json +
-                   judge_scores.jsonl, failures.txt, done/
-charts/            GENERATED (committed): the SVG decision charts
-appendix.md        GENERATED (committed): embeds charts/ into analysis.md
-analysis.md        Phase-C write-up (benchmark-results skill) + charts appendix
+inputs/tasks/      tasks.jsonl — 12 tasks + grader specs
+tmp/               GENERATED (gitignored): outputs.jsonl, vram.jsonl, gpu_<cfg>.csv, props_<cfg>.json,
+                   done/ markers, failures.txt; Phase-B working files (judge_bundle.md, judge_raw.json)
+results/           GENERATED (committed): scores_deterministic.jsonl, judge_scores.jsonl, charts/ (SVGs),
+                   appendix.md (embeds charts/ into the write-up)
 ```
-Shared machinery (not in this dir): `bench/core/capture_engine.py` (tasks capture),
+Write-up (Phase C, benchmark-results skill):
+`docs/findings/quality/2026-07-12-1736-27b-finetune-quality.md` + the charts appendix embedded from
+`results/appendix.md`.
+Shared machinery (not in this dir): `bench/quality/capture.py` (tasks capture),
+`bench/core/capture_engine.py` (the go-forward engine path),
 `bench/quality/graders/` (score_deterministic + prepare_judge + apply_judge_scores),
 `bench/core/report.py` (charts), `stack/gpu/vram_sampler.py`.
 
@@ -231,6 +240,6 @@ Shared machinery (not in this dir): `bench/core/capture_engine.py` (tasks captur
 - **Sampling noise:** temp 1.0 makes single-rep pass/fail noisy; use `REPS=3` near a boundary
   (majority vote in Phase C).
 - **MTP correctness:** `unsloth-mtp-on` needs the draft-mtp layer; if it fails to start it's logged in
-  `failures.txt` and the others still complete.
+  `tmp/failures.txt` and the others still complete.
 - **IQ4_XS vs Q4_K_M** quant mismatch across repos is a minor confound (note it); pick a common quant
   to eliminate it.

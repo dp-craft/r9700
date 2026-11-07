@@ -2,7 +2,7 @@
 
 *Part of the agentic-config series (`notes/plans/2026-07-12-27b-agentic-config-campaign-series.md`).*
 **Status: READY TO RUN** — harness, 8-task eval, corpus, driver, and charts are all built and
-validated offline. One command runs it: `bash run_capture.sh`.
+validated offline. One command runs it: `bash bench/quality/run_capture.sh campaigns/quality/2026-07-13-1657-27b-quality-at-depth`.
 
 This campaign gives a **round, comprehensive picture** of what the local 27B can do *and* how each
 serving knob moves the result — on realistic work (64–128k of actual TypeScript in context), not toy
@@ -53,7 +53,7 @@ just produces code; the toolchain judges it.
 
 Eight TypeScript-TDD tasks on a validated difficulty ladder (calibrated by running `haiku`/`Sonnet`/
 `Opus` one-shot; a task is admitted only if the weak model hard-fails and a stronger tier scores
-higher — see `calibration.jsonl` + `calibration-hard.jsonl`):
+higher — see `inputs/calibration.jsonl` + `inputs/calibration-hard.jsonl`):
 
 | tier | tasks | reads as |
 |------|-------|----------|
@@ -95,15 +95,16 @@ the budget rather than fix it; keep 16384 as a single opt-in confirmation, not i
 ## 5. How to run
 
 ```bash
-# from this directory (models default to /home/dev/models/gguf):
+D=campaigns/quality/2026-07-13-1657-27b-quality-at-depth   # the campaign dir (run from the repo root;
+                                                           # campaign.env holds the defaults, MODELS_DIR=/home/dev/models/gguf)
 tmux new-session -d -s claude-run                # ONCE — the judge + summary run claude through tmux
-bash run_capture.sh                              # FULL auto: capture → grade → judge → charts → analysis.md
-ONLY='un-d64*' REPS=1 bash run_capture.sh        # quick subset (labels glob-matched)
-SMOKE=1 bash run_capture.sh                      # also include the 2 easy smoke tasks
-RUN_OPTIN=1 bash run_capture.sh                  # also run the 16384-budget ceiling cell
-JUDGE_ENGINE=http JUDGE_BASE_URL=https://host/v1 bash run_capture.sh   # judge via a hosted endpoint instead
-JUDGE_ENGINE=none SUMMARY=0 bash run_capture.sh  # capture+grade+charts only (no claude, no tmux needed)
-MODELS_DIR=/path/to/gguf bash run_capture.sh     # models elsewhere
+bash bench/quality/run_capture.sh "$D"           # FULL auto: capture → grade → judge → charts → write-up
+ONLY='un-d64*' REPS=1 bash bench/quality/run_capture.sh "$D"  # quick subset (labels glob-matched)
+SMOKE=1 bash bench/quality/run_capture.sh "$D"   # also include the 2 easy smoke tasks
+RUN_OPTIN=1 bash bench/quality/run_capture.sh "$D"   # also run the 16384-budget ceiling cell
+JUDGE_ENGINE=http JUDGE_BASE_URL=https://host/v1 bash bench/quality/run_capture.sh "$D"   # judge via a hosted endpoint instead
+JUDGE_ENGINE=none SUMMARY=0 bash bench/quality/run_capture.sh "$D"  # capture+grade+charts only (no claude, no tmux needed)
+MODELS_DIR=/path/to/gguf bash bench/quality/run_capture.sh "$D"     # models elsewhere
 ```
 
 > **One script, no human interaction.** It requires a **tmux session** first (`claude-run`) because
@@ -112,29 +113,31 @@ MODELS_DIR=/path/to/gguf bash run_capture.sh     # models elsewhere
 > session is missing, the script **fails fast with the exact command to start it**, before the
 > hours-long capture. To run without any claude steps: `JUDGE_ENGINE=none SUMMARY=0`.
 
-The driver is **resumable** (per-cell `out/done/<label>` markers — a re-run skips finished cells) and
-**continues past a failed cell** (logged to `out/failures.txt`). End to end it: (1) per cell, starts one
+The driver is **resumable** (per-cell `tmp/done/<label>` markers — a re-run skips finished cells) and
+**continues past a failed cell** (logged to `tmp/failures.txt`). End to end it: (1) per cell, starts one
 llama-server on the frozen substrate with `--reasoning-budget N`, samples VRAM/GTT/power, sends the 6
 matrix tasks (built at the cell's depth by `build_context.py`, corpus = shared cached prefix) through
 `capture.py`, stops the server; (2) **grades** every reply with the real toolchain
 (`score_typescript.py batch`); (3) **judges** subjective quality (`judge.py --engine claude-tmux`, blind
 — **one** claude session fans out one strong-model (`opus`) subagent per batch, Python collects the
 verdicts); (4) **charts** (`make_charts.py`); (5) **aggregates every number deterministically
-in Python** (`aggregate.py` → `out/summary.md`: per-cell table + the 4 findings computed, not inferred);
-(6) **writes `analysis.md`** by driving the **benchmark-results skill** through `claude` (via tmux) — the
-LLM reads **only the digest + charts, never the per-reply jsonl** — then reindexes `docs/INDEX.md`.
+in Python** (`aggregate.py` → `results/summary.md`: per-cell table + the 4 findings computed, not inferred);
+(6) **writes the write-up** (`docs/findings/quality/2026-07-13-1657-27b-quality-at-depth.md`) by driving
+the **benchmark-results skill** through `claude` (via tmux, with this campaign's `summary-prompt.md`) —
+the LLM reads **only the digest + charts, never the per-reply jsonl** — then reindexes `docs/INDEX.md`.
 
-The deterministic aggregator has its own test suite — **`python3 test_aggregate.py`** (stdlib
+The deterministic aggregator has its own test suite — **`python3 bench/quality/test_aggregate.py`** (stdlib
 `unittest`; 22 unit + edge-case + stress + fuzz tests, no GPU/network). Run it after touching
-`aggregate.py`; the grader has `python3 score_typescript.py selftest`.
+`bench/quality/aggregate.py`; the grader has `python3 bench/quality/score_typescript.py selftest`.
 
-**Outputs (in `out/`):** `outputs.jsonl` (replies + token/latency/throughput), `scores_typescript.jsonl`
-(per-reply objectives + score + hard_pass), `judge_scores.jsonl` + `judge_raw.jsonl` (subjective
-design/clarity/robustness + the full judge prompt & reply), `vram.jsonl` + `gpu_*.csv`
-(memory/power/thermal), `props_*.json` (per-server provenance), `charts/*.svg` + `charts/appendix.md`,
-`summary.md` + `summary.json` (the deterministic digest), and the co-located **`analysis.md`**. Commit the
-run data after eyeballing `analysis.md` (the model wrote its prose from the digest — spot-check it against
-`summary.md`).
+**Outputs:** raw (gitignored) in `tmp/`: `outputs.jsonl` (replies + token/latency/throughput),
+`judge_raw.jsonl` (the full judge prompt & reply), `tasks-<N>k.jsonl` (per-depth prompts), `vram.jsonl` +
+`gpu_*.csv` (memory/power/thermal), `props_*.json` (per-server provenance), `done/` markers. Committed in
+`results/`: `scores_typescript.jsonl` (per-reply objectives + score + hard_pass), `judge_scores.jsonl`
+(subjective design/clarity/robustness), `charts/*.svg` + `appendix.md`, `summary.md` + `summary.json`
+(the deterministic digest). The write-up is **`docs/findings/quality/2026-07-13-1657-27b-quality-at-depth.md`**.
+Commit the run data after eyeballing the write-up (the model wrote its prose from the digest — spot-check
+it against `summary.md`).
 
 ---
 
@@ -164,5 +167,5 @@ GGUF *or* any OpenAI-compatible endpoint (llama.cpp, vLLM, or a hosted API) — 
 ---
 
 *Substrate (frozen, C1):* llama.cpp Vulkan b9950 · `-ub 2048 -b 4096 -fa on` · MTP-on · prefix cache.
-*Provenance:* `bench/runs/` + this campaign's `out/` = `MEASURED`; external claims = `CLAIMED` (cited);
+*Provenance:* this campaign's `tmp/` + `results/` = `MEASURED`; external claims = `CLAIMED` (cited);
 reasoned = `INFERRED`. Never blended. *Full task detail + calibration:* `eval-design.md`.

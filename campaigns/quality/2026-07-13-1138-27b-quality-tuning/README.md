@@ -1,7 +1,8 @@
 # Qwen3.6-27B quality tuning — sampling × thinking-budget × MTP-draft on HARD agentic tasks (R9700)
 
-*This README is the campaign's runbook. Results write-up lands in `analysis.md` (co-located,
-registered in `docs/INDEX.md`) after Phase C.*
+*This README is the campaign's runbook. Results write-up lands in
+`docs/findings/quality/2026-07-13-1138-27b-quality-tuning.md` (registered in `docs/INDEX.md`) after
+Phase C.*
 
 - **Date:** 2026-07-13 · **Status:** scaffolded, ready to run · **Campaign 2 of 3**
   (plan: `notes/plans/2026-07-12-27b-agentic-config-campaign-series.md`)
@@ -13,9 +14,9 @@ registered in `docs/INDEX.md`) after Phase C.*
 `benchmark-new-campaign`/`gen_campaign.py` emit **engine-bench throughput** probes (`openai_probe`:
 prefill/decode tok/s). This is a **quality** campaign — it needs per-task replies graded for
 correctness (deterministic verifiers + an LLM judge), which is the **finetune-quality** machinery
-(`capture.py` + `graders/` + judge), not a throughput matrix. So we **reuse** that campaign's
-`capture.py` and `graders/score_deterministic.py` verbatim (by path) and drive them with a
-config-sweep `run_capture.sh`. Applied the skill's discipline anyway: VRAM checked (below), iron
+(`capture.py` + `graders/` + judge), not a throughput matrix. So we **reuse** the shared tools
+`bench/quality/capture.py` and `bench/quality/graders/score_deterministic.py` (by path) and drive them
+with a config-sweep `run_capture.sh`. Applied the skill's discipline anyway: VRAM checked (below), iron
 rules honored (chat API, f16 default + one q8 confirm, MTP-on single-stream, one variable per
 phase), gap-analysis done.
 
@@ -29,7 +30,7 @@ officially wants **temp 0.6** (`docs/research/models-sampling/2026-07-12-2310-qw
 ## 1. VRAM (skill step 2 — non-binding, documented)
 Both models ~15.4/15.9 GiB weights, 64 KiB/tok f16 (hybrid, from `bench/core/gguf_kv.py`). At **CTX 32768
 f16 → ~20.4 GiB predicted** (q8_0 ~19.4), ~12 GiB under the 32400 budget. No guard needed at this
-depth; the driver samples actual VRAM/GTT/power per server into `out/gpu_<name>.csv` → `out/vram.jsonl`.
+depth; the driver samples actual VRAM/GTT/power per server into `tmp/gpu_<name>.csv` → `tmp/vram.jsonl`.
 
 ## 2. The matrix — `configs.jsonl` (13 server configs · 17 sampling points)
 Each **server config** = model × mtp × kv × `extra_args` (reasoning-budget / spec-draft flags) → one
@@ -47,7 +48,7 @@ Runtime estimate: 14 tasks × 17 samplings × reps 1 ≈ **~2–3 h** (thinking 
 temp-1.0 rows may runaway to the 8192 cap and run longer). `REPS=3` (recommended near grade
 boundaries at temp>0) ≈ 3× that. `ONLY=` subsets by config/server name.
 
-## 3. Tasks — `tasks/tasks.jsonl` (14 HARD tasks; the discriminator)
+## 3. Tasks — `inputs/tasks/tasks.jsonl` (14 HARD tasks; the discriminator)
 Deliberately **harder** than finetune-quality (which saturated) so a thinking-budget/sampling change
 is *detectable*. **11 deterministic** (auto-graded, verified) + **3 judge** (rubric). Borrowed from
 IFEval/AgentIF (verifiable multi-constraint + tool-call schema + agentic rules).
@@ -86,8 +87,9 @@ bash campaigns/quality/2026-07-13-1138-27b-quality-tuning/run_capture.sh        
 # at agentic depth:  CONTEXT_PREFIX=codereview-8000.txt bash .../run_capture.sh
 ```
 The driver serves each config (with its `EXTRA_ARGS`), samples VRAM/power, sends all 14 tasks via
-`capture.py` at the config's sampling, is **resumable** (`out/done/<label>` markers) and **continues
-past a failed server** (`out/failures.txt`). It finishes by running `score_deterministic.py`.
+`capture.py` at the config's sampling, is **resumable** (`tmp/done/<label>` markers) and **continues
+past a failed server** (`tmp/failures.txt`). It finishes by running `score_deterministic.py` (→
+`results/scores_deterministic.jsonl`) + `make_charts.py` (→ `results/charts/` + `results/appendix.md`).
 
 ⚠️ **`CONTEXT_PREFIX` and ctx:** default (no prefix) runs at CTX 32768 — fine. If you prepend a code
 context, raise CTX so `prompt + max_tokens(8192) ≤ CTX`: `codereview-8000` → CTX≥16384 default ok;
@@ -99,7 +101,7 @@ you run them through a gen_campaign campaign first, else build with `build_promp
 
 ## 5. Phase B — LLM judge (Claude)
 Score the 3 rubric tasks per config, **blind** (shuffle+anonymize), 0–5 on correctness/depth/clarity
-against each task's embedded `grader.anchors`, into `out/judge_scores.jsonl`. Same protocol as
+against each task's embedded `grader.anchors`, into `results/judge_scores.jsonl`. Same protocol as
 finetune-quality Phase B.
 
 ## 6. Phase C — aggregate & write up (Claude → benchmark-results skill)
@@ -111,15 +113,17 @@ Headline questions to answer:
    killing runaways? best budget per model. (challenge #2)
 3. **MTP draft** — does `p-min` 0.5/0.75 stop the MTP correctness regression at temp 0.6? decode cost?
 4. **KV q8 quality** — any accuracy loss vs f16 (pairs with Campaign 1's perf rejection).
-Write `analysis.md` (summary + table first, **memory column mandatory**), `<!-- meta -->` block,
-`docs/reindex.py`. Deliverable of the series: the stable `{substrate + sampling + reasoning-budget +
-MTP settings}` combo per model.
+Write the write-up (`docs/findings/quality/2026-07-13-1138-27b-quality-tuning.md`; summary + table
+first, **memory column mandatory**), `<!-- meta -->` block, `docs/reindex.py`. Deliverable of the series:
+the stable `{substrate + sampling + reasoning-budget + MTP settings}` combo per model.
 
 ## File map
 ```
-tasks/tasks.jsonl     14 hard tasks + grader specs (verified)
-configs.jsonl         13 server configs × 17 sampling points (the matrix)
-run_capture.sh        Phase-A driver (server sweep → capture.py → graders); reuses ../2026-07-12-27b-finetune-quality/{capture.py,graders}
-out/                  GENERATED: outputs.jsonl, vram.jsonl, gpu_<name>.csv, scores_deterministic.jsonl, judge_scores.jsonl, done/, failures.txt
-analysis.md           Phase-C write-up
+inputs/tasks/tasks.jsonl   14 hard tasks + grader specs (verified)
+inputs/sweeps.json         the reasoning-budget sweep declared for the charts (`make_charts.py`)
+configs.jsonl              13 server configs × 17 sampling points (the matrix)
+run_capture.sh             Phase-A driver (server sweep → capture.py → graders); reuses the shared tools `bench/quality/{capture.py,graders/}`
+tmp/                       GENERATED (gitignored): outputs.jsonl, vram.jsonl, gpu_<name>.csv, done/, failures.txt
+results/                   GENERATED (committed): scores_deterministic.jsonl, judge_scores.jsonl, charts/ (SVGs), appendix.md
+write-up (Phase C)         docs/findings/quality/2026-07-13-1138-27b-quality-tuning.md
 ```

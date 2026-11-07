@@ -25,7 +25,8 @@ Vulkan · f16 · `-ub 2048 -b 4096 -fa on` · ctx 163840 · reasoning-budget 409
 - **Models are symlinked** into `/home/dev/models/gguf/` (the harness `MODELS_DIR`) — they physically live in
   the HF cache; the symlinks just make them visible to the driver.
 - **Deterministic by default** (`JUDGE_ENGINE=none SUMMARY=0`): capture → grade → charts → aggregate, no
-  tmux/claude. Write `analysis.md` afterward via the **/benchmark-results** skill (or set `SUMMARY=1`).
+  tmux/claude. Write the write-up (`docs/findings/quality/2026-07-19-0000-ornith-vs-gemma.md`) afterward
+  via the **/benchmark-results** skill (or set `SUMMARY=1`).
 
 ## Caveats to verify AT RUN TIME
 
@@ -34,7 +35,7 @@ Vulkan · f16 · `-ub 2048 -b 4096 -fa on` · ctx 163840 · reasoning-budget 409
    `gpu_*.csv` sampler; weights ~16.1 GiB leaves headroom but the global-attention layers grow with ctx.
 2. **Gemma think-split** — Gemma emits `<|channel>thought`, not `<think>…</think>`; `capture.py` splits on
    `<think>`, so Gemma's think/answer split + think_tokens may be wrong. Inspect one Gemma reply in
-   `out/outputs.jsonl` before trusting those columns (the grader extracts code from the answer, so pass/fail
+   `tmp/outputs.jsonl` before trusting those columns (the grader extracts code from the answer, so pass/fail
    may still be fine — but ttfa/think_tokens are suspect).
 3. **Grader self-check** — the driver runs `score_typescript.py selftest` (tsc+eslint+vitest on fixtures) and
    ABORTS if vitest can't spawn. Free host memory if it fails.
@@ -43,12 +44,14 @@ Vulkan · f16 · `-ub 2048 -b 4096 -fa on` · ctx 163840 · reasoning-budget 409
 
 ```bash
 cd /home/dev/work/dp-craft/amd
-# deterministic (no claude/tmux): capture -> grade -> charts -> aggregate
-bash campaigns/2026-07-19-ornith-vs-gemma/run_capture.sh
+D=campaigns/quality/2026-07-19-0000-ornith-vs-gemma   # the campaign dir (run from the repo root)
+# deterministic (no claude/tmux) by campaign.env defaults: capture -> grade -> charts -> aggregate
+bash bench/quality/run_capture.sh "$D"
 # quick single cell / smoke:
-ONLY='ornith-*' REPS=1 bash campaigns/2026-07-19-ornith-vs-gemma/run_capture.sh
+ONLY='ornith-*' REPS=1 bash bench/quality/run_capture.sh "$D"
 ```
 
-Resumable (row-level in `capture.py` + per-cell markers in `out/done/`). Outputs: `out/outputs.jsonl`,
-`out/scores_typescript.jsonl`, `out/summary.md`, `charts/`. Stop a stuck server by pidfile
-(`stack/serve/var/servers/8081.pid`) and verify VRAM idle before relaunch (iron rule 14).
+Resumable (row-level in `capture.py` + per-cell markers in `tmp/done/`). Outputs: raw in `tmp/`
+(`outputs.jsonl`), committed in `results/` (`scores_typescript.jsonl`, `summary.md`, `charts/`). Stop a
+stuck server by pidfile (`stack/serve/var/servers/8081.pid`) and verify VRAM idle before relaunch (iron
+rule 14).
