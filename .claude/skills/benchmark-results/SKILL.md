@@ -175,7 +175,7 @@ SVG or hand-write an appendix** — the tools own that (iron rule #6).
    ```markdown
    **Config scorecard — quality · judge · full time · memory**
 
-   ![Config scorecard](charts/scorecard.svg)
+   ![Config scorecard](../../../campaigns/quality/<stamp>-<slug>/results/charts/scorecard.svg)
 
    > <what the chart shows, what it does NOT license, provenance tag>
    ```
