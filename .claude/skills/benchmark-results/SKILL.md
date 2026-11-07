@@ -1,6 +1,6 @@
 ---
 name: benchmark-results
-description: Run a benchmark on the R9700 (RDNA4) box AND document it to a fixed, reproducible spec — every run's full parameterization and measured numbers (including VRAM/GTT memory) captured, nothing lost. Routes between two tracks: model-bench (llama-bench tuning; sweep.py adaptive optimum search with the KV ≤5% rule) and engine-bench (cross-engine + serving combos: MTP × KV × context depth × concurrency via campaign.sh). Use when the user wants to measure a runtime/model/tuning config, compare backends/engines, find an optimum, test parallel/agentic throughput, or turn a bench/runs/ result into a report. Produces canonical run data plus an English analysis doc co-located in the campaign dir (campaigns/<date>-<slug>/analysis.md, summary + table first). May pull external context via the research skill. To plan/scaffold a new campaign first, use the benchmark-new-campaign skill.
+description: Run a benchmark on the R9700 (RDNA4) box AND document it to a fixed, reproducible spec — every run's full parameterization and measured numbers (including VRAM/GTT memory) captured, nothing lost. Routes between two tracks: model-bench (llama-bench tuning; sweep.py adaptive optimum search with the KV ≤5% rule) and engine-bench (cross-engine + serving combos: MTP × KV × context depth × concurrency via campaign.sh). Use when the user wants to measure a runtime/model/tuning config, compare backends/engines, find an optimum, test parallel/agentic throughput, or turn a campaign's results into a report. Produces canonical run data in the campaign (campaigns/<type>/<stamp>-<slug>/results/) plus an English write-up in docs/findings/<topic>/<stamp>-<slug>.md that names the campaign in its meta block (summary + table first). May pull external context via the research skill. To plan/scaffold a new campaign first, use the benchmark-new-campaign skill.
 ---
 
 # benchmark-results — measure, then document (nothing lost)
@@ -12,11 +12,11 @@ Full how-to for a human: `docs/guides/GUIDE.md`. Standard campaign: `campaigns/p
 ## Route first — which track?
 | If the goal is… | Tool | Dir |
 |-----------------|------|-----|
-| THE tuning optimum for one engine (peak bracketed both sides + KV f16/q8_0 ≤5% verdict) | **`sweep.py`** | `bench/model-bench/` |
-| Quick manual knob check (fixed grid, one invocation) | `run.sh` | `bench/model-bench/` |
-| Real-workload cross-engine / thinking / **concurrency** numbers against running servers | `run.sh` (capture_engine probe) | `bench/engine-bench/` |
-| The **combination matrix** — backend × MTP × KV × depth × parallel streams, server restarts handled, resumable | **`campaign.sh`** | `bench/engine-bench/` |
-| Community-comparable synthetic serving curves | llama-benchy (`stack/serve/var/venvs/benchy-venv`) | `bench/engine-bench/` |
+| THE tuning optimum for one engine (peak bracketed both sides + KV f16/q8_0 ≤5% verdict) | **`sweep.py`** | `bench/perf/model-bench/` |
+| Quick manual knob check (fixed grid, one invocation) | `run.sh` | `bench/perf/model-bench/` |
+| Real-workload cross-engine / thinking / **concurrency** numbers against running servers | `run.sh` (capture_engine probe) | `bench/perf/engine-bench/` |
+| The **combination matrix** — backend × MTP × KV × depth × parallel streams, server restarts handled, resumable | **`campaign.sh`** | `bench/perf/engine-bench/` |
+| Community-comparable synthetic serving curves | llama-benchy (`stack/serve/var/venvs/benchy-venv`) | `bench/perf/engine-bench/` |
 
 llama-bench = synthetic tokens (no real prompts, no thinking, no MTP, no concurrency). Serving-only
 knobs (MTP `--spec-type draft-mtp`, `-np` slots, prefix cache) live in engine-bench. Don't force
@@ -35,7 +35,7 @@ point (campaign.sh) before they go in a TL;DR.
    not a winner. REPS ≥ 2 on engine-bench, ≥ 3 on model-bench.
 5. **KV q8_0 decision** comes only from the sweep's A/B at target depth (≤5% rule), never from
    defaults. Quantify the payoff (VRAM saved → extra ctx/slots) from the gpu_samples data.
-6. **Provenance tags**: our `bench/runs/` = `MEASURED` (cite run dir), external = `CLAIMED`
+6. **Provenance tags**: rows in a campaign's `results/` = `MEASURED` (cite the row `label`), external = `CLAIMED`
    (research skill, with source), reasoning = `INFERRED`. Never blend in one table.
 7. **Failures are results**: campaign `failures.txt` rows (e.g. MTP mid-stream crash, OOM combos)
    go in the report as FAILED — an OOM at f16 that fits at q8_0 is a finding, not a gap. A server the
@@ -80,14 +80,15 @@ point (campaign.sh) before they go in a TL;DR.
 
 ## Token policy
 Running is shell work — do it directly. For interpreting large logs or pulling external comparison
-numbers, fan out to **haiku** subagents (return digests only). Never read `bench/llamacpp*/`
+numbers, fan out to **haiku** subagents (return digests only). Never read `stack/llamacpp/var/`
 binaries or `*.err`/`*.log` into the main context — parse the JSON/JSONL
 (`sweep-summary.json`, `results.jsonl` aggregate rows first).
 
 ## Process
 1. **Route** (table above) and **define the question** — what varies, what's fixed.
 2. **(Optional)** research skill for external baselines.
-3. **Run**; results land in `bench/runs/<stamp>-*/` (campaigns are resumable via `CAMPAIGN_DIR`).
+3. **Run** inside a campaign dir (drivers take `CAMPAIGN_DIR` / `--campaign-dir`): rows land in
+   `campaigns/<type>/<stamp>-<slug>/results/`, raw logs, replies and GPU CSVs in its `tmp/` (resumable).
 4. **Analyze — ultrathink.** Don't stop at deltas (% prefill / % decode / % aggregate, noise-band
    ties, failures): hunt for **relations** (MTP × KV interaction, depth-scaling shape, where
    concurrency saturates, VRAM cliffs), **root causes**, and **consequences for practice** (which
@@ -98,18 +99,18 @@ binaries or `*.err`/`*.log` into the main context — parse the JSON/JSONL
    in the doc marked **OPEN**, never papered over.
 5. **Document** to the contract below; register via the `<!-- meta -->` block + `docs/reindex.py`.
 
-## Output contract → `campaigns/<date>-<slug>/analysis.md`
-The analysis is **co-located in the campaign dir** next to `spec.json` / `run.sh` / `README.md`
-(one self-contained folder: plan → driver → write-up). Use the **same `<date>-<slug>` as the
-campaign and the `bench/runs/` dir** (1:1 raw data ↔ report). A one-off measurement with no campaign
-dir still writes `docs/analysis/YYYY-MM-DD-HHMM-<slug>.md` (reindex scans both locations).
+## Output contract → `docs/findings/<topic>/<stamp>-<slug>.md`
+The write-up lives in `docs/findings/<topic>/`, the data in the campaign: recipe at its root, rows,
+summaries and charts in `results/`, raw in `tmp/`. Use the **same `<stamp>-<slug>` as the campaign** and
+name it in the meta block (`campaign: campaigns/<type>/<stamp>-<slug>`; 1:1 data ↔ report). A one-off
+measurement still gets a campaign dir first (`/benchmark-new-campaign`), so `docs/reindex.py` can resolve it.
 
 ```markdown
 # Benchmark: <what was measured> — R9700 (gfx1201)
 
 - **Date:** YYYY-MM-DD HH:MM · **Track:** model-bench sweep / engine-bench / campaign
 - **GPU/Host:** <from meta.txt> · **Runtimes/builds:** <build_commit / Mesa / ROCm / image>
-- **Models:** <model / quant> · **Data:** bench/runs/<stamp>-<slug>/
+- **Models:** <model / quant> · **Data:** campaigns/<type>/<stamp>-<slug>/results/
 
 ## Summary
 <3–5 sentences: winning config, the deltas that mattered, one caveat.>
@@ -164,7 +165,8 @@ SVG or hand-write an appendix** — the tools own that (iron rule #6).
 1. **Generate** (quality campaigns): `bench/quality/make_charts.py --dir out
    --charts charts [--order …] [--calibration …]` → cell-level SVGs + `charts/appendix.md`. Per-task views:
    the campaign's own `make_charts_detailed.py --dir out --charts charts/detailed` → `charts/detailed/`.
-   Throughput runs: `bench/core/report.py <run_dir>` → theme-aware SVG charts + `appendix.md` instead. Wire the call into the
+   Throughput campaigns: `bench/core/report.py <campaign_dir>` → `results/charts/*.svg` + `results/appendix.md`
+   instead (gen_campaign's `run.sh` already calls it). Wire the call into the
    campaign's `run_capture.sh` so charts regenerate with the data — a chart built from a stale
    `summary*.json` is a correctness bug, not a cosmetic one.
 2. **Embed the decision-grade charts INLINE at the finding they support** — a chart belongs next to the
@@ -177,23 +179,24 @@ SVG or hand-write an appendix** — the tools own that (iron rule #6).
 
    > <what the chart shows, what it does NOT license, provenance tag>
    ```
-   Paths are **campaign-root-relative** (`charts/x.svg`) — that is what the generated `appendix.md`
-   already assumes. Typical map: scorecard → Summary · memory/power → Health · objective breakdown →
+   Paths are **relative to the finding** (`../../../campaigns/<type>/<stamp>-<slug>/results/charts/x.svg`);
+   the generated `results/appendix.md` uses `charts/x.svg`, relative to itself. Typical map: scorecard → Summary · memory/power → Health · objective breakdown →
    the wall/capability finding · quality-vs-time + throughput + latency → the speed finding · judge →
    Judge verdicts · task heatmap → per-task results.
 3. **Link the rest**, don't dump all of them: name the appendix-only SVGs and point at
-   `charts/appendix.md` + `charts/detailed/appendix.md`. Roughly 10–15 inline is right for a long
+   `results/appendix.md` + `results/appendix-detailed.md`. Roughly 10–15 inline is right for a long
    report; the reference shape is `docs/findings/quality/2026-07-14-0000-hardest-tasks-27b-vs-35b.md`.
 4. **A caption must not out-claim the statistics.** If the doc says the configs are not resolvable
    (overlapping CIs), every bar-chart caption must say the bar order is **not a ranking** — charts are
    the easiest place to quietly reintroduce a ranking the data does not support. Same for
    non-depth-matched reference lines: state the caveat *at the chart*, not only in prose.
-5. **Verify before committing**: every embedded path resolves from the campaign dir, no chart is stale
+5. **Verify before committing**: every embedded path resolves from the finding's dir, no chart is stale
    (regenerate and diff — it must reproduce byte-identically), and the appendix-only list matches what
    is actually not embedded.
 
-After writing: add a `<!-- meta` block (date + one-line takeaway) at the top of the report, then
-run `docs/reindex.py` to regenerate `docs/INDEX.md` (it fails if the meta block is missing). Report
+After writing: add a `<!-- meta` block (date, one-line takeaway, `campaign: campaigns/<type>/<stamp>-<slug>`)
+at the top of the report, then run `docs/reindex.py` to regenerate `docs/INDEX.md` (it fails if the meta
+block is missing or `campaign:` does not resolve). Report
 the path to the user.
 
 ## Canonical legend rows (copy into the doc's Legend, trim to what the run used)
