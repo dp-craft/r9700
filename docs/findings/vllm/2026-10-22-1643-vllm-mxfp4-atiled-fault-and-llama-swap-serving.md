@@ -3,6 +3,7 @@ date: 2026-10-22 16:43
 slug: vllm-mxfp4-atiled-fault-and-llama-swap-serving
 title: Sly radiance vLLM + MXFP4 + DFlash2 under llama-swap / Claude Code — A-tiled GEMM fault, RAM-tier sizing, fp8-KV claims
 takeaway: SOLVED 2026-10-23 (see 2026-10-23-0023-vllm-gpu-fault-solved-hip-kernarg) — the GPU memory fault in Sly's MXFP4 GEMMs was a corrupted kernel-argument pointer (bit 44), fixed by HIP_FORCE_DEV_KERNARG=0; this report keeps the llama-swap serving, RAM-tier and fp8-KV findings
+campaign: campaigns/investigation/2026-10-22-1925-vllm-mxfp4-gpu-fault
 -->
 
 # Sly radiance vLLM under llama-swap / Claude Code — A-tiled GEMM fault, RAM-tier sizing, fp8-KV claims — R9700 (gfx1201)

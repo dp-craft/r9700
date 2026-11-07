@@ -3,6 +3,7 @@ date: 2026-10-22 14:50
 slug: vllm-sly-mxfp4-dflash
 title: Sly radiance 1.6.0 (vLLM docker) · Qwen3.8-27B AMD MXFP4 · fp8 KV · DFlash2 k=7 — depth curve + growing conversation
 takeaway: Adding the **DFlash2 k=7 drafter** (`syvai/Qwen3.8-27B-DFlash2-W4A16`) to Sly radiance 1.6.0 + AMD MXFP4 + fp8 KV on one R9700 (one variable vs the no-speculation baseline, MEASURED): **cold decode 33.8 → 136.6 tok/s at 8k (4.0×) and 17.9 → 100.5 at 136k (5.6×)**; in the growing 9-turn conversation decode rises to **~145–203 tok/s at 70–131k** (acceptance 66.9 %, τ 5.68 vs 30.6–52.9 %, τ 3.1–4.7 cold); **prefill unchanged** (±3 %); conversation wall to 131k **184.8 → 108.3 s** and is now 86 % prefill. Decode is no longer depth-bound (verify-step rate k −0.06 vs AR −0.23) but acceptance-bound. Cost: KV pool **433,957 → 345,297 tok** (−20 %, still 2.3 × 150k), prefix-cache granularity 64 → 880 tok, VRAM +400 MiB, GTT at baseline. 0 faults in 29 requests (the baseline's faulting 131k turn passed twice). Beats the repo's older llama.cpp+MTP numbers on both prefill and decode (not like-for-like). OPEN: DFlash vs the image's always-on n-gram lookup draft are not separated; reply text not captured, so Sly #164 repetition cannot be ruled out.
+campaign: campaigns/perf/2026-10-22-1406-vllm-sly-mxfp4-dflash
 -->
 
 # Benchmark: Sly radiance vLLM · Qwen3.8-27B MXFP4 · fp8 KV · DFlash2 k=7 — R9700 (gfx1201)

@@ -3,6 +3,7 @@ date: 2026-07-14 19:30
 slug: 27b-quality-at-depth-detailed
 title: Qwen3.6-27B quality-at-depth — per-task deep dive (R9700)
 takeaway: Per-task deep dive. The 27B sits in the haiku->sonnet band (best cells 92-99% on deep-equal/store-remove); the REAL wall is strict eslint/tsc (lint 0.29, types 0.32), NOT logic (tests 0.89, edge 0.95). Reasoning budget helps at 64k, saturates at 128k (model never early-stops). KV q8 fine on average but tanks lru-cache and destabilises output at 128k (think-tag leaks/truncation). Fastest-good config: un-d64-f16-rb2048. DATA VALIDITY: the run's original grade was voided by a vitest execution fault (tests+edge=0 on all 120) — EXCLUDED from all analysis here; every number uses a clean CPU-only re-grade of the same saved answers. Harness fix + rerun steps in §1.
+campaign: campaigns/quality/2026-07-13-1657-27b-quality-at-depth
 -->
 
 # Qwen3.6-27B — quality at depth, **per-task deep dive** (R9700, gfx1201)
@@ -604,8 +605,8 @@ list is from the clean re-grade.
 
 ## Appendix
 
-- **Per-task charts:** [`charts/detailed/appendix.md`](../../../campaigns/quality/2026-07-13-1657-27b-quality-at-depth/results/charts/detailed/appendix.md) (all 9 SVGs).
-- **Cell-level charts & full original verdict table:** [`charts/appendix.md`](../../../campaigns/quality/2026-07-13-1657-27b-quality-at-depth/results/charts/appendix.md).
+- **Per-task charts:** [`results/appendix-detailed.md`](../../../campaigns/quality/2026-07-13-1657-27b-quality-at-depth/results/appendix-detailed.md) (all 9 SVGs).
+- **Cell-level charts & full original verdict table:** [`results/appendix.md`](../../../campaigns/quality/2026-07-13-1657-27b-quality-at-depth/results/appendix.md).
 - **Corrected per-task data:** `out/summary_by_task.json` (from `aggregate.py --by-task --scores scores_typescript_regraded.jsonl`).
 - **Reproduce the correction:**
   ```

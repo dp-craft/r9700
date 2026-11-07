@@ -3,6 +3,7 @@ date: 2026-07-13 07:33
 slug: 27b-serving-substrate
 title: 27B serving substrate — real prefill curve, KV f16/q8_0, MTP decode, cache reuse (R9700)
 takeaway: The "slow prefill" was a small-input artifact — real prefill at depth is 666–831 tok/s (3–4× the 75-token number) and sags with depth. Prompt-cache reuse cuts 32K ttft 42.7s→3.1s (13.7×) — the big agentic win (built-in; explicit --cache-reuse flags add nothing). KV q8_0 REJECTED (−12%/−19% prefill for ~0 decode gain). MTP = 2.0× decode for −5% prefill + ~1.4 GiB. ROCm/HIP ~92× slower prefill than Vulkan on gfx1201 (8 vs 756 tok/s). Frozen substrate for Campaign 2: vulkan · f16 · MTP-on.
+campaign: campaigns/perf/2026-07-13-0733-27b-serving-substrate
 -->
 
 # Benchmark: 27B serving substrate — real prefill curve, KV f16/q8_0, MTP decode, cache reuse — R9700 (gfx1201)

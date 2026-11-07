@@ -3,6 +3,7 @@ date: 2026-07-19 21:05
 slug: ornith-vs-gemma
 title: Ornith-1.0-35B vs Qwen3.6-35B-A3B vs Gemma-4-31B at 120k depth (Gemma needs ROCm)
 takeaway: Ornith-1.0-35B (qwen35moe hybrid, MTP off, Vulkan) on the hardest-tasks TS-TDD suite at ~120k depth, 3 reps: **62.2% TS** (MEASURED), 1/5 hard-pass, decode 70.9 t/s, fits clean at f16 (25.4 GiB). Vs Qwen3.6-35B-A3B at MATCHED settings (n=3): 35B is **73.3%** (Δ−11.0, paired t=−1.16 → NOT significant), but Ornith is **~half as noisy** (within-task sd 7.4 vs 12.9), wins the two stable tasks (expr-eval/async-memo), and its ~2× speed deficit is **MTP-only** (Ornith has 0 nextn). **Gemma-4-31B: Vulkan/RADV DEVICE-LOSTS at deep prefill and crashes the GUI (~65k @ctx163840 / ~24.5k @140000) — a driver bug, NOT memory — but on `BACKEND=rocm` it runs the full depth suite CLEAN** (q8_0, ctx150000, n=1): **56.6% TS, 0/5 hard-pass, decode 11.6 t/s** (ROCm ~6× slower decode; prefill ~650→200 t/s, so the old ~92× figure is wrong). Gemma hits the lint/types wall harder than Ornith (0.12/0.20) and emits `<think>` (capture.py splits fine). Ornith leads Gemma ~62 vs ~57 but Gemma n=1 (CI [33,80]) is not yet a real comparison.
+campaign: campaigns/quality/2026-07-19-0000-ornith-vs-gemma
 -->
 
 # Ornith-1.0-35B @ 120k depth (vs Qwen3.6-35B-A3B) — Gemma blocked on Vulkan

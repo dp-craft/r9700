@@ -1,6 +1,7 @@
 <!-- meta
 date: 2026-10-08 13:16
 takeaway: llama.cpp **b11448-rocm** build check on `Qwen3.8-27B-UD-Q4_K_XL.gguf` / KV q8_0 — rocm: **REGRESSION** vs `b790cf51aa-stew675-10.1-rocm` (32k-in / 2k-out request +14.6%).
+campaign: campaigns/build-check/2026-10-08-1316-llamacpp-b11448-rocm
 -->
 
 # Build check: llama.cpp b11448-rocm vs previous — R9700 (gfx1201)

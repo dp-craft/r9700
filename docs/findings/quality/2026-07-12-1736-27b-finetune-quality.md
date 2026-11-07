@@ -3,6 +3,7 @@ date: 2026-07-12 21:30
 slug: 27b-finetune-quality
 title: Qwen3.6-27B fine-tune shootout — output quality + token economy (R9700)
 takeaway: Same hybrid arch across 4 fine-tunes ⇒ quality/economy differ only by training. jackrong-qwopus is the efficient-frontier pick (100% det, judge 4.67, ~960 think tok); MTP gives 2.2× decode & 2.6× faster time-to-answer for ~1.7 GiB VRAM but caused one sampling-trajectory regression; hauhau runs away (2 empty answers at 8192-tok cap).
+campaign: campaigns/quality/2026-07-12-1736-27b-finetune-quality
 -->
 
 # Benchmark: Qwen3.6-27B fine-tune shootout — output quality + token economy — R9700 (gfx1201)

@@ -3,6 +3,7 @@ date: 2026-10-31 13:55
 slug: redhat-sharp-w208-blind
 title: RedHat Qwen3.8-27B-MXFP4 δ 0 with the sharp chat template - W2-08 blind review quality, the δ 0 baseline with only --chat-template changed; four-way blind re-grade (Q4_K_XL, RedHat δ 0, RedHat + sharp, heretic)
 takeaway: Swapping only the chat template (froggeric v22.5 → sharp = v22.5 + a terseness directive) on the RedHat MXFP4 δ 0 server cut step-A work by about a third (thinking 304k vs 489k chars, 101 vs 156 tool calls, ~144k vs ~200k generated tokens) with no quality loss. Blind-graded at 11/19 Opus findings (high 4/6, 14/14 findings real) vs δ 0's 9/19 (high 4/6, 13/14). +2 is below the pre-registered grey zone, so the gain is not demonstrated, but the loss is ruled out at n = 1. With the template equal, Q4_K_XL vs RedHat is 12 vs 11 findings and 3 vs 4 highs, a tie. The earlier Q4_K_XL efficiency edge is mostly the template (n = 1 per config, one blind grader for all four).
+campaign: campaigns/agentic/2026-10-31-0000-redhat-sharp-w208-blind
 -->
 
 # Benchmark: RedHat Qwen3.8-27B-MXFP4 δ 0 + sharp chat template - W2-08 blind review quality - R9700 (gfx1201)

@@ -3,6 +3,7 @@ date: 2026-10-31 20:05
 slug: redhat191-sharpsly2-w208-blind
 title: RedHat Qwen3.8-27B-MXFP4 on Sly 1.9.1 + sharp-sly2 (k=1 reasoning replay) — W2-08 blind review (RUNBOOK step A), Cactus δ 0
 takeaway: sharp-sly2 (keep-newest reasoning replay) did not complete step A — it hit the 3600 s cap still probing, 1.65x the keep-all wall (2182 s). It generated 1.4x more tokens (167,814 vs 120,001) and thought 1.9x more per step (563,748 chars, 2.5x per tool call). k=1 replay did not speed up a real agentic review: the model re-derived its reasoning instead of replaying it. No exact loops (0/60 blocks), but semantic circling is present. Not a blind-grade result (no review written — rule 18); sharp-sly2 is not a winner over keep-all on this workload.
+campaign: campaigns/agentic/2026-10-31-0000-redhat191-sharpsly2-w208-blind
 -->
 
 # Benchmark: RedHat Qwen3.8-27B-MXFP4 on Sly 1.9.1 + sharp-sly2 (k=1) template — W2-08 blind review (RUNBOOK step A), Cactus δ 0 — R9700 (gfx1201)
@@ -33,7 +34,7 @@ tokens: total processed tokens were *higher* (638,197 vs 433,202). No exact loop
 cheap semantic pass (haiku) found circling (re-derivation) in 2–6 of the largest blocks. **Conclusion:** on this workload, k = 1 replay
 does not beat keep-all — it is slower and did not complete. `sharp-sly2` is not a winner over keep-all (n = 1, single arm).
 
-## Results (all MEASURED, `report.py` agentic; `charts/appendix.md`)
+## Results (all MEASURED, `report.py` agentic; `results/appendix.md`)
 
 Reference rows are the keep-all arms from the same δ-ladder campaign (same charts). `r191-sharpsly2-d0` is the k = 1 arm.
 

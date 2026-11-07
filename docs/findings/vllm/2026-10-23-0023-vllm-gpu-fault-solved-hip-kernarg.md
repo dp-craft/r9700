@@ -3,6 +3,7 @@ date: 2026-10-23 00:23
 slug: vllm-gpu-fault-solved-hip-kernarg
 title: vLLM (Sly radiance MXFP4 + DFlash) GPU memory fault on R9700 — solved by HIP_FORCE_DEV_KERNARG=0
 takeaway: The random HSA_STATUS_ERROR_MEMORY_FAULT (any ROCm kernel, address = a valid pointer with bit 44 cleared) disappears with HIP_FORCE_DEV_KERNARG=0 (kernel args in host memory instead of device memory written over PCIe) — 3/3 boots × 4 Claude turns clean at full speed (decode med 111–150, prefill med 2.4–3.0k tok/s); not the Sly kernels, not the 7.0.0-38 driver. Now the default in every vLLM profile.
+campaign: campaigns/investigation/2026-10-22-1925-vllm-mxfp4-gpu-fault
 -->
 
 # vLLM GPU memory fault on the R9700 — solved by `HIP_FORCE_DEV_KERNARG=0`

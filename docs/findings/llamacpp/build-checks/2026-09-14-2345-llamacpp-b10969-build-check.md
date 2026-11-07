@@ -1,6 +1,7 @@
 <!-- meta
 date: 2026-09-14 23:45
 takeaway: llama.cpp **b10969** build check on `Qwen3.8-27B-UD-Q4_K_XL.gguf` / KV q8_0 — vulkan: **NEUTRAL** vs `b10909-vulkan` (32k-in / 2k-out request -0.1%).
+campaign: campaigns/build-check/2026-09-14-2345-llamacpp-b10969
 -->
 
 # Build check: llama.cpp b10969 vs previous — R9700 (gfx1201)

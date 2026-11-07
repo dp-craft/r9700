@@ -1,6 +1,7 @@
 <!-- meta
 date: 2026-09-12 10:55
 takeaway: `stilldeadcode/vllm-radiance` (gfx1201-only vLLM 0.27.1 + libr4d kernels) is the undisclosed "tuned" build behind Puget's R9700 numbers, and it runs our single-GPU INT4 checkpoint. **Clean 4-depth curve on ONE fixture family (findings 21-22): llama.cpp + MTP wins decode at every depth by 9-33 %; radiance's only win is prefill/TTFT at 8k.** Radiance decode does NOT decay with depth (exponent +0.070, R2 0.25) - the earlier "degrades with depth" claim was a content artifact and is withdrawn. The ranking is set by WORKLOAD, not depth: radiance leads on generated code, llama.cpp on review prose. A divergent-tail warm test (finding 23) confirms partial cache hits equal full hits, so the earlier identical-prompt warm figures stand.
+campaign: campaigns/perf/2026-09-12-1330-depth-curve-mtp
 -->
 
 # vllm-radiance on the R9700 (gfx1201) — what it is, what transfers to a single-GPU INT4 setup

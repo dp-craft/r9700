@@ -3,6 +3,7 @@ date: 2026-11-02 00:20
 slug: redhat191-dp-sharp-w208-blind
 title: RedHat Qwen3.8-27B-MXFP4 on Sly 1.9.1 + dp-sharp template (keep-all reasoning, froggeric v22.5 + the dp terse prompt), Cactus δ 0 — W2-08 blind review (RUNBOOK step A)
 takeaway: Two reps: V1 (original terse prompt) wrote a 12-finding review (8/19 Opus findings, weighted 16/38, precision 11/12) and missed the deeper flow/state highs (#1, #2, #4, #8, #9). V2 (updated terse prompt with explicit step-by-step mechanics tracing + boundary/failure-case simulation) wrote a 19-finding review (11/19 Opus findings, weighted ~26/38) — recovering #2 (goal-duplication) and #8 (empty-line→schema) while keeping all 7 of V1's matches plus the import-sort win (#6). The two remaining highs (#1 confirm-chain, #4 T3 source-vs-@tmp) are cross-contract data-flow defects that no arm has found. Speed not comparable (throttled GPU).
+campaign: campaigns/agentic/2026-11-01-0000-redhat191-dp-sharp-w208-blind
 -->
 
 # Benchmark: RedHat Qwen3.8-27B-MXFP4 on Sly 1.9.1 + dp-sharp template (keep-all reasoning + dp terse prompt) — W2-08 blind review (RUNBOOK step A), Cactus δ 0 — R9700 (gfx1201)

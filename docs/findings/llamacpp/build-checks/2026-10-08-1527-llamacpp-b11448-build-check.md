@@ -1,6 +1,7 @@
 <!-- meta
 date: 2026-10-08 15:27
 takeaway: llama.cpp **b11448** build check on `Qwen3.8-27B-UD-Q4_K_XL.gguf` / KV q8_0 — rocm: **FAILED** vs `b790cf51aa-stew675-rocm` (32k-in / 2k-out request n/a).
+campaign: campaigns/build-check/2026-10-08-1527-llamacpp-b11448
 -->
 
 # Build check: llama.cpp b11448 vs previous — R9700 (gfx1201)

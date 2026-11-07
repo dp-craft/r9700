@@ -1,6 +1,7 @@
 <!-- meta
 date: 2026-09-11 15:37
 takeaway: llama.cpp **b10909** build check on `Qwen3.8-27B-UD-Q4_K_XL.gguf` / KV q8_0 — vulkan: **IMPROVEMENT** vs `b10655-4-g6fdd0ac-vulkan` (est. 30k-in / 4k-out request -2.4%); rocm: **IMPROVEMENT** vs `b10375-rocm` (est. 30k-in / 4k-out request -10.9%).
+campaign: campaigns/build-check/2026-09-11-1537-llamacpp-b10909
 -->
 
 # Build check: llama.cpp b10909 vs previous — R9700 (gfx1201)

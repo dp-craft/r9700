@@ -2,6 +2,7 @@
 date: 2026-09-15 20:33
 title: Muse-Glimmer-30B + DFlash drafter — Vulkan vs ROCm depth curve (128k ctx) through llama-swap
 takeaway: Muse-Glimmer-30B + DFlash (n_max 15) at ctx 131072: ROCm/stew675 prefill 941→842 tok/s vs Vulkan/b10969 865→740 (gap widens +9%→+14% with depth); decode 27–48 t/s is NOT rankable at reps=2 (inter-rep spread up to +75%); prefill decays shallowly (slope −0.04…−0.06, R² 0.77–0.82) — GQA 32:2 keeps KV at 52 KiB/tok; fits at 27.3 GiB peak VRAM; backend×build still confounded (3 arms = 3 builds), two factorial arms pending.
+campaign: campaigns/perf/2026-09-15-2016-muse-glimmer-vulkan-vs-rocm
 -->
 # Benchmark: Muse-Glimmer-30B + DFlash drafter — Vulkan vs ROCm depth curve — R9700 (gfx1201)
 

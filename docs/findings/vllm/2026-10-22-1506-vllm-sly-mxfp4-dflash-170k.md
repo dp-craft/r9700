@@ -3,6 +3,7 @@ date: 2026-10-22 15:45
 slug: vllm-sly-mxfp4-dflash-170k
 title: Sly radiance 1.6.0 · Qwen3.8-27B MXFP4 · fp8 KV · DFlash2 — 170k window filled to the edge: memory over time
 takeaway: vLLM (Sly radiance 1.6.0) + MXFP4 + fp8 KV + DFlash2 at **max-model-len 170000**, conversation filled to 150k then grown by hard-thinking turns to **169.3k** (MEASURED): **no memory creep** — device VRAM peaked at **30,259 MiB** (29.55 GiB) during the cold 150k prefill, then stepped down and stayed flat at 29,774 MiB for ~5 min and two conversations; GTT 64–120 MiB (no spill). KV pool **332,822 tok** (11.84 GiB, 1.96 × 170k); one full 170k sequence occupies **51 %** of it (`kv_cache_usage_perc`). Memory is not the limit at util 0.90 — **reliability is**: a 2nd GPU memory fault in the same `radiance_mxfp4_fp8_gemm_atiled` kernel (rep 1, ~156k context) hung the engine 387 s → EngineDead. MXFP4 tally: 2 faults in 84 requests, 2 of 4 serving boots, both in the 2nd deep conversation of a boot. Side finding: novel 1k-token thinking at 150k decodes at **~65 tok/s**; repeated-task turns copy the earlier answer at ~178 tok/s (not representative).
+campaign: campaigns/perf/2026-10-22-1506-vllm-sly-mxfp4-dflash-170k
 -->
 
 # Benchmark: 170k window filled to the edge — memory over time · Sly radiance vLLM + DFlash2 — R9700 (gfx1201)

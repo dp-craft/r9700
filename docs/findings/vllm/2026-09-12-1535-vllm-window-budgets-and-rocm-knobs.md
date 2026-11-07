@@ -1,6 +1,7 @@
 <!-- meta
 date: 2026-09-12 15:35
 takeaway: The vLLM row's 36864 window could not serve the dp-forge spec-pipeline (dies at the first LLM stage); the row is now ctx 114688 / MTP-3 and MEASURED to boot (138k-token pool). fp8 KV measured as an exact null on this hybrid; MTP is the only window lever. At ~98k prompts vLLM decodes 25% faster than the llama.cpp 200k row (flat vs decaying decode), though llama.cpp leads decode by 60% at 8k.
+campaign: campaigns/perf/2026-09-12-1844-vllm-window-budgets, campaigns/perf/2026-09-12-1330-depth-curve-mtp, campaigns/perf/2026-09-11-2047-vllm-qwen38-27b-int4
 -->
 
 # vLLM window vs spec-pipeline budgets, and the ROCm decode-knob list — R9700 (gfx1201)

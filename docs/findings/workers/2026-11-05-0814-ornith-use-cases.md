@@ -1,6 +1,7 @@
 <!-- meta
 date: 2026-11-05 08:14
 takeaway: Ornith 1.5 on native Radiance is a good free worker when the task is clear and a script can check the result: JSON to **131k**, code inventory to **88k**, document splitting with **0 lost lines in 6 of 6** runs, tests, renames and clear bug fixes. Draft only for bug classification and code from a spec; never retype text (6k took **480 s**, two more runs didn't finish). Haiku `max` wins on exhaustive lists and path extraction, and Ornith is about **4× faster** on the median task. Mostly n=1. Repeats with 3 sessions in parallel (**1.46×** throughput) make the operator's `dp` prompt the default: a quality tie on 29 of 34 tasks with **17% fewer** generated tokens. Per-profile add-ons don't earn their place, and the `code` allow-list blocks most of Ornith's test commands (7–15 denials per `impl` session).
+campaign: campaigns/workers/2026-11-05-0320-ornith-usecases
 -->
 
 # Ornith use cases: what to give it, how much, and how to check it

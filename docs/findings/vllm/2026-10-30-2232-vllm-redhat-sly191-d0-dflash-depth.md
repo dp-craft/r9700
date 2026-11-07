@@ -3,6 +3,7 @@ date: 2026-10-30 23:05
 slug: vllm-redhat-sly191-d0-dflash-depth
 title: RedHat Qwen3.8-27B-MXFP4 on Sly 1.9.1 at Cactus δ 0 (stock acceptance) - DFlash2 k=7 vs MTP k=4, depth 10k/50k/100k/150k
 takeaway: At δ 0 DFlash2 k=7 decodes faster than the model's own MTP head k=4 at 10k/100k/145k (mean of 2 reps 100.2/93.9/80.5 vs 62.8/73.0/68.0 tok/s; every DFlash rep above every MTP rep) and ties at 50k (73.9 vs 73.7), so the W2-08 session S1 uses DFlash2. Decode = verify steps/s x mean accept length; steps/s does not depend on δ (δ 0 vs δ 0.5 within 1-4 %), so δ 0.5 buys only acceptance - +29/+30/-7 % accept length for DFlash2 at 10k/50k/100k, -5..+8 % for MTP.
+campaign: campaigns/perf/2026-10-30-2232-vllm-redhat-sly191-d0-dflash-depth
 -->
 
 # Benchmark: RedHat Qwen3.8-27B-MXFP4 on Sly 1.9.1 at Cactus δ 0 - DFlash2 k=7 vs MTP k=4 by depth - R9700 (gfx1201)
@@ -87,7 +88,7 @@ Depth fits (log-log, y = a·depth^k, fit range 10k-145k):
 
 | series | k | R² | n | source |
 |---|---:|---:|---:|---|
-| δ 0 DFlash2 prefill p50 | −0.149 | 0.919 | 4 | `charts/appendix.md` (report.py) |
+| δ 0 DFlash2 prefill p50 | −0.149 | 0.919 | 4 | `results/appendix.md` (report.py) |
 | δ 0 MTP prefill p50 | −0.113 | 0.791 | 4 | report.py; pulled by the slow 10k rep 0 (2783.2 vs 3145.6 tok/s, that request's prefill 136 W avg) |
 | δ 0 DFlash2 decode p50 | −0.036 | 0.126 | 4 | report.py: no depth trend, decode follows acceptance |
 | δ 0 MTP decode p50 | +0.037 | 0.330 | 4 | report.py: no depth trend |
@@ -152,7 +153,7 @@ In the agentic campaign this is one arm: `{"profile": "sly-redhat/redhat-mxfp4-d
 - **Failure:** the first MTP boot is a FAILED row above. The retry used the same spec plus `WATCHDOG_MIB=32` (22:43:53 local).
   - The MTP `meta.txt` still shows the first attempt's env line, because `run.sh` writes `meta.txt` only once. The retry's config is in `server-redhat-sly191-d0-mtp-fp8kv-ctx262000.txt` (`printed_utc=2026-10-30T21:43:53Z`).
   - `serve_vllm.sh print` does not echo `WATCHDOG_MIB`. The value 32 is recorded in the spec, the regenerated `run.sh` and the depth log.
-- **Charts:** `bench/core/report.py` charts one run dir per call; with `--charts`, the last dir overwrites the others. They were therefore generated from a merged input dir: `campaigns/perf/2026-10-30-2232-vllm-redhat-sly191-d0-dflash-depth/results/2026-10-30-vllm-redhat-sly191-d0-dflash-vs-mtp-merged/` (`cat` of both `results.jsonl` + the MTP `failures.txt`; see its `README.txt`). Regenerate with `python3 bench/core/report.py campaigns/perf/2026-10-30-2232-vllm-redhat-sly191-d0-dflash-depth/results/2026-10-30-vllm-redhat-sly191-d0-dflash-vs-mtp-merged --charts campaigns/perf/2026-10-30-2232-vllm-redhat-sly191-d0-dflash-depth/results/charts --appendix campaigns/perf/2026-10-30-2232-vllm-redhat-sly191-d0-dflash-depth/results/charts/appendix.md`. Also embedded: `charts/power_phase.svg` in the appendix only (`charts/appendix.md`).
+- **Charts:** `bench/core/report.py` charts one run dir per call; with `--charts`, the last dir overwrites the others. They were therefore generated from a merged input dir: `campaigns/perf/2026-10-30-2232-vllm-redhat-sly191-d0-dflash-depth/results/2026-10-30-vllm-redhat-sly191-d0-dflash-vs-mtp-merged/` (`cat` of both `results.jsonl` + the MTP `failures.txt`; see its `README.txt`). Regenerate with `python3 bench/core/report.py campaigns/perf/2026-10-30-2232-vllm-redhat-sly191-d0-dflash-depth/results/2026-10-30-vllm-redhat-sly191-d0-dflash-vs-mtp-merged --charts campaigns/perf/2026-10-30-2232-vllm-redhat-sly191-d0-dflash-depth/results/charts --appendix campaigns/perf/2026-10-30-2232-vllm-redhat-sly191-d0-dflash-depth/results/appendix.md`. Also embedded: `charts/power_phase.svg` in the appendix only (`results/appendix.md`).
 - **Tool gaps found** (recommendations, not done):
   - `report.py`: merge several run dirs into one chart set, and accept a per-dir series label, so that δ 0 and δ 0.5 runs of the same profile can share a chart.
   - Throughput `run.sh`: record each attempt's env, rather than writing `meta.txt` only once.

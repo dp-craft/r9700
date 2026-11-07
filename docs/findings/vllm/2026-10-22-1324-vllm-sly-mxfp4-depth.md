@@ -3,6 +3,7 @@ date: 2026-10-22 14:30
 slug: vllm-sly-mxfp4-depth
 title: Sly radiance 1.6.0 (vLLM docker) · Qwen3.8-27B AMD MXFP4 · fp8 KV — depth curve + growing conversation
 takeaway: SlyBase/vllm-sly-radiance **1.6.0** (docker, vLLM 0.31.0) serving **amd/Qwen3.8-27B-Quark-AWQ-MXFP4** on one R9700, fp8 KV, ctx 150000, **no speculative decoding** (MEASURED): **prefill 2,845 → 1,500 tok/s** (8k → 136k, k −0.21) — ~2.3–3.2× the repo's earlier llama.cpp/radiance-0.9.3 prefill on the same fixtures — but **decode only 33.8 → 17.9 tok/s** (k −0.23), below llama.cpp+MTP; the drafter is the missing piece. Growing 9-turn conversation to 131k: prefix cache live (turn-8 TTFT 15.1 s vs 90.2 s cold). Power sits at the 210 W cap in both phases (no config suspect). **Reliability: 1 GPU memory fault in 27 requests** (`radiance_mxfp4_fp8_gemm_atiled`, prefill at ~131k) killed the engine after a 6.5-min hang — not reported upstream. Setup lessons: NVFP4 load peak crashed the desktop (→ boot watchdog), containerd image store ignores docker `data-root`, vLLM 0.31 streams `delta.reasoning`.
+campaign: campaigns/perf/2026-10-22-1324-vllm-sly-mxfp4-depth
 -->
 
 # Benchmark: Sly radiance vLLM · Qwen3.8-27B MXFP4 · fp8 KV — R9700 (gfx1201)

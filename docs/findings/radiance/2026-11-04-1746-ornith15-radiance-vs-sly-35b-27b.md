@@ -1,6 +1,7 @@
 <!-- meta
 date: 2026-11-04 17:46
 takeaway: Best 35B on one R9700 at 210 W is Ornith-1.5-35B-A3B w4a8 on native Radiance 1.16.0 with MTP K=3: 220/205/175 t/s decode and 13059/8029/5301 t/s prefill at 10k/50k/100k, 2.1-2.5x Qwen3.8-27B on Sly 1.9.1 (87/96/82 t/s). Ornith on Sly with Radiance's serving values and DFlash K=3 reaches only 95/71/67 t/s, and MTP does not load there on any usable backend. The Qwen3.5-35B slowdown on Sly is the EMULATION MoE backend (16.6 to 110 t/s with triton_unfused). Radiance's default 96 MiB headroom crashed the desktop once, and coding quality is untested.
+campaign: campaigns/perf/2026-11-04-1527-ornith15-radiance-vs-sly
 -->
 
 # Benchmark: Ornith 1.5 on native Radiance vs Sly (Qwen3.8-27B, Qwen3.5-35B) — R9700 (gfx1201)
