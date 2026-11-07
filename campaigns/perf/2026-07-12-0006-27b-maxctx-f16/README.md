@@ -54,10 +54,10 @@ f16: PASS at 48K/56K, FAIL by 64K → ceiling ≈ 56–60K. q8_0: PASS to ~104K,
 ## Build fixtures first (~1 min)
 ```bash
 export ROOT=/home/dev/work/dp-craft/amd
-cd "$ROOT/bench/workloads" && mkdir -p generated
+cd "$ROOT/bench/workloads" && mkdir -p tmp
 python3 build_prompt.py --task tasks/codereview-large.task.md \
   --src corpus/ts-agentic-code-runner --src corpus/py-rich \
-  --target-tokens 40000 --out generated/codereview-40000.txt
+  --target-tokens 40000 --out tmp/codereview-40000.txt
 ```
 Builder errors out if the 40K target can't be filled ≥97 % (the ~565K-tok corpus is ample).
 

@@ -189,13 +189,13 @@ embedded via `results/appendix.md`.
 
 | Need | Tool (invoke, don't reimplement) | Emits |
 |------|----------------------------------|-------|
-| Scaffold a campaign (throughput matrix) | **`/benchmark-new-campaign`** → `bench/core/gen_campaign.py emit --spec …` | `spec.json` → resumable `run.sh` (VRAM guard + **auto-builds missing fixtures**) + README |
+| Scaffold a campaign (throughput matrix) | **`/benchmark-new-campaign`** → `bench/core/gen_campaign.py emit --spec …` | `campaigns/<type>/<YYYY-MM-DD-HHMM>-<slug>/`: resumable `run.sh` (VRAM guard + **auto-builds missing fixtures**; raw → `tmp/`, rows → `results/results.jsonl`) + README |
 | KV geometry / max-ctx / `vram` block (HYBRID-aware) | `bench/core/gguf_kv.py MODEL.gguf --weights-gib G` | KiB/tok f16+q8, max ctx, paste-ready guard block |
-| Agentic A/B (real `claude -p` sessions, fresh vllm server + worktree per rep×arm) | **`/benchmark-new-campaign`** → `gen_campaign.py emit` with `kind: "agentic"` (`example --agentic`; GUIDE §7) | resumable `run.sh` (quarantines `interrupted`) + README; `rep<R>/<arm>/` dirs |
+| Agentic A/B (real `claude -p` sessions, fresh vllm server + worktree per rep×arm) | **`/benchmark-new-campaign`** → `gen_campaign.py emit` with `kind: "agentic"` (`example --agentic`; GUIDE §7) | resumable `run.sh` (quarantines `interrupted`) + README; raw `tmp/rep<R>/<arm>/` dirs, `results/summary.tsv` |
 | Quick VRAM↔ctx what-if | `bench/core/gen_campaign.py vram-ctx --weights-gib G --kv-kib-per-tok K --budget-mib M` | max ctx |
-| Build a prompt fixture (code/agentic/thinking, N tokens) | `bench/workloads/build_prompt.py --task … --src corpus/… --target-tokens N` | `generated/<name>.txt` (also auto-built by campaign `run.sh`) |
+| Build a prompt fixture (code/agentic/thinking, N tokens) | `bench/workloads/build_prompt.py --task … --src corpus/… --target-tokens N` | `bench/workloads/tmp/<name>.txt` (also auto-built by campaign `run.sh`) |
 | Find THE tuning optimum (one engine, bracket + KV ≤5%) | `bench/perf/model-bench/sweep.py` | `sweep-summary.json` |
-| Probe a live server (prefill/decode/ttft/concurrency) | `bench/core/capture_engine.py probe` (via `run.sh`) | `results.jsonl` |
+| Probe a live server (prefill/decode/ttft/concurrency) | `bench/core/capture_engine.py probe` (via `bench/perf/engine-bench/run.sh`, `CAMPAIGN_DIR` required) | rows → `<campaign>/results/results.jsonl` (once, on success); raw → `tmp/` |
 | Launch a parameterized llama-server (BACKEND/MTP/KV/**EXTRA_ARGS**) | `stack/serve/llamacpp/serve_llamacpp.sh` | running server + `/props` |
 | Sample VRAM/GTT/power/thermal | `stack/gpu/vram_sampler.py --out CSV` | `gpu_samples.csv` |
 | **Make the GPU exclusive + assert a free-VRAM floor before booting any engine** | `stack/gpu/gpu_exclusive.sh [required_free_mib]` | unloads llama-swap (GET), kills the hipfire daemon+serve shape, exits non-zero naming the holder |
@@ -203,7 +203,7 @@ embedded via `results/appendix.md`.
 | Quality capture (per-task replies + tokens/ttfa/flags) | `bench/quality/capture.py` | `outputs.jsonl` |
 | Grade deterministic tasks (final_match/pyexec/json_schema/constraints) | `…/finetune-quality/graders/score_deterministic.py` | `scores_deterministic.jsonl` |
 | Quality campaign → decision charts (theme-aware SVG + appendix.md) | `bench/quality/make_charts.py --dir out --charts charts [--order …] [+ out/sweeps.json for connected-parameter line charts]` | `charts/*.svg` + `appendix.md` |
-| Throughput run/campaign dir → theme-aware SVG charts + appendix.md | `bench/core/report.py <run_dir>` (auto-run by gen_campaign's `run.sh`) | `charts/*.svg` + `appendix.md` |
+| Throughput run/campaign dir → theme-aware SVG charts + appendix.md | `bench/core/report.py <campaign_dir>` (auto-run by gen_campaign's `run.sh`) | `results/charts/*.svg` + `results/appendix.md` + `results/gpu_peaks.json` |
 | Fetch + build a llama.cpp tag (vulkan+rocm), promote / roll back `latest-*` | `stack/llamacpp/build_llamacpp.sh build\|promote\|status` (skill **`/llamacpp-build`**) | `stack/llamacpp/var/builds/<ver>-{src,vulkan,rocm}` + `latest-*` symlinks + Vulkan SDK (`stack/llamacpp/setup_vulkan.sh`) |
 | New llama.cpp build vs previous (llama-bench request shapes pp128/tg64 … pp32768/tg2048 → verdict; optional `--parallel 2` = 2 concurrent 32k requests via llama-batched-bench) | `bench/build-check/compare_builds.py run --new <ver> [--parallel 2]` | campaign `campaigns/build-check/<stamp>-llamacpp-<ver>/` + `docs/findings/llamacpp/build-checks/<stamp>-llamacpp-<ver>-build-check.md` + `VERDICT` line |
 

@@ -65,10 +65,10 @@ KiB/tok) which genuinely ran 200K — same "27B/35B" labels, 12× different KV r
 `codereview-8000.txt` is the only fixture; build it if absent:
 ```bash
 export ROOT=/home/dev/work/dp-craft/amd
-cd "$ROOT/bench/workloads" && mkdir -p generated
+cd "$ROOT/bench/workloads" && mkdir -p tmp
 python3 build_prompt.py --task tasks/codereview-large.task.md \
   --src corpus/ts-agentic-code-runner --src corpus/py-rich \
-  --target-tokens 8000 --out generated/codereview-8000.txt
+  --target-tokens 8000 --out tmp/codereview-8000.txt
 ```
 
 ## Run

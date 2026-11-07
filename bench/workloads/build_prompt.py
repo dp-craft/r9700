@@ -23,16 +23,16 @@ Usage:
   # 64K-token code-review prompt padded from the tracked corpus (TS first, then Python):
   python3 build_prompt.py --task tasks/codereview-large.task.md \
         --src corpus/ts-agentic-code-runner --src corpus/py-rich --target-tokens 64000 \
-        --out generated/codereview-64000.txt
+        --out tmp/codereview-64000.txt
 
   # thinking-mode prompt needs no big context:
   python3 build_prompt.py --task tasks/thinking-hard.prompt.txt --target-tokens 0 \
-        --out generated/thinking-hard.txt
+        --out tmp/thinking-hard.txt
 
   # 4 per-stream variants of an 8K agentic prompt:
   python3 build_prompt.py --task tasks/agentic-implement.task.md \
         --src corpus/ts-agentic-code-runner --target-tokens 8000 --variants 4 \
-        --out generated/agentic-8000.txt
+        --out tmp/agentic-8000.txt
 """
 import argparse, pathlib, sys, uuid
 

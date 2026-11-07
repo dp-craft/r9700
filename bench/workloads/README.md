@@ -12,20 +12,20 @@ mkdir -p generated
 for T in 8000 32000 64000 100000; do
   python3 build_prompt.py --task tasks/codereview-large.task.md \
       --src corpus/ts-agentic-code-runner --src corpus/py-rich \
-      --target-tokens $T --out generated/codereview-${T}.txt
+      --target-tokens $T --out tmp/codereview-${T}.txt
 done
 # thinking-mode prompt (tiny context, long reasoning):
 python3 build_prompt.py --task tasks/thinking-hard.prompt.txt --target-tokens 0 \
-    --out generated/thinking-hard.txt
+    --out tmp/thinking-hard.txt
 # agentic per-stream variants (4 files differing only in run-id → cold cache per stream):
 python3 build_prompt.py --task tasks/agentic-implement.task.md \
     --src corpus/ts-agentic-code-runner --target-tokens 8000 --variants 4 \
-    --out generated/agentic-8000.txt
+    --out tmp/agentic-8000.txt
 ```
 
 `build_prompt.py` assembles `[unique run-id] + [task instruction] + [real context from corpus/]`.
 It **fails hard** if the corpus can't fill ≥97% of the target (no more silently short prompts).
-`generated/` is gitignored; `tasks/` and `corpus/` are tracked (reproducible).
+`tmp/` is gitignored (campaign `run.sh` files build missing fixtures there); `tasks/` and `corpus/` are tracked (reproducible).
 
 ## Token calibration (MEASURED 2026-07-11)
 
