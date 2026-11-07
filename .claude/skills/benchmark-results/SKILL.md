@@ -162,12 +162,13 @@ unexplained ones stay listed as OPEN.>
 A campaign that produces charts but never shows them is a half-written report. **Never hand-draw an
 SVG or hand-write an appendix** — the tools own that (iron rule #6).
 
-1. **Generate** (quality campaigns): `bench/quality/make_charts.py --dir out
-   --charts charts [--order …] [--calibration …]` → cell-level SVGs + `charts/appendix.md`. Per-task views:
-   the campaign's own `make_charts_detailed.py --dir out --charts charts/detailed` → `charts/detailed/`.
+1. **Generate** (quality campaigns): `bench/quality/make_charts.py --campaign <dir> [--order …]
+   [--calibration …]` → cell-level SVGs in `results/charts/` + `results/appendix.md` + `results/gpu_peaks.json`.
+   Per-task views: `bench/quality/make_charts_detailed.py --campaign <dir>` (after `aggregate.py --by-task`)
+   → `results/charts/detailed/` + `results/appendix-detailed.md`.
    Throughput campaigns: `bench/core/report.py <campaign_dir>` → `results/charts/*.svg` + `results/appendix.md`
-   instead (gen_campaign's `run.sh` already calls it). Wire the call into the
-   campaign's `run_capture.sh` so charts regenerate with the data — a chart built from a stale
+   instead (gen_campaign's `run.sh` already calls it). The quality driver `bench/quality/run_capture.sh`
+   runs them after each capture, so charts regenerate with the data — a chart built from a stale
    `summary*.json` is a correctness bug, not a cosmetic one.
 2. **Embed the decision-grade charts INLINE at the finding they support** — a chart belongs next to the
    claim it proves, not in a pile at the end. Use a bold caption + the embed + a short interpretive
