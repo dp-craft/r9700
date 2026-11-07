@@ -28,7 +28,7 @@ stack/llamacpp/
     latest →             symlink → installed SDK version
 ```
 
-`build/` at the repo root is a symlink → `stack/llamacpp/var/builds/`. All downstream tools (`stack/llama-swap/generate.py`, `compare_builds.py`, campaign scripts) resolve through it transparently.
+Builds live in `stack/llamacpp/var/builds/` (ignored). Downstream tools (`stack/llama-swap/generate.py`, `compare_builds.py`) point at `stack/llamacpp/var/builds/latest-<backend>` directly; the old `build/` compat symlink at the repo root was removed in the 2026-11-06 restructure.
 
 ## Build directory naming
 
@@ -152,7 +152,7 @@ stack/llamacpp/build_llamacpp.sh promote b10909 --backend vulkan
 
 `stack/llama-swap/generate.py` resolves the server binary as:
 ```python
-f"{REPO}/build/latest-{backend}/bin/llama-server"
+f"{REPO}/stack/llamacpp/var/builds/latest-{backend}/bin/llama-server"
 ```
 
-Because `build/` → `stack/llamacpp/var/builds/` (symlink), and `latest-*` → `<ver>-<backend>[-<sdk>]`, the chain resolves automatically. After promoting, llama-swap picks up the new binary at the next model load. A running model keeps the old binary until unloaded (`GET /unload`).
+Because `latest-*` → `<ver>-<backend>[-<sdk>]`, the chain resolves automatically. After promoting, llama-swap picks up the new binary at the next model load. A running model keeps the old binary until unloaded (`GET /unload`).

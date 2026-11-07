@@ -50,8 +50,8 @@ REPO = str(HERE.parents[1])   # stack/llama-swap -> repo root
 # were applying to Qwen3.5+ too and degrading many-tool runs), #27034 (two O(N^2) terms in jinja
 # gather_string_parts), #25494 (coopmat1 dequantised q8_0 KV 32x per prefill -- every Qwen3.8 row
 # runs q8_0 KV on coopmat1). It also gained DFlash2 support; measured and NOT adopted, see below.
-# Since 2026-09-11 both binaries resolve through build/latest-<backend>, promoted by
-# bench/build_llamacpp.sh (skill llamacpp-build, which benchmarks every new build against the previous
+# Since 2026-09-11 both binaries resolve through stack/llamacpp/var/builds/latest-<backend>, promoted by
+# stack/llamacpp/build_llamacpp.sh (skill llamacpp-build, which benchmarks every new build against the previous
 # one first). Switching or rolling back = `build_llamacpp.sh promote <ver>`, never an edit here.
 VULKAN_BIN = f"{REPO}/stack/llamacpp/var/builds/latest-vulkan/bin/llama-server -b 1024 -ub 512"
 # COMMUNITY TUNING TABLE (llama.cpp Discussion #21043) CHECKED ROW BY ROW, 2026-08-27.
@@ -95,7 +95,7 @@ ROCM_BIN = f"{REPO}/stack/llamacpp/var/builds/latest-rocm/bin/llama-server -b 20
 # NO LD_LIBRARY_PATH on ROCm rows: it outranks RUNPATH, so a fixed one would load another build's
 # libllama.so. Source builds find /opt/rocm via RUNPATH. The prebuilt b10375 asset does NOT bundle
 # the HIP runtime (libamdhip64.so.7 / libhipblas.so.3 / librocblas.so.5) and borrows it from the
-# July b9949 bundle -- that now lives in its own wrappers, build/b10375-rocm/bin/* (own dist/ first:
+# July b9949 bundle -- that now lives in its own wrappers, stack/llamacpp/var/builds/b10375-rocm/bin/* (own dist/ first:
 # the reverse order resurrects `unknown model architecture: 'muse-glimmer'`).
 # hipfire — a SEPARATE ENGINE, not a llama.cpp build. It is its own OpenAI-compatible daemon, so a
 # hipfire row shares NOTHING with the vulkan/rocm rows: no ${common}, no -ngl/-fa/-c/--jinja, no

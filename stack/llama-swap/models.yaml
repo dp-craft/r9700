@@ -124,7 +124,7 @@ models:
     backends: [vulkan]
     templates: [froggeric, sharp]
     # T2 RAM prompt-cache budget (llama.cpp --cache-ram, MiB) -- the tier that carries
-    # orchestrator<->subagent state across slot switches (see docs/analysis/
+    # orchestrator<->subagent state across slot switches (see AiChatney docs/analysis/
     # 2026-10-01-1230-052-reprefill-cache-research.md). 2026-10-01: 8192 -> 12288 ("no swap
     # change", user decision). The earlier note assumed dropping --load-mode mlock would free
     # ~16 GiB; it did not -- mlock was a measured no-op (VmLck 0, RLIMIT_MEMLOCK 0). 12288 is
