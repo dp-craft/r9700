@@ -3,26 +3,35 @@
 # OpenAI-compatible /v1 endpoint and records prefill/decode/TTFT (+ thinking + concurrency metrics).
 #
 # Two measurement backends:
-#   1. capture_engine.py probe (bench/lib/) — zero install: real prompt files, thinking-mode ttfa,
+#   1. capture_engine.py probe (bench/core/) — zero install: real prompt files, thinking-mode ttfa,
 #      --concurrency waves, prefix modes (agentic). Default.
 #   2. llama-benchy    — standardized synthetic pp/tg/depth curves with concurrency
 #      (install: see README). Set USE_BENCHY=1. Complements, does not replace, the probe.
 #
-# You start the engine servers yourself (docs/guides/GUIDE.md, or engine-bench/serve_llamacpp.sh);
+# You start the engine servers yourself (docs/guides/GUIDE.md, or stack/serve/llamacpp/serve_llamacpp.sh);
 # this script only drives them. Engine list: edit ENGINES below or set ENGINES_LIST
 # (semicolon-separated "name|base-url-with-/v1|model" entries).
 #
-# Env knobs: PROMPT_FILE (required for probe; space-separated list = per-stream variants)
-#            SLUG MAX_TOKENS CONCURRENCY REPS WARMUP PREFIX_MODE (none|unique|shared)
-#            MODE=conversation (+ START_TOKENS STEP_TOKENS MAX_DEPTH CHAT_KWARGS [TURN_PROMPT]): growing multi-turn chat
-#            USE_BENCHY BENCHY_ARGS
-#            SAMPLE_VRAM=1  → log GPU VRAM+GTT+power across the probe (gpu_samples.csv) and fold a
-#                            `gpu` row into results.jsonl. NOTE: the sampler spans the whole engine
-#                            loop, so the memory row is only cleanly attributable when ENGINES_LIST
-#                            has ONE engine (the campaign case). Multi-engine comparisons share it.
+# Two roots (layout contract): RAW = $CAMPAIGN_DIR/tmp/<stamp>-engine-<slug>/ (per-run meta.txt,
+# prompt copies, /props dumps, gpu_samples.csv, and this run's rows in results.jsonl, which
+# phase_power.py reads); at the end the run's rows are APPENDED to $CAMPAIGN_DIR/results/results.jsonl
+# once, only if every probe succeeded (a caller never appends them a second time).
+#
+# Env: CAMPAIGN_DIR (REQUIRED: campaigns/<type>/<stamp>-<slug>; raw -> tmp/, rows -> results/)
+#      PROMPT_FILE (required for probe; space-separated list = per-stream variants)
+#      SLUG MAX_TOKENS CONCURRENCY REPS WARMUP PREFIX_MODE (none|unique|shared)
+#      MODE=conversation (+ START_TOKENS STEP_TOKENS MAX_DEPTH CHAT_KWARGS [TURN_PROMPT]): growing multi-turn chat
+#      USE_BENCHY BENCHY_ARGS
+#      SAMPLE_VRAM=1  → log GPU VRAM+GTT+power across the probe (gpu_samples.csv) and fold a
+#                      `gpu` row into results.jsonl. NOTE: the sampler spans the whole engine
+#                      loop, so the memory row is only cleanly attributable when ENGINES_LIST
+#                      has ONE engine (the campaign case). Multi-engine comparisons share it.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO="$(cd "$HERE/../.." && pwd)"
+REPO="$(git -C "$HERE" rev-parse --show-toplevel)"
+USAGE="usage: CAMPAIGN_DIR=campaigns/<type>/<stamp>-<slug> PROMPT_FILE=/path/to/workload.txt SLUG=… $0"
+[ -n "${CAMPAIGN_DIR:-}" ] || { echo "CAMPAIGN_DIR is not set — $USAGE" >&2; exit 2; }
+CAMPAIGN_DIR="$(realpath -m "$CAMPAIGN_DIR")"
 
 : "${SLUG:=enginecmp}"
 : "${MAX_TOKENS:=512}"
@@ -50,8 +59,10 @@ if [ -n "${ENGINES_LIST:-}" ]; then
 fi
 
 STAMP="$(date '+%Y-%m-%d-%H%M')"
-OUT="$REPO/bench/runs/${STAMP}-engine-${SLUG}"
-mkdir -p "$OUT"
+OUT="$CAMPAIGN_DIR/tmp/${STAMP}-engine-${SLUG}"   # raw run dir (meta.txt, prompt copies, props, GPU CSVs)
+RUN_ROWS="$OUT/results.jsonl"                      # this run's rows (raw; phase_power.py reads them here)
+ROWS="$CAMPAIGN_DIR/results/results.jsonl"         # campaign results: RUN_ROWS appended once at the end, on success
+mkdir -p "$OUT" "$(dirname "$ROWS")"
 {
   echo "date=$(date -Iseconds)"
   echo "workload=${PROMPT_FILE:-benchy-synthetic}"
@@ -91,7 +102,7 @@ for e in "${ENGINES[@]}"; do
   curl -sf -m 5 "$url/models" -o "$OUT/models_${name}.json" 2>/dev/null || true
 
   if [ "$USE_BENCHY" = "1" ]; then
-    BENCHY="${BENCHY_BIN:-$REPO/bench/dl/benchy-venv/bin/llama-benchy}"
+    BENCHY="${BENCHY_BIN:-$REPO/stack/serve/var/venvs/benchy-venv/bin/llama-benchy}"
     "$BENCHY" --base-url "$url" --model "$model" ${BENCHY_ARGS:-} \
       > "$OUT/benchy_${name}.txt" 2>&1 || echo "  benchy failed for $name (see $OUT/benchy_${name}.txt)"
   else
@@ -99,28 +110,28 @@ for e in "${ENGINES[@]}"; do
     # speculative-decoding acceptance for THIS probe (vLLM counters; no-op for engines without them)
     python3 "$REPO/stack/gpu/spec_metrics.py" snap "$url" > "$OUT/.spec_before_${name}.json" 2>/dev/null || echo '{}' > "$OUT/.spec_before_${name}.json"
     spec_row () { python3 "$REPO/stack/gpu/spec_metrics.py" diff "$OUT/.spec_before_${name}.json" "$url" "$SLUG" "$name" \
-                    >> "$OUT/results.jsonl" 2>/dev/null || true; rm -f "$OUT/.spec_before_${name}.json"; }
+                    >> "$RUN_ROWS" 2>/dev/null || true; rm -f "$OUT/.spec_before_${name}.json"; }
     if [ "${MODE:-probe}" = conversation ]; then
       python3 "$REPO/bench/core/capture_engine.py" conversation --url "$url" --model "$model" "${PF_ARGS[@]}" \
         --start-tokens "${START_TOKENS:-10000}" --step-tokens "${STEP_TOKENS:-15000}" \
         --max-depth "${MAX_DEPTH:?MODE=conversation needs MAX_DEPTH}" --max-tokens "$MAX_TOKENS" \
         --reps "$REPS" --chat-template-kwargs "${CHAT_KWARGS:-}" ${TURN_PROMPT:+--turn-prompt "$TURN_PROMPT"} \
-        --engine "$name" --label "$SLUG" >> "$OUT/results.jsonl" || { echo "  conversation failed for $name"; PROBE_FAILED=1; }
+        --engine "$name" --label "$SLUG" >> "$RUN_ROWS" || { echo "  conversation failed for $name"; PROBE_FAILED=1; }
       spec_row
       continue
     fi
     python3 "$REPO/bench/core/capture_engine.py" probe --url "$url" --model "$model" "${PF_ARGS[@]}" \
       --max-tokens "$MAX_TOKENS" --concurrency "$CONCURRENCY" --reps "$REPS" \
       --warmup "$WARMUP" --prefix-mode "$PREFIX_MODE" --api "$API" \
-      --engine "$name" --label "$SLUG" >> "$OUT/results.jsonl" || { echo "  probe failed for $name"; PROBE_FAILED=1; }
+      --engine "$name" --label "$SLUG" >> "$RUN_ROWS" || { echo "  probe failed for $name"; PROBE_FAILED=1; }
     spec_row
   fi
 done
 
 stop_sampler
-# fold the GPU memory summary into results.jsonl as a `gpu` row (report + write-up read it)
-if [ -f "$OUT/gpu_samples.csv" ] && [ -f "$OUT/results.jsonl" ]; then
-  python3 - "$OUT/gpu_samples.csv" "$SLUG" >> "$OUT/results.jsonl" <<'PY' || true
+# fold the GPU memory summary into the campaign results as a `gpu` row (report + write-up read it)
+if [ -f "$OUT/gpu_samples.csv" ] && [ -f "$RUN_ROWS" ]; then
+  python3 - "$OUT/gpu_samples.csv" "$SLUG" >> "$RUN_ROWS" <<'PY' || true
 import sys, re
 csv, slug = sys.argv[1], sys.argv[2]
 last = ""
@@ -137,20 +148,26 @@ if last:
 PY
   # per-phase power (prefill vs decode) from the requests' wall-clock phase boundaries
   python3 "$REPO/stack/gpu/phase_power.py" "$OUT" > "$OUT/.power.jsonl" 2>/dev/null \
-    && cat "$OUT/.power.jsonl" >> "$OUT/results.jsonl"; rm -f "$OUT/.power.jsonl"
+    && cat "$OUT/.power.jsonl" >> "$RUN_ROWS"; rm -f "$OUT/.power.jsonl"
   python3 -c "import json
-for l in open('$OUT/results.jsonl'):
+for l in open('$RUN_ROWS'):
     d=json.loads(l)
     if d.get('kind')=='power': print(f\"power {d['label']}: prefill avg {d['prefill_w_avg']} W (n={d['prefill_n']}) decode avg {d['decode_w_avg']} W (n={d['decode_n']}) {d.get('flag') or ''}\")" || true
 fi
 
-echo "→ results: $OUT"
-[ -f "$OUT/results.jsonl" ] && { echo "--- summary (aggregate rows) ---"; \
+[ -f "$RUN_ROWS" ] && { echo "--- summary (aggregate rows) ---"; \
   python3 -c "import json
-for l in open('$OUT/results.jsonl'):
+for l in open('$RUN_ROWS'):
     d=json.loads(l)
     if d.get('kind')!='aggregate': continue
     print(f\"{d.get('engine'):16} c={d.get('concurrency')} ttft_p50={d.get('ttft_s_p50')}s \"
           f\"prefill_p50={d.get('prefill_tok_s_p50')} dec/stream_p50={d.get('decode_tok_s_per_stream_p50')} \"
           f\"AGG={d.get('aggregate_tok_s')} tok/s err={d.get('n_err')}\")"; }
-[ "$PROBE_FAILED" = 0 ] || { echo "→ at least one probe FAILED (rows kept in $OUT/results.jsonl)" >&2; exit 1; }
+# this run's rows reach the campaign results once, and only when every probe succeeded: a failed probe's
+# partial rows stay in the raw run dir, and the rerun of that probe adds its full set (iron rule 18)
+if [ "$PROBE_FAILED" = 0 ]; then
+  [ -f "$RUN_ROWS" ] && cat "$RUN_ROWS" >> "$ROWS"
+  echo "→ rows: $ROWS   (raw run dir: $OUT)"
+else
+  echo "→ at least one probe FAILED: rows NOT added to $ROWS (kept in $RUN_ROWS)" >&2; exit 1
+fi

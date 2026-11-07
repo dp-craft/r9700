@@ -349,7 +349,9 @@ class AgenticBase(unittest.TestCase):
                            ("vram_sampler.py", STUB_SAMPLER), ("docker", STUB_DOCKER),
                            ("curl", STUB_CURL), ("claude", STUB_CLAUDE)):
             write(os.path.join(self.stubs, name), body, 0o755)
-        self.run_dir = os.path.join(T, "run")
+        self.campaign_dir = os.path.join(T, "run")              # the CAMPAIGN_DIR (two roots inside it)
+        self.run_dir = os.path.join(self.campaign_dir, "tmp")   # raw root ($CAMPAIGN_DIR/tmp)
+        self.res_dir = os.path.join(self.campaign_dir, "results")   # results root ($CAMPAIGN_DIR/results)
         self.wt_root = os.path.join(T, "wt")
         self.spec = self.make_spec()
 
@@ -403,7 +405,9 @@ class AgenticBase(unittest.TestCase):
         return path
 
     def env(self, **extra):
-        e = dict(os.environ, HOME=self.home, RUN_DIR=self.run_dir, STUB_DIR=self.stubdir,
+        # RUN_DIR is no longer a knob (the driver refuses it); the campaign dir is. ROOT is the
+        # git-toplevel default in the emitted run.sh, but run.sh lives in T (not a git repo), so set it.
+        e = dict(os.environ, HOME=self.home, ROOT=self.T, CAMPAIGN_DIR=self.campaign_dir, STUB_DIR=self.stubdir,
                  STUB_TMP=self.stub_tmp, GIT_CONFIG_GLOBAL="/dev/null", GIT_CONFIG_SYSTEM="/dev/null",
                  SERVE_VLLM=self.stubs + "/serve_vllm.sh", SERVE_LLAMASWAP=self.stubs + "/serve_llamaswap.sh",
                  GPU_EXCLUSIVE=self.stubs + "/gpu_exclusive.sh",
@@ -420,7 +424,7 @@ class AgenticBase(unittest.TestCase):
         return p
 
     def summary(self):
-        path = os.path.join(self.run_dir, "summary.tsv")
+        path = os.path.join(self.res_dir, "summary.tsv")
         if not os.path.exists(path):
             return []
         rows = [l.rstrip("\n").split("\t") for l in open(path)]
@@ -435,11 +439,31 @@ class AgenticBase(unittest.TestCase):
         return os.path.join(self.run_dir, f"rep{rep}", arm)
 
     def rd(self, *parts):
-        return open(os.path.join(self.run_dir, *parts)).read()
+        """Read a file the driver writes, from the raw root (tmp/) or the results root (results/)."""
+        for root in (self.run_dir, self.res_dir):
+            p = os.path.join(root, *parts)
+            if os.path.exists(p):
+                return open(p).read()
+        raise AssertionError(f"no {'/'.join(parts)} under raw (tmp/) or results (results/)")
 
     def lines(self, name):
         p = os.path.join(self.stubdir, name)
         return open(p).read().splitlines() if os.path.exists(p) else []
+
+    # ---- two-root layout (brief A): no absolute repo path; raw=tmp/, results=results/ ----
+    def test_no_absolute_repo_path_in_run_sh(self):
+        sh = gc.emit_runsh(self.spec)
+        self.assertNotIn(gc.REPO, sh)                        # tool paths are $ROOT-relative, not baked in
+
+    def test_raw_and_results_roots(self):
+        sh = gc.emit_runsh(self.spec)
+        self.assertIn('RAW="$CAMPAIGN_DIR/tmp"', sh)
+        self.assertIn('RES="$CAMPAIGN_DIR/results"', sh)
+        self.assertIn('RUN_DIR="$RAW"', sh)                  # markers/lock/log/arm dirs stay raw
+        self.assertIn("$RES/summary.tsv", sh)                # results rows are committed
+        self.assertIn("$RES/spec.resolved.json", sh)
+        self.assertIn("$RUN_DIR/done/", sh)                 # done markers under tmp/
+        self.assertIn('$CAMPAIGN_DIR (results: $RES, raw: $RUN_DIR)', sh)
 
 
 # ======================================================================================
@@ -599,16 +623,16 @@ class AgenticScript(AgenticBase):
 
     def test_emit_writes_run_sh_and_readme_only_if_absent(self):
         camp = os.path.join(self.T, "campaigns")
-        old = gc.CAMPAIGNS
-        gc.CAMPAIGNS = camp
-        self.addCleanup(setattr, gc, "CAMPAIGNS", old)
+        old = gc.REPO
+        gc.REPO = self.T
+        self.addCleanup(setattr, gc, "REPO", old)
         sp = write(os.path.join(self.T, "spec.json"), json.dumps(self.spec))
 
         class A: pass
         a = A(); a.spec = sp; a.force = False; a.print = False
         with contextlib.redirect_stdout(io.StringIO()):
             gc.cmd_emit(a)
-        d = os.path.join(camp, "2026-01-01-agtest")
+        d = os.path.join(camp, "agentic", "2026-01-01-agtest")   # kind agentic -> type dir; old date form kept
         self.assertTrue(os.access(os.path.join(d, "run.sh"), os.X_OK))
         self.assertTrue(os.path.exists(os.path.join(d, "README.md")))
         write(os.path.join(d, "README.md"), "HAND WRITTEN")
@@ -635,6 +659,12 @@ class AgenticScript(AgenticBase):
             self.assertIn(ph, rd)
         self.assertIn("600", rd)
         self.assertIn("ONLY", rd)
+        # two-root layout: campaign path under the type dir; write-up in docs/findings/ with meta campaign:
+        self.assertIn("bash campaigns/agentic/2026-01-01-agtest/run.sh", rd)
+        self.assertIn("CAMPAIGN_DIR=/path bash campaigns/agentic/2026-01-01-agtest/run.sh", rd)
+        self.assertIn("campaign: campaigns/agentic/2026-01-01-agtest", rd)
+        self.assertNotIn("analysis.md", rd)
+        self.assertNotIn("bench/runs", rd)
 
     def test_prompts_with_backticks_survive_in_readme(self):
         s = copy.deepcopy(self.spec)
@@ -732,7 +762,7 @@ class AgenticE2E(AgenticBase):
         self.assertTrue(os.path.exists(self.run_dir + "/started/rep1.fast"))
         # server stopped each time, port free
         self.assertEqual(sum(1 for l in slog if l.startswith("stop")), 2)
-        self.assertFalse(os.path.exists(self.run_dir + "/failures.txt"))
+        self.assertFalse(os.path.exists(self.res_dir + "/failures.txt"))
         # worktrees kept (remove_worktree false)
         self.assertTrue(os.path.isdir(wt))
         # the main checkout was untouched
@@ -802,7 +832,7 @@ class AgenticE2E(AgenticBase):
         self.assertTrue(os.path.exists(self.run_dir + "/done/rep1.slow"))
         self.assertEqual(len(self.lines("claude.log")), 1)
         # MAX_RESUMES env wins
-        shutil.rmtree(self.run_dir)
+        shutil.rmtree(self.campaign_dir)   # raw (markers) + results (summary) both live under it
         shutil.rmtree(self.wt_root)
         git(self.repo, "worktree", "prune")
         self.run_script(s, MAX_RESUMES="2")
@@ -968,7 +998,7 @@ class AgenticLlamaSwapScript(AgenticBase):
         gc.validate_spec(s)
         sh = gc.emit_runsh(s)
         bash_n(self, sh)
-        self.assertIn('SERVE_LLAMASWAP="${SERVE_LLAMASWAP:-$EB/serve_llamaswap.sh}"', sh)
+        self.assertIn('SERVE_LLAMASWAP="${SERVE_LLAMASWAP:-$ROOT/stack/serve/llamacpp/serve_llamaswap.sh}"', sh)
         self.assertNotIn("SERVE_VLLM", sh)
         self.assertNotIn('"$DOCKER" logs', sh)
         self.assertNotIn("\n  port_free_check\n", sh)
@@ -1037,7 +1067,7 @@ class AgenticLlamaSwapE2E(AgenticBase):
         self.assertTrue(os.path.exists(ad + "/gpu_samples.csv"))
         self.assertTrue(os.path.exists(self.run_dir + "/done/rep1.fast"))
         self.assertTrue(os.path.exists(self.run_dir + "/done/rep1.slow"))
-        self.assertFalse(os.path.exists(self.run_dir + "/failures.txt"))
+        self.assertFalse(os.path.exists(self.res_dir + "/failures.txt"))
         self.assertNotIn("WARNING", self.rd("driver.log"))
 
     def test_unload_not_confirmed_warns(self):
@@ -1260,7 +1290,7 @@ class StopWhenE2E(AgenticBase):
         self.assertLess(fired - emitted, 4)
         self.assertLess(wall, 20)                                     # the 119 s sleep was cut short
         self.assertTrue(os.path.exists(self.run_dir + "/done/rep1.stopper"))
-        self.assertFalse(os.path.exists(self.run_dir + "/failures.txt"), self.out)
+        self.assertFalse(os.path.exists(self.res_dir + "/failures.txt"), self.out)
         self.assertNotIn("--resume", "".join(self.lines("claude.log")))                  # never resumed
         self.assertEqual(open(self.arm_dir("stopper") + "/calls.tsv").read().count("\n"), 2)
         t = open(self.arm_dir("stopper") + "/stop_when.txt").read()
@@ -1397,7 +1427,7 @@ class AgenticReuse(AgenticBase):
         p = self.run_script(self.spec)
         self.assertEqual(p.returncode, 0, self.out)        # continue-on-failure: run exits 0
         self.assertEqual(self.status_of("fast"), "served_name_mismatch", self.out)
-        self.assertTrue(os.path.exists(self.run_dir + "/failures.txt"))
+        self.assertTrue(os.path.exists(self.res_dir + "/failures.txt"))
 
     def test_reuse_server_down(self):
         # a failing curl stub: the shared /v1/models check and the live check both fail
@@ -1427,6 +1457,221 @@ class AgenticReuse(AgenticBase):
         self.assertEqual(orphans, [], "orphan session process")
         # no stop ever issued (the server is not ours to stop)
         self.assertEqual([l for l in self.lines("serve.log") if l.startswith("stop")], [])
+
+
+# ======================================================================================
+# Part G: two-root campaign layout (brief A): campaigns/<type>/<date>-<slug>, raw=tmp/,
+#   results=results/; engine-bench drivers take CAMPAIGN_DIR; example specs emit clean.
+# ======================================================================================
+def throughput_spec(**over):
+    s = {"slug": "layout", "model": "/m/x.gguf", "backend": "vulkan",
+         "servers": [{"name": "a", "ctx": 4096, "np": 1, "kv": "f16", "mtp": 0,
+                      "probes": [{"slug": "p", "prompts": ["codereview-100.txt"]}]}]}
+    s.update(over)
+    return s
+
+
+def quality_spec(**over):
+    s = {"kind": "quality", "slug": "layout-q",
+         "configs": [{"label": "a", "file": "A.gguf", "mtp": 0}]}
+    s.update(over)
+    return s
+
+
+def cmd_emit_in(camp, spec):
+    """gc.cmd_emit with gc.REPO pointed at `camp` (campaigns/ are written under it); returns stdout."""
+    sp = write(os.path.join(camp, "spec.json"), json.dumps(spec))
+
+    class A: pass
+    a = A(); a.spec = sp; a.force = False; a.print = False
+    with contextlib.redirect_stdout(io.StringIO()) as out:
+        gc.cmd_emit(a)
+    return out.getvalue()
+
+
+class EmitDirLayout(unittest.TestCase):
+    """emit dir = campaigns/<type>/<date>-<slug>/ (type from the spec, else from the kind;
+    date YYYY-MM-DD-HHMM, default now; old YYYY-MM-DD specs keep their <date>-<slug> name)."""
+
+    def setUp(self):
+        self.camp = os.path.realpath(tempfile.mkdtemp(prefix="gc-layout-"))
+        self.addCleanup(shutil.rmtree, self.camp, True)
+        self.camps = os.path.join(self.camp, "campaigns")
+        self.old = gc.REPO
+        gc.REPO = self.camp
+        self.addCleanup(setattr, gc, "REPO", self.old)
+
+    def test_kind_maps_to_type_dir_with_hhmm_default_date(self):
+        import datetime
+        before = datetime.datetime.now()
+        cmd_emit_in(self.camp, throughput_spec())
+        cmd_emit_in(self.camp, quality_spec())
+        for t in ("perf", "quality"):
+            self.assertIn(t, os.listdir(self.camps), os.listdir(self.camps))
+        perf = os.listdir(os.path.join(self.camps, "perf"))[0]
+        self.assertRegex(perf, r"^\d{4}-\d{2}-\d{2}-\d{4}-layout$")     # default date = now as HHMM
+        self.assertTrue(before.strftime("%Y-%m-%d") <= perf[:10] <= datetime.datetime.now().strftime("%Y-%m-%d"), perf)
+        self.assertTrue(os.access(os.path.join(self.camps, "perf", perf, "run.sh"), os.X_OK))
+
+    def test_explicit_type_and_hhmm_date_win(self):
+        cmd_emit_in(self.camp, throughput_spec(date="2026-07-11-1430", type="investigation"))
+        d = os.path.join(self.camps, "investigation", "2026-07-11-1430-layout")
+        self.assertTrue(os.path.exists(os.path.join(d, "run.sh")))
+
+    def test_dateless_spec_in_its_campaign_dir_keeps_that_dir(self):
+        # re-emitting a spec with no date must not open a new dir each minute: the dir it sits in gives the stamp
+        d = os.path.join(self.camps, "perf", "2026-01-02-0304-layout")
+        cmd_emit_in(d, throughput_spec())
+        self.assertEqual(os.listdir(os.path.join(self.camps, "perf")), ["2026-01-02-0304-layout"])
+        with open(os.path.join(d, "README.md")) as fh:
+            self.assertIn("campaigns/perf/2026-01-02-0304-layout/run.sh", fh.read())
+
+    def test_old_date_form_lands_under_type(self):
+        cmd_emit_in(self.camp, quality_spec(date="2026-07-11"))
+        self.assertTrue(os.path.exists(os.path.join(self.camps, "quality", "2026-07-11-layout-q", "plan.md")))
+
+    def test_bad_type_or_date_rejected(self):
+        exits(self, gc.validate_layout, {"type": "bogus"})
+        exits(self, gc.validate_layout, {"date": "2026-07-11-14300"})
+        exits(self, gc.validate_layout, {"date": "2026-7-11"})
+        gc.validate_layout({"type": "workers", "date": "2026-07-11-0905"})   # any of the six types
+
+
+class RunshTwoRoots(unittest.TestCase):
+    def test_no_absolute_repo_path_and_roots(self):
+        for spec in (throughput_spec(), quality_spec()):
+            with self.subTest(kind=spec.get("kind", "throughput")):
+                sh = gc.emit_runsh(spec)
+                self.assertNotIn(gc.REPO, sh)                      # nothing baked from the repo root
+                self.assertIn('RAW="$CAMPAIGN_DIR/tmp"', sh)
+                self.assertIn('RES="$CAMPAIGN_DIR/results"', sh)
+
+    def test_throughput_driver_writes_classified_files(self):
+        sh = gc.emit_runsh(throughput_spec())
+        for want in ('touch "$RAW/done/$slug"', 'tee -a "$RES/failures.txt"', 'tee -a "$RES/skipped.txt"',
+                     '> "$RES/meta.txt"', 'python3 "$ROOT/bench/core/report.py" "$CAMPAIGN_DIR"',
+                     'EB="$ROOT/bench/perf/engine-bench"', 'GEN="$ROOT/bench/workloads/tmp"'):
+            self.assertIn(want, sh)
+        self.assertNotIn('>> "$RES/results.jsonl"', sh)            # rows are engine-bench's to append (once), not the driver's
+
+    def test_quality_driver_writes_classified_files(self):
+        sh = gc.emit_runsh(quality_spec())
+        for want in ('OUTF="$RAW/outputs.jsonl"', 'VRAMF="$RES/vram.jsonl"', 'touch "$RAW/done/$label"',
+                     '--out "$RES/scores_deterministic.jsonl"', 'python3 "$CORE/report.py" "$CAMPAIGN_DIR"',
+                     'SERVE="$ROOT/stack/serve/llamacpp/serve_llamacpp.sh"'):
+            self.assertIn(want, sh)
+
+
+class ExampleSpecEmit(unittest.TestCase):
+    """The three `example` specs must emit into a tmp campaigns/ root and pass bash -n."""
+
+    def setUp(self):
+        self.camp = os.path.realpath(tempfile.mkdtemp(prefix="gc-ex-"))
+        self.addCleanup(shutil.rmtree, self.camp, True)
+        self.old = gc.REPO
+        gc.REPO = self.camp
+        self.addCleanup(setattr, gc, "REPO", self.old)
+
+    def test_example_specs_emit_and_pass_bash_n(self):
+        for name, spec, doc in (("throughput", gc.EXAMPLE, "README.md"),
+                                ("quality", gc.EXAMPLE_QUALITY, "plan.md"),
+                                ("agentic", gc.EXAMPLE_AGENTIC, "README.md")):
+            with self.subTest(kind=name):
+                # gc.REPO points at the tmp root, so materialize the example's repo-relative
+                # install srcs there (the real repo's copies are not in the sandbox)
+                for it in spec.get("install", []):
+                    if not os.path.isabs(it["src"]):
+                        write(os.path.join(self.camp, it["src"]), "placeholder\n")
+                cmd_emit_in(self.camp, spec)
+                d = os.path.join(self.camp, *gc.campaign_rel(spec).split("/"))
+                run_sh = os.path.join(d, "run.sh")
+                self.assertTrue(os.access(run_sh, os.X_OK), run_sh)
+                self.assertTrue(os.path.exists(os.path.join(d, doc)), d)
+                bash_n(self, open(run_sh).read())
+
+
+class EngineBenchScripts(unittest.TestCase):
+    def test_run_sh_and_campaign_sh_pass_bash_n(self):
+        eb = os.path.join(HERE, os.pardir, "perf", "engine-bench")
+        for name in ("run.sh", "campaign.sh"):
+            with self.subTest(script=name):
+                r = subprocess.run(["bash", "-n", os.path.join(eb, name)], capture_output=True, text=True)
+                self.assertEqual(r.returncode, 0, r.stderr)
+
+    def test_run_sh_requires_campaign_dir(self):
+        r = subprocess.run(["bash", os.path.join(HERE, os.pardir, "perf", "engine-bench", "run.sh"),
+                            "PROMPT_FILE=/dev/null SLUG=x true"], env={k: v for k, v in os.environ.items()
+                            if k not in ("CAMPAIGN_DIR", "RUN_DIR")}, capture_output=True, text=True)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("CAMPAIGN_DIR is not set", r.stderr)
+
+    def test_run_sh_rows_reach_results_once_and_only_on_success(self):
+        """run.sh keeps the run's rows in tmp/<run>/results.jsonl (phase_power.py reads them there) and appends them
+        to results/results.jsonl once at the end, only when every probe succeeded (iron rule 18)."""
+        sb = tempfile.mkdtemp(prefix="ebrun-")
+        self.addCleanup(shutil.rmtree, sb, True)
+        subprocess.run(["git", "init", "-q", sb], check=True)
+        stubs = {
+            "bench/core/capture_engine.py":  # one aggregate row per engine; FAIL_ENGINE writes a partial row, then fails
+                "import json, os, sys\na = sys.argv\ne, l = a[a.index('--engine') + 1], a[a.index('--label') + 1]\n"
+                "print(json.dumps({'kind': 'aggregate', 'engine': e, 'label': l}))\n"
+                "sys.exit(1 if os.environ.get('FAIL_ENGINE') == e else 0)\n",
+            "stack/gpu/spec_metrics.py": "import sys\nif sys.argv[1] == 'snap': print('{}')\n",
+            "stack/gpu/phase_power.py":  # reports how many request rows it found in RUN_DIR/results.jsonl
+                "import json, os, sys\nrs = os.path.join(sys.argv[1], 'results.jsonl')\n"
+                "n = sum(1 for _ in open(rs)) if os.path.exists(rs) else 0\n"
+                "print(json.dumps({'kind': 'power', 'label': 'x', 'rows_seen': n, 'prefill_w_avg': 1, 'prefill_n': 1,"
+                " 'decode_w_avg': 1, 'decode_n': 1}))\n",
+            "stack/gpu/vram_sampler.py":
+                "import sys, time\nf = open(sys.argv[sys.argv.index('--out') + 1], 'w')\n"
+                "f.write('t,vram\\n0,1\\n# peak_vram_used_mib=100\\n'); f.flush()\ntime.sleep(60)\n",
+            "bin/rocm-smi": "#!/bin/sh\nexit 0\n",
+        }
+        for rel, body in stubs.items():
+            os.makedirs(os.path.dirname(os.path.join(sb, rel)), exist_ok=True)
+            with open(os.path.join(sb, rel), "w") as fh:
+                fh.write(body)
+        os.chmod(os.path.join(sb, "bin/rocm-smi"), 0o755)
+        os.makedirs(os.path.join(sb, "bench/perf/engine-bench"))
+        shutil.copy(os.path.join(HERE, os.pardir, "perf", "engine-bench", "run.sh"), os.path.join(sb, "bench/perf/engine-bench"))
+        www = os.path.join(sb, "www"); os.makedirs(www)
+        open(os.path.join(www, "health"), "w").write("ok")
+        with socket.socket() as s:
+            s.bind(("127.0.0.1", 0)); port = s.getsockname()[1]
+        srv = subprocess.Popen([sys.executable, "-m", "http.server", str(port), "--bind", "127.0.0.1", "--directory", www],
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.addCleanup(srv.kill)
+        for _ in range(50):
+            with socket.socket() as s:
+                if s.connect_ex(("127.0.0.1", port)) == 0:
+                    break
+            time.sleep(0.1)
+        prompt = os.path.join(sb, "prompt.txt"); open(prompt, "w").write("hi")
+        url = f"http://127.0.0.1:{port}/v1"
+
+        def run(camp, **extra):
+            env = dict(os.environ, CAMPAIGN_DIR=os.path.join(sb, camp), PROMPT_FILE=prompt, SLUG="t", SAMPLE_VRAM="1",
+                       ENGINES_LIST=f"good|{url}|m;bad|{url}|m", PATH=os.path.join(sb, "bin") + os.pathsep + os.environ["PATH"],
+                       **extra)
+            r = subprocess.run(["bash", os.path.join(sb, "bench/perf/engine-bench/run.sh")], env=env,
+                               capture_output=True, text=True, timeout=60)
+            raw = glob.glob(os.path.join(sb, camp, "tmp", "*-engine-t", "results.jsonl"))
+            res = os.path.join(sb, camp, "results", "results.jsonl")
+            rows = lambda p: [json.loads(l) for l in open(p)] if os.path.exists(p) else []
+            return r, rows(raw[0]) if raw else [], rows(res)
+
+        r, raw, res = run("ok")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(raw, res)                                  # appended once, nothing extra
+        self.assertEqual([d["engine"] for d in res if d["kind"] == "aggregate"], ["good", "bad"])
+        power = [d for d in res if d["kind"] == "power"]
+        self.assertEqual(len(power), 1)
+        self.assertGreaterEqual(power[0]["rows_seen"], 2)           # phase_power saw the run's rows
+        r, raw, res = run("fail", FAIL_ENGINE="bad")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("rows NOT added", r.stderr)
+        self.assertEqual(res, [])                                   # a failed run adds nothing to results/
+        self.assertIn("bad", [d.get("engine") for d in raw])        # its partial rows stay raw
 
 
 if __name__ == "__main__":

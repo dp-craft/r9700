@@ -3,16 +3,16 @@ r"""Deterministic campaign scaffolder for the R9700 benchmark harness.
 
 Turns a small JSON *spec* (which servers to launch, which probes to run against each)
 into a **resumable** `run.sh` plus a README skeleton under
-`campaigns/<date>-<slug>/` (project root). The judgement (which depths, MTP/KV matrix, VRAM
-budget) is expected to come from the `benchmark-new-campaign` skill or from you; this tool only
-emits the mechanical, reproducible driver. The emitted run.sh CONTINUES on a server start
+`campaigns/<type>/<date>-<slug>/` (project root; type = perf|quality|agentic|...). The judgement
+(which depths, MTP/KV matrix, VRAM budget) is expected to come from the `benchmark-new-campaign`
+skill or from you; this tool only emits the mechanical, reproducible driver. The emitted run.sh CONTINUES on a server start
 failure, and (if the spec carries a `vram` block) SKIPS before launch any server predicted to
 exceed the VRAM budget — GPU/VRAM-only, never spilling to system RAM. It is safe to run by hand.
 
 Subcommands
 -----------
   emit --spec SPEC.json [--force] [--print]
-        Generate campaigns/<date>-<slug>/{run.sh, README.md|plan.md}. run.sh is always
+        Generate campaigns/<type>/<date>-<slug>/{run.sh, README.md|plan.md}. run.sh is always
         (re)written; the doc is written only if absent (never clobbers a hand-written one).
         The spec's `kind` selects the driver:
           "throughput" (default) — servers × probes matrix; emits README.md; drives
@@ -30,8 +30,8 @@ Subcommands
 Spec schema (JSON)
 ------------------
 {
-  "slug": "deep-context",             # required; campaign dir = <date>-<slug>
-  "date": "2026-07-11",               # optional (default: today)
+  "slug": "deep-context",             # required; campaign dir = campaigns/<type>/<date>-<slug>
+  "date": "2026-07-11-1430",          # optional; YYYY-MM-DD-HHMM (old specs accept YYYY-MM-DD); default: now
   "title": "Deep-context campaign",   # optional (README H1)
   "notes": ["free-text lines emitted as # NOTE: comments at the top of run.sh"],  # optional
 
@@ -77,7 +77,7 @@ vllm servers: `ctx` → MAXLEN, `np` → MAXSEQS, `kv` → KV_DTYPE (e.g. fp8|au
 speculative config lives in the profile). No VRAM prediction: vLLM reserves
 --gpu-memory-utilization at boot, and serve_vllm.sh's watchdog guards the load-time peak.
 Before each vllm server starts, run.sh saves `serve_vllm.sh print` (resolved image + digest, env, argv)
-to <campaign run dir>/server-<name>.txt, and meta.txt records the image (and the env, if any).
+to results/server-<name>.txt, and results/meta.txt records the image (and the env, if any).
 Each probe SLUG must be unique in the campaign (the driver globs its run dir by that slug).
 
 Agentic specs (kind "agentic") — generalises the hand-written run_redhat_w208.sh driver
@@ -117,7 +117,7 @@ upstream llama-server log streamed into server-container.log), stop (GET /unload
 stays up by design, so there is no port-free check: summary.tsv's port_free column is unloaded=yes|no (a WARNING
 on no). The row's config owns model/build/ctx/KV/flags/env, so `server` is optional and takes only free_mib_floor
 (top level and per arm), arms take only name (+ server), and profile/image/env/capture_requests:true are rejected.
-Run-time knobs: ONLY (arm globs) REPS CAP_S MAX_RESUMES RUN_DIR IMAGE (vllm); tool paths for stub testing:
+Run-time knobs: ONLY (arm globs) REPS CAP_S MAX_RESUMES CAMPAIGN_DIR IMAGE (vllm); tool paths for stub testing:
 SERVE_VLLM SERVE_LLAMASWAP GPU_EXCLUSIVE VRAM_SAMPLER CAPTURE_PROXY CLAUDE_BIN DOCKER CURL SS.
 Loop = reps outer, arms inner; every (rep, arm) boots a fresh server. Statuses: done cap max_resumes stopped
 (result, done-marker written) | interrupted claude_error (quarantined, never auto-retried) | wt_exists
@@ -126,9 +126,60 @@ Tests: python3 bench/core/test_gen_campaign.py -v
 """
 import sys, os, re, json, argparse, datetime, stat, hashlib, subprocess, urllib.parse
 
-REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+def _repo_root(start):
+    """The dir holding .git, walking up from `start` (fallback: two levels up from bench/core/)."""
+    d = start
+    while True:
+        if os.path.exists(os.path.join(d, ".git")):
+            return d
+        up = os.path.dirname(d)
+        if up == d:
+            return os.path.dirname(os.path.dirname(start))
+        d = up
+
+
+REPO = _repo_root(os.path.dirname(os.path.abspath(__file__)))
 CAMPAIGNS = os.path.join(REPO, "campaigns")
 BACKEND_PORT = {"rocm": 8080, "vulkan": 8081}
+VLLM_PROFILES = os.path.join(REPO, "stack", "serve", "vllm", "profiles")
+
+# campaigns/<type>/<date>-<slug>/ (layout contract): type from the spec, else from the kind
+CAMPAIGN_TYPES = ("perf", "build-check", "quality", "agentic", "workers", "investigation")
+KIND_TYPE = {"throughput": "perf", "quality": "quality", "agentic": "agentic"}
+DATE_RE = re.compile(r"\d{4}-\d{2}-\d{2}(-\d{4})?")      # YYYY-MM-DD-HHMM (new) | YYYY-MM-DD (old specs)
+
+
+def campaign_date(spec):
+    """The spec's date (YYYY-MM-DD-HHMM or YYYY-MM-DD), default now as YYYY-MM-DD-HHMM."""
+    return spec.get("date") or datetime.datetime.now().strftime("%Y-%m-%d-%H%M")
+
+
+def campaign_type(spec):
+    return spec.get("type") or KIND_TYPE[spec.get("kind", "throughput")]
+
+
+def campaign_rel(spec):
+    """Repo-relative campaign dir: campaigns/<type>/<date>-<slug>."""
+    return f"campaigns/{campaign_type(spec)}/{campaign_date(spec)}-{spec['slug']}"
+
+
+def validate_layout(spec):
+    """type / date checks shared by every kind (sys.exit with a clear message)."""
+    if "type" in spec and spec["type"] not in CAMPAIGN_TYPES:
+        sys.exit(f"spec type must be one of {' | '.join(CAMPAIGN_TYPES)}: {spec['type']!r}")
+    if "date" in spec and not (isinstance(spec["date"], str) and DATE_RE.fullmatch(spec["date"])):
+        sys.exit(f"spec date must be YYYY-MM-DD-HHMM (or YYYY-MM-DD for old specs): {spec['date']!r}")
+
+
+# Shared run.sh preamble (every kind): no absolute repo path baked in. ROOT = git toplevel of run.sh's own dir,
+# CAMPAIGN_DIR = the dir holding run.sh (both overridable); raw -> $CAMPAIGN_DIR/tmp, results -> $CAMPAIGN_DIR/results.
+RUNSH_ROOTS = r'''HERE="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+ROOT="${ROOT:-$(git -C "$HERE" rev-parse --show-toplevel 2>/dev/null)}"
+[ -n "$ROOT" ] || { echo "run.sh: cannot find the repo root (git toplevel of $HERE) -- set ROOT=" >&2; exit 1; }
+CAMPAIGN_DIR="${CAMPAIGN_DIR:-$HERE}"
+mkdir -p "$CAMPAIGN_DIR" && CAMPAIGN_DIR="$(cd "$CAMPAIGN_DIR" && pwd)"
+RAW="$CAMPAIGN_DIR/tmp"; RES="$CAMPAIGN_DIR/results"   # raw (ignored) / results (committed)
+mkdir -p "$RAW" "$RES"'''
 
 # vllm `env` (throughput + agentic): extra environment for serve_vllm.sh, so a profile's ${KNOB:-default}
 # can be overridden per campaign/server/arm. Values are restricted to shell-inert characters.
@@ -203,7 +254,6 @@ def emit_runsh(spec):
     if spec.get("kind") == "agentic":
         return emit_agentic_runsh(spec)
     slug = spec["slug"]
-    date = spec.get("date") or datetime.date.today().isoformat()
     backend = spec.get("backend", "vulkan")
     port = spec.get("port") or BACKEND_PORT.get(backend, 8080)
     tune = spec.get("tuning", {})
@@ -223,21 +273,22 @@ def emit_runsh(spec):
     ad = L.append
     ad("#!/usr/bin/env bash")
     ad(f"# GENERATED by bench/core/gen_campaign.py — campaign '{slug}'. Resumable: rerun to continue")
-    ad("# after an interruption (per-probe markers in <campaign>/done/). Edit the spec and")
+    ad("# after an interruption (per-probe markers in <campaign>/tmp/done/). Edit the spec and")
     ad("# regenerate. Behaviour baked in (no hand-editing needed):")
     ad("#   * CONTINUE-ON-FAILURE: a server that fails to start is recorded and the run moves on.")
     ad("#   * PRE-FLIGHT VRAM GUARD: a server whose predicted VRAM > VRAM_BUDGET_MIB is SKIPPED")
     ad("#     before launch → GPU/VRAM-only, never spills to system RAM (no GTT thrash / freeze).")
     ad("#   * SUBSET / SHORT runs: ONLY='glob,..' picks probes; REPS=/MAX_TOKENS= shorten a pass.")
+    ad("#   * TWO ROOTS: raw (per-probe run dirs, GPU CSVs, done/ markers) -> <campaign>/tmp/; results")
+    ad("#     (results.jsonl, meta/failures/skipped, server-<name>.txt, charts, appendix) -> <campaign>/results/.")
     notes = spec.get("notes")
     if notes:
         ad("#")
         for line in ([notes] if isinstance(notes, str) else notes):
             ad(f"# NOTE: {line}")
     ad("set -uo pipefail")
-    ad('ROOT="${ROOT:-' + REPO + '}"')
-    ad(f'CAMPAIGN_DIR="${{CAMPAIGN_DIR:-$ROOT/bench/runs/{date}-{slug}}}"')
-    ad('EB="$ROOT/bench/engine-bench"')
+    ad(RUNSH_ROOTS)
+    ad('EB="$ROOT/bench/perf/engine-bench"')
     ad('GEN="$ROOT/bench/workloads/tmp"')
     ad(f'export MODEL={sh_quote(spec["model"])}')
     ad(f'export ENGINES_LIST="{engine_name}|http://localhost:{port}/v1|{served}"')
@@ -248,18 +299,18 @@ def emit_runsh(spec):
     ad('MAXTOK_OVERRIDE="${MAX_TOKENS:-}"  # override every probe\'s max_tokens')
     if vllm:
         ad(f'IMAGE="${{IMAGE:-{spec.get("image", "")}}}"  # docker image (spec "image"); empty = the profile\'s IMAGE')
-    ad('mkdir -p "$CAMPAIGN_DIR/done"')
-    ad('if [ ! -f "$CAMPAIGN_DIR/meta.txt" ]; then')
+    ad('mkdir -p "$RAW/done"')
+    ad('if [ ! -f "$RES/meta.txt" ]; then')
     ad('  { echo "date=$(date -Iseconds)"; echo "model=$MODEL"; '
        + (f'echo "engine=vllm profile={spec["profile"]} served_model={served}"; '
           'echo "image=${IMAGE:-profile default}"; ' if vllm else
           f'echo "backend={backend}"; echo "tuning=ub{ub} b{b} fa{fa}"; ') +
        ("".join(f"echo {sh_quote('env[' + n + ']=' + env_assign(e))}; " for n, e in srv_env.items() if e)) +
-       'echo "vram_budget_mib=$VRAM_BUDGET_MIB"; } > "$CAMPAIGN_DIR/meta.txt"')
+       'echo "vram_budget_mib=$VRAM_BUDGET_MIB"; } > "$RES/meta.txt"')
     ad('fi')
     ad("")
     ad("server_needed () {  # any listed probe marker missing?")
-    ad('  local s; for s in "$@"; do [ -f "$CAMPAIGN_DIR/done/$s" ] || return 0; done; return 1; }')
+    ad('  local s; for s in "$@"; do [ -f "$RAW/done/$s" ] || return 0; done; return 1; }')
     ad("")
     ad("want_probe () {  # honor ONLY='glob,glob' filter")
     ad('  [ -z "$ONLY" ] && return 0')
@@ -274,7 +325,7 @@ def emit_runsh(spec):
     ad('  [ "$pred" -lt 0 ] && return 0   # no prediction available (spec has no vram block)')
     ad('  if [ "$pred" -gt "$VRAM_BUDGET_MIB" ]; then')
     ad('    echo "SKIPPED (predicted ${pred} MiB > budget ${VRAM_BUDGET_MIB} MiB): $name" \\')
-    ad('      | tee -a "$CAMPAIGN_DIR/skipped.txt"; return 1; fi')
+    ad('      | tee -a "$RES/skipped.txt"; return 1; fi')
     ad('  return 0; }')
     ad("")
     ad("ensure_fixtures () {  # auto-build any missing prompt fixture from its canonical recipe")
@@ -309,39 +360,33 @@ def emit_runsh(spec):
     ad("")
     ad("run_probe () {  # slug conc reps max_tokens api prefix prompt_files...")
     ad("  local slug=$1 conc=$2 reps=$3 maxt=$4 api=$5 prefix=$6; shift 6")
-    ad('  if [ -f "$CAMPAIGN_DIR/done/$slug" ]; then echo "  skip (done): $slug"; return 0; fi')
+    ad('  if [ -f "$RAW/done/$slug" ]; then echo "  skip (done): $slug"; return 0; fi')
     ad('  if ! want_probe "$slug"; then echo "  skip (ONLY filter): $slug"; return 0; fi')
     ad('  [ -n "$REPS_OVERRIDE" ] && reps="$REPS_OVERRIDE"')
     ad('  [ -n "$MAXTOK_OVERRIDE" ] && maxt="$MAXTOK_OVERRIDE"')
     ad('  local files=""; local f; for f in "$@"; do files="$files $GEN/$f"; done')
-    ad('  if PROMPT_FILE="$files" SLUG="$slug" MAX_TOKENS="$maxt" CONCURRENCY="$conc" \\')
+    ad('  if CAMPAIGN_DIR="$CAMPAIGN_DIR" PROMPT_FILE="$files" SLUG="$slug" MAX_TOKENS="$maxt" CONCURRENCY="$conc" \\')
     ad('       REPS="$reps" API="$api" PREFIX_MODE="$prefix" SAMPLE_VRAM=1 "$EB/run.sh"; then')
-    ad('    local rd; rd=$(ls -td "$ROOT"/bench/runs/*-engine-"$slug"/ 2>/dev/null | head -1)')
-    ad('    [ -n "$rd" ] && [ -f "$rd/results.jsonl" ] \\')
-    ad('      && cat "$rd/results.jsonl" >> "$CAMPAIGN_DIR/results.jsonl"')
-    ad('    touch "$CAMPAIGN_DIR/done/$slug"')
-    ad('  else echo "  FAILED: $slug" | tee -a "$CAMPAIGN_DIR/failures.txt"; fi; }')
+    ad('    touch "$RAW/done/$slug"   # engine-bench/run.sh appended its rows to $RES/results.jsonl (success only)')
+    ad('  else echo "  FAILED: $slug" | tee -a "$RES/failures.txt"; fi; }')
     ad("")
     if any(p.get("mode") == "conversation" for srv in spec["servers"] for p in srv["probes"]):
         ad("run_conv () {  # slug reps max_tokens start step max_depth chat_kwargs_json prompt_file")
         ad("  local slug=$1 reps=$2 maxt=$3 start=$4 step=$5 depth=$6 kw=$7 pf=$8")
-        ad('  if [ -f "$CAMPAIGN_DIR/done/$slug" ]; then echo "  skip (done): $slug"; return 0; fi')
+        ad('  if [ -f "$RAW/done/$slug" ]; then echo "  skip (done): $slug"; return 0; fi')
         ad('  if ! want_probe "$slug"; then echo "  skip (ONLY filter): $slug"; return 0; fi')
         ad('  [ -n "$REPS_OVERRIDE" ] && reps="$REPS_OVERRIDE"')
         ad('  [ -n "$MAXTOK_OVERRIDE" ] && maxt="$MAXTOK_OVERRIDE"')
-        ad('  if MODE=conversation PROMPT_FILE="$GEN/$pf" SLUG="$slug" MAX_TOKENS="$maxt" REPS="$reps" \\')
+        ad('  if CAMPAIGN_DIR="$CAMPAIGN_DIR" MODE=conversation PROMPT_FILE="$GEN/$pf" SLUG="$slug" MAX_TOKENS="$maxt" REPS="$reps" \\')
         ad('       START_TOKENS="$start" STEP_TOKENS="$step" MAX_DEPTH="$depth" CHAT_KWARGS="$kw" \\')
         ad('       SAMPLE_VRAM=1 "$EB/run.sh"; then')
-        ad('    local rd; rd=$(ls -td "$ROOT"/bench/runs/*-engine-"$slug"/ 2>/dev/null | head -1)')
-        ad('    [ -n "$rd" ] && [ -f "$rd/results.jsonl" ] \\')
-        ad('      && cat "$rd/results.jsonl" >> "$CAMPAIGN_DIR/results.jsonl"')
-        ad('    touch "$CAMPAIGN_DIR/done/$slug"')
-        ad('  else echo "  FAILED: $slug" | tee -a "$CAMPAIGN_DIR/failures.txt"; fi; }')
+        ad('    touch "$RAW/done/$slug"   # engine-bench/run.sh appended its rows to $RES/results.jsonl (success only)')
+        ad('  else echo "  FAILED: $slug" | tee -a "$RES/failures.txt"; fi; }')
         ad("")
     if vllm:
-        ad(f'stop_server () {{ PORT={port} "$EB/vllm/serve_vllm.sh" stop 2>/dev/null || true; }}')
+        ad(f'stop_server () {{ PORT={port} "$ROOT/stack/serve/vllm/serve_vllm.sh" stop 2>/dev/null || true; }}')
     else:
-        ad(f'stop_server () {{ PORT={port} "$EB/serve_llamacpp.sh" stop 2>/dev/null || true; }}')
+        ad(f'stop_server () {{ PORT={port} "$ROOT/stack/serve/llamacpp/serve_llamacpp.sh" stop 2>/dev/null || true; }}')
     ad("start_server () {  # name ctx kv -> 0 up, nonzero (recorded) on failure; run CONTINUES")
     ad('  local name=$1 ctx=$2 kv=$3 mtp=$4 np=$5')
     ad('  echo ">>> starting $name (ctx=$ctx kv=$kv mtp=$mtp np=$np)"')
@@ -354,19 +399,19 @@ def emit_runsh(spec):
             for n, e in srv_env.items():
                 ev = venv.replace(" PORT=", " " + env_assign(e) + " PORT=", 1) if e else venv
                 ad(f'    {sh_quote(n)})')
-                ad(f'      {ev} "$EB/vllm/serve_vllm.sh" print > "$CAMPAIGN_DIR/server-$name.txt" 2>&1')
-                ad(f'      if {ev} "$EB/vllm/serve_vllm.sh" start; then return 0; fi ;;')
+                ad(f'      {ev} "$ROOT/stack/serve/vllm/serve_vllm.sh" print > "$RES/server-$name.txt" 2>&1')
+                ad(f'      if {ev} "$ROOT/stack/serve/vllm/serve_vllm.sh" start; then return 0; fi ;;')
             ad('  esac')
         else:
-            ad(f'  {venv} "$EB/vllm/serve_vllm.sh" print > "$CAMPAIGN_DIR/server-$name.txt" 2>&1')
+            ad(f'  {venv} "$ROOT/stack/serve/vllm/serve_vllm.sh" print > "$RES/server-$name.txt" 2>&1')
             ad(f'  if {venv} \\')
-            ad('       "$EB/vllm/serve_vllm.sh" start; then return 0; fi')
+            ad('       "$ROOT/stack/serve/vllm/serve_vllm.sh" start; then return 0; fi')
     else:
         ad(f'  if BACKEND={backend} CTX="$ctx" NP="$np" KV="$kv" MTP="$mtp" UB={ub} B={b} FA={fa} '
            'PORT=' + str(port) + ' \\')
-        ad('       "$EB/serve_llamacpp.sh" start; then return 0; fi')
+        ad('       "$ROOT/stack/serve/llamacpp/serve_llamacpp.sh" start; then return 0; fi')
     ad('  echo "SERVER-FAILED (start OOM/other; expected near the ceiling): $name ctx=$ctx kv=$kv" \\')
-    ad('    | tee -a "$CAMPAIGN_DIR/failures.txt"; stop_server; return 1; }')
+    ad('    | tee -a "$RES/failures.txt"; stop_server; return 1; }')
     ad('trap stop_server EXIT')
     ad("")
     fixtures = sorted({f for srv in spec["servers"] for p in srv["probes"] for f in p["prompts"]})
@@ -418,13 +463,13 @@ def emit_runsh(spec):
         ad("")
 
     ad('# ===== report (last step): theme-aware SVG charts + appendix.md, embedded in the write-up =====')
-    ad('if [ -f "$CAMPAIGN_DIR/results.jsonl" ]; then')
+    ad('if [ -f "$RES/results.jsonl" ]; then')
     ad('  python3 "$ROOT/bench/core/report.py" "$CAMPAIGN_DIR" \\')
-    ad('    && echo "charts: $CAMPAIGN_DIR/charts/  ·  appendix: $CAMPAIGN_DIR/appendix.md"')
+    ad('    && echo "charts: $RES/charts/  ·  appendix: $RES/appendix.md"')
     ad('fi')
-    ad('echo "campaign done. consolidated results: $CAMPAIGN_DIR/results.jsonl"')
-    ad('[ -f "$CAMPAIGN_DIR/skipped.txt" ] && { echo "--- guard-skipped (over budget) ---"; '
-       'cat "$CAMPAIGN_DIR/skipped.txt"; } || true')
+    ad('echo "campaign done. consolidated results: $RES/results.jsonl  (raw: $RAW/)"')
+    ad('[ -f "$RES/skipped.txt" ] && { echo "--- guard-skipped (over budget) ---"; '
+       'cat "$RES/skipped.txt"; } || true')
     return "\n".join(L) + "\n"
 
 
@@ -434,7 +479,8 @@ def emit_readme(spec):
     if spec.get("kind") == "agentic":
         return emit_agentic_readme(spec)
     slug = spec["slug"]
-    date = spec.get("date") or datetime.date.today().isoformat()
+    date = campaign_date(spec)
+    cd = campaign_rel(spec)
     title = spec.get("title", f"{slug} campaign")
     rows = []
     for srv in spec["servers"]:
@@ -448,7 +494,7 @@ def emit_readme(spec):
                  f"`{spec['profile']}` (`stack/serve/vllm/profiles/`) · served as "
                  f"`{spec['served_model']}` · server on :{spec.get('port', 8000)} · image "
                  + (f"`{spec['image']}`" if spec.get("image") else "= the profile's IMAGE")
-                 + " (resolved per server in `server-<name>.txt` of the run dir).")
+                 + " (resolved per server in `results/server-<name>.txt`).")
         envs = {s["name"]: merge_env(spec.get("env"), s.get("env")) for s in spec["servers"]}
         if spec.get("env"):
             fixed += f"\n- Env (all servers, passed to `serve_vllm.sh`): `{env_assign(spec['env'])}`."
@@ -462,7 +508,7 @@ def emit_readme(spec):
     return f"""# {title} (R9700, {date})
 
 Scaffolded by `bench/core/gen_campaign.py`. The executable driver is **`run.sh`** in this folder
-(resumable — per-probe markers in `done/`, rerun to continue). Fill in the prose below.
+(resumable — per-probe markers in `tmp/done/`, rerun to continue). Fill in the prose below.
 
 ## Fixed parameters
 {fixed}
@@ -476,14 +522,21 @@ to `ensure_fixtures` in `gen_campaign.py` to support a new pattern).
 
 ## Run
 ```bash
-bash campaigns/{date}-{slug}/run.sh
-# resume after interruption: same command (done/ markers skip finished probes)
-# subset / shorter pass:  ONLY='*-q8-*' REPS=1 MAX_TOKENS=64 bash campaigns/{date}-{slug}/run.sh
-# tighten the guard:      VRAM_BUDGET_MIB=31000 bash campaigns/{date}-{slug}/run.sh
+bash {cd}/run.sh
+# resume after interruption: same command (tmp/done/ markers skip finished probes)
+# subset / shorter pass:  ONLY='*-q8-*' REPS=1 MAX_TOKENS=64 bash {cd}/run.sh
+# tighten the guard:      VRAM_BUDGET_MIB=31000 bash {cd}/run.sh
 ```
 The driver **continues past a failed server** and **skips (before launch) any server predicted to
 exceed `VRAM_BUDGET_MIB`** — so it stays in VRAM and never risks a system-RAM spill/freeze. VRAM &
-GTT are sampled per probe into each run dir's `gpu_samples.csv`.
+GTT are sampled per probe into each probe's raw dir (`tmp/<stamp>-engine-<probe>/gpu_samples.csv`).
+
+## Layout
+- `results/` (committed): `results.jsonl` (every probe's rows, appended once by `engine-bench/run.sh` when the
+  probe succeeds), `meta.txt`, `failures.txt`, `skipped.txt`{', `server-<name>.txt`' if spec.get('engine') == 'vllm' else ''},
+  `charts/`, `appendix.md`, `gpu_peaks.json`.
+- `tmp/` (git-ignored raw): `done/` markers, one `<stamp>-engine-<probe>/` dir per probe (meta, prompt copies,
+  `/props`, `gpu_samples.csv`).
 
 ## Matrix
 | server | ctx | np | kv | mtp | probe | conc | prompts |
@@ -491,19 +544,19 @@ GTT are sampled per probe into each run dir's `gpu_samples.csv`.
 {chr(10).join(rows)}
 
 ## Write-up
-**benchmark-results** skill → co-located `campaigns/{date}-{slug}/analysis.md` (summary + table
-first, **memory column mandatory**). `run.sh`'s last step auto-generates theme-aware SVG charts in
-`charts/` + an `appendix.md` (`bench/core/report.py`) — embed the appendix in `analysis.md`. Add a
-`<!-- meta -->` block and run `docs/reindex.py`.
+**benchmark-results** skill → `docs/findings/<topic>/{date}-{slug}.md` (summary + table first,
+**memory column mandatory**), with `campaign: {cd}` (plus `date:` and `takeaway:`) in its
+`<!-- meta -->` block. `run.sh`'s last step auto-generates theme-aware SVG charts in `results/charts/` +
+`results/appendix.md` (`bench/core/report.py`) — embed the appendix in the write-up, then run
+`docs/reindex.py`.
 """
 
 
 def emit_quality_runsh(spec):
     """Driver for a `kind:"quality"` campaign: for each config (model × MTP) launch one server,
     sample GPU telemetry, capture the task suite with capture_engine `tasks`, score deterministically,
-    then render SVG charts. Resumable (out/done/<label>), continue-on-fail, pre-flight VRAM guard."""
+    then render SVG charts. Resumable (tmp/done/<label>), continue-on-fail, pre-flight VRAM guard."""
     slug = spec["slug"]
-    date = spec.get("date") or datetime.date.today().isoformat()
     backend = spec.get("backend", "vulkan")
     port = spec.get("port") or BACKEND_PORT.get(backend, 8081)
     tune = spec.get("tuning", {})
@@ -526,22 +579,23 @@ def emit_quality_runsh(spec):
     ad = L.append
     ad("#!/usr/bin/env bash")
     ad(f"# GENERATED by bench/core/gen_campaign.py — QUALITY campaign '{slug}'. Resumable: rerun to")
-    ad("# continue (per-config markers in out/done/). Edit the spec and regenerate. Behaviour:")
+    ad("# continue (per-config markers in tmp/done/). Edit the spec and regenerate. Behaviour:")
     ad("#   * Per config: serve ONE llama-server → sample VRAM/GTT/power → capture the task suite")
     ad("#     (capture_engine tasks: full telemetry, saved responses) → stop. Then deterministic")
     ad("#     scoring + SVG report. CONTINUE-ON-FAIL; PRE-FLIGHT VRAM GUARD skips a model predicted")
     ad("#     over budget (VRAM-only, no GTT spill/freeze).")
     ad("#   * Subset / short pass: ONLY='glob' picks configs; REPS=/MAX_TOKENS= shorten a run.")
+    ad("#   * TWO ROOTS: raw (outputs.jsonl replies, props, GPU CSVs, done/ markers) -> <campaign>/tmp/;")
+    ad("#     results (vram.jsonl, scores, failures/skipped, charts, appendix) -> <campaign>/results/.")
     for line in ([spec["notes"]] if isinstance(spec.get("notes"), str) else spec.get("notes", [])):
         ad(f"# NOTE: {line}")
     ad("set -uo pipefail")
-    ad(f'ROOT="${{ROOT:-{REPO}}}"')
-    ad(f'CAMPAIGN_DIR="${{CAMPAIGN_DIR:-$ROOT/campaigns/{date}-{slug}}}"')
-    ad('LIB="$ROOT/bench/lib"; EB="$ROOT/bench/engine-bench"')
-    ad('OUT="$CAMPAIGN_DIR/out"; mkdir -p "$OUT/done"')
-    ad('OUTF="$OUT/outputs.jsonl"; VRAMF="$OUT/vram.jsonl"')
+    ad(RUNSH_ROOTS)
+    ad('CORE="$ROOT/bench/core"; GPU="$ROOT/stack/gpu"; SERVE="$ROOT/stack/serve/llamacpp/serve_llamacpp.sh"')
+    ad('mkdir -p "$RAW/done"')
+    ad('OUTF="$RAW/outputs.jsonl"; VRAMF="$RES/vram.jsonl"   # raw replies+telemetry / per-config memory rows')
     ad(f'MODELS_DIR="${{MODELS_DIR:-{models_dir}}}"')
-    ad(f'TASKS="${{TASKS:-$CAMPAIGN_DIR/{tasks_rel}}}"')
+    ad(f'TASKS="${{TASKS:-$CAMPAIGN_DIR/inputs/{tasks_rel}}}"   # spec "tasks" is relative to the campaign\'s inputs/')
     ad(f'BACKEND={sh_quote(backend)}; PORT={port}; CTX={ctx}; KV={sh_quote(kv)}; UB={ub}; B={b}; FA={sh_quote(str(fa))}')
     ad(f'REPS="${{REPS:-{reps}}}"; MAX_TOKENS="${{MAX_TOKENS:-{max_tokens}}}"; API={sh_quote(api)}')
     ad(f'VRAM_BUDGET_MIB="${{VRAM_BUDGET_MIB:-{budget}}}"; OVERHEAD_MIB={overhead}; KV_KIB_PER_TOK={kv_kib}  # 0 = guard off')
@@ -562,35 +616,35 @@ def emit_quality_runsh(spec):
     ad('  local pred=$(( wmib + OVERHEAD_MIB + KV_KIB_PER_TOK * CTX / 1024 ))')
     ad('  if [ "$pred" -gt "$VRAM_BUDGET_MIB" ]; then')
     ad('    echo "  SKIPPED (predicted ${pred} MiB > budget ${VRAM_BUDGET_MIB} MiB): $(basename "$1")" \\')
-    ad('      | tee -a "$CAMPAIGN_DIR/skipped.txt"; return 1; fi')
+    ad('      | tee -a "$RES/skipped.txt"; return 1; fi')
     ad('  echo "  VRAM predicted ${pred} MiB (budget ${VRAM_BUDGET_MIB})"; return 0; }')
-    ad(f'stop_server(){{ PORT={port} bash "$EB/serve_llamacpp.sh" stop 2>/dev/null || true; }}')
+    ad(f'stop_server(){{ PORT={port} bash "$SERVE" stop 2>/dev/null || true; }}')
     ad("trap stop_server EXIT")
     ad("")
     ad('for entry in "${CONFIGS[@]}"; do')
     ad('  IFS="|" read -r label file mtp <<< "$entry"')
     ad('  want "$label" || { echo "skip (ONLY): $label"; continue; }')
-    ad('  [ -f "$OUT/done/$label" ] && { echo "skip (done): $label"; continue; }')
+    ad('  [ -f "$RAW/done/$label" ] && { echo "skip (done): $label"; continue; }')
     ad('  model="$MODELS_DIR/$file"')
-    ad('  [ -f "$model" ] || { echo "MISSING MODEL: $model" | tee -a "$CAMPAIGN_DIR/failures.txt"; continue; }')
+    ad('  [ -f "$model" ] || { echo "MISSING MODEL: $model" | tee -a "$RES/failures.txt"; continue; }')
     ad('  echo "=== $label  (mtp=$mtp)  $file ==="')
     ad('  guard_ok "$model" || continue')
     ad('  t0=$(date +%s)')
     ad('  if MODEL="$model" BACKEND="$BACKEND" PORT="$PORT" CTX="$CTX" NP=1 UB="$UB" B="$B" FA="$FA" \\')
-    ad('       KV="$KV" MTP="$mtp" bash "$EB/serve_llamacpp.sh" start; then')
+    ad('       KV="$KV" MTP="$mtp" bash "$SERVE" start; then')
     ad('    load_s=$(( $(date +%s) - t0 )); used=$(vram_used_mib)')
     ad('    echo "  VRAM at load: ${used} MiB  (load ${load_s}s)"')
-    ad('    curl -s -m 10 "http://127.0.0.1:$PORT/props" > "$OUT/props_${label}.json" 2>/dev/null || true')
+    ad('    curl -s -m 10 "http://127.0.0.1:$PORT/props" > "$RAW/props_${label}.json" 2>/dev/null || true')
     ad('    msize=$(stat -c%s "$model" 2>/dev/null || echo 0)')
-    ad('    csv="$OUT/gpu_${label}.csv"; SPID=""')
+    ad('    csv="$RAW/gpu_${label}.csv"; SPID=""')
     ad('    if command -v rocm-smi >/dev/null 2>&1 || command -v nvidia-smi >/dev/null 2>&1; then')
-    ad('      python3 "$LIB/vram_sampler.py" --out "$csv" --interval 1 & SPID=$!')
+    ad('      python3 "$GPU/vram_sampler.py" --out "$csv" --interval 1 & SPID=$!')
     ad('      for _ in 1 2 3 4; do [ -s "$csv" ] && [ "$(wc -l <"$csv")" -ge 2 ] && break')
     ad('        kill -0 "$SPID" 2>/dev/null || break; sleep 0.5; done')
     ad('    fi')
-    ad('    python3 "$LIB/capture_engine.py" tasks --url "http://127.0.0.1:$PORT/v1" --config "$label" \\')
+    ad('    python3 "$CORE/capture_engine.py" tasks --url "http://127.0.0.1:$PORT/v1" --config "$label" \\')
     ad('       --tasks "$TASKS" --out "$OUTF" --reps "$REPS" --max-tokens "$MAX_TOKENS" --api "$API" \\')
-    ad('       && touch "$OUT/done/$label"')
+    ad('       && touch "$RAW/done/$label"')
     ad('    [ -n "$SPID" ] && { kill "$SPID" 2>/dev/null; wait "$SPID" 2>/dev/null || true; }')
     ad('    python3 - "$label" "$file" "$mtp" "$CTX" "$KV" "$used" "$csv" "$load_s" "$msize" >> "$VRAMF" <<\'PY\'')
     ad('import sys, json, re')
@@ -607,32 +661,33 @@ def emit_quality_runsh(spec):
     ad('print(json.dumps(row))')
     ad("PY")
     ad('  else')
-    ad('    echo "SERVER FAILED to start: $label" | tee -a "$CAMPAIGN_DIR/failures.txt"')
+    ad('    echo "SERVER FAILED to start: $label" | tee -a "$RES/failures.txt"')
     ad('  fi')
     ad('  stop_server; sleep 2')
     ad('done')
     ad("")
     ad('echo; echo "=== deterministic scoring ==="')
     ad('python3 "$ROOT/bench/quality/graders/score_deterministic.py" --tasks "$TASKS" \\')
-    ad('  --outputs "$OUTF" --out "$OUT/scores_deterministic.jsonl" || true')
-    ad('echo; echo "=== charts + appendix (SVG, embedded in analysis.md) ==="')
-    ad('python3 "$LIB/report.py" "$CAMPAIGN_DIR" || true')
+    ad('  --outputs "$OUTF" --out "$RES/scores_deterministic.jsonl" || true')
+    ad('echo; echo "=== charts + appendix (SVG, embedded in the write-up) ==="')
+    ad('python3 "$CORE/report.py" "$CAMPAIGN_DIR" || true')
     ad('echo; echo "Phase A complete. Raw telemetry: $OUTF ; per-config VRAM/power: $VRAMF"')
-    ad('echo "Next: Phase B (LLM-judge, see plan.md) → Phase C (write analysis.md)."')
-    ad('[ -f "$CAMPAIGN_DIR/skipped.txt" ] && { echo "--- guard-skipped ---"; cat "$CAMPAIGN_DIR/skipped.txt"; } || true')
+    ad('echo "Next: Phase B (LLM-judge, see plan.md) → Phase C (write-up in docs/findings/, see plan.md)."')
+    ad('[ -f "$RES/skipped.txt" ] && { echo "--- guard-skipped ---"; cat "$RES/skipped.txt"; } || true')
     return "\n".join(L) + "\n"
 
 
 def emit_quality_plan(spec):
     slug = spec["slug"]
-    date = spec.get("date") or datetime.date.today().isoformat()
+    date = campaign_date(spec)
+    cd = campaign_rel(spec)
     title = spec.get("title", f"{slug} — quality shootout")
     rows = "\n".join(f"| `{c['label']}` | `{c['file']}` | {c.get('mtp', 0)} |" for c in spec["configs"])
     tune = spec.get("tuning", {})
     return f"""# {title} (R9700, {date})
 
 *This is the campaign runbook (a **plan**, not a passive README). The results write-up lands in
-`analysis.md` (co-located, registered in `docs/INDEX.md`) after Phase C.*
+`docs/findings/<topic>/{date}-{slug}.md` (meta `campaign: {cd}`, indexed by `docs/reindex.py`) after Phase C.*
 
 Scaffolded by `bench/core/gen_campaign.py` (`kind: quality`). **Owner split:** Phase A (GPU capture +
 deterministic scoring) is run manually; Phase B (LLM-judge of open-ended tasks) is done by you in a
@@ -650,12 +705,13 @@ max_tokens {spec.get('max_tokens', 8192)}.
 
 ## Phase A — capture + deterministic scoring (manual)
 ```bash
-bash campaigns/{date}-{slug}/run.sh
-# resume after interruption: same command (out/done/ markers skip finished configs)
-# subset / short pass:  ONLY='unsloth*' REPS=1 MAX_TOKENS=2048 bash campaigns/{date}-{slug}/run.sh
+bash {cd}/run.sh
+# resume after interruption: same command (tmp/done/ markers skip finished configs)
+# subset / short pass:  ONLY='unsloth*' REPS=1 MAX_TOKENS=2048 bash {cd}/run.sh
 ```
-Writes `out/outputs.jsonl` (full responses + telemetry), `out/vram.jsonl` (peak VRAM/GTT/power/
-thermal per config), `out/scores_deterministic.jsonl`, and `charts/` + `appendix.md`.
+Writes raw `tmp/outputs.jsonl` (full responses + telemetry), `tmp/props_<label>.json`, `tmp/gpu_<label>.csv`;
+results `results/vram.jsonl` (peak VRAM/GTT/power/thermal per config), `results/scores_deterministic.jsonl`,
+`results/failures.txt` / `skipped.txt`, and `results/charts/` + `results/appendix.md`.
 
 ## Phase B — LLM-judge the open-ended tasks (in a Claude session)
 The `judge`-category tasks (code review, explanations, refactors) have no deterministic answer.
@@ -663,9 +719,9 @@ Extract them into a paste-ready bundle, then judge them **in a Claude session** 
 below (deterministic instruction; temp is the session's, so note it in the write-up):
 ```bash
 python3 bench/quality/graders/prepare_judge.py \\
-  --outputs campaigns/{date}-{slug}/out/outputs.jsonl \\
-  --tasks   campaigns/{date}-{slug}/tasks/tasks.jsonl \\
-  --out     campaigns/{date}-{slug}/out/judge_bundle.md
+  --outputs {cd}/tmp/outputs.jsonl \\
+  --tasks   {cd}/inputs/{spec.get('tasks', 'tasks/tasks.jsonl')} \\
+  --out     {cd}/tmp/judge_bundle.md
 ```
 Paste the ENTIRE `judge_bundle.md` into Claude under this exact prompt (the blocks are already
 blind — opaque ids, shuffled — so you can't tell which model wrote which):
@@ -677,17 +733,19 @@ blind — opaque ids, shuffled — so you can't tell which model wrote which):
 > `[{{"id": "b01", "correctness": 0, "depth": 0, "clarity": 0, "note": "one-line reason"}}]`
 > No prose outside the JSON.
 
-Save Claude's JSON array to `out/judge_raw.json`, then fold it in:
+Save Claude's JSON array to `results/judge_raw.json` (committed: a judge session is not reproducible
+by a rerun), then fold it in:
 ```bash
 python3 bench/quality/graders/apply_judge_scores.py \\
-  --raw campaigns/{date}-{slug}/out/judge_raw.json \\
-  --out campaigns/{date}-{slug}/out/judge_scores.jsonl
-python3 bench/core/report.py campaigns/{date}-{slug}     # re-render with judge data
+  --raw {cd}/results/judge_raw.json \\
+  --out {cd}/results/judge_scores.jsonl
+python3 bench/core/report.py {cd}     # re-render with judge data
 ```
 
 ## Phase C — write-up (Claude)
-Write `analysis.md` (summary + headline table first, **memory column mandatory**), embed
-`appendix.md`, add a `<!-- meta -->` block, and run `docs/reindex.py`.
+Write `docs/findings/<topic>/{date}-{slug}.md` (summary + headline table first, **memory column
+mandatory**), embed `results/appendix.md`, add a `<!-- meta -->` block with `date:`, `takeaway:` and
+`campaign: {cd}`, and run `docs/reindex.py`.
 """
 
 
@@ -700,7 +758,7 @@ AGENTIC_DEFAULTS = {"maxseqs": 1, "kv_dtype": "fp8", "gpu_util": 0.93, "watchdog
                     "free_mib_floor": 30000}      # dp-forge vllm.sh values; 30000 = sly-official floor
 AGENTIC_SERVER_KEYS = ("maxlen", "maxseqs", "kv_dtype", "gpu_util", "watchdog_mib", "free_mib_floor")
 LLAMASWAP_SERVER_KEYS = ("free_mib_floor",)       # the llama-swap row's config owns everything else
-AGENTIC_KEYS = ("kind", "slug", "date", "title", "notes", "engine", "port", "repo", "base", "worktree",
+AGENTIC_KEYS = ("kind", "type", "slug", "date", "title", "notes", "engine", "port", "repo", "base", "worktree",
                 "served_model", "server", "env", "claude", "prompt", "resume_prompt", "install", "rewrite",
                 "symlinks", "done_when", "collect", "tmp_dirs", "cap_s", "max_resumes", "reps", "server_info",
                 "post", "capture_requests", "remove_worktree", "stop_when", "arms", "reuse_server")
@@ -1090,7 +1148,7 @@ def validate_agentic(spec):
         else:
             if "profile" not in a:
                 sys.exit(f"{where}: missing profile")
-            prof = os.path.join(REPO, "bench", "engine-bench", "vllm", "profiles", str(a["profile"]) + ".env")
+            prof = os.path.join(VLLM_PROFILES, str(a["profile"]) + ".env")
             if not re.fullmatch(r"[\w.-]+/[\w.-]+", str(a["profile"])) or not os.path.exists(prof):
                 sys.exit(f"{where}: vllm profile not found: {prof}")
         if "image" in a:
@@ -1215,9 +1273,9 @@ _AGENTIC_ENGINE_COMMON = {
     "vllm": {
         "SERVER_KIND": "vllm server",
         "ENGINE_HDR": r'''#   * Teardown is trap-protected (Ctrl-C/TERM): sampler, proxy, docker logs, serve_vllm stop, port-free check.
-#   * Knobs: ONLY='armglob,..' REPS=N CAP_S=sec MAX_RESUMES=N RUN_DIR=dir IMAGE=ref (beats the spec's per-arm image).
+#   * Knobs: ONLY='armglob,..' REPS=N CAP_S=sec MAX_RESUMES=N CAMPAIGN_DIR=dir IMAGE=ref (beats the spec's per-arm image).
 #     Tool paths (stub testing): SERVE_VLLM GPU_EXCLUSIVE VRAM_SAMPLER CAPTURE_PROXY CLAUDE_BIN DOCKER CURL SS.''',
-        "SERVE_TOOL": 'SERVE_VLLM="${SERVE_VLLM:-$EB/vllm/serve_vllm.sh}"',
+        "SERVE_TOOL": 'SERVE_VLLM="${SERVE_VLLM:-$ROOT/stack/serve/vllm/serve_vllm.sh}"',
         "SERVE": "SERVE_VLLM",
         "PORT_FREE_FN": r'''port_free_check() {
   local p i held out ports=("$SPORT"); [ "$CAPTURE" = 1 ] && ports+=("$PORT")
@@ -1236,9 +1294,9 @@ _AGENTIC_ENGINE_COMMON = {
         "SERVER_KIND": "llama-server via llama-swap",
         "ENGINE_HDR": r'''#   * Teardown is trap-protected (Ctrl-C/TERM): sampler, serve_llamaswap stop (GET /unload). The llama-swap router
 #     keeps its port by design (never stopped), so summary.tsv's port_free column is unloaded=yes|no.
-#   * Knobs: ONLY='armglob,..' REPS=N CAP_S=sec MAX_RESUMES=N RUN_DIR=dir.
+#   * Knobs: ONLY='armglob,..' REPS=N CAP_S=sec MAX_RESUMES=N CAMPAIGN_DIR=dir.
 #     Tool paths (stub testing): SERVE_LLAMASWAP GPU_EXCLUSIVE VRAM_SAMPLER CLAUDE_BIN CURL.''',
-        "SERVE_TOOL": 'SERVE_LLAMASWAP="${SERVE_LLAMASWAP:-$EB/serve_llamaswap.sh}"',
+        "SERVE_TOOL": 'SERVE_LLAMASWAP="${SERVE_LLAMASWAP:-$ROOT/stack/serve/llamacpp/serve_llamaswap.sh}"',
         "SERVE": "SERVE_LLAMASWAP",
         "PORT_FREE_FN": r'''unload_check() {  # the router keeps its port by design: port_free records serve_llamaswap.sh stop's verdict
   R_PORTFREE=unloaded=no
@@ -1252,9 +1310,9 @@ _AGENTIC_ENGINE_COMMON = {
 #     unload it -- no GPU-exclusive, no kill of a process the driver does not own (iron rule 14). It verifies the
 #     served name (shared check) and samples the GPU (VRAM sampler) for the arm's memory column; teardown stops only
 #     the sampler/proxy, leaving the server untouched. summary.tsv's port_free column reads 'reused'.
-#   * Knobs: ONLY='armglob,..' REPS=N CAP_S=sec MAX_RESUMES=N RUN_DIR=dir.
+#   * Knobs: ONLY='armglob,..' REPS=N CAP_S=sec MAX_RESUMES=N CAMPAIGN_DIR=dir.
 #     Tool paths (stub testing): SERVE_VLLM VRAM_SAMPLER CAPTURE_PROXY CLAUDE_BIN CURL.''',
-        "SERVE_TOOL": 'SERVE_VLLM="${SERVE_VLLM:-$EB/vllm/serve_vllm.sh}"',
+        "SERVE_TOOL": 'SERVE_VLLM="${SERVE_VLLM:-$ROOT/stack/serve/vllm/serve_vllm.sh}"',
         "SERVE": "SERVE_VLLM",
         "PORT_FREE_FN": r'''reuse_check() {  # the driver never stops the server: port_free is 'reused' by definition
   R_PORTFREE=reused
@@ -1343,19 +1401,22 @@ AGENTIC_RUNSH = r'''#!/usr/bin/env bash
 # Behaviour baked in (no hand-editing needed):
 #   * CONTINUE-ON-FAILURE: wt_exists | gpu_busy | server_fail | served_name_mismatch | wt_fail | prep_fail |
 #     proxy_fail are recorded in failures.txt and the run moves on. They leave NO marker, so a rerun retries them.
-#   * <run>/started/rep<R>.<arm> is written when the session loop begins; <run>/done/... only for the RESULT
+#   * tmp/started/rep<R>.<arm> is written when the session loop begins; tmp/done/... only for the RESULT
 #     statuses done|cap|max_resumes (a cap is a measured outcome). Started-without-done = `interrupted`
 #     (also what a claude_error leaves): recorded, SKIPPED, never auto-deleted or auto-retried (iron rule 18).
+#   * TWO ROOTS: raw -> <campaign>/tmp/ (done/ started/ markers, .lock, driver.log, agentic_helper.py, stale/,
+#     per-arm dirs rep<R>/<arm>/ with server logs, transcripts, GPU CSV, diffs, outputs);
+#     results -> <campaign>/results/ (summary.tsv, failures.txt, spec.resolved.json).
 @@ENGINE_HDR@@
 @@NOTES@@
 set -uo pipefail
-ROOT="${ROOT:-@@ROOT@@}"
-EB="$ROOT/bench/engine-bench"; LIB="$ROOT/bench/lib"
-RUN_DIR="${RUN_DIR:-$ROOT/bench/runs/@@DATE@@-@@SLUG@@}"
+[ -z "${RUN_DIR:-}" ] || { echo "RUN_DIR is no longer a knob: set CAMPAIGN_DIR (raw -> \$CAMPAIGN_DIR/tmp, results -> \$CAMPAIGN_DIR/results)" >&2; exit 2; }
+@@ROOTS@@
+RUN_DIR="$RAW"   # the raw root (markers, lock, driver log, per-arm dirs)
 @@SERVE_TOOL@@
-GPU_EXCLUSIVE="${GPU_EXCLUSIVE:-$LIB/gpu_exclusive.sh}"
-VRAM_SAMPLER="${VRAM_SAMPLER:-$LIB/vram_sampler.py}"
-CAPTURE_PROXY="${CAPTURE_PROXY:-$EB/vllm/capture_proxy.py}"
+GPU_EXCLUSIVE="${GPU_EXCLUSIVE:-$ROOT/stack/gpu/gpu_exclusive.sh}"
+VRAM_SAMPLER="${VRAM_SAMPLER:-$ROOT/stack/gpu/vram_sampler.py}"
+CAPTURE_PROXY="${CAPTURE_PROXY:-$ROOT/bench/core/capture_proxy.py}"
 CLAUDE_BIN="${CLAUDE_BIN:-claude}"
 DOCKER="${DOCKER:-docker}"; CURL="${CURL:-curl}"; SS="${SS:-ss}"
 ONLY="${ONLY:-}"; REPS="${REPS:-@@REPS@@}"; CAP_S="${CAP_S:-@@CAP_S@@}"; MAX_RESUMES="${MAX_RESUMES:-@@MAX_RESUMES@@}"
@@ -1382,15 +1443,15 @@ arm_conf() {  # sets A_* for the named arm (profile/image/server knobs/merged en
 
 mkdir -p "$RUN_DIR/done" "$RUN_DIR/started"
 exec 9>"$RUN_DIR/.lock"
-flock -n 9 || { echo "another run.sh holds $RUN_DIR/.lock -- refusing to run two drivers on one run dir" >&2; exit 1; }
+flock -n 9 || { echo "another run.sh holds $RUN_DIR/.lock -- refusing to run two drivers on one campaign dir" >&2; exit 1; }
 # provenance: the exact helper and resolved config this run used
 cat > "$RUN_DIR/agentic_helper.py" <<'@@HTAG@@'
 @@HELPER@@
 @@HTAG@@
-cat > "$RUN_DIR/spec.resolved.json" <<'@@CTAG@@'
+cat > "$RES/spec.resolved.json" <<'@@CTAG@@'
 @@CFGJSON@@
 @@CTAG@@
-CFG="$RUN_DIR/spec.resolved.json"
+CFG="$RES/spec.resolved.json"
 
 pyh() { python3 -I "$RUN_DIR/agentic_helper.py" "$@"; }
 log() { echo "$(date +%H:%M:%S) [${CUR:-run}] $*" | tee -a "$RUN_DIR/driver.log"; }
@@ -1405,16 +1466,16 @@ summary_row() {
   local img="-" f="$ARM_DIR/server.txt"
   [ -s "$f" ] && img=$(sed -n 's/^#   IMAGE=//p' "$f" | head -1)
   [ -n "$img" ] || img="-"
-  [ -e "$RUN_DIR/summary.tsv" ] || printf 'rep\tarm\tstatus\twall_s\tcalls\tresumes\tdone_line\tmain_unchanged\tport_free\timage\tenv\n' \
-    > "$RUN_DIR/summary.tsv"
+  [ -e "$RES/summary.tsv" ] || printf 'rep\tarm\tstatus\twall_s\tcalls\tresumes\tdone_line\tmain_unchanged\tport_free\timage\tenv\n' \
+    > "$RES/summary.tsv"
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$REP" "$ARM" "$R_STATUS" "$R_WALL" "$R_CALLS" "$R_RESUMES" \
-    "$(printf '%s' "$R_DONE_LINE" | tr '\t\n' '  ')" "$R_MAIN" "$R_PORTFREE" "$img" "${A_ENV_STR:--}" >> "$RUN_DIR/summary.tsv"
+    "$(printf '%s' "$R_DONE_LINE" | tr '\t\n' '  ')" "$R_MAIN" "$R_PORTFREE" "$img" "${A_ENV_STR:--}" >> "$RES/summary.tsv"
 }
 end_arm() {  # status [detail]: record the outcome (non-result statuses also go to failures.txt)
   R_STATUS=$1
   case "$R_STATUS" in
     done|cap|max_resumes@@STOP_STATUS@@) ;;
-    *) printf 'rep%s\t%s\t%s\t%s\n' "$REP" "$ARM" "$R_STATUS" "${2:-}" >> "$RUN_DIR/failures.txt"
+    *) printf 'rep%s\t%s\t%s\t%s\n' "$REP" "$ARM" "$R_STATUS" "${2:-}" >> "$RES/failures.txt"
        log "FAILED $R_STATUS: ${2:-}" ;;
   esac
   summary_row
@@ -1510,7 +1571,7 @@ run_one() {
     log "  re-collect by hand:  git -C '$WT' status --porcelain; git -C '$WT' diff $BASE; copy the spec's collect paths;"
     log "                       the transcript is in ~/.claude/projects/<mangled worktree path>/"
     log "  retry from scratch:  rm $RUN_DIR/started/$key; mv $ARM_DIR $ARM_DIR.attempt1; git -C '$REPO_DIR' worktree remove --force '$WT'; rerun"
-    if ! grep -qF "$(printf 'rep%s\t%s\tinterrupted\t' "$REP" "$ARM")" "$RUN_DIR/failures.txt" 2>/dev/null; then
+    if ! grep -qF "$(printf 'rep%s\t%s\tinterrupted\t' "$REP" "$ARM")" "$RES/failures.txt" 2>/dev/null; then
       mkdir -p "$ARM_DIR"; end_arm interrupted "started marker without done marker; see driver.log"
     fi
     return 0
@@ -1608,9 +1669,9 @@ for ((rep = 1; rep <= REPS; rep++)); do
     run_one "$rep" "$arm"
   done
 done
-echo; echo "=== run done: $RUN_DIR ==="
-[ -f "$RUN_DIR/summary.tsv" ] && cat "$RUN_DIR/summary.tsv"
-[ -f "$RUN_DIR/failures.txt" ] && { echo "--- failures (nothing here is auto-retried if it was interrupted/claude_error) ---"; cat "$RUN_DIR/failures.txt"; }
+echo; echo "=== run done: $CAMPAIGN_DIR (results: $RES, raw: $RUN_DIR) ==="
+[ -f "$RES/summary.tsv" ] && cat "$RES/summary.tsv"
+[ -f "$RES/failures.txt" ] && { echo "--- failures (nothing here is auto-retried if it was interrupted/claude_error) ---"; cat "$RES/failures.txt"; }
 exit 0
 '''
 
@@ -1633,7 +1694,6 @@ AGENTIC_STOP_SH = {
 
 def emit_agentic_runsh(spec):
     arms = agentic_arms(spec)
-    date = spec.get("date") or datetime.date.today().isoformat()
     base = _resolve_base(spec)
     cfg = {"install": _norm_install(spec), "rewrite": spec.get("rewrite", []), "symlinks": spec.get("symlinks", []),
            "done_when": spec["done_when"], "collect": spec.get("collect", []), "spec": spec}
@@ -1665,7 +1725,7 @@ def emit_agentic_runsh(spec):
     helper_tag = _heredoc_tag("GC_HELPER_EOF", agentic_helper(sw))
     cfg_tag = _heredoc_tag("GC_CFG_EOF", cfg_json)
     vals = {
-        "SLUG": spec["slug"], "DATE": date, "ROOT": REPO, "NOTES": note_lines,
+        "SLUG": spec["slug"], "ROOTS": RUNSH_ROOTS, "NOTES": note_lines,
         "REPS": str(spec.get("reps", 1)), "CAP_S": str(spec.get("cap_s", 10800)),
         "MAX_RESUMES": str(spec.get("max_resumes", 5)),
         "REPO_DIR": sh_quote(spec["repo"]), "BASE": sh_quote(base), "PORT": str(spec["port"]),
@@ -1702,7 +1762,8 @@ def _fence(text):
 
 def emit_agentic_readme(spec):
     slug = spec["slug"]
-    date = spec.get("date") or datetime.date.today().isoformat()
+    date = campaign_date(spec)
+    cd = campaign_rel(spec)
     title = spec.get("title", f"{slug} agentic campaign")
     arms = agentic_arms(spec)
     base = _resolve_base(spec)
@@ -1824,14 +1885,16 @@ Resume (`--resume <session id>`):
 
 ## Run / rerun / re-collect
 ```bash
-bash campaigns/{date}-{slug}/run.sh
-# resume after interruption: same command (done/ markers skip finished arms)
-# subset / shorter:  ONLY='s1-*' REPS=1 CAP_S=3600 MAX_RESUMES=2 bash campaigns/{date}-{slug}/run.sh
-# another output dir: RUN_DIR=/path bash campaigns/{date}-{slug}/run.sh
+bash {cd}/run.sh
+# resume after interruption: same command (tmp/done/ markers skip finished arms)
+# subset / shorter:  ONLY='s1-*' REPS=1 CAP_S=3600 MAX_RESUMES=2 bash {cd}/run.sh
+# another campaign dir: CAMPAIGN_DIR=/path bash {cd}/run.sh
 ```
-Output: `bench/runs/{date}-{slug}/` (or `$RUN_DIR`): `summary.tsv` (rep, arm, status, wall_s, calls, resumes, done_line,
-main_unchanged, port_free, image, env), `failures.txt`, `driver.log`, and per (rep, arm) `rep<R>/<arm>/`: `server.txt`,
-`calls.tsv`, `session-N.jsonl`, `gpu_samples.csv`, `wt.diff`, `outputs/`, `tmp/`, `claude-project/`, `main-*.txt`.
+Output: `results/` (committed): `summary.tsv` (rep, arm, status, wall_s, calls, resumes, done_line,
+main_unchanged, port_free, image, env), `failures.txt`, `spec.resolved.json`; `tmp/` (git-ignored raw):
+`done/`, `started/`, `.lock`, `driver.log`, `agentic_helper.py`, `stale/`, and per (rep, arm) `rep<R>/<arm>/`:
+`server.txt`, `calls.tsv`, `session-N.jsonl`, `gpu_samples.csv`, `wt.diff`, `outputs/`, `tmp/`,
+`claude-project/`, `main-*.txt`.
 
 An **interrupted** arm (started marker, no done marker) is reported and skipped on every rerun. Nothing is deleted. To
 re-collect by hand use the commands `run.sh` prints (worktree status/diff, the spec's `collect` paths, the
@@ -1839,7 +1902,8 @@ re-collect by hand use the commands `run.sh` prints (worktree status/diff, the s
 `git worktree remove --force` its worktree, then rerun.
 
 ## Write-up
-**benchmark-results** skill -> co-located `campaigns/{date}-{slug}/analysis.md` (summary + table first).
+**benchmark-results** skill -> `docs/findings/<topic>/{date}-{slug}.md` (summary + table first), with
+`campaign: {cd}` (plus `date:` and `takeaway:`) in its `<!-- meta -->` block; run `docs/reindex.py`.
 """
 
 
@@ -1875,7 +1939,7 @@ def validate_spec(spec):
         for k in ("profile", "served_model"):
             if k not in spec:
                 sys.exit(f"vllm spec missing required key: {k}")
-        prof = os.path.join(REPO, "bench", "engine-bench", "vllm", "profiles", spec["profile"] + ".env")
+        prof = os.path.join(VLLM_PROFILES, spec["profile"] + ".env")
         if not os.path.exists(prof):
             sys.exit(f"vllm profile not found: {prof}")
         if any(int(s.get("mtp", 0)) for s in spec["servers"]):
@@ -1905,9 +1969,13 @@ def validate_spec(spec):
 def cmd_emit(args):
     with open(args.spec, encoding="utf-8") as fh:
         spec = json.load(fh)
+    validate_layout(spec)
+    if not spec.get("date"):   # resolve once: the stamp of the campaign dir the spec sits in, else now
+        m = re.fullmatch(r"(\d{4}-\d{2}-\d{2}-\d{4})-" + re.escape(str(spec.get("slug", ""))),
+                         os.path.basename(os.path.dirname(os.path.abspath(args.spec))))
+        spec["date"] = m.group(1) if m else campaign_date(spec)
     doc_name = validate_spec(spec)
-    date = spec.get("date") or datetime.date.today().isoformat()
-    cdir = os.path.join(CAMPAIGNS, f"{date}-{spec['slug']}")
+    cdir = os.path.join(REPO, campaign_rel(spec))   # campaigns/<type>/<date>-<slug>/
     run_sh = emit_runsh(spec)
     if args.print:
         sys.stdout.write(run_sh)

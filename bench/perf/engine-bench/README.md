@@ -11,9 +11,16 @@ an OpenAI-compatible server endpoint. This is also where the *serving-only* knob
 |--------|------|
 | `capture_engine.py probe` | zero-install measurement client: real prompt files, **concurrency waves**, reps, TTFT p50/p95, per-stream + **aggregate tok/s**, thinking `ttfa_s`, prefix modes |
 | `run.sh` | drive a set of already-running engines with one workload (probe or benchy) |
-| `serve_llamacpp.sh` | parameterized llama-server launcher: `BACKEND/MTP/KV/CTX/NP/UB/B/FA/PORT`, health-wait, records exact cmdline + `/props` |
+| `stack/serve/llamacpp/serve_llamacpp.sh` | parameterized llama-server launcher: `BACKEND/MTP/KV/CTX/NP/UB/B/FA/PORT`, health-wait, records exact cmdline + `/props` |
 | `campaign.sh` | the **combination matrix**: backend × MTP × KV × depth × concurrency, resumable |
 | llama-benchy | standardized synthetic pp/tg/depth/concurrency curves (installed in `stack/serve/var/venvs/benchy-venv`, v0.4.0 verified) |
+
+Both drivers take `CAMPAIGN_DIR=campaigns/<type>/<stamp>-<slug>` (required; refused unset) and write
+two roots: raw → `$CAMPAIGN_DIR/tmp/` (per-run `<stamp>-engine-<slug>/` for `run.sh`: meta, prompt
+copies, `/props`, `gpu_samples.csv`, the run's own rows; `tmp/servers/` + `tmp/done/` markers for `campaign.sh`),
+rows → `$CAMPAIGN_DIR/results/results.jsonl` (`run.sh` appends a run's rows once, at the end, and only when every
+probe succeeded; a failed run's partial rows stay in its `tmp/` dir). `bench/core/report.py "$CAMPAIGN_DIR"` renders the charts
+into `results/charts/` + `results/appendix.md` + `results/gpu_peaks.json`.
 
 ## Probe metrics (why these)
 
@@ -38,14 +45,16 @@ Probe knobs: `--concurrency N --reps R --prefix-mode unique|shared|none --api co
 
 ```bash
 # cross-engine, one workload (start servers first — GUIDE §3):
-PROMPT_FILE=$PWD/../workloads/generated/codereview-64000.txt SLUG=cr64k \
+CAMPAIGN_DIR=campaigns/perf/2026-11-07-1200-cross-engine \
+PROMPT_FILE=$PWD/../../workloads/tmp/codereview-64000.txt SLUG=cr64k \
   MAX_TOKENS=256 PREFIX_MODE=unique ./run.sh
 
 # full combination campaign on the 35B (server restarts handled for you, resumable):
-./campaign.sh                      # defaults: rocm+vulkan × mtp0/1 × f16/q8_0, Part A+B
-CAMPAIGN_DIR=... ./campaign.sh     # resume an interrupted campaign
+CAMPAIGN_DIR=campaigns/perf/2026-11-07-1200-combo35b ./campaign.sh   # defaults: rocm+vulkan × mtp0/1 × f16/q8_0, Part A+B
+CAMPAIGN_DIR=… ./campaign.sh     # resume an interrupted campaign (same CAMPAIGN_DIR)
 
 # llama-benchy (synthetic, standardized — good for community-comparable numbers):
+CAMPAIGN_DIR=campaigns/perf/2026-11-07-1200-benchy \
 BENCHY_ARGS="--pp 2048 8192 --tg 128 --depth 0 16384 --concurrency 1 4 --runs 3 \
   --save-result out.json --format json" USE_BENCHY=1 SLUG=benchy ./run.sh
 ```

@@ -9,18 +9,26 @@
 # validates it at the real serving operating point (llama-bench optima don't automatically
 # transfer to -np>1 + MTP serving).
 #
-# Resumable: each matrix point drops a marker in $CAMPAIGN_DIR/done/; rerun with
-# CAMPAIGN_DIR=bench/runs/<stamp>-campaign-<slug> to continue after an interruption.
-# A failing point (e.g. OOM combo) is recorded and skipped, never fatal.
+# Resumable: each matrix point drops a marker in $CAMPAIGN_DIR/tmp/done/; rerun with the same
+# CAMPAIGN_DIR to continue after an interruption. A failing point (e.g. OOM combo) is recorded
+# and skipped, never fatal.
 #
-# Env: MODEL SLUG BACKENDS("rocm vulkan") MTPS("0 1") KVS("f16 q8_0")
+# Two roots (layout contract): raw (server start logs, /props dumps, done/ markers) ->
+# $CAMPAIGN_DIR/tmp/; results (results.jsonl, meta.txt, failures.txt) -> $CAMPAIGN_DIR/results/.
+#
+# Env: CAMPAIGN_DIR (REQUIRED: campaigns/<type>/<stamp>-campaign-<slug>)
+#      MODEL SLUG BACKENDS("rocm vulkan") MTPS("0 1") KVS("f16 q8_0")
 #      UB(2048) B(8192) FA(on) CTX(65536) NGL(99) PORT(8090)
 #      DEPTHS("8000 32000 64000") MAX_TOKENS(256) THINK_MAX_TOKENS(1024)
-#      CONC_LIST("1 2 4") CONC_NP(4) REPS(2) CAMPAIGN_DIR(resume)
+#      CONC_LIST("1 2 4") CONC_NP(4) REPS(2)
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO="$(cd "$HERE/../.." && pwd)"
+REPO="$(git -C "$HERE" rev-parse --show-toplevel)"
+USAGE="usage: CAMPAIGN_DIR=campaigns/<type>/<stamp>-campaign-<slug> [MODEL=… SLUG=…] $0"
+[ -n "${CAMPAIGN_DIR:-}" ] || { echo "CAMPAIGN_DIR is not set — $USAGE" >&2; exit 2; }
+CAMPAIGN_DIR="$(realpath -m "$CAMPAIGN_DIR")"
 WL="$REPO/bench/workloads/tmp"
+RAW="$CAMPAIGN_DIR/tmp"; RES="$CAMPAIGN_DIR/results"   # raw (ignored) / results (committed)
 
 : "${MODEL:=/home/dev/models/gguf/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf}"
 : "${SLUG:=combo35b}"
@@ -47,12 +55,8 @@ for v in 1 2 3 4; do
 done
 [ "$MISSING" = 1 ] && { echo "build workloads first (docs/guides/GUIDE.md §2)" >&2; exit 1; }
 
-if [ -z "${CAMPAIGN_DIR:-}" ]; then
-  STAMP="$(date '+%Y-%m-%d-%H%M')"
-  CAMPAIGN_DIR="$REPO/bench/runs/${STAMP}-campaign-${SLUG}"
-fi
-mkdir -p "$CAMPAIGN_DIR/done" "$CAMPAIGN_DIR/servers"
-RESULTS="$CAMPAIGN_DIR/results.jsonl"
+mkdir -p "$RAW/done" "$RAW/servers" "$RES"
+RESULTS="$RES/results.jsonl"
 {
   echo "date=$(date -Iseconds)"
   echo "model=$MODEL"
@@ -61,8 +65,8 @@ RESULTS="$CAMPAIGN_DIR/results.jsonl"
   echo "partA: DEPTHS=$DEPTHS MAX_TOKENS=$MAX_TOKENS THINK_MAX_TOKENS=$THINK_MAX_TOKENS"
   echo "partB: CONC_LIST=$CONC_LIST CONC_NP=$CONC_NP REPS=$REPS"
   bash -c "source '$REPO/stack/gpu/gpu_env.sh'; gpu_meta"
-} > "$CAMPAIGN_DIR/meta.txt"
-echo "campaign → $CAMPAIGN_DIR"
+} > "$RES/meta.txt"
+echo "campaign → $CAMPAIGN_DIR (results: $RES/, raw: $RAW/)"
 
 probe() {  # probe <engine-label> <label> <max_tokens> <concurrency> <reps> <prefix_mode> <api> <files...>
   local engine="$1" label="$2" mt="$3" conc="$4" reps="$5" pm="$6" api="$7"; shift 7
@@ -70,20 +74,20 @@ probe() {  # probe <engine-label> <label> <max_tokens> <concurrency> <reps> <pre
   python3 "$REPO/bench/core/capture_engine.py" probe --url "http://localhost:$PORT/v1" --model local \
     "${pf[@]}" --max-tokens "$mt" --concurrency "$conc" --reps "$reps" \
     --prefix-mode "$pm" --api "$api" --engine "$engine" --label "$label" >> "$RESULTS" \
-    || echo "  probe FAILED: $engine/$label" | tee -a "$CAMPAIGN_DIR/failures.txt"
+    || echo "  probe FAILED: $engine/$label" | tee -a "$RES/failures.txt"
 }
 
 start_server() {  # start_server <cfg-name> <np>
   local cfg="$1" np="$2"
   BACKEND="$backend" MODEL="$MODEL" CTX="$CTX" NP="$np" UB="$UB" B="$B" FA="$FA" \
-    KV="$kv" MTP="$mtp" NGL="$NGL" PORT="$PORT" "$HERE/serve_llamacpp.sh" start \
-    > "$CAMPAIGN_DIR/servers/$cfg.start.log" 2>&1
+    KV="$kv" MTP="$mtp" NGL="$NGL" PORT="$PORT" "$REPO/stack/serve/llamacpp/serve_llamacpp.sh" start \
+    > "$RAW/servers/$cfg.start.log" 2>&1
   local rc=$?
-  cp "$REPO/stack/serve/var/servers/$PORT.cmdline" "$CAMPAIGN_DIR/servers/$cfg.cmdline" 2>/dev/null
-  curl -sf -m 5 "http://localhost:$PORT/props" -o "$CAMPAIGN_DIR/servers/$cfg.props.json" 2>/dev/null
+  cp "$REPO/stack/serve/var/servers/$PORT.cmdline" "$RAW/servers/$cfg.cmdline" 2>/dev/null
+  curl -sf -m 5 "http://localhost:$PORT/props" -o "$RAW/servers/$cfg.props.json" 2>/dev/null
   return $rc
 }
-stop_server() { PORT="$PORT" "$HERE/serve_llamacpp.sh" stop >/dev/null 2>&1; }
+stop_server() { PORT="$PORT" "$REPO/stack/serve/llamacpp/serve_llamacpp.sh" stop >/dev/null 2>&1; }
 
 for backend in $BACKENDS; do
   for mtp in $MTPS; do
@@ -91,7 +95,7 @@ for backend in $BACKENDS; do
       cfg="${backend}-mtp${mtp}-kv${kv}"
 
       # ---- Part A: single-stream depth curve + thinking (NP=1) ----
-      if [ -f "$CAMPAIGN_DIR/done/A-$cfg" ]; then
+      if [ -f "$RAW/done/A-$cfg" ]; then
         echo "== A-$cfg: already done, skipping =="
       else
         echo "== A-$cfg: starting server (NP=1) =="
@@ -106,16 +110,16 @@ for backend in $BACKENDS; do
           # chat api: bare instruction prompts NEED the chat template (raw completions can EOS
           # immediately) and it gives a MEASURED ttfa_s via delta.reasoning_content
           probe "$cfg" thinking "$THINK_MAX_TOKENS" 1 "$REPS" unique chat "$WL/thinking-hard.txt"
-          touch "$CAMPAIGN_DIR/done/A-$cfg"
+          touch "$RAW/done/A-$cfg"
         else
-          echo "A-$cfg: server failed to start (see servers/A-$cfg.start.log)" \
-            | tee -a "$CAMPAIGN_DIR/failures.txt"
+          echo "A-$cfg: server failed to start (see tmp/servers/A-$cfg.start.log)" \
+            | tee -a "$RES/failures.txt"
         fi
         stop_server
       fi
 
       # ---- Part B: agentic concurrency waves (NP=$CONC_NP, ctx/slot = CTX/NP) ----
-      if [ -f "$CAMPAIGN_DIR/done/B-$cfg" ]; then
+      if [ -f "$RAW/done/B-$cfg" ]; then
         echo "== B-$cfg: already done, skipping =="
       else
         echo "== B-$cfg: starting server (NP=$CONC_NP) =="
@@ -126,10 +130,10 @@ for backend in $BACKENDS; do
             # shellcheck disable=SC2086
             probe "$cfg" "agentic-c$c" "$MAX_TOKENS" "$c" "$REPS" unique completions $CONC_FILES
           done
-          touch "$CAMPAIGN_DIR/done/B-$cfg"
+          touch "$RAW/done/B-$cfg"
         else
-          echo "B-$cfg: server failed to start (see servers/B-$cfg.start.log)" \
-            | tee -a "$CAMPAIGN_DIR/failures.txt"
+          echo "B-$cfg: server failed to start (see tmp/servers/B-$cfg.start.log)" \
+            | tee -a "$RES/failures.txt"
         fi
         stop_server
       fi
@@ -147,5 +151,5 @@ for d in rows:
           f\"ttft_p50={d.get('ttft_s_p50')} prefill_p50={d.get('prefill_tok_s_p50')} \"
           f\"dec/stream={d.get('decode_tok_s_per_stream_p50')} AGG={d.get('aggregate_tok_s')} \"
           f\"err={d.get('n_err')}\")"
-[ -f "$CAMPAIGN_DIR/failures.txt" ] && { echo '-- failures --'; cat "$CAMPAIGN_DIR/failures.txt"; }
-echo "→ $CAMPAIGN_DIR (write it up with /benchmark)"
+[ -f "$RES/failures.txt" ] && { echo '-- failures --'; cat "$RES/failures.txt"; }
+echo "→ $CAMPAIGN_DIR (rows: $RESULTS; raw: $RAW/ — write it up under docs/findings/)"
