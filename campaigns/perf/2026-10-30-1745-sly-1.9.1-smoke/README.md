@@ -1,0 +1,11 @@
+# 2026-10-30-1745-sly-1.9.1-smoke
+
+Campaign type `perf`. README written by the 2026-11-06 repo restructure from the campaign's own files and its write-up; nothing here is reconstructed.
+
+**Takeaway** (from the write-up): On an agentic brief review+fix task, RedHat MXFP4 failed at Sly's default Cactus δ 0.5 (9 runaway thinking loops, 0/3 briefs in 3 h) because the lossy spec-decode acceptance locks in repetition; with CACTUS_DELTA=0 it ran W2-08 loop-free and out-reviewed heretic (9/19 vs 4/19 Opus findings blind, 2 reasoned rejections, own lint-clean fix) at 29-38 % slower decode and ~9x the time (6.8x the generated tokens x 1.35x slower decode, plus 6 compactions fed by the template's reasoning replay; not context size, not literal repetition). Rerun on Sly 1.9.1 (δ 0.5 + fade/cap, template v22.5-sly2 that drops old reasoning, budget RUNBOOK): W2-08 in 87 min (-22 %), 2 compactions instead of 6, decode 102 tok/s, all 6 high Opus findings fixed with a clean probe - but the blind review collapsed to 1/19 (no probes) and 3 decision loops returned (one to the output cap); the template alone cuts prompt tokens 25 % (calculated on the δ 0 session). Added 2026-10-31: unsloth Q4_K_XL on llama-swap (sharp template) found 12/19 blind (high 3/6) vs RedHat δ 0's 9/19 (4/6) under one blind re-grade - grey zone at n = 1; the re-grade also turned one RedHat δ 0 extra finding to wrong (precision 13/14). Then RedHat δ 0 with only the chat template swapped to sharp: 11/19 (high 4/6, 14/14) with 38 % less thinking and 35 % fewer tool calls - no quality loss, +2 not significant; template held equal, Q4_K_XL vs RedHat is a tie (12 vs 11, 4-way blind grade).
+
+- **Write-up:** [`2026-10-30-1552-dpf-brief-fix-heretic-vs-redhat.md`](../../../docs/findings/agentic/2026-10-30-1552-dpf-brief-fix-heretic-vs-redhat.md)
+- **Recipe (as run):** `smoke_191.sh`. The write-up's method section has the commands.
+- **`results/`** — rows, summaries, charts (committed): `README.md`, `server.cmdline`, `summary.txt`
+- **`tmp/`** — raw data: server logs, replies, GPU sample CSVs (git-ignored, local only)
+- **Migrated from:** `bench/runs/2026-10-30-1745-sly-1.9.1-smoke/`
