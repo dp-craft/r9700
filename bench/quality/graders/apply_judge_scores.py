@@ -6,12 +6,14 @@ id→config map from prepare_judge.py), and writes judge_scores.jsonl that repor
 each axis to integers 0–5 and reports coverage (missing / unknown / out-of-range) so a malformed
 paste can't silently corrupt the analysis.
 
-    python3 apply_judge_scores.py --raw out/judge_raw.json --out out/judge_scores.jsonl
-        # --map defaults to judge_map.json next to --raw
+    python3 apply_judge_scores.py --campaign campaigns/quality/<stamp>-<slug>
+        # --campaign (or $CAMPAIGN_DIR): --raw defaults to <dir>/tmp/judge_raw.json, --out to
+        # <dir>/results/judge_scores.jsonl; --map defaults to judge_map.json next to --raw;
+        # explicit flags win.
 
 Stdlib only.
 """
-import argparse, json, os
+import argparse, json, os, sys
 
 
 def clamp05(x):
@@ -23,10 +25,20 @@ def clamp05(x):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--raw", required=True, help="judge_raw.json: array of {id,correctness,depth,clarity,note}")
+    ap.add_argument("--campaign", default=os.environ.get("CAMPAIGN_DIR"),
+                    help="campaign dir (default: $CAMPAIGN_DIR): --raw defaults to <dir>/tmp/"
+                         "judge_raw.json, --out to <dir>/results/judge_scores.jsonl; explicit flags win")
+    ap.add_argument("--raw", default=None, help="judge_raw.json: array of {id,correctness,depth,clarity,note}")
     ap.add_argument("--map", help="judge_map.json (default: alongside --raw)")
-    ap.add_argument("--out", required=True, help="judge_scores.jsonl to write")
+    ap.add_argument("--out", default=None, help="judge_scores.jsonl to write")
     a = ap.parse_args()
+
+    # --campaign (or $CAMPAIGN_DIR) supplies the split-layout defaults; an explicit flag always wins.
+    for flag, rel in (("raw", ("tmp", "judge_raw.json")), ("out", ("results", "judge_scores.jsonl"))):
+        if not getattr(a, flag):
+            if not a.campaign:
+                sys.exit(f"apply_judge_scores: --{flag} required (or --campaign / $CAMPAIGN_DIR)")
+            setattr(a, flag, os.path.join(a.campaign, *rel))
 
     map_path = a.map or os.path.join(os.path.dirname(os.path.abspath(a.raw)), "judge_map.json")
     mapping = json.load(open(map_path, encoding="utf-8"))

@@ -8,13 +8,17 @@
 Covers: helpers; load_cells across many field combinations (runaway variants, grade errors, missing
 VRAM, partial/empty runs, bulk-`response` dropping); calib_bands (task-filtering, missing models);
 findings (budget curve rise/hold/fall, depth delta, KV ≤5%-vs-exceeds both signs, capability gaps,
-health flags incl. the GTT >500 boundary); end-to-end file output; a scaling stress test; and a fuzz
-loop asserting invariants on random data.
+health flags incl. the GTT >500 boundary); end-to-end file output; a scaling stress test; a fuzz loop
+asserting invariants on random data; and the --campaign split layout (raw in tmp/, results in
+results/, fixtures in inputs/; explicit flags win; gpu_peaks.json from a measured GPU sample CSV).
+The synthetic campaign is built in the SPLIT layout: inputs/ (calibration), results/ (scores),
+tmp/ (outputs, vram), configs.jsonl at the campaign root — the same roots the tools read.
 """
-import json, os, sys, tempfile, time, random, unittest
+import contextlib, io, json, os, sys, tempfile, time, random, unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import aggregate as A
+import make_charts as MC
 
 
 def write_jsonl(path, rows):
@@ -23,14 +27,37 @@ def write_jsonl(path, rows):
             fo.write(json.dumps(r) + "\n")
 
 
+def run_main(mod, argv, env=None):
+    """Run mod.main() with sys.argv = [mod_name] + argv and an optionally-patched CAMPAIGN_DIR."""
+    old_argv = sys.argv
+    old_env = os.environ.get("CAMPAIGN_DIR")
+    sys.argv = [os.path.basename(mod.__file__)] + argv
+    if env is not None:
+        os.environ["CAMPAIGN_DIR"] = env
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):
+            mod.main()
+    finally:
+        sys.argv = old_argv
+        if env is not None and old_env is None:
+            os.environ.pop("CAMPAIGN_DIR", None)
+        elif old_env is not None:
+            os.environ["CAMPAIGN_DIR"] = old_env
+
+
 class Run:
-    """Builds a synthetic out/ dir + a configs.jsonl so load_cells/build_digest can be exercised
-    against arbitrary matrices without touching the real campaign files."""
+    """Builds a synthetic campaign in the SPLIT layout (inputs/ + results/ + tmp/ + configs.jsonl
+    at the root) so load_cells/build_digest can be exercised against arbitrary matrices without
+    touching the real campaign files."""
     def __init__(self):
         self.d = tempfile.mkdtemp(prefix="aggtest-")
-        self.out = os.path.join(self.d, "out"); os.makedirs(self.out)
+        for sub in ("inputs", "results", "tmp"):
+            os.makedirs(os.path.join(self.d, sub))
+        self.inputs = os.path.join(self.d, "inputs")
+        self.results = os.path.join(self.d, "results")
+        self.tmp = os.path.join(self.d, "tmp")
         self.configs = os.path.join(self.d, "configs.jsonl")
-        self.calib = os.path.join(self.d, "calib.jsonl")
+        self.calib = os.path.join(self.inputs, "calibration.jsonl")
         self._cfg, self._ts, self._jd, self._o, self._vr, self._cal = [], [], [], [], [], []
 
     def cfg(self, label, model="M.gguf", kv="f16", depth="64k", budget=2048, **kw):
@@ -60,15 +87,26 @@ class Run:
 
     def flush(self):
         write_jsonl(self.configs, self._cfg)
-        write_jsonl(os.path.join(self.out, "scores_typescript.jsonl"), self._ts)
-        write_jsonl(os.path.join(self.out, "judge_scores.jsonl"), self._jd)
-        write_jsonl(os.path.join(self.out, "outputs.jsonl"), self._o)
-        write_jsonl(os.path.join(self.out, "vram.jsonl"), self._vr)
+        write_jsonl(os.path.join(self.results, "scores_typescript.jsonl"), self._ts)
+        write_jsonl(os.path.join(self.results, "judge_scores.jsonl"), self._jd)
+        write_jsonl(os.path.join(self.tmp, "outputs.jsonl"), self._o)
+        write_jsonl(os.path.join(self.tmp, "vram.jsonl"), self._vr)
         write_jsonl(self.calib, self._cal)
         return self
 
     def cells(self):
-        return A.load_cells(self.out, self.configs)
+        return A.load_cells(self.d, self.configs)
+
+
+def campaign_with_data():
+    """One cell, one scored reply, one judge row, one VRAM row, one haiku reference."""
+    r = Run().cfg("c1")
+    r.score("c1", rep=0, score=0.8)
+    r.judge("c1", rep=0)
+    r.out_row("c1")
+    r.vram("c1", peak_vram_used_mib=20000)
+    r.cal("haiku", "lru-cache", 0.7)
+    return r.flush()
 
 
 # ------------------------------------------------------------------ helpers
@@ -158,10 +196,10 @@ class TestLoadCells(unittest.TestCase):
         r = Run().cfg("c1")
         r.score("c1").judge("c1").out_row("c1", response=big).vram("c1", peak_vram_used_mib=23000)
         r.flush()
-        _, cells, _, md = A.build_digest(r.out, os.path.join(r.out, "summary.md"), r.configs, [r.calib])
+        _, cells, _, md = A.build_digest(r.d, os.path.join(r.results, "summary.md"), r.configs, [r.calib])
         self.assertNotIn("response", cells["c1"])                                       # not carried into the cell
         self.assertNotIn(big, md)                                                       # not leaked into the digest
-        with open(os.path.join(r.out, "summary.json")) as fh:
+        with open(os.path.join(r.results, "summary.json")) as fh:
             self.assertNotIn(big, fh.read())
 
 
@@ -258,20 +296,167 @@ class TestFindings(unittest.TestCase):
 # ------------------------------------------------------------------ end to end
 class TestEndToEnd(unittest.TestCase):
     def test_build_digest_writes_files(self):
-        r = Run().cfg("un-d64-f16-rb2048", depth="64k")
-        for rep in range(2):
-            r.score("un-d64-f16-rb2048", rep=rep, score=0.8).judge("un-d64-f16-rb2048", rep=rep).out_row("un-d64-f16-rb2048", rep=rep)
-        r.vram("un-d64-f16-rb2048", peak_vram_used_mib=23000, peak_gtt_used_mib=78)
-        r.cal("haiku", "lru-cache", 0.7).cal("opus", "lru-cache", 0.95)
-        r.flush()
-        outp, cells, _, md = A.build_digest(r.out, os.path.join(r.out, "summary.md"), r.configs, [r.calib])
+        r = campaign_with_data()
+        outp, cells, _, md = A.build_digest(r.d, os.path.join(r.results, "summary.md"), r.configs, [r.calib])
         self.assertTrue(os.path.exists(outp) and os.path.exists(outp.replace(".md", ".json")))
         self.assertEqual(len(cells), 1)
         self.assertIn("Per-cell aggregates", md)
-        self.assertIn("un-d64-f16-rb2048", md)
+        self.assertIn("c1", md)
         j = json.load(open(outp.replace(".md", ".json")))
         self.assertIn("cells", j); self.assertIn("bands", j)
         self.assertAlmostEqual(j["bands"]["haiku"], 70.0)
+
+
+# ------------------------------------------------------------------ --campaign split layout
+class TestCampaignSplit(unittest.TestCase):
+    """--campaign (or $CAMPAIGN_DIR): raw read/written from/to tmp/, results written to results/,
+    fixtures read from inputs/; an explicit path flag always wins over the default."""
+
+    def test_campaign_defaults_resolve_to_split_layout(self):
+        r = campaign_with_data()
+        run_main(A, ["--campaign", r.d])
+        # results -> <dir>/results/
+        self.assertTrue(os.path.exists(os.path.join(r.results, "summary.md")))
+        self.assertTrue(os.path.exists(os.path.join(r.results, "summary.json")))
+        j = json.load(open(os.path.join(r.results, "summary.json")))
+        # scores read from results/, raw (outputs/vram) from tmp/, calib fixtures from inputs/
+        self.assertEqual(j["cells"]["c1"]["ts_pct"], 80.0)      # results/scores_typescript.jsonl
+        self.assertEqual(j["cells"]["c1"]["peak_vram"], 20000)  # tmp/vram.jsonl
+        self.assertAlmostEqual(j["bands"]["haiku"], 70.0)       # inputs/calibration.jsonl
+
+    def test_campaign_dir_env_default(self):
+        r = campaign_with_data()
+        run_main(A, [], env=r.d)                                # CAMPAIGN_DIR env, no --campaign flag
+        self.assertTrue(os.path.exists(os.path.join(r.results, "summary.md")))
+
+    def test_by_task_default_writes_results(self):
+        r = campaign_with_data()
+        run_main(A, ["--campaign", r.d, "--by-task"])
+        self.assertTrue(os.path.exists(os.path.join(r.results, "summary_by_task.json")))
+        by = json.load(open(os.path.join(r.results, "summary_by_task.json")))
+        self.assertIn("lru-cache", by["by_task"])
+
+    def test_explicit_flags_win_over_campaign_defaults(self):
+        r = campaign_with_data()
+        out_md = os.path.join(tempfile.mkdtemp(prefix="aggtest-explicit-"), "summary.md")
+        # a second calib file: proves --calib-files (relative → inputs/) wins over the default pair
+        other = os.path.join(r.inputs, "other.jsonl")
+        write_jsonl(other, [{"model": "opus", "task": "lru-cache", "score": 0.95}])
+        run_main(A, ["--campaign", r.d, "--out", out_md, "--calib-files", "other.jsonl"])
+        self.assertTrue(os.path.exists(out_md))                              # --out won: not results/summary.md
+        self.assertFalse(os.path.exists(os.path.join(r.results, "summary.md")))
+        j = json.load(open(out_md.replace(".md", ".json")))
+        self.assertAlmostEqual(j["bands"]["opus"], 95.0)                    # from the explicit file
+        self.assertNotIn("haiku", j["bands"])                               # default pair not merged
+
+    def test_no_campaign_no_dir_exits(self):
+        r = campaign_with_data()
+        old_argv, old_env = sys.argv, os.environ.get("CAMPAIGN_DIR")
+        sys.argv = ["aggregate.py"]
+        try:
+            if old_env is None:
+                os.environ.pop("CAMPAIGN_DIR", None)
+            with self.assertRaises(SystemExit):
+                with contextlib.redirect_stdout(io.StringIO()):
+                    A.main()
+        finally:
+            sys.argv = old_argv
+            if old_env is None:
+                os.environ.pop("CAMPAIGN_DIR", None)
+            else:
+                os.environ["CAMPAIGN_DIR"] = old_env
+
+
+# ------------------------------------------------------------------ make_charts --campaign
+class TestMakeChartsCampaign(unittest.TestCase):
+    """make_charts.py --campaign: SVGs to results/charts/, appendix to results/appendix.md with
+    links relative to the appendix file; an explicit --charts without --campaign keeps old behaviour."""
+
+    def _campaign(self):
+        d = tempfile.mkdtemp(prefix="mctest-")
+        for sub in ("inputs", "results", "tmp"):
+            os.makedirs(os.path.join(d, sub))
+        write_jsonl(os.path.join(d, "tmp", "outputs.jsonl"), [
+            {"config": "c1", "task_id": "t1", "rep": 0, "response": "x",
+             "total_tokens": 1000, "think_tokens": 500, "answer_tokens": 500,
+             "decode_tps": 50, "prefill_tps": 100, "ttft_s": 1.0, "ttfa_s": 2.0,
+             "latency_s": 10.0, "finish_reason": "stop"}])
+        write_jsonl(os.path.join(d, "results", "scores_typescript.jsonl"), [
+            {"config": "c1", "task_id": "t1", "rep": 0, "score": 0.9, "hard_pass": True,
+             "objectives": {"types": 1, "lint": 1, "tests": 1}}])
+        return d
+
+    def test_campaign_defaults_charts_appendix_gpu_peaks(self):
+        d = self._campaign()
+        # a 2-row sample CSV so gpu_peaks.json is written too (see TestGpuPeaks for the peaks)
+        with open(os.path.join(d, "tmp", "gpu_c1.csv"), "w") as f:
+            f.write("unix_ts,vram_used_mib,vram_total_mib,gtt_used_mib,power_w,temp_c,sclk_mhz\n")
+            f.write("1.0,20000,32000,500,100.0,50.0,0.0\n2.0,21000,32000,800,150.0,52.0,0.0\n")
+        run_main(MC, ["--campaign", d])
+        self.assertTrue(os.path.exists(os.path.join(d, "results", "charts", "scorecard.svg")))
+        ap = os.path.join(d, "results", "appendix.md")
+        self.assertTrue(os.path.exists(ap))
+        txt = open(ap).read()
+        self.assertIn("](charts/scorecard.svg)", txt)     # link relative to the appendix file
+        self.assertTrue(os.path.exists(os.path.join(d, "results", "gpu_peaks.json")))
+
+    def test_explicit_charts_without_campaign_keeps_old_behaviour(self):
+        d = self._campaign()
+        charts = os.path.join(d, "charts")                # explicit --charts, NO --campaign
+        run_main(MC, ["--dir", d, "--charts", charts])
+        self.assertTrue(os.path.exists(os.path.join(charts, "scorecard.svg")))
+        self.assertTrue(os.path.exists(os.path.join(charts, "appendix.md")))   # appendix inside charts dir
+        self.assertFalse(os.path.exists(os.path.join(d, "results", "appendix.md")))
+
+
+# ------------------------------------------------------------------ gpu_peaks.json (iron rule 7)
+class TestGpuPeaks(unittest.TestCase):
+    """results/gpu_peaks.json: MEASURED peak VRAM/GTT per config label from the tmp/gpu_<label>.csv
+    sample files (reusing bench/core/report.py's gpu_peaks), csv paths relative to the campaign dir."""
+
+    def _campaign_with_csv(self):
+        d = tempfile.mkdtemp(prefix="gpupk-")
+        os.makedirs(os.path.join(d, "results"))
+        os.makedirs(os.path.join(d, "tmp"))
+        with open(os.path.join(d, "tmp", "gpu_c1.csv"), "w") as f:
+            f.write("unix_ts,vram_used_mib,vram_total_mib,gtt_used_mib,power_w,temp_c,sclk_mhz\n")
+            f.write("1.0,20000,32000,500,100.0,50.0,0.0\n")
+            f.write("2.0,21000,32000,800,150.0,52.0,0.0\n")
+        return d
+
+    def test_gpu_peaks_json_from_three_line_csv(self):
+        d = self._campaign_with_csv()
+        MC.write_gpu_peaks(d)
+        j = json.load(open(os.path.join(d, "results", "gpu_peaks.json")))
+        self.assertTrue(j["provenance"].startswith("MEASURED"))
+        self.assertEqual(len(j["runs"]), 1)
+        run = j["runs"][0]
+        self.assertEqual(run["label"], "c1")                       # from the gpu_<label>.csv name
+        self.assertEqual(run["csv"], "tmp/gpu_c1.csv")             # relative to the campaign dir
+        self.assertEqual(run["peak_vram_mib"], 21000)              # max over the samples
+        self.assertEqual(run["peak_gtt_mib"], 800)
+        self.assertEqual(run["provenance"], "MEASURED")
+
+    def test_gpu_peaks_skipped_for_flat_dir(self):
+        d = tempfile.mkdtemp(prefix="gpupk-flat-")
+        os.makedirs(os.path.join(d, "tmp"))                        # no results/ -> not a split campaign
+        MC.write_gpu_peaks(d)
+        self.assertFalse(os.path.exists(os.path.join(d, "results", "gpu_peaks.json")))
+
+
+# ------------------------------------------------------------------ tool imports
+class TestToolImports(unittest.TestCase):
+    """Every quality tool module must still import cleanly after the layout change (no import-time
+    path breakage, e.g. a sibling-campaign reference)."""
+
+    def test_all_tool_modules_import(self):
+        import importlib
+        for name in ("aggregate", "capture", "score_typescript", "make_charts",
+                     "make_charts_detailed", "judge", "repair", "build_context",
+                     "graders.score_deterministic", "graders.prepare_judge",
+                     "graders.apply_judge_scores"):
+            with self.subTest(tool=name):
+                importlib.import_module(name)
 
 
 # ------------------------------------------------------------------ stress + fuzz
@@ -294,7 +479,7 @@ class TestStress(unittest.TestCase):
                               truncated_thinking=random.random() > 0.9)
         r.flush()
         t0 = time.time()
-        _, cells, _, md = A.build_digest(r.out, os.path.join(r.out, "summary.md"), r.configs, [r.calib])
+        _, cells, _, md = A.build_digest(r.d, os.path.join(r.results, "summary.md"), r.configs, [r.calib])
         dt = time.time() - t0
         self.assertEqual(len(cells), 40)
         self.assertLess(dt, 15.0, f"aggregate too slow on 960 rows: {dt:.1f}s")
@@ -328,7 +513,7 @@ class TestStress(unittest.TestCase):
                     if random.random() > 0.5:
                         r.vram(L, peak_vram_used_mib=random.randint(0, 32000), peak_gtt_used_mib=random.randint(0, 3000))
             r.flush()
-            _, cells, _, md = A.build_digest(r.out, os.path.join(r.out, "summary.md"), r.configs, [r.calib])
+            _, cells, _, md = A.build_digest(r.d, os.path.join(r.results, "summary.md"), r.configs, [r.calib])
             self.assertIsInstance(md, str)
             for c in cells.values():
                 if c["ts_pct"] is not None:

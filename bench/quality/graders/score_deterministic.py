@@ -6,8 +6,9 @@ reply + token usage) and tasks.jsonl (grader specs), and emits scores.jsonl + a 
 Grader kinds: final_match, pyexec (runs candidate code in an isolated subprocess), json_schema,
 constraints. The `judge` tasks are skipped here — they go to the LLM-judge step (Phase B).
 
-    python3 score_deterministic.py --tasks ../tasks/tasks.jsonl --outputs OUT/outputs.jsonl \
-        --out OUT/scores_deterministic.jsonl
+    python3 score_deterministic.py --campaign campaigns/quality/<stamp>-<slug>
+    # --campaign (or $CAMPAIGN_DIR): --tasks defaults to <dir>/inputs/tasks.jsonl, --outputs to
+    # <dir>/tmp/outputs.jsonl, --out to <dir>/results/scores_deterministic.jsonl; explicit flags win.
 
 ⚠️ pyexec RUNS MODEL-GENERATED CODE. It is sandboxed only by a subprocess + timeout (no network/fs
 isolation). Run on a throwaway box or inside a container if you don't trust the outputs. Stdlib only.
@@ -114,10 +115,21 @@ GRADERS = {"final_match": g_final_match, "pyexec": g_pyexec,
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--tasks", required=True)
-    ap.add_argument("--outputs", required=True)
-    ap.add_argument("--out", required=True)
+    ap.add_argument("--campaign", default=os.environ.get("CAMPAIGN_DIR"),
+                    help="campaign dir (default: $CAMPAIGN_DIR): --tasks defaults to <dir>/inputs/"
+                         "tasks.jsonl, --outputs to <dir>/tmp/outputs.jsonl, --out to <dir>/results/"
+                         "scores_deterministic.jsonl; explicit flags win")
+    ap.add_argument("--tasks", default=None)
+    ap.add_argument("--outputs", default=None)
+    ap.add_argument("--out", default=None)
     a = ap.parse_args()
+    # --campaign (or $CAMPAIGN_DIR) supplies the split-layout defaults; an explicit flag always wins.
+    for flag, rel in (("tasks", ("inputs", "tasks.jsonl")), ("outputs", ("tmp", "outputs.jsonl")),
+                       ("out", ("results", "scores_deterministic.jsonl"))):
+        if not getattr(a, flag):
+            if not a.campaign:
+                sys.exit(f"score_deterministic: --{flag} required (or --campaign / $CAMPAIGN_DIR)")
+            setattr(a, flag, os.path.join(a.campaign, *rel))
     tasks = {}
     for line in open(a.tasks):
         line = line.strip()

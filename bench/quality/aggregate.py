@@ -3,12 +3,18 @@
 
 The summary step must not slurp the raw JSONL — `outputs.jsonl` alone is 60 full replies incl. thinking
 (hundreds of thousands of tokens). This does ALL the arithmetic in Python and writes a compact
-`out/summary.md` (+ `out/summary.json`): a per-cell table, a PER-REP detail table (every rep + the
+`results/summary.md` (+ `results/summary.json`): a per-cell table, a PER-REP detail table (every rep + the
 haiku/sonnet/opus references), and the campaign's relational findings (quant ladder, 27B-vs-35B,
-capability vs haiku/Sonnet/Opus). The LLM then only writes prose from this digest + `charts/appendix.md`
-— it is explicitly told NOT to read the per-reply jsonl.
+capability vs haiku/Sonnet/Opus). The LLM then only writes prose from this digest + `results/appendix.md`
+— it is explicitly told NOT to read the per-reply jsonl. Raw (outputs.jsonl, vram.jsonl) is read from
+`<campaign>/tmp/`, graded rows (scores_*.jsonl, judge_scores.jsonl) from `<campaign>/results/`,
+calibration fixtures from `<campaign>/inputs/`.
 
-  python3 aggregate.py --dir out --out out/summary.md
+  python3 aggregate.py --campaign campaigns/quality/<stamp>-<slug> --by-task
+  # with --campaign (or $CAMPAIGN_DIR): reads <dir>/configs.jsonl, results/scores_*.jsonl +
+  # judge_scores.jsonl, tmp/outputs.jsonl + vram.jsonl, inputs/calibration*.jsonl; writes
+  # results/summary.{md,json} (+ results/summary_by_task.json with --by-task)
+  python3 aggregate.py --dir <flat-run-dir> --out <path>/summary.md   # explicit paths still win
 """
 import argparse, json, os, statistics as st, sys
 
@@ -21,6 +27,24 @@ def jl(p):
         return []
     with open(p) as fh:
         return [json.loads(l) for l in fh if l.strip()]
+
+
+def jld(D, name):
+    """Rows of `name` under D, or under its split roots (results/ = graded results, tmp/ = raw).
+    A flat legacy run dir (or the synthetic test layout) is searched first, so a single dir and a
+    split campaign dir read identically."""
+    for root in (D, os.path.join(D, "results"), os.path.join(D, "tmp")):
+        p = os.path.join(root, name)
+        if os.path.exists(p):
+            return jl(p)
+    return []
+
+
+def results_root(D):
+    """results/ for a split campaign dir; D itself for a flat legacy run dir (or a fresh one
+    that has not created results/ yet)."""
+    r = os.path.join(D, "results")
+    return r if os.path.isdir(r) else D
 
 
 def mean(xs):
@@ -40,9 +64,9 @@ def f(x, d=1):
 def load_cells(D, configs_path=None):
     """One aggregated record per config, keyed by configs.jsonl (authoritative depth/kv/budget/model).
     Reads only SMALL fields from outputs.jsonl (drops the huge `response`)."""
-    cfgs = {c["label"]: c for c in jl(configs_path or os.path.join(HERE, "configs.jsonl"))}
-    ts, jd, out = jl(f"{D}/scores_typescript.jsonl"), jl(f"{D}/judge_scores.jsonl"), jl(f"{D}/outputs.jsonl")
-    vr = {v["config"]: v for v in jl(f"{D}/vram.jsonl")}
+    cfgs = {c["label"]: c for c in jl(configs_path or os.path.join(D, "configs.jsonl"))}
+    ts, jd, out = jld(D, "scores_typescript.jsonl"), jld(D, "judge_scores.jsonl"), jld(D, "outputs.jsonl")
+    vr = {v["config"]: v for v in jld(D, "vram.jsonl")}
     cells = {}
     for label, c in cfgs.items():
         tsr = [r for r in ts if r.get("config") == label]
@@ -93,8 +117,11 @@ def calib_by_task_full(files=None):
     the same numbers as before.
 
     Per (task, model) we return: score = mean over reps · sd/n · hard_pass = ANY rep strictly clean
-    (the tier's *existence* semantics, unchanged from n=1) · hard_pass_k = how many of n."""
-    files = files or [os.path.join(HERE, "calibration.jsonl"), os.path.join(HERE, "calibration-hard.jsonl")]
+    (the tier's *existence* semantics, unchanged from n=1) · hard_pass_k = how many of n.
+
+    `files` defaults to NONE (the calibration fixtures live in the campaign's inputs/; main()
+    resolves them from --calib-files / --campaign and passes them explicitly)."""
+    files = list(files or [])
     acc = {}
     for r in (row for p in files for row in jl(p)):
         t, m = r.get("task"), r.get("model")
@@ -197,8 +224,8 @@ def findings(cells, bands):
 def render_md(cells, bands):
     order = sorted(cells, key=lambda l: (cells[l]["model"], cells[l]["depth"] or "", cells[l]["kv"] or "", cells[l]["budget"] or 0))
     L = ["# Depth run — deterministic digest (`aggregate.py`)",
-         "", "_All numbers computed in Python from out/*.jsonl. The analysis LLM writes prose from THIS "
-         "+ charts/appendix.md — it does not read the per-reply jsonl._", "",
+         "", "_All numbers computed in Python from the campaign's results/*.jsonl + tmp/*.jsonl. "
+         "The analysis LLM writes prose from THIS + results/appendix.md — it does not read the per-reply jsonl._", "",
          "## Per-cell aggregates", "",
          "| cell | model | depth | kv | budget | n | TS % | worst | best | hard % | judge/5 | judge d·c·r | think tok | ttfa s | full s | decode t/s | peak VRAM | peak GTT | runaway % | fails |",
          "|------|-------|-------|----|-------:|--:|-----:|------:|-----:|-------:|--------:|:-----------:|----------:|-------:|-------:|-----------:|----------:|---------:|----------:|------:|"]
@@ -272,8 +299,8 @@ def render_uncertainty(D, configs_path=None, baseline=None):
     (27B dense vs 35B MoE) rather than a statement about the sampler. To read the sampling axis,
     pass --baseline a3b-d128-f16-rb16384 (the same model at the vendor's coding temperature), or
     --baseline a3b-d128-f16-rb16384-t10 to isolate presence_penalty from temperature."""
-    cfgs = {c["label"]: c for c in jl(configs_path or os.path.join(HERE, "configs.jsonl"))}
-    ts = jl(f"{D}/scores_typescript.jsonl")
+    cfgs = {c["label"]: c for c in jl(configs_path or os.path.join(D, "configs.jsonl"))}
+    ts = jld(D, "scores_typescript.jsonl")
     if not ts:
         return ""
     tasks = list(dict.fromkeys(r.get("task_id") for r in ts))
@@ -346,8 +373,8 @@ def render_fluctuation(D, configs_path=None):
     human who already knows the answer — tsc/eslint/vitest say which candidate is clean. `hard@R` (a task
     counts if ANY rep is strictly clean) is therefore a REAL, reproducible strategy for this task class,
     which is exactly why it is reported next to hard@1."""
-    cfgs = {c["label"]: c for c in jl(configs_path or os.path.join(HERE, "configs.jsonl"))}
-    ts = jl(f"{D}/scores_typescript.jsonl")
+    cfgs = {c["label"]: c for c in jl(configs_path or os.path.join(D, "configs.jsonl"))}
+    ts = jld(D, "scores_typescript.jsonl")
     if not ts:
         return ""
     tasks = list(dict.fromkeys(r.get("task_id") for r in ts))
@@ -412,11 +439,11 @@ def render_reps(D, configs_path=None, calib_files=None):
     row, and the haiku/sonnet/opus one-shot references in the SAME columns (existing calibration data;
     missing points, e.g. opus on lru-cache/rate-limiter, are marked). This is the 'see all 3 values'
     table the analysis inlines; it reads only small fields (never the bulk `response`)."""
-    cfgs = {c["label"]: c for c in jl(configs_path or os.path.join(HERE, "configs.jsonl"))}
-    ts = jl(f"{D}/scores_typescript.jsonl")
+    cfgs = {c["label"]: c for c in jl(configs_path or os.path.join(D, "configs.jsonl"))}
+    ts = jld(D, "scores_typescript.jsonl")
     if not ts:
         return ""
-    out, jd = jl(f"{D}/outputs.jsonl"), jl(f"{D}/judge_scores.jsonl")
+    out, jd = jld(D, "outputs.jsonl"), jld(D, "judge_scores.jsonl")
     think = {(r.get("config"), r.get("task_id"), r.get("rep", 0)): r.get("think_tokens") for r in out}
     jdix = {(r.get("config"), r.get("task_id"), r.get("rep", 0)): r for r in jd}
     refs = calib_by_task_full(calib_files)
@@ -484,12 +511,13 @@ def render_reps(D, configs_path=None, calib_files=None):
 
 def build_digest(D, out_path=None, configs_path=None, calib_files=None, baseline=None):
     cells = load_cells(D, configs_path)
-    run_task_ids = {r.get("task_id") for r in jl(f"{D}/scores_typescript.jsonl")}
+    run_task_ids = {r.get("task_id") for r in jld(D, "scores_typescript.jsonl")}
     bands = calib_bands(run_task_ids, calib_files)
     md = (render_md(cells, bands) + render_uncertainty(D, configs_path, baseline)
           + render_fluctuation(D, configs_path)
           + render_reps(D, configs_path, calib_files))
-    out_path = out_path or f"{D}/summary.md"
+    out_path = out_path or os.path.join(results_root(D), "summary.md")
+    os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
     with open(out_path, "w") as fh:
         fh.write(md)
     with open(out_path.replace(".md", ".json"), "w") as fh:
@@ -507,8 +535,9 @@ OBJ_ALL = ["types", "lint", "tests", "edge", "reuse", "bdd", "novj"]
 
 
 def calib_by_task(files=None):
-    """{task: {model: score%}} from the calibration one-shots (haiku/sonnet/opus)."""
-    files = files or [os.path.join(HERE, "calibration.jsonl"), os.path.join(HERE, "calibration-hard.jsonl")]
+    """{task: {model: score%}} from the calibration one-shots (haiku/sonnet/opus).
+    `files` defaults to NONE (main() resolves the campaign's inputs/ calibration explicitly)."""
+    files = list(files or [])
     out = {}
     for r in (row for p in files for row in jl(p)):
         t, m, s = r.get("task"), r.get("model"), r.get("score")
@@ -522,10 +551,10 @@ def load_by_task(D, scores_file="scores_typescript.jsonl", configs_path=None, ca
     """Per (task, config) aggregate. `scores_file` selects the grade source (e.g. the corrected
     re-grade). Timing uses GENERATION time = (think+answer)/decode_tps — prefill-free, so the shared
     cold-prefill outlier (~300 s on the first task of a server) does not pollute per-task cost."""
-    cfgs = {c["label"]: c for c in jl(configs_path or os.path.join(HERE, "configs.jsonl"))}
-    ts = jl(f"{D}/{scores_file}")
-    jd = jl(f"{D}/judge_scores.jsonl")
-    out = jl(f"{D}/outputs.jsonl")
+    cfgs = {c["label"]: c for c in jl(configs_path or os.path.join(D, "configs.jsonl"))}
+    ts = jld(D, scores_file)
+    jd = jld(D, "judge_scores.jsonl")
+    out = jld(D, "outputs.jsonl")
     o_idx = {}
     for r in out:
         o_idx.setdefault((r.get("config"), r.get("task_id")), []).append(r)
@@ -573,7 +602,7 @@ def load_by_task(D, scores_file="scores_typescript.jsonl", configs_path=None, ca
 
 def cell_ts_by_scores(D, scores_file):
     """Per-config mean TS% for a given grade file — for the orig-vs-regrade correction table."""
-    ts = jl(f"{D}/{scores_file}")
+    ts = jld(D, scores_file)
     labels = list(dict.fromkeys(r.get("config") for r in ts))
     return {l: pct([r.get("score") for r in ts if r.get("config") == l]) for l in labels}, \
            {l: pct([1 if r.get("hard_pass") else 0 for r in ts if r.get("config") == l]) for l in labels}
@@ -581,7 +610,8 @@ def cell_ts_by_scores(D, scores_file):
 
 def build_by_task(D, scores_file="scores_typescript.jsonl", out_json=None, calib_files=None):
     by = load_by_task(D, scores_file, calib_files=calib_files)
-    out_json = out_json or f"{D}/summary_by_task.json"
+    out_json = out_json or os.path.join(results_root(D), "summary_by_task.json")
+    os.makedirs(os.path.dirname(out_json) or ".", exist_ok=True)
     with open(out_json, "w") as fh:
         json.dump({"scores_file": scores_file, "by_task": by, "refs": calib_by_task(calib_files)}, fh, indent=1)
     return out_json, by
@@ -589,16 +619,26 @@ def build_by_task(D, scores_file="scores_typescript.jsonl", out_json=None, calib
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--dir", default=os.path.join(HERE, "out"))
-    ap.add_argument("--out", default="")
-    ap.add_argument("--by-task", action="store_true", help="also emit out/summary_by_task.json (per task×config)")
+    ap.add_argument("--campaign", default=os.environ.get("CAMPAIGN_DIR"),
+                    help="campaign dir (default: $CAMPAIGN_DIR): reads configs.jsonl + results/ + "
+                         "tmp/ + inputs/ per the split layout, writes results/summary.{md,json}")
+    ap.add_argument("--dir", default=None,
+                    help="flat run dir with the jsonl files (wins over --campaign; reads also search "
+                         "its results/ + tmp/ subdirs)")
+    ap.add_argument("--configs", default=None,
+                    help="configs.jsonl path (default: <dir>/configs.jsonl)")
+    ap.add_argument("--out", default=None,
+                    help="summary.md path (default: <dir>/results/summary.md)")
+    ap.add_argument("--by-task", action="store_true", help="also emit results/summary_by_task.json (per task×config)")
     ap.add_argument("--scores", default="scores_typescript.jsonl", help="grade file to aggregate (e.g. the corrected re-grade)")
     ap.add_argument("--calib-files", default="",
-                    help="comma-separated reference/calibration jsonl files, relative to the campaign dir "
-                         "(default: calibration.jsonl,calibration-hard.jsonl). Point this at a multi-rep "
-                         "file (rows carrying `rep`) to get mean+-sd references instead of n=1 one-shots. "
-                         "The legacy files are NOT merged in automatically — list them explicitly if wanted, "
-                         "otherwise a (task,model) present in both would silently gain an extra rep.")
+                    help="comma-separated reference/calibration jsonl files; relative paths resolve "
+                         "against <campaign>/inputs/ (else the cwd). Default with --campaign: "
+                         "inputs/calibration.jsonl + inputs/calibration-hard.jsonl (missing ones skipped). "
+                         "Point this at a multi-rep file (rows carrying `rep`) to get mean+-sd references "
+                         "instead of n=1 one-shots. The legacy files are NOT merged in automatically — "
+                         "list them explicitly if wanted, otherwise a (task,model) present in both would "
+                         "silently gain an extra rep.")
     ap.add_argument("--baseline", default="",
                     help="cell label to use as the PAIRED-test reference (default: the quant ladder's "
                          "Q4_K_M, un-d128-f16-rb4096). The default is only valid for the 27B quant "
@@ -607,23 +647,40 @@ def main():
                          "Use a3b-d128-f16-rb16384 to read the sampling axis within-model, or "
                          "a3b-d128-f16-rb16384-t10 to isolate presence_penalty from temperature.")
     a = ap.parse_args()
-    calib_files = [p if os.path.isabs(p) else os.path.join(HERE, p)
-                   for p in (s.strip() for s in a.calib_files.split(",")) if p] or None
-    for p in calib_files or []:
-        if not os.path.exists(p):
-            sys.exit(f"aggregate: --calib-files: no such file: {p}")
+    D = a.dir or a.campaign
+    if not D:
+        sys.exit("aggregate: pass --dir or --campaign (or set CAMPAIGN_DIR): where the campaign data lives")
+    configs_path = a.configs or os.path.join(D, "configs.jsonl")
+    if a.calib_files:                                   # explicit list: relative -> inputs/ (or cwd), strict
+        calib_files = [p if os.path.isabs(p) else
+                       (os.path.join(a.campaign, "inputs", p) if a.campaign else p)
+                       for p in (s.strip() for s in a.calib_files.split(",")) if p]
+        for p in calib_files:
+            if not os.path.exists(p):
+                sys.exit(f"aggregate: --calib-files: no such file: {p}")
+    elif a.campaign:                                   # default: the campaign's inputs/ calibration fixtures
+        calib_files = [p for p in (os.path.join(a.campaign, "inputs", "calibration.jsonl"),
+                                   os.path.join(a.campaign, "inputs", "calibration-hard.jsonl"))
+                       if os.path.exists(p)]
+    else:
+        calib_files = None
+    # results/ for a --campaign dir even before it exists (a fresh campaign still is a split layout);
+    # an explicit --dir falls back to itself when it has no results/ subdir (flat legacy run dir).
+    rroot = os.path.join(D, "results") if a.campaign else results_root(D)
     # --by-task is ADDITIVE, as its help says. It used to `return` early, so summary.md and
     # summary_by_task.json could only ever be produced by two SEPARATE invocations — which is exactly
     # how they drifted apart (summary_by_task.json 16 min behind a corrected re-grade, 2026-07-15).
     # One invocation now writes both, from the same data, always.
-    outp, cells, _, _ = build_digest(a.dir, a.out or None, calib_files=calib_files,
+    outp, cells, _, _ = build_digest(D, a.out or os.path.join(rroot, "summary.md"),
+                                     configs_path=configs_path, calib_files=calib_files,
                                      baseline=a.baseline or None)
     print(f"wrote {outp} ({len(cells)} cells) + {outp.replace('.md', '.json')}")
     if a.by_task:
         if a.scores != "scores_typescript.jsonl":
             print(f"  NOTE: --scores {a.scores} applies to summary_by_task.json only; the digest above "
                   f"is built from scores_typescript.jsonl — do not compare them.", file=sys.stderr)
-        outp2, by = build_by_task(a.dir, a.scores, calib_files=calib_files)
+        outp2, by = build_by_task(D, a.scores, out_json=os.path.join(rroot, "summary_by_task.json"),
+                                  calib_files=calib_files)
         print(f"wrote {outp2} ({len(by)} tasks) from {a.scores}")
 
 

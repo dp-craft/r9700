@@ -11,11 +11,15 @@ Design (per the dataviz method):
   - Every mark is direct-labeled (the palette's low-contrast slots require this relief) + a data
     table is emitted, so nothing depends on color alone.
 
-    python3 make_charts.py --dir out            # reads out/{outputs,vram,scores_*,judge_scores}.jsonl
-                                                 # writes out/charts/*.svg + out/charts/appendix.md
+    python3 make_charts.py --campaign campaigns/quality/<stamp>-<slug>
+    # reads tmp/{outputs,vram}.jsonl + results/{scores_*,judge_scores}.jsonl (+ inputs/ calibration),
+    # writes <dir>/results/charts/*.svg + <dir>/results/appendix.md + <dir>/results/gpu_peaks.json
+    python3 make_charts.py --dir <flat-run-dir> --charts <dir>   # explicit paths still win
 """
-import argparse, json, os, statistics as st
+import argparse, json, os, re, statistics as st, sys
 from collections import defaultdict, OrderedDict
+
+HERE = os.path.dirname(os.path.abspath(__file__))
 
 CANON = ["rico03-distilled", "unsloth-mtp-off", "unsloth-mtp-on", "hauhau-uncensored", "jackrong-qwopus"]
 # validated categorical slots (light / dark) — see dataviz references/palette.md
@@ -32,6 +36,48 @@ def load_jsonl(p):
 def mean(xs):
     xs = [x for x in xs if isinstance(x, (int, float))]
     return st.mean(xs) if xs else None
+
+
+def roots(D):
+    """Read roots for D: itself first (flat legacy run dir), then the split campaign roots
+    (results/ = graded rows, tmp/ = raw)."""
+    return (D, os.path.join(D, "results"), os.path.join(D, "tmp"))
+
+
+def rd(D, name):
+    """Rows of `name` under any of its roots (missing -> [])."""
+    for root in roots(D):
+        p = os.path.join(root, name)
+        if os.path.exists(p):
+            return load_jsonl(p)
+    return []
+
+
+def write_gpu_peaks(D):
+    """MEASURED peak VRAM/GTT (MiB) per config label from the tmp/gpu_<label>.csv sample files
+    (iron rule 7: a reported memory number is a MEASURED sample, never a calculation) ->
+    results/gpu_peaks.json. Reuses bench/core/report.py's gpu_peaks (same CSV columns, per-CSV max)
+    instead of re-implementing the sampling; the CSV paths are relative to the campaign dir."""
+    results, tmp = os.path.join(D, "results"), os.path.join(D, "tmp")
+    if not (os.path.isdir(results) and os.path.isdir(tmp)):
+        return                                          # not a split campaign dir -> nothing to write
+    sys.path.insert(0, os.path.join(HERE, "..", "core"))
+    from report import gpu_peaks
+    peaks = gpu_peaks(D)
+    if not peaks:
+        return
+    for p in peaks:
+        m = re.search(r"gpu_(.+)\.csv$", p["csv"])
+        if m:
+            p["label"] = m.group(1)
+    ppath = os.path.join(results, "gpu_peaks.json")
+    with open(ppath, "w") as f:
+        json.dump({"generated_by": "bench/quality/make_charts.py",
+                   "provenance": "MEASURED: max over the samples of each GPU sample CSV "
+                                 "(stack/gpu/vram_sampler.py); csv paths relative to the campaign dir",
+                   "runs": peaks}, f, indent=1)
+        f.write("\n")
+    print(f"[gpu] wrote {len(peaks)} measured peak rows -> {ppath}")
 
 
 # ---------- SVG toolkit ----------
@@ -389,24 +435,52 @@ def slot_of(cfg, order):
 
 
 def main():
-    HERE = os.path.dirname(os.path.abspath(__file__))
     ap = argparse.ArgumentParser()
-    ap.add_argument("--dir", default=os.path.join(HERE, "out"), help="dir with the Phase-A/B jsonl outputs")
-    ap.add_argument("--charts", default=os.path.join(HERE, "charts"),
-                    help="output dir for SVGs+appendix (default: campaign/charts, next to analysis.md)")
+    ap.add_argument("--campaign", default=os.environ.get("CAMPAIGN_DIR"),
+                    help="campaign dir (default: $CAMPAIGN_DIR): reads tmp/ + results/ per the split "
+                         "layout; writes SVGs to <dir>/results/charts/ + <dir>/results/appendix.md "
+                         "(links relative to the appendix) + <dir>/results/gpu_peaks.json")
+    ap.add_argument("--dir", default=None,
+                    help="dir with the Phase-A/B jsonl outputs (wins over --campaign; reads also search "
+                         "its results/ + tmp/ subdirs)")
+    ap.add_argument("--charts", default=None,
+                    help="output dir for SVGs (wins over the default; default with --campaign: "
+                         "<dir>/results/charts). Without --campaign this is required — the appendix "
+                         "then stays in the charts dir (previous behaviour)")
     ap.add_argument("--order", default="",
                     help="comma-separated config order (palette + row order); overrides CANON for this campaign")
     ap.add_argument("--calibration", default="",
                     help="path to calibration jsonl ({tier|model, score, hard_pass}); drawn as reference "
-                         "bands (haiku/sonnet/opus) on the quality charts")
+                         "bands (haiku/sonnet/opus) on the quality charts. Default with --campaign: "
+                         "inputs/calibration.jsonl + inputs/calibration-hard.jsonl (missing ones skipped)")
     a = ap.parse_args()
-    D = a.dir
-    outs = [r for r in load_jsonl(f"{D}/outputs.jsonl") if "error" not in r]
-    vram = load_jsonl(f"{D}/vram.jsonl")
-    dets = load_jsonl(f"{D}/scores_deterministic.jsonl")
-    tss = load_jsonl(f"{D}/scores_typescript.jsonl")     # multi-objective TS grader (quality-at-depth)
-    judg = load_jsonl(f"{D}/judge_scores.jsonl")
-    cdir = a.charts; cbase = os.path.basename(cdir.rstrip("/")); os.makedirs(cdir, exist_ok=True)
+    D = a.dir or a.campaign
+    if not D:
+        sys.exit("make_charts: pass --dir or --campaign (or set CAMPAIGN_DIR)")
+    outs = [r for r in rd(D, "outputs.jsonl") if "error" not in r]
+    vram = rd(D, "vram.jsonl")
+    dets = rd(D, "scores_deterministic.jsonl")
+    tss = rd(D, "scores_typescript.jsonl")     # multi-objective TS grader (quality-at-depth)
+    judg = rd(D, "judge_scores.jsonl")
+    # With --campaign everything goes to results/: SVGs in results/charts/, the appendix at
+    # results/appendix.md, its links relative to the appendix file (charts/<fn>.svg — the
+    # bench/core/report.py convention). An explicit --charts WITHOUT --campaign keeps the old
+    # behaviour: appendix inside the charts dir, links = the charts dir's basename.
+    if a.charts:
+        cdir = a.charts
+    elif a.campaign:
+        cdir = os.path.join(D, "results", "charts")
+    else:
+        sys.exit("make_charts: --charts required without --campaign (or set CAMPAIGN_DIR)")
+    if a.campaign:
+        ap_path = os.path.join(D, "results", "appendix.md")
+        cbase = os.path.relpath(cdir, os.path.dirname(ap_path))
+    else:
+        ap_path = os.path.join(cdir, "appendix.md")
+        cbase = os.path.basename(cdir.rstrip("/"))
+    os.makedirs(cdir, exist_ok=True)
+    os.makedirs(os.path.dirname(ap_path) or ".", exist_ok=True)
+    write_gpu_peaks(D)
 
     seed = [c.strip() for c in a.order.split(",") if c.strip()] or CANON
     configs = [c for c in seed if any(r.get("config") == c for r in outs)]
@@ -461,6 +535,10 @@ def main():
 
     # --- capability reference bands from calibration (haiku floor / sonnet / opus ceiling) ---
     calib_files = [p.strip() for p in a.calibration.split(",") if p.strip()]
+    if not calib_files and a.campaign:            # fixtures live in <campaign>/inputs/
+        calib_files = [p for p in (os.path.join(a.campaign, "inputs", "calibration.jsonl"),
+                                   os.path.join(a.campaign, "inputs", "calibration-hard.jsonl"))
+                       if os.path.exists(p)]
     calib = [r for p in calib_files for r in load_jsonl(p)]
     run_tasks = {t.get("task_id") for t in tss}         # compare bands over the SAME tasks the run scored
     # Reference points may carry MULTIPLE reps (rows sharing model+task). Mean per (model, task) FIRST,
@@ -635,8 +713,11 @@ def main():
         "ts_hardpass": ("Hard-pass rate", "%", "{:.0f}", tshard),
     }
     sweeps = []
-    if os.path.exists(f"{D}/sweeps.json"):                  # whole-file JSON array (not JSONL)
-        sweeps = json.load(open(f"{D}/sweeps.json"))
+    for _root in roots(D):                                  # whole-file JSON array (not JSONL)
+        _sp = os.path.join(_root, "sweeps.json")
+        if os.path.exists(_sp):
+            sweeps = json.load(open(_sp))
+            break
     sweep_appendix = []
     for si, sw in enumerate(sweeps):
         panels = []
@@ -727,8 +808,9 @@ def main():
             ranked = sorted(by_task.items(), key=lambda kv: mean(kv[1]) or 0)
             ap_lines.append("\n**Judge mean by task** (weakest first): " +
                             " · ".join(f"`{t}` {mean(v):.1f}" for t, v in ranked))
-    open(f"{cdir}/appendix.md", "w").write("\n".join(ap_lines) + "\n")
-    print(f"wrote {len(files)} charts + appendix.md -> {cdir}/")
+    with open(ap_path, "w") as fh:
+        fh.write("\n".join(ap_lines) + "\n")
+    print(f"wrote {len(files)} charts -> {cdir}/  + appendix -> {ap_path}")
     for n in files:
         print(f"  {n}")
 

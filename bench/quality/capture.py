@@ -15,10 +15,13 @@ Captures everything measurable per config×task×rep:
 
 Streaming SSE, so TTFT/TTFA are true measurements. Stdlib only (urllib).
 
-    python3 capture.py --config rico03-distilled --tasks tasks/tasks.jsonl --out OUT/outputs.jsonl \
+    python3 capture.py --campaign campaigns/quality/<stamp>-<slug> --config <label> \
         --base-url http://127.0.0.1:8081 --reps 1 --max-tokens 8192
+    # --campaign (or $CAMPAIGN_DIR): --tasks defaults to <dir>/inputs/tasks.jsonl, --out to
+    # <dir>/tmp/outputs.jsonl; explicit flags win. (The per-cell prompt file the driver built,
+    # <dir>/tmp/tasks-<depth>.jsonl, is passed explicitly as --tasks.)
 """
-import argparse, json, os, time, urllib.request, re
+import argparse, json, os, sys, time, urllib.request, re
 
 THINK_RE = re.compile(r"<think>(.*?)</think>", re.S)
 
@@ -115,9 +118,12 @@ def stream_chat(base, payload, timeout=600):
 
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("--campaign", default=os.environ.get("CAMPAIGN_DIR"),
+                    help="campaign dir (default: $CAMPAIGN_DIR): --tasks defaults to <dir>/inputs/"
+                         "tasks.jsonl, --out to <dir>/tmp/outputs.jsonl; explicit flags win")
     ap.add_argument("--config", required=True, help="config label, e.g. rico03-distilled / unsloth-mtp-on")
-    ap.add_argument("--tasks", required=True)
-    ap.add_argument("--out", required=True)
+    ap.add_argument("--tasks", default=None)
+    ap.add_argument("--out", default=None)
     ap.add_argument("--base-url", default="http://127.0.0.1:8081")
     ap.add_argument("--reps", type=int, default=1)
     ap.add_argument("--max-tokens", type=int, default=8192,
@@ -135,6 +141,17 @@ def main():
                     help="only sent when set — pin to 0 for Qwen3.6 thinking; omit to keep server default")
     ap.add_argument("--seed", type=int, default=42)        # fixed for reproducibility
     a = ap.parse_args()
+
+    # --campaign (or $CAMPAIGN_DIR) supplies the split-layout defaults; an explicit flag always wins.
+    if not a.tasks:
+        if not a.campaign:
+            sys.exit("capture: --tasks required (or --campaign / $CAMPAIGN_DIR)")
+        a.tasks = os.path.join(a.campaign, "inputs", "tasks.jsonl")
+    if not a.out:
+        if not a.campaign:
+            sys.exit("capture: --out required (or --campaign / $CAMPAIGN_DIR)")
+        a.out = os.path.join(a.campaign, "tmp", "outputs.jsonl")
+    os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True)
 
     tasks = [json.loads(l) for l in open(a.tasks) if l.strip()]
     base = a.base_url.rstrip("/")

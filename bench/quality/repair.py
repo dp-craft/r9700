@@ -8,13 +8,14 @@ errors back to the SAME live server for ONE repair turn, and re-grade. If it clo
 
 Runs against a LIVE llama-server (the cell's own server, so same model+reasoning-budget). Idempotent:
 (config,task,rep) rows already in --out are skipped. Grade the result with:
-    python3 score_typescript.py batch --outputs out/outputs_repair.jsonl --tasks tasks.jsonl \
-        --out out/scores_repair.jsonl
+    python3 score_typescript.py batch --campaign <dir> --outputs <dir>/tmp/outputs_repair.jsonl \
+        --out <dir>/results/scores_repair.jsonl
 
     # while the server for a cell is up (see run_capture.sh REPAIR=1 hook):
-    python3 repair.py --config un-d128-f16-rb2048 --base-url http://127.0.0.1:8081 \
-        --outputs out/outputs.jsonl --scores out/scores_typescript.jsonl --out out/outputs_repair.jsonl \
-        --temp 0.6 --top-p 0.95 --top-k 20 --min-p 0 --max-tokens 8192
+    python3 repair.py --campaign campaigns/quality/<stamp>-<slug> --config un-d128-f16-rb2048 \
+        --base-url http://127.0.0.1:8081 --temp 0.6 --top-p 0.95 --top-k 20 --min-p 0 --max-tokens 8192
+    # with --campaign (or $CAMPAIGN_DIR): --defaults to <dir>/tmp/outputs.jsonl, --scores to
+    # <dir>/results/scores_typescript.jsonl, --out to <dir>/tmp/outputs_repair.jsonl; explicit flags win.
 """
 import argparse, json, os, sys, urllib.request
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -43,15 +44,27 @@ def chat(base_url, msgs, sampling):
 
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("--campaign", default=os.environ.get("CAMPAIGN_DIR"),
+                    help="campaign dir (default: $CAMPAIGN_DIR): --outputs defaults to <dir>/tmp/"
+                         "outputs.jsonl, --scores to <dir>/results/scores_typescript.jsonl, --out to "
+                         "<dir>/tmp/outputs_repair.jsonl; explicit flags win")
     ap.add_argument("--config", required=True)
     ap.add_argument("--base-url", required=True)
-    ap.add_argument("--outputs", default=f"{HERE}/out/outputs.jsonl")
-    ap.add_argument("--scores", default=f"{HERE}/out/scores_typescript.jsonl")
-    ap.add_argument("--out", default=f"{HERE}/out/outputs_repair.jsonl")
+    ap.add_argument("--outputs", default=None)
+    ap.add_argument("--scores", default=None)
+    ap.add_argument("--out", default=None)
     ap.add_argument("--temp", type=float, default=0.6); ap.add_argument("--top-p", type=float, default=0.95)
     ap.add_argument("--top-k", type=int, default=20); ap.add_argument("--min-p", type=float, default=0.0)
     ap.add_argument("--max-tokens", type=int, default=8192)
     a = ap.parse_args()
+    # --campaign (or $CAMPAIGN_DIR) supplies the split-layout defaults; an explicit flag always wins.
+    for flag, rel in (("outputs", ("tmp", "outputs.jsonl")),
+                       ("scores", ("results", "scores_typescript.jsonl")),
+                       ("out", ("tmp", "outputs_repair.jsonl"))):
+        if not getattr(a, flag):
+            if not a.campaign:
+                sys.exit(f"repair: --{flag} required (or --campaign / $CAMPAIGN_DIR)")
+            setattr(a, flag, os.path.join(a.campaign, *rel))
     sampling = {"temperature": a.temp, "top_p": a.top_p, "top_k": a.top_k, "min_p": a.min_p, "max_tokens": a.max_tokens}
 
     outs = {(r["config"], r["task_id"], r.get("rep", 0)): r for r in jl(a.outputs) if r.get("config") == a.config}

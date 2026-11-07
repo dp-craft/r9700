@@ -13,7 +13,10 @@ reuse(per-task reuse.json) bdd(test naming) novj(no jest). Deps auto-install on 
 
   python3 score_typescript.py fixture  --dir ts-harness/fixtures/count-words-good --task ts-harness/tasks/count-words
   python3 score_typescript.py response --response-file reply.txt --task ts-harness/tasks/lru-cache --id un-rb2048
-  python3 score_typescript.py batch    --outputs out/outputs.jsonl --tasks tasks.jsonl --out out/scores_typescript.jsonl
+  python3 score_typescript.py batch    --campaign campaigns/quality/<stamp>-<slug>
+  # --campaign (or $CAMPAIGN_DIR): batch reads tmp/outputs.jsonl + inputs/tasks.jsonl, writes
+  # results/scores_typescript.jsonl; explicit --outputs/--tasks/--out win. A relative --task
+  # (fixture/response) resolves against bench/quality/ (this file's dir), not the cwd.
   python3 score_typescript.py selftest
 """
 import argparse, glob, json, os, re, shutil, subprocess, sys
@@ -264,6 +267,7 @@ def grade_batch(outputs_path, tasks_path, out_path, resume=False):
                 continue
             done[(r.get("config"), r.get("task_id"), r.get("rep", 0))] = r
     rows, n_err, n_skip = [], 0, 0
+    os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
     with open(out_path, "w") as fout:
         for l in open(outputs_path):
             if not l.strip():
@@ -307,12 +311,24 @@ def grade_batch(outputs_path, tasks_path, out_path, resume=False):
     return rows
 
 
+def _task_dir(t):
+    """ts-harness task dirs resolve against bench/quality/ (this file's dir), not the cwd."""
+    return t if os.path.isabs(t) else os.path.join(HERE, t)
+
+
 def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
     f = sub.add_parser("fixture"); f.add_argument("--dir", required=True); f.add_argument("--task", required=True)
     r = sub.add_parser("response"); r.add_argument("--response-file", required=True); r.add_argument("--task", required=True); r.add_argument("--id", default="case")
-    b = sub.add_parser("batch"); b.add_argument("--outputs", required=True); b.add_argument("--tasks", required=True); b.add_argument("--out", required=True)
+    b = sub.add_parser("batch")
+    b.add_argument("--campaign", default=os.environ.get("CAMPAIGN_DIR"),
+                   help="campaign dir (default: $CAMPAIGN_DIR): --outputs defaults to <dir>/tmp/"
+                        "outputs.jsonl, --tasks to <dir>/inputs/tasks.jsonl, --out to <dir>/results/"
+                        "scores_typescript.jsonl; explicit flags win")
+    b.add_argument("--outputs", default=None)
+    b.add_argument("--tasks", default=None)
+    b.add_argument("--out", default=None)
     b.add_argument("--resume", action="store_true",
                    help="reuse rows already in --out (skip re-running tsc/eslint/vitest on them); "
                         "grade_error rows are always retried")
@@ -322,13 +338,20 @@ def main():
     if a.cmd == "fixture":
         impl = open(os.path.join(a.dir, "impl.ts")).read()
         test = open(os.path.join(a.dir, "impl.test.ts")).read()
-        print(json.dumps(grade(impl, test, a.task, os.path.basename(a.dir)), indent=2))
+        print(json.dumps(grade(impl, test, _task_dir(a.task), os.path.basename(a.dir)), indent=2))
     elif a.cmd == "response":
         files = extract_files(open(a.response_file).read())
         if not files:
             sys.exit("no `// FILE:` blocks or ```ts fences found in response")
-        print(json.dumps(grade_files(files, a.task, a.id), indent=2))
+        print(json.dumps(grade_files(files, _task_dir(a.task), a.id), indent=2))
     elif a.cmd == "batch":
+        # --campaign (or $CAMPAIGN_DIR) supplies the split-layout defaults; an explicit flag always wins.
+        for flag, rel in (("outputs", ("tmp", "outputs.jsonl")), ("tasks", ("inputs", "tasks.jsonl")),
+                           ("out", ("results", "scores_typescript.jsonl"))):
+            if not getattr(a, flag):
+                if not a.campaign:
+                    sys.exit(f"score_typescript batch: --{flag} required (or --campaign / $CAMPAIGN_DIR)")
+                setattr(a, flag, os.path.join(a.campaign, *rel))
         grade_batch(a.outputs, a.tasks, a.out, resume=a.resume)
     elif a.cmd == "selftest":
         task = os.path.join(HARNESS, "tasks", "count-words")

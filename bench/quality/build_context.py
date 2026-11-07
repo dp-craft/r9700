@@ -3,8 +3,9 @@
 including the planted reuse-target util] + [rules] + [task spec]. The reuse-target lib/*.ts files are
 always appended at the END of the context (deepest position → hardest retrieval / lost-in-the-middle).
 
-  python3 build_context.py --task ts-harness/tasks/lru-cache --tokens 64000 --out out/prompt-lru-64k.txt
+  python3 build_context.py --task ts-harness/tasks/lru-cache --tokens 64000 --out <campaign>/tmp/prompt-lru-64k.txt
   python3 build_context.py --task ts-harness/tasks/count-words --tokens 0            # no filler (logic-only)
+A relative --task resolves against bench/quality/ (this file's dir), not the cwd.
 """
 import argparse, os, glob, sys
 
@@ -80,7 +81,9 @@ def main():
     ap.add_argument("--tokens", type=int, default=0)
     ap.add_argument("--out", default="")
     a = ap.parse_args()
-    prompt = build(a.task, a.tokens)
+    # ts-harness task dirs resolve against bench/quality/ (this file's dir), not the cwd.
+    task_dir = a.task if os.path.isabs(a.task) else os.path.join(HERE, a.task)
+    prompt = build(task_dir, a.tokens)
     if a.out:
         os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True)
         open(a.out, "w").write(prompt)

@@ -7,12 +7,14 @@ cannot see which config produced it (a name like "uncensored" or "opus" must not
 The id→(config, task_id, rep) mapping is written to a side file; `apply_judge_scores.py` uses it to
 fold the judge's scores back in. Thinking is stripped — the judge grades the answer, not the trace.
 
-    python3 prepare_judge.py --outputs out/outputs.jsonl --tasks tasks/tasks.jsonl \
-        --out out/judge_bundle.md            # + writes out/judge_map.json alongside
+    python3 prepare_judge.py --campaign campaigns/quality/<stamp>-<slug>
+    # --campaign (or $CAMPAIGN_DIR): --outputs defaults to <dir>/tmp/outputs.jsonl, --tasks to
+    # <dir>/inputs/tasks.jsonl, --out to <dir>/tmp/judge_bundle.md (+ <dir>/tmp/judge_map.json
+    # alongside); explicit flags win.
 
 Stdlib only.
 """
-import argparse, json, os, random, re
+import argparse, json, os, random, re, sys
 
 THINK_RE = re.compile(r"<think>.*?</think>", re.S)
 
@@ -23,12 +25,24 @@ def strip_think(t):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--outputs", required=True)
-    ap.add_argument("--tasks", required=True)
-    ap.add_argument("--out", required=True, help="judge_bundle.md to write")
+    ap.add_argument("--campaign", default=os.environ.get("CAMPAIGN_DIR"),
+                    help="campaign dir (default: $CAMPAIGN_DIR): --outputs defaults to <dir>/tmp/"
+                         "outputs.jsonl, --tasks to <dir>/inputs/tasks.jsonl, --out to <dir>/tmp/"
+                         "judge_bundle.md; explicit flags win")
+    ap.add_argument("--outputs", default=None)
+    ap.add_argument("--tasks", default=None)
+    ap.add_argument("--out", default=None, help="judge_bundle.md to write")
     ap.add_argument("--map", help="id→config map json (default: judge_map.json next to --out)")
     ap.add_argument("--seed", type=int, default=42, help="shuffle seed (reproducible blinding)")
     a = ap.parse_args()
+
+    # --campaign (or $CAMPAIGN_DIR) supplies the split-layout defaults; an explicit flag always wins.
+    for flag, rel in (("outputs", ("tmp", "outputs.jsonl")), ("tasks", ("inputs", "tasks.jsonl")),
+                       ("out", ("tmp", "judge_bundle.md"))):
+        if not getattr(a, flag):
+            if not a.campaign:
+                sys.exit(f"prepare_judge: --{flag} required (or --campaign / $CAMPAIGN_DIR)")
+            setattr(a, flag, os.path.join(a.campaign, *rel))
 
     tasks = {}
     for l in open(a.tasks, encoding="utf-8"):

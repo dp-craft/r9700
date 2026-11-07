@@ -9,14 +9,16 @@ task-resolved views the detailed write-up needs. Input: out/summary_by_task.json
 `aggregate.py --by-task --scores <corrected grade>`) + out/summary.json + the orig/corrected grade
 files. Output: charts/detailed/*.svg + charts/detailed/appendix.md.
 
-    python3 make_charts_detailed.py --dir out --charts charts/detailed \
+    python3 make_charts_detailed.py --campaign campaigns/quality/<stamp>-<slug>
+    # reads <dir>/results/summary_by_task.json (+ <dir>/configs.jsonl), writes
+    # <dir>/results/charts/detailed/*.svg + <dir>/results/appendix-detailed.md
+    python3 make_charts_detailed.py --dir <flat-run-dir> --charts <dir> \
         --scores scores_typescript_regraded.jsonl --orig scores_typescript.orig.jsonl
 """
-import argparse, importlib.util, json, os, statistics as st
+import argparse, importlib.util, json, os, statistics as st, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-REPO = os.path.abspath(os.path.join(HERE, "..", ".."))
-MC_PATH = os.path.join(REPO, "campaigns", "2026-07-12-27b-finetune-quality", "make_charts.py")
+MC_PATH = os.path.join(HERE, "make_charts.py")     # the shared SVG toolkit now lives next to us
 _spec = importlib.util.spec_from_file_location("make_charts_shared", MC_PATH)
 mc = importlib.util.module_from_spec(_spec); _spec.loader.exec_module(mc)   # shared SVG toolkit
 import aggregate as agg                                                     # per-task aggregation
@@ -117,16 +119,47 @@ def scatter_panels(title, panels, w=760, sub=""):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--dir", default=os.path.join(HERE, "out"))
-    ap.add_argument("--charts", default=os.path.join(HERE, "charts", "detailed"))
+    ap.add_argument("--campaign", default=os.environ.get("CAMPAIGN_DIR"),
+                    help="campaign dir (default: $CAMPAIGN_DIR): reads <dir>/results/summary_by_task.json "
+                         "+ <dir>/configs.jsonl; writes SVGs to <dir>/results/charts/detailed/ and the "
+                         "appendix to <dir>/results/appendix-detailed.md (links relative to it: "
+                         "charts/detailed/<fn>.svg)")
+    ap.add_argument("--dir", default=None,
+                    help="run dir with summary_by_task.json (wins over --campaign; reads also search "
+                         "its results/ + tmp/ subdirs)")
+    ap.add_argument("--charts", default=None,
+                    help="output dir for SVGs (wins over the default; default with --campaign: "
+                         "<dir>/results/charts/detailed). Without --campaign this is required — the "
+                         "appendix then stays in the charts dir (previous behaviour)")
     ap.add_argument("--scores", default="scores_typescript_regraded.jsonl")
     ap.add_argument("--orig", default="scores_typescript.orig.jsonl")
     a = ap.parse_args()
-    D, cdir = a.dir, a.charts
+    D = a.dir or a.campaign
+    if not D:
+        sys.exit("make_charts_detailed: pass --dir or --campaign (or set CAMPAIGN_DIR)")
+    if a.charts:
+        cdir = a.charts
+    elif a.campaign:
+        cdir = os.path.join(D, "results", "charts", "detailed")
+    else:
+        sys.exit("make_charts_detailed: --charts required without --campaign (or set CAMPAIGN_DIR)")
+    # --campaign: appendix at results/appendix-detailed.md, links relative to it (charts/detailed/…);
+    # an explicit --charts without --campaign keeps the old behaviour (appendix inside the charts dir).
+    if a.campaign:
+        ap_path = os.path.join(D, "results", "appendix-detailed.md")
+        cbase = os.path.relpath(cdir, os.path.dirname(ap_path))
+    else:
+        ap_path = os.path.join(cdir, "appendix.md")
+        cbase = "/".join(cdir.rstrip("/").split("/")[-2:])
     os.makedirs(cdir, exist_ok=True)
-    cbase = "/".join(cdir.rstrip("/").split("/")[-2:])   # e.g. "charts/detailed" for markdown links
+    os.makedirs(os.path.dirname(ap_path) or ".", exist_ok=True)
+    mc.write_gpu_peaks(D)
 
-    by = json.load(open(f"{D}/summary_by_task.json"))["by_task"]
+    by_path = next((p for root in mc.roots(D) for p in (os.path.join(root, "summary_by_task.json"),)
+                    if os.path.exists(p)), None)
+    if not by_path:
+        sys.exit(f"make_charts_detailed: no summary_by_task.json under {D} (run aggregate.py --by-task first)")
+    by = json.load(open(by_path))["by_task"]
     tasks = order_tasks(by)
     files = {}
 
@@ -174,7 +207,12 @@ def main():
         [(t, " tok", "{:.0f}", quant_rows(t, "out_tok")) for t in tasks])
 
     # D4 — efficiency frontier: quality vs generation time, per task (color = quant/model)
-    CFGS = [l for l in agg.jl(f"{D}/../configs.jsonl") if not l.get("optin")]
+    # configs.jsonl is the campaign recipe: at the campaign root for a split campaign, or next to a
+    # flat legacy run dir (the old out/-dir's sibling).
+    cfg_path = os.path.join(D, "configs.jsonl")
+    if not os.path.exists(cfg_path):
+        cfg_path = os.path.join(D, "..", "configs.jsonl")
+    CFGS = [l for l in agg.jl(cfg_path) if not l.get("optin")]
     max_tok = max((c.get("out_tok") or 0) for t in tasks for c in by[t]["cells"].values()) or 1
     sp = []
     for t in tasks:
@@ -242,8 +280,9 @@ def main():
     for fn, ti in titles:
         if fn in files:
             ap_lines.append(f"\n**{ti}**\n\n![{ti}]({cbase}/{fn})\n")
-    open(f"{cdir}/appendix.md", "w").write("\n".join(ap_lines) + "\n")
-    print(f"wrote {len(files)} detailed charts + appendix.md -> {cdir}/")
+    with open(ap_path, "w") as fh:
+        fh.write("\n".join(ap_lines) + "\n")
+    print(f"wrote {len(files)} detailed charts -> {cdir}/  + appendix -> {ap_path}")
     for n in files:
         print(" ", n)
 

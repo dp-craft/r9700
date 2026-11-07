@@ -20,11 +20,15 @@ Human-readable rubric + run modes: JUDGE.md (kept in sync with this file). Saves
 already in --out are skipped; subagents also skip candidates whose verdict file already exists.
 
   # Claude via tmux (local box, 27B is the best local model) — needs a tmux session (see claude_ask.sh):
-  python3 judge.py --engine claude-tmux --outputs out/outputs.jsonl --tasks tasks.jsonl \
-      --model opus --subagent-model opus --out out/judge_scores.jsonl --raw out/judge_raw.jsonl
+  python3 judge.py --campaign campaigns/quality/<stamp>-<slug> --engine claude-tmux \
+      --model opus --subagent-model opus
+  # with --campaign (or $CAMPAIGN_DIR): --outputs defaults to <dir>/tmp/outputs.jsonl, --tasks to
+  # <dir>/inputs/tasks.jsonl, --out to <dir>/results/judge_scores.jsonl, --raw to <dir>/tmp/
+  # judge_raw.jsonl; the .judge-io work dir is <dir>/tmp/.judge-io. Explicit flags win.
   # or a hosted OpenAI-compatible endpoint:
   JUDGE_API_KEY=... python3 judge.py --engine http --base-url https://api.example/v1 --model my-judge \
-      --outputs out/outputs.jsonl --tasks tasks.jsonl --out out/judge_scores.jsonl --raw out/judge_raw.jsonl
+      --outputs <dir>/tmp/outputs.jsonl --tasks <dir>/inputs/tasks.jsonl \
+      --out <dir>/results/judge_scores.jsonl --raw <dir>/tmp/judge_raw.jsonl
 """
 import argparse, json, os, re, subprocess, sys, urllib.request
 
@@ -36,7 +40,10 @@ from score_typescript import extract_files            # reuse the exact same cod
 # trusted) repo avoids the folder-trust dialog and makes RESULT an in-workspace edit that acceptEdits
 # auto-approves. Blindness is preserved regardless: the candidate's model/config never appears in the
 # prompt — the repo CLAUDE.md that loads carries no clue about which cell produced the code.
-JUDGE_IO = os.path.join(HERE, "out", ".judge-io")
+# The work dir is per-campaign RAW state: <campaign>/tmp/.judge-io (resumable subagent verdicts).
+def judge_io_dir(camp):
+    """The campaign's .judge-io work dir (<dir>/tmp/.judge-io), or None without a campaign."""
+    return os.path.abspath(os.path.join(camp, "tmp", ".judge-io")) if camp else None   # absolute: the tmux claude runs elsewhere
 
 THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
 AXES = ["design", "clarity", "robustness"]
@@ -85,23 +92,23 @@ def call_http(base, model, key, prompt, timeout=300):
 ORCH = """You are orchestrating a BLIND TypeScript code-review judging pass. Do NOT review any code
 yourself — your ONLY job is to fan out subagents and make sure every verdict file gets written.
 
-Paths (relative to the current directory):
-  out/.judge-io/rubric.txt        the scoring rubric (0-5 on design, clarity, robustness)
-  out/.judge-io/batches/*.jsonl   {n} batch files; each line is one candidate: {{"id":..., "spec":<path>, "code":<path>}}
-  out/.judge-io/results/          write verdicts here, one <id>.json per candidate
+Paths (absolute):
+  {io}/rubric.txt        the scoring rubric (0-5 on design, clarity, robustness)
+  {io}/batches/*.jsonl   {n} batch files; each line is one candidate: {{"id":..., "spec":<path>, "code":<path>}}
+  {io}/results/          write verdicts here, one <id>.json per candidate
 
 For EACH of the {n} batch files, launch ONE subagent with the Task tool (model "{sub}", subagent_type
 "general-purpose"), all in parallel. Instruct each subagent to do exactly this for its one batch file:
 
-  1. Read out/.judge-io/rubric.txt.
+  1. Read {io}/rubric.txt.
   2. For EVERY candidate line in its batch file:
-     - if out/.judge-io/results/<id>.json already exists and is non-empty, skip that candidate;
+     - if {io}/results/<id>.json already exists and is non-empty, skip that candidate;
      - otherwise read the candidate's `spec` file and `code` file, score it per the rubric, and write
        ONLY a JSON object {{"design":N,"clarity":N,"robustness":N,"notes":"<=1 sentence"}} to
-       out/.judge-io/results/<id>.json  (<id> is that candidate's id). Write nothing else to that file.
+       {io}/results/<id>.json  (<id> is that candidate's id). Write nothing else to that file.
   3. The review is BLIND: it sees only the spec and the code, never which model/config produced it.
 
-When all subagents have finished, verify out/.judge-io/results/ holds one <id>.json for every candidate
+When all subagents have finished, verify {io}/results/ holds one <id>.json for every candidate
 id across all batch files; re-dispatch a subagent for any that are missing. Then write a one-line
 confirmation ("judged <count> candidates") as your final answer — that is what the harness collects.
 """
@@ -131,7 +138,8 @@ def prepare_fanout(outputs_path, tiers, done, io_dir, batch_size):
             with open(os.path.join(cand, cid + ".txt"), "w") as cf:
                 cf.write("\n\n".join(f"// FILE: {p}\n{c}" for p, c in files.items()))
             items.append({"id": cid, "config": cfg, "task_id": tid, "rep": rep, "tier": tiers.get(tid, "?"),
-                          "spec": f"ts-harness/tasks/{tid}/spec.md", "code": f"out/.judge-io/candidates/{cid}.txt"})
+                          "spec": os.path.join(HERE, "ts-harness", "tasks", tid, "spec.md"),
+                          "code": os.path.join(io_dir, "candidates", cid + ".txt")})
     nb = 0
     for i in range(0, len(items), batch_size):
         with open(os.path.join(bat, f"batch-{nb:03d}.jsonl"), "w") as bf:
@@ -244,25 +252,35 @@ def judge_http(a, tiers, done):
 
 def judge_fanout(a, tiers, done):
     """One interactive claude session fans out judge subagents (one per batch); Python collects."""
-    os.makedirs(JUDGE_IO, exist_ok=True)
-    items, nb = prepare_fanout(a.outputs, tiers, done, JUDGE_IO, a.batch_size)
+    io_dir = judge_io_dir(a.campaign)
+    if not io_dir:
+        sys.exit("judge: --engine claude-tmux needs --campaign (or $CAMPAIGN_DIR) for the "
+                 "<dir>/tmp/.judge-io work dir")
+    os.makedirs(io_dir, exist_ok=True)
+    items, nb = prepare_fanout(a.outputs, tiers, done, io_dir, a.batch_size)
     if not items:
         print("judge: nothing to do (all replies already judged, or no gradable code)", file=sys.stderr)
         return
     print(f"judge: fanning out {len(items)} candidates in {nb} '{a.subagent_model}'-subagent batches "
           f"via ONE claude session (orchestrator={a.model or 'default'})", file=sys.stderr)
-    prompt = ORCH.format(n=nb, sub=a.subagent_model)
-    rc = run_claude_once(prompt, os.path.join(JUDGE_IO, "orch_result.txt"), a.model, a.timeout)
+    prompt = ORCH.format(n=nb, sub=a.subagent_model, io=io_dir)
+    orch_res = os.path.join(io_dir, "orch_result.txt")
+    rc = run_claude_once(prompt, orch_res, a.model, a.timeout)
     if rc != 0:
-        print(f"judge: claude orchestration returned {rc} (see out/.judge-io/orch_result.txt.err) — "
+        print(f"judge: claude orchestration returned {rc} (see {orch_res}.err) — "
               f"collecting whatever verdicts landed", file=sys.stderr)
-    collect_fanout(items, JUDGE_IO, a.out, a.raw)
+    collect_fanout(items, io_dir, a.out, a.raw)
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--outputs", required=True)
-    ap.add_argument("--tasks", required=True)
+    ap.add_argument("--campaign", default=os.environ.get("CAMPAIGN_DIR"),
+                    help="campaign dir (default: $CAMPAIGN_DIR): --outputs defaults to <dir>/tmp/"
+                         "outputs.jsonl, --tasks to <dir>/inputs/tasks.jsonl, --out to <dir>/results/"
+                         "judge_scores.jsonl, --raw to <dir>/tmp/judge_raw.jsonl; the .judge-io work "
+                         "dir is <dir>/tmp/.judge-io; explicit flags win")
+    ap.add_argument("--outputs", default=None)
+    ap.add_argument("--tasks", default=None)
     ap.add_argument("--engine", choices=["http", "claude-tmux"], default="http",
                     help="http = any OpenAI-compatible endpoint; claude-tmux = ONE claude session (via "
                          "the tmux gateway) that fans out judge subagents in parallel (use when 27B is the "
@@ -277,13 +295,23 @@ def main():
     ap.add_argument("--batch-size", dest="batch_size", type=int, default=8,
                     help="claude-tmux: candidates per subagent batch")
     ap.add_argument("--timeout", type=int, default=2400, help="claude-tmux: seconds for the whole fan-out")
-    ap.add_argument("--out", required=True)
+    ap.add_argument("--out", default=None)
     ap.add_argument("--raw", default="")
     ap.add_argument("--key-env", default="JUDGE_API_KEY", help="env var holding the API key (if any)")
     a = ap.parse_args()
     if a.engine == "http" and not a.base_url:
         sys.exit("--engine http needs --base-url (an OpenAI-compatible /v1). "
                  "For a local box where 27B is the best model, use --engine claude-tmux instead.")
+
+    # --campaign (or $CAMPAIGN_DIR) supplies the split-layout defaults; an explicit flag always wins.
+    for flag, rel in (("outputs", ("tmp", "outputs.jsonl")), ("tasks", ("inputs", "tasks.jsonl")),
+                       ("out", ("results", "judge_scores.jsonl"))):
+        if not getattr(a, flag):
+            if not a.campaign:
+                sys.exit(f"judge: --{flag} required (or --campaign / $CAMPAIGN_DIR)")
+            setattr(a, flag, os.path.join(a.campaign, *rel))
+    if not a.raw:                                       # raw verdict audit is raw state -> tmp/ (opt-in without a campaign)
+        a.raw = os.path.join(a.campaign, "tmp", "judge_raw.jsonl") if a.campaign else ""
 
     # matrix tasks only, and remember tiers for the score rows
     tiers = {}
