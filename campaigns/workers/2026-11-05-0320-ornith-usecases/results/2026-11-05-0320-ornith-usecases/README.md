@@ -1,6 +1,6 @@
 # Ornith use cases
 
-Report: `docs/analysis/2026-11-05-0814-ornith-use-cases.md`
+Report: `docs/findings/workers/2026-11-05-0814-ornith-use-cases.md`
 
 **Quarantine:** planted log lines and `docnotes` incidents are fiction. Fixtures are copies with those lines added. Never cite one as a real event; use the real reports.
 

@@ -1,5 +1,7 @@
 # Starter campaign v2 — baseline + optimum picture (R9700, 2026-07-11)
 
+> **Layout note (2026-11-06 restructure):** this plan ran before the restructure, and its commands are kept as run. Old → new: `bench/model-bench` → `bench/perf/model-bench`, `bench/engine-bench` → `bench/perf/engine-bench`, `bench/runs/<stamp>-…/` → this campaign's `results/<stamp>-…/` (rows) and `tmp/` (raw), `bench/.servers/` → `stack/serve/var/servers/`, `docs/analysis/` → `docs/findings/<topic>/`. Write-ups: [`2026-07-11-1833-sweep-35b-rocm-vs-vulkan.md`](../../../docs/findings/llamacpp/2026-07-11-1833-sweep-35b-rocm-vs-vulkan.md), [`2026-07-11-1844-campaign-combo35b.md`](../../../docs/findings/llamacpp/2026-07-11-1844-campaign-combo35b.md).
+
 A self-contained run plan. A fresh session executes it top to bottom without guesswork.
 ✅ = command verified in this repo · ⚠️ = one-time check on your machine.
 
@@ -70,8 +72,8 @@ mid-stream crash — known upstream issue, see `bench/perf/engine-bench/README.m
 never silently averaged.
 
 ## Phase 4 — write it up (/benchmark-results skill)
-- `docs/analysis/<stamp>-sweep-35b-rocm-vs-vulkan.md` — Phase 2: optimum + KV decision table.
-- `docs/analysis/<stamp>-campaign-combo35b.md` — Phase 3: depth curve, MTP×KV interaction,
+- `docs/findings/llamacpp/2026-07-11-1833-sweep-35b-rocm-vs-vulkan.md` — Phase 2: optimum + KV decision table.
+- `docs/findings/llamacpp/2026-07-11-1844-campaign-combo35b.md` — Phase 3: depth curve, MTP×KV interaction,
   concurrency scaling (per-stream vs aggregate), TTFT p95. Update README TL;DR with the new
   winning config (provenance: these runs).
 

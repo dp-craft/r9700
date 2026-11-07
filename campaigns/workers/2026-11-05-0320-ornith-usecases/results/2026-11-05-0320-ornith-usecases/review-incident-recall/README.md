@@ -1,7 +1,7 @@
 # Review package: Ornith misses incidents that Haiku finds
 
 Self-contained, for review in another session. All numbers `MEASURED` unless marked. Written 2026-11-06.
-Folder: `bench/runs/2026-11-05-0320-ornith-usecases/review-incident-recall/`.
+Folder: `campaigns/workers/2026-11-05-0320-ornith-usecases/results/2026-11-05-0320-ornith-usecases/review-incident-recall/`.
 
 ## The question
 
@@ -109,6 +109,6 @@ run 3 cites L66 only.
 - `briefs/`: Haiku's brief (also the old Ornith brief), Ornith V2, V5, V6, and the operator's system prompt.
 - `notes/`: one Haiku and one old Ornith buildcmp note, and the 3 passing Ornith notes.
 - Raw data: `../arms/docnotes.<report>.<brief>.P0.<variant>[-<rep>]/` (`brief.txt`, `raw.json`,
-  `output/01.txt`); the old run is in `bench/runs/2026-11-04-2207-docanalysis-ornith-vs-haiku/{S,L,X}/out-*/`.
+  `output/01.txt`); the old run is in `campaigns/workers/2026-11-04-2207-docanalysis-ornith-vs-haiku/tmp/{S,L,X}/out-*/` (raw, local only).
 - Harness: `../harness/prompt_run.py` (plans `rd`, `rr` tags = replace), `../harness/notes_briefs.py`
   (V2, V5, V6). The gate script is `gate.py` in this folder.

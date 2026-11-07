@@ -3,7 +3,7 @@
 Raw data for one agentic quality test: each local 27B runs dp-forge's 27B brief-fix RUNBOOK
 (`docs/plans/2026-10-28-2239-dpf-tui-f0-f1/review/27b-fix/RUNBOOK.md`) on the three briefs left in it,
 W2-06 · W2-07 · W2-08: A blind review → B compare with the Opus review → C fix → D progress line.
-The write-up (comparison, grading summary) lives in `docs/analysis/`; everything it cites is here.
+The write-up (comparison, grading summary) is `docs/findings/agentic/2026-10-30-1552-dpf-brief-fix-heretic-vs-redhat.md`; everything it cites is here.
 
 ## Layout
 

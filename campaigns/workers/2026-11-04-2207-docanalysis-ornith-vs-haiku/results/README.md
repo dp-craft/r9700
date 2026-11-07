@@ -1,6 +1,6 @@
 # Document analysis: local-agent Ornith vs Haiku
 
-Report: `docs/analysis/2026-11-04-2207-sly-radiance-ornith-vs-haiku-high-effort.md`
+Report: `docs/findings/workers/2026-11-04-2207-sly-radiance-ornith-vs-haiku-high-effort.md`
 
 **Quarantine:** the notes here were written from fixture copies with planted fictional incidents. `key.json` and
 `harness/prepare.py` list them. Never cite an incident from these notes as a real event; use the real reports.

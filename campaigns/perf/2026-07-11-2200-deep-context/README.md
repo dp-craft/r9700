@@ -1,5 +1,7 @@
 # Deep-context campaign — max depth + parallel at the ceiling (R9700, 2026-07-11)
 
+> **Layout note (2026-11-06 restructure):** this plan ran before the restructure, and its commands are kept as run. Old → new: `bench/model-bench` → `bench/perf/model-bench`, `bench/engine-bench` → `bench/perf/engine-bench`, `bench/runs/<stamp>-…/` → this campaign's `results/<stamp>-…/` (rows) and `tmp/` (raw), `bench/.servers/` → `stack/serve/var/servers/`, `docs/analysis/` → `docs/findings/<topic>/`. Write-up: [`2026-07-11-2200-deep-context-35b.md`](../../../docs/findings/llamacpp/2026-07-11-2200-deep-context-35b.md).
+
 A self-contained run plan. Built from the conventions in `docs/guides/GUIDE.md`.
 ✅ = command uses verified repo tooling · ⚠️ = watch point.
 
@@ -101,7 +103,7 @@ Each `run.sh` writes `bench/runs/<stamp>-engine-deep-*/results.jsonl` (+ per-eng
 copied prompts). Server cmdline/props/log live under `bench/.servers/8081.*` per launch.
 
 ## Phase 5 — write it up (/benchmark-results skill)
-`docs/analysis/<stamp>-deep-context-35b.md` — depth curve to 200K (prefill+decode collapse),
+`docs/findings/llamacpp/2026-07-11-2200-deep-context-35b.md` — depth curve to 200K (prefill+decode collapse),
 MTP on/off at depth, q8_0-vs-f16 confirmatory row, parallel decode/stream + aggregate + TTFT p95
 at np 2/4. Update the README TL;DR max-context line (provenance: these runs).
 
