@@ -64,7 +64,7 @@ without polluting the generic rules.
    tag, a kernel, a container's userspace) rather than a property of the hardware or the tools.
 2. Record the date, issue, solution, **exact environment (tools + versions)**, and **why it's
    historical** (what stopped needing it).
-3. Keep the full MEASURED evidence in the dated `docs/analysis/` report; this doc **links** to it
+3. Keep the full MEASURED evidence in the dated `docs/findings/` report; this doc **links** to it
    (iron rule 1) rather than restating it.
 4. When a CLAUDE.md "rule" is actually a candidate for here, remove it from CLAUDE.md and add the
    entry here — CLAUDE.md keeps only generic rules.

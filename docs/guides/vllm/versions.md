@@ -36,7 +36,7 @@ that actually ran.
   reasoning adds 0 prompt tokens, the newest turn's adds 1,169). Fade/cap/template behaviour and the loop and speed
   gains are CLAIMED (Sly v1.9.0/v1.9.1 release notes). Depth probe (MEASURED, 2026-10-30 19:32-19:59, ctx 110000,
   fp8 KV, 1 stream, 256 tok, 2 reps): `docs/findings/radiance/2026-10-30-0900-vllm-redhat-mxfp4-depth-transposed.md` § "Sly 1.9.1
-  rerun" (run dirs `bench/runs/2026-10-30-vllm-redhat-sly191{,-mtp,-dflash}-depth/`). Real session (loops reduced, not
+  rerun" (campaigns `campaigns/perf/2026-10-30-1932-vllm-redhat-sly191-depth/`, `…-1941-…-mtp-depth/`, `…-1951-…-dflash-depth/`). Real session (loops reduced, not
   removed): `docs/findings/agentic/2026-10-30-1552-dpf-brief-fix-heretic-vs-redhat.md`. Previous RedHat image 1.8.1: profile comment
   `profiles/sly-redhat/_engine.env` (rollback) and `docs/findings/radiance/2026-10-30-0900-vllm-redhat-mxfp4-depth-transposed.md`.
 - **`.rad` native** (row 4): the `.rad`-vs-HF-checkpoint loading distinction is documented in
@@ -51,5 +51,5 @@ that actually ran.
 
 1. A new campaign lands via `/benchmark-results` → add a row (engine, image tag, vLLM ver, radiance
    ver, ROCm, model/format, kernel behavior, VRAM, status).
-2. Tag the VRAM `MEASURED` and cite the campaign `analysis.md` (iron rule 1) — **no row without a citation**.
+2. Tag the VRAM `MEASURED` and cite the campaign's finding in `docs/findings/` (iron rule 1) — **no row without a citation**.
 3. If a version is ambiguous (image report vs PR), flag it open rather than assert (see the 0.31/0.32 row).

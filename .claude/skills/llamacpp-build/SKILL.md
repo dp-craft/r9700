@@ -3,7 +3,7 @@ name: llamacpp-build
 description: Build a new llama.cpp for the R9700 — fetch the newest upstream release tag (or a given bNNNNN) into stack/llamacpp/var/builds/<ver>-src, compile stack/llamacpp/var/builds/<ver>-vulkan and stack/llamacpp/var/builds/<ver>-rocm, benchmark both against the previous build (llama-bench, Qwen3.8-27B Q4 + q8_0 KV, five request shapes pp128+tg64 … pp32768+tg2048, optionally 2 concurrent 32k requests), write the dated comparison report, and promote llamacpp/builds/latest-{vulkan,rocm} — the symlinks llama-swap serves (build/ is a compat symlink → stack/llamacpp/var/builds/). Uses self-contained Vulkan SDK managed by stack/llamacpp/setup_vulkan.sh. Use whenever the user wants to update, upgrade, rebuild or try a new llama.cpp release/tag/commit, asks whether a newer llama.cpp is faster or regressed, or wants llama-swap rolled back to an older llama.cpp build — even if they never say "skill" or "build".
 argument-hint: "[bNNNNN] [--backend vulkan|rocm|both] [--parallel 2]"
 ---
-<!-- LLM-PRIMARY: Fetch → build → benchmark-vs-previous → promote a llama.cpp build into build/latest-* (served by llama-swap). -->
+<!-- LLM-PRIMARY: Fetch → build → benchmark-vs-previous → promote a llama.cpp build into stack/llamacpp/var/builds/latest-* (served by llama-swap). -->
 
 # llamacpp-build
 
@@ -23,7 +23,7 @@ Empty → newest upstream tag, both backends. `bNNNNN` → that tag. `--backend`
    - `-j` is capped by free RAM (no swap). Printed ROCm `-j` < 4 → ask the user whether to unload llama-swap first (`curl -s http://127.0.0.1:9292/unload`).
    - Failure → show the printed log tail + `build.log` path, stop. Re-running resumes.
    - Duration (MEASURED, b10909): Vulkan 174 s at `-j10`; ROCm is the long one (hipcc TUs, RAM-capped `-j4`). A resume after a fix = relink only (seconds).
-4. **Benchmark + report** — tell the user llama-swap is stopped for the run (the tool restarts it, also on failure; opencode requests fail meanwhile), then `bench/build-check/compare_builds.py run --new bNNNNN [--backend B] [--parallel 2]` in background (prints plan + ETA first). It writes `docs/analysis/<stamp>-llamacpp-<ver>-build-check.md`, reindexes `docs/INDEX.md`, and ends with `VERDICT {...}`.
+4. **Benchmark + report** — tell the user llama-swap is stopped for the run (the tool restarts it, also on failure; opencode requests fail meanwhile), then `bench/build-check/compare_builds.py run --new bNNNNN [--backend B] [--parallel 2]` in background (prints plan + ETA first). It creates the campaign `campaigns/build-check/<stamp>-llamacpp-<ver>/` (raw arm logs → `tmp/`, `arms.json` + llama-bench JSON → `results/`, README = the exact command), writes `docs/findings/llamacpp/build-checks/<stamp>-llamacpp-<ver>-build-check.md` (with `campaign:` in its meta block), reindexes `docs/INDEX.md`, and ends with `VERDICT {...}`.
    - Measures five request shapes per build — pp128+tg64, pp512+tg256, pp2048+tg512, pp8192+tg1024, pp32768+tg2048 — each as `pp P` (prefill t/s) + `-pg P,G` (whole request; decode t/s = G / (t_pg − t_pp)), n=1 after one warmup pass.
    - `--parallel 2` (optional): per build also 2 × pp32768+tg2048 at once via `llama-batched-bench` (`run.sh NPL=2`) — total prefill/decode t/s, per-stream decode, request time, throughput vs 2 in a row. Its cells count in the verdict.
    - Duration (MEASURED, b10909, both backends): 4 shape arms 4.0–4.8 min each, 17.2 min total; `--parallel 2` adds 3.0–3.9 min per build (one-off, 2026-09-11) → ≈ 32 min. The printed ETA (754/51 t/s) runs ~20% low: llama-bench decode has no MTP (~28 t/s).
@@ -54,12 +54,10 @@ Verdicts are per backend — act on each separately.
 |---|---|
 | `stack/llamacpp/var/builds/<ver>-src` | shallow checkout of upstream tag `<ver>` (`bNNNNN`); untagged commits use `git describe` (`b10655-4-g6fdd0ac`) |
 | `stack/llamacpp/var/builds/<ver>-vulkan`, `stack/llamacpp/var/builds/<ver>-rocm` | CMake binary dir: `bin/`, `BUILD_INFO` (flags, compiler, version, Vulkan SDK), `build.log` |
-| `stack/llamacpp/var/builds/latest-vulkan`, `stack/llamacpp/var/builds/latest-rocm` | symlink → promoted build; llama-swap `generate.py` `VULKAN_BIN` / `ROCM_BIN` = `build/latest-*/bin/llama-server` (resolves via `build/` → `stack/llamacpp/var/builds/` symlink) |
+| `stack/llamacpp/var/builds/latest-vulkan`, `stack/llamacpp/var/builds/latest-rocm` | symlink → promoted build; llama-swap `generate.py` `VULKAN_BIN` / `ROCM_BIN` = `stack/llamacpp/var/builds/latest-*/bin/llama-server` |
 | `stack/llamacpp/var/vulkansdk/<ver>/` | versioned Vulkan SDK directory (managed by `stack/llamacpp/setup_vulkan.sh`) |
 | `stack/llamacpp/var/vulkansdk/latest` | symlink → latest installed SDK version |
-| `build/` | backward-compat symlink → `stack/llamacpp/var/builds/` (all downstream tools use `build/` which resolves transparently) |
-| `bench/llamacpp*`, `llama.cpp-src` | compat symlinks to migrated builds — old campaigns and tool defaults use them |
-| `bench/runs/<stamp>-buildcmp-<ver>/` | `arms.json` + `arm-<build>[-par<N>].log`; per arm `bench/runs/<stamp>-model-buildcmp-[par<N>-]<build>/` (`llama-bench.json` or `batched-bench.json`, `meta.txt`, `gpu_samples.csv`) |
+| `campaigns/build-check/<stamp>-llamacpp-<ver>/` | `results/arms.json` (config, env, per-arm dirs + MEASURED memory); per arm `results/<stamp>-model-buildcmp-[par<N>-]<build>/` (`llama-bench.json` or `batched-bench.json`, `meta.txt`) and `tmp/<same>/` + `tmp/arm-<build>[-par<N>].log` (`llama-bench.err`, `gpu_samples.csv`; git-ignored) |
 
 ## Rules
 
@@ -72,6 +70,6 @@ Verdicts are per backend — act on each separately.
 | MUST NOT commit in `~/.config` | shared, already dirty git tree |
 | MUST NOT edit either tool (or `bench/perf/model-bench/run.sh`) while it runs | bash reads scripts lazily (iron rule 14) |
 | FORBIDDEN as a Vulkan baseline: builds older than b10655 (6fdd0ac) | b9950 + b10375 Vulkan `llama-bench` hit `vk::DeviceLostError` on this workload (2026-09-11); a RADV device loss can take down the desktop session |
-| Out of scope: MTP / served-path throughput | llama-bench and batched-bench have no speculative decoding; that is `bench/engine-bench/` (`serve_llamacpp.sh MTP=1` + `capture_engine.py probe`) |
+| Out of scope: MTP / served-path throughput | llama-bench and batched-bench have no speculative decoding; that is `bench/perf/engine-bench/` (`stack/serve/llamacpp/serve_llamacpp.sh MTP=1` + `bench/core/capture_engine.py probe`) |
 | Tool gap (new backend, new metric, other model) → extend `build_llamacpp.sh` / `compare_builds.py` and say so | never fork the logic into a one-off |
 | Vulkan SDK versioning is recorded in BUILD_INFO | `vulkan_sdk=` and `vulkan_sdk_path=` lines track which SDK built each tree — essential for diagnosing glslc regressions |

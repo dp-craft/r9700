@@ -74,7 +74,7 @@ an issue lives in `settings.md`; a fix that was version/env-specific lives in `h
 - **not the same as:** vLLM's comment `TRITON_UNFUSED has bug with MTP support` (`oracle/mxfp4.py`:403, :442), whose symptom nobody
   documents ([#49446](https://github.com/vllm-project/vllm/issues/49446), open).
 - **report:** `docs/findings/radiance/2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md`; raw boots in
-  `bench/runs/2026-11-04-1802-ornith15-sly-dflash/ornith-mtp-k3-*FAILED*`.
+  `campaigns/perf/2026-11-04-1527-ornith15-radiance-vs-sly/tmp/2026-11-04-1802-ornith15-sly-dflash/ornith-mtp-k3-*FAILED*` (raw, local only).
 
 ## `.rad`-vs-HF-checkpoint loading distinction — **live (design, not a bug)**
 - **symptom:** not a fault — a loading distinction. **sly loads HF checkpoints only; radiance loads

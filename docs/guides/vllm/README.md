@@ -7,7 +7,7 @@ on RDNA4's fp8 WMMA) and other quantizations, with **DFlash2** speculative decod
 five dated reports. This is a **living** layer: it is kept current by the update-trigger rule below,
 and it **references** the dated immutable reports in `docs/{analysis,research}` and `campaigns/` for
 provenance (iron rule 1) rather than restating them. `docs/guides/vllm/` is **not** in `docs/INDEX.md`
-(`reindex.py` scans only `docs/{analysis,research}/` + `campaigns/*/analysis.md`) — deliberate.
+(`reindex.py` scans only `docs/findings/` and `docs/research/`) — deliberate.
 
 ## Engines
 

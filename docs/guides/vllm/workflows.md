@@ -49,7 +49,7 @@ python3 stack/gpu/monitor.py --port 8000                 # live view (zero-insta
 python3 stack/gpu/monitor.py --port 8000 --out session.jsonl   # live, records the session
 python3 stack/gpu/monitor.py --port 8000 --once         # single snapshot
 python3 stack/gpu/monitor.py --port 8000 --history 50   # show 50 history rows
-./bench/engine-bench/claude/monitor.sh --once           # thin wrapper, records to stack/serve/var/servers/<port>.session.jsonl
+stack/gpu/monitor.sh --once                             # thin wrapper, records to stack/serve/var/servers/<port>.session.jsonl
 ```
 
 - `monitor.py` polls `/metrics` + rocm-smi + the log every 2 s; blocks = polls (requests) / avg (last

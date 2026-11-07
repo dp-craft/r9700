@@ -12,12 +12,12 @@ questions people usually answer with folklore and one-off runs:
    reasoning, and **N parallel agent streams**, not synthetic 512-token prompts.
 
 Born on an AMD Radeon AI PRO R9700 (RDNA4, 32 GB), but **vendor-parameterizable**: AMD/NVIDIA is
-auto-detected (`lib/gpu_env.sh`), the cross-engine track is pure HTTP, and the tuning track runs
+auto-detected (`stack/gpu/gpu_env.sh`), the cross-engine track is pure HTTP, and the tuning track runs
 against any llama.cpp build you point it at (ROCm, Vulkan, CUDA, Metal…).
 
 ## What it can do
 
-- **Adaptive optimum search** (`model-bench/sweep.py`): coordinate descent over `-ub` → `-b` →
+- **Adaptive optimum search** (`perf/model-bench/sweep.py`): coordinate descent over `-ub` → `-b` →
   `-fa`; each axis grid *expands* (×2/÷2) while the best value sits on a boundary, and stops only
   when the peak is interior or a hard cap/OOM is hit. Ties inside the ±3% noise band are flagged
   `plateau_within_noise`, not sold as wins.
@@ -25,7 +25,7 @@ against any llama.cpp build you point it at (ROCm, Vulkan, CUDA, Metal…).
   target context depth* and accepts q8_0 only if prefill AND decode lose ≤5% — reporting the
   measured VRAM saving (= extra context / extra parallel slots) either way. "f16 OOMs where q8_0
   fits" is recorded as a finding.
-- **Serving-combo matrix** (`engine-bench/campaign.sh`): backend × MTP (speculative decode) ×
+- **Serving-combo matrix** (`perf/engine-bench/campaign.sh`): backend × MTP (speculative decode) ×
   KV type × context depth (8K→64K) × concurrency (1/2/4) on real workloads, with server
   restarts handled, per-point failure tolerance, and **resume** after interruption. This is where
   llama-bench optima get validated at the real serving operating point (they don't transfer
@@ -47,12 +47,13 @@ against any llama.cpp build you point it at (ROCm, Vulkan, CUDA, Metal…).
 
 - A `sweep-summary.json` with the tuning curves, the KV verdict, and a **copy-pasteable
   recommended `llama-server` command**.
-- A campaign `results.jsonl` (per-request + aggregate + `gpu` memory rows) that turns into a report
-  co-located at `campaigns/<date>-<slug>/analysis.md` via the `/benchmark-results` skill — summary +
-  table first (memory column mandatory), raw data linked 1:1.
-- **A one-command visual report**: `lib/report.py <run-dir> [...]` renders any run dir (quality,
-  throughput or sweep) into theme-aware **SVG charts** (`charts/*.svg`) + an `appendix.md` that
-  embeds them in the Markdown write-up — tuning curves, KV verdict, quality-vs-cost, depth/concurrency,
+- A campaign `results/results.jsonl` (per-request + aggregate + `gpu` memory rows) that turns into a
+  report at `docs/findings/<topic>/<stamp>-<slug>.md` (its meta block names the campaign) via the
+  `/benchmark-results` skill — summary + table first (memory column mandatory), raw data linked 1:1.
+- **A one-command visual report**: `core/report.py <campaign-dir>` renders a campaign (quality,
+  throughput or sweep) into theme-aware **SVG charts** (`results/charts/*.svg`), a `results/appendix.md`
+  that embeds them in the Markdown write-up and `results/gpu_peaks.json` (MEASURED peak VRAM/GTT per
+  run, so the memory column survives the ignored sample CSVs) — tuning curves, KV verdict, quality-vs-cost, depth/concurrency,
   failure notes, color-independent data tables. Stdlib Python only; works offline.
 - Honest numbers: cold prefix cache by default (identical prompts inflate "prefill" 2.4× from the
   second request — measured), chat template where raw completions would silently EOS, failures
@@ -62,7 +63,7 @@ against any llama.cpp build you point it at (ROCm, Vulkan, CUDA, Metal…).
 
 Every number below is **MEASURED** on the R9700 (32 GB, gfx1201): either quoted from a report's
 summary (its `results.jsonl` rows) or read directly from the run dir's aggregate row (label cited).
-Per-run detail: [`runs/INDEX.md`](runs/INDEX.md) · full write-ups: `docs/INDEX.md`. Newest first.
+Per-run detail: each campaign's `results/` · full write-ups: [`docs/INDEX.md`](../docs/INDEX.md). Newest first.
 
 | Date | Campaign (run dir) | Model · stack | Headline result | Report |
 |------|--------------------|---------------|-----------------|--------|
@@ -80,22 +81,29 @@ Per-run detail: [`runs/INDEX.md`](runs/INDEX.md) · full write-ups: `docs/INDEX.
 | 2026-07-11 | [deep-context 35B matrix](../campaigns/perf/2026-07-11-2200-deep-context/results/2026-07-11-2200-deep-context/) | Qwen3.6-35B-A3B · Vulkan, MTP×KV×depth×np, 8k→200k | prefill 3077→1254 tok/s, decode 104→61 (8k→200k); MTP a **net loss** for deep-prefill/short-decode; **q8_0 KV −40 % prefill** at depth → keep f16; np2→np4 doubles TTFT ~0 gain | [deep-context](../docs/findings/llamacpp/2026-07-11-2200-deep-context-35b.md) |
 | 2026-07-11 | [35B adaptive sweeps](../campaigns/perf/2026-07-11-1833-starter-baseline/results/2026-07-11-1833-sweep-35b-rocm/) | Qwen3.6-35B-A3B · `sweep.py`, ROCm vs Vulkan | optima `-ub 4096` ROCm / `-ub 2048` Vulkan (interior peaks), `-fa on` +6–9 % pf; q8_0 rejected both (ROCm −7.5 % dec, Vulkan −29.7 % pf); Vulkan decode +53 % | [sweep](../docs/findings/llamacpp/2026-07-11-1833-sweep-35b-rocm-vs-vulkan.md) |
 | 2026-07-11 | [35B serving combo](../campaigns/perf/2026-07-11-1833-starter-baseline/results/2026-07-11-1844-campaign-combo35b/) | Qwen3.6-35B-A3B · backend×MTP×KV×depth×conc | **Vulkan+MTP+f16 ≈140 decode** single-stream; MTP +30–40 % but −8…−15 % at c4 → off for parallel; 4 agents fit 32 GB (~48 tok/s/stream) | [combo](../docs/findings/llamacpp/2026-07-11-1844-campaign-combo35b.md) |
-| 2026-07-11 | [harness smokes](runs/2026-07-11-1734-model-smoke-v2/) | 27B/35B · both tracks | pipeline validation runs (sweep micro, mini campaign, engine run.sh) — no published findings | none |
+| 2026-07-11 | harness smokes (archived) | 27B/35B · both tracks | pipeline validation runs (sweep micro, mini campaign, engine run.sh) — no published findings | none |
 
 ## Layout
 
 | Dir | Track | Tool | Answers |
 |-----|-------|------|---------|
-| `model-bench/` | **Model / tuning microscope** — one engine | `run.sh` (manual grid) + `sweep.py` (**adaptive optimum search**, KV ≤5% rule) over `llama-bench` | "Which `-ub`/`-b`/`-fa`/KV is fastest — with the peak bracketed on both sides?" |
-| `engine-bench/` | **Cross-engine + serving combos** | `capture_engine.py probe` (concurrency, thinking, prefix modes) + `serve_llamacpp.sh` + `campaign.sh` (MTP×KV×depth×parallel) + `llama-benchy` (`dl/benchy-venv`) | "Which engine/combo is fastest on my real task, single-stream and under N parallel agents?" |
-| `workloads/` | Prompt fixtures | `build_prompt.py` + tracked `corpus/` (TS+Python, ~565K tok) | shared stimulus for both tracks |
-| `lib/` | Shared plumbing | `gpu_env.sh` (AMD/NVIDIA vendor abstraction), `vram_sampler.py`, `capture_engine.py` (THE prober: probe + tasks), `graders/`, `report.py` (run dir → SVG charts + appendix.md) | vendor-neutral meta + VRAM/power/throttle capture + capture + scoring + visualization |
-| `runs/` | Dated campaign outputs `YYYY-MM-DD-HHMM-<slug>/` | — | raw results + per-run meta |
+| `perf/model-bench/` | **Model / tuning microscope** — one engine | `run.sh` (manual grid) + `sweep.py` (**adaptive optimum search**, KV ≤5% rule) over `llama-bench` | "Which `-ub`/`-b`/`-fa`/KV is fastest — with the peak bracketed on both sides?" |
+| `perf/engine-bench/` | **Cross-engine + serving combos** | `run.sh` (`capture_engine.py probe`: concurrency, thinking, prefix modes) + `campaign.sh` (MTP×KV×depth×parallel), servers via `stack/serve/` | "Which engine/combo is fastest on my real task, single-stream and under N parallel agents?" |
+| `perf/hipfire/` | hipfire engine evaluation | driver rebuild + bench scripts | hipfire vs llama.cpp (see `docs/findings/hipfire/`) |
+| `build-check/` | **New llama.cpp build vs previous** | `compare_builds.py run` (one campaign per check) | "Is the new build faster, neutral or a regression — promote or not?" |
+| `quality/` | **Coding quality** | `run_capture.sh <campaign>`: capture → `score_typescript.py` (tsc + eslint + vitest) → `aggregate.py` → `make_charts*.py`; `judge.py` (blind judge), `graders/` | "Which model/config writes the best TypeScript at depth, and at what cost?" |
+| `workers/` | Subagent workers | Ornith / Haiku / local-27B task harness (fixtures, scoring) | "Which worker does this kind of task well enough?" |
+| `workloads/` | Prompt fixtures | `build_prompt.py` + tracked `corpus/` (TS+Python, ~565K tok); built fixtures → `workloads/tmp/` | shared stimulus for every track |
+| `core/` | Shared plumbing | `capture_engine.py` (THE prober: probe + tasks), `capture_proxy.py`, `report.py` (campaign → SVG charts + appendix.md + gpu_peaks.json), `gguf_kv.py`, `gen_campaign.py` | capture + visualization + scaffolding |
+
+GPU plumbing (vendor abstraction `gpu_env.sh`, `vram_sampler.py`, `gpu_exclusive.sh`, `monitor.py`) lives in
+`stack/gpu/`; server launchers in `stack/serve/`. Every run writes into a campaign dir
+`campaigns/<type>/<stamp>-<slug>/`: raw to `tmp/` (ignored), rows to `results/` (committed).
 
 **Scaffolding & bookkeeping (repo-level):**
 - **`bench/core/gen_campaign.py`** — deterministic campaign scaffolder: a JSON `spec.json` → a resumable
-  `run.sh` (per-probe `done/` markers) + README skeleton under `campaigns/<date>-<slug>/` (project
-  root). The emitted driver **continues past a failed server** and **skips (before launch) any
+  `run.sh` (per-probe `done/` markers in `tmp/`) + README skeleton under `campaigns/<type>/<stamp>-<slug>/`.
+  The emitted driver **continues past a failed server** and **skips (before launch) any
   server predicted over the VRAM budget** (GPU/VRAM-only, no system-RAM spill), and honors
   `ONLY=`/`REPS=`/`MAX_TOKENS=`/`VRAM_BUDGET_MIB=` for subset/short runs. Also
   `gen_campaign.py vram-ctx …` = the VRAM-budget → max-context calculator. `--help` for both.
@@ -103,21 +111,18 @@ Per-run detail: [`runs/INDEX.md`](runs/INDEX.md) · full write-ups: `docs/INDEX.
   VRAM budget, the MTP/KV/depth/concurrency matrix (honoring your explicit ladder), and the gaps
   (fixtures, ctx headroom) **before** you spend GPU hours, then emits the spec + driver.
 - **`docs/reindex.py`** — regenerates `docs/INDEX.md` from each report's `<!-- meta -->` block
-  (scans `docs/{analysis,research}/` and `campaigns/*/analysis.md`; fails if one is missing).
+  (scans `docs/findings/**` and `docs/research/**`; fails on a missing block or a `campaign:` that does not resolve).
 
 **How to run everything (offline, solo): [`docs/guides/GUIDE.md`](../docs/guides/GUIDE.md).**
 **Campaign plans (runbooks): [`starter-baseline`](../campaigns/perf/2026-07-11-1833-starter-baseline/README.md) ·
 [`deep-context`](../campaigns/perf/2026-07-11-2200-deep-context/README.md). New one → `/benchmark-new-campaign`.**
 
-## Legacy (frozen)
-`bench/legacy/` holds the original harness (`harness/` + the pre-harness `*.sh` + `*_results.jsonl`).
-⚠️ Frozen and superseded by the two tracks above; it hardcodes the old path `/home/dev/work/dippe/amd`
-and does not run here. See `bench/legacy/README.md`. Do not add new work there.
+The original pre-harness scripts and their `results_*.jsonl` (2026-07-09/10) are archived outside this repo.
 
 ## Not tracked (gitignored)
-`stack/llamacpp/`, `llamacpp-vulkan/`, `llamacpp-rocm-b9950/`, `dl/` (multi-GB binaries + benchy venv),
-`.servers/` (runtime pids/logs), `workloads/generated/`, `*.log`, `runs/*/report.html` (legacy), committed `charts/*.svg`
-(regenerate with `lib/report.py`).
+Every `tmp/` and `var/` dir: llama.cpp builds and the Vulkan SDK (`stack/llamacpp/var/`), venvs, model caches
+and server state (`stack/serve/var/`), built fixtures (`workloads/tmp/`), and each campaign's raw `tmp/`
+(replies, server logs, GPU sample CSVs, done markers). Charts are committed SVGs (regenerate with `core/report.py`).
 
 ## Known gaps — stated debt, not silent workarounds
 
@@ -125,8 +130,8 @@ CLAUDE.md rule 6 requires naming the tool that *should* own a job before hand-wr
 forced hand-written probes during the 2026-09-10 hipfire evaluation, and both should be closed here
 rather than re-improvised per engine:
 
-1. **No driver for engines outside llama.cpp/vLLM.** `engine-bench/serve_llamacpp.sh`,
-   `lib/capture_engine.py probe` and `gen_campaign.py` cannot launch or probe hipfire, so the whole
+1. **No driver for engines outside llama.cpp/vLLM.** `stack/serve/llamacpp/serve_llamacpp.sh`,
+   `core/capture_engine.py probe` and `gen_campaign.py` cannot launch or probe hipfire, so the whole
    evaluation ran on scratchpad scripts. **Wanted:** a generic OpenAI-compatible driver, base-URL
    parameterised, normalising `prompt_per_second`/`predicted_per_second` → `prefill_tok_s`/
    `decode_tok_s`, so a new engine is a config row instead of a fresh pile of shell.
@@ -146,7 +151,7 @@ rather than re-improvised per engine:
 Until both exist, a hand-written probe is legitimate **only if it is stated as such in the report**,
 per rule 6.
 
-**Before any engine boots**, run `lib/gpu_exclusive.sh [required_free_mib]` — it unloads llama-swap
+**Before any engine boots**, run `stack/gpu/gpu_exclusive.sh [required_free_mib]` — it unloads llama-swap
 (`/unload` is GET; POST is 405), kills hipfire's `bin/daemon` + `hipfire serve` shape, and fails
 loudly naming the holder if the free-VRAM floor is not met. See CLAUDE.md rules 14-15 for why a
 post-kill check alone is not enough on a paging allocator.
