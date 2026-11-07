@@ -159,7 +159,7 @@ like "uncensored"/"opus" must not bias the grade):
 
 ```bash
 python3 bench/quality/graders/prepare_judge.py \
-  --outputs campaigns/quality/2026-07-12-1736-27b-finetune-quality/tmp/out/outputs.jsonl \
+  --outputs campaigns/quality/2026-07-12-1736-27b-finetune-quality/tmp/outputs.jsonl \
   --tasks   campaigns/quality/2026-07-12-1736-27b-finetune-quality/inputs/tasks/tasks.jsonl \
   --out     campaigns/quality/2026-07-12-1736-27b-finetune-quality/out/judge_bundle.md
 ```

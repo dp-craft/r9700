@@ -205,7 +205,7 @@ it holding *somewhere* with acceptance pinned, which it does.
 
 ## Provenance
 
-- **MEASURED** — everything in the tables above, from `campaigns/perf/2026-07-16-0927-mtp-sampler-tax/results/2026-07-16-0927-mtp-sampler-probe/results.jsonl` (26 rows, cite the row `label`) and, where stated, the 210 rows of `campaigns/quality/2026-07-14-0000-hardest-tasks-27b-vs-35b/tmp/out/outputs.jsonl`.
+- **MEASURED** — everything in the tables above, from `campaigns/perf/2026-07-16-0927-mtp-sampler-tax/results/2026-07-16-0927-mtp-sampler-probe/results.jsonl` (26 rows, cite the row `label`) and, where stated, the 210 rows of `campaigns/quality/2026-07-14-0000-hardest-tasks-27b-vs-35b/tmp/outputs.jsonl`.
 - **INFERRED** — the vocabulary-scan explanation for the ~2 ms; the Amdahl framing; the claim that the tax shrinks on faster hosts.
 - **CLAIMED** — vLLM [#27433](https://github.com/vllm-project/vllm/issues/27433) (open) for batch-invariance as the known mechanism of inference non-determinism. Depth-scaling of MTP's benefit from `docs/findings/llamacpp/2026-07-11-2200-deep-context-35b.md` (MEASURED, ours).
 
