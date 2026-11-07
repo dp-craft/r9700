@@ -92,7 +92,9 @@ embedded via `results/appendix.md`.
 5. **Documentation is uniform.** Reports → `docs/findings/<topic>/YYYY-MM-DD-HHMM-<slug>.md` (ours, with
    `campaign: campaigns/<type>/<stamp>-<slug>` in the meta block) or `docs/research/<topic>/…` (external),
    English, **summary + table first**, full detail below. Every report gets a `<!-- meta -->` block; run
-   `docs/reindex.py` to register it in `docs/INDEX.md`.
+   `docs/reindex.py` to register it in `docs/INDEX.md`. Shared skills that write elsewhere are overridden here:
+   `/research` files into `docs/research/<topic>/`, not flat `docs/research/`; brainstorming design docs and
+   plans go to `notes/plans/` (private, linked from amd-private), never `docs/plans/` (this repo has none).
 6. **Tools & skills first — improvising is a last resort, not a shortcut.** Every recurring job in
    this repo has a **deterministic tool or a skill** that owns it (registry below). Route the task
    through it. **Do NOT hand-write files (drivers, spec.json, run.sh, fixtures, reports, charts) that
