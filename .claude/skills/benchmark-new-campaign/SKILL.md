@@ -1,6 +1,6 @@
 ---
 name: benchmark-new-campaign
-description: Design AND scaffold a new benchmark campaign for the R9700 harness. Use when the user wants to plan a new set of runs (a "campaign") — pick the model/backend, work out the VRAM budget and max context, decide the MTP/KV/depth/concurrency matrix, catch gaps BEFORE burning expensive GPU time, then emit a resumable run.sh + README via bench/core/gen_campaign.py. The judgement lives here; the deterministic emission lives in gen_campaign.py. Produces campaigns/<date>-<slug>/{spec.json,run.sh,README.md}. Hand off to the benchmark-results skill to write up results (co-located as campaigns/<date>-<slug>/analysis.md).
+description: Design AND scaffold a new benchmark campaign for the R9700 harness. Use when the user wants to plan a new set of runs (a "campaign") — pick the model/backend, work out the VRAM budget and max context, decide the MTP/KV/depth/concurrency matrix, catch gaps BEFORE burning expensive GPU time, then emit a resumable run.sh + README via bench/core/gen_campaign.py. The judgement lives here; the deterministic emission lives in gen_campaign.py. Produces campaigns/<type>/<YYYY-MM-DD-HHMM>-<slug>/{spec.json,run.sh,README.md}. Hand off to the benchmark-results skill to write up results (docs/findings/<topic>/, with the campaign named in its meta block).
 ---
 
 # benchmark-new-campaign — plan first, then scaffold deterministically
@@ -78,16 +78,19 @@ the generic how-to is `docs/guides/GUIDE.md`.
    overrides (quick pass), and `VRAM_BUDGET_MIB=` (guard threshold). Set sensible per-probe defaults
    (reps 2, max_tokens 256) so the whole campaign *and* a chosen subset both give reliable numbers.
 
-6. **Emit**: `bench/core/gen_campaign.py emit --spec campaigns/<date>-<slug>/spec.json`
-   → resumable `run.sh` (per-probe `done/` markers) + a README skeleton, under
-   `campaigns/<date>-<slug>/`. Flesh out the README prose (goal, decisions, out-of-scope). run.sh
-   consolidates every probe into one `results.jsonl` (with VRAM/GTT samples per server) and its
-   **last step auto-generates SVG charts + `appendix.md`** (`bench/core/report.py`) to embed in the write-up.
+6. **Emit**: put `"date": "YYYY-MM-DD-HHMM"` (and `"type"` if it is not the kind's default: throughput →
+   `perf`, quality → `quality`, agentic → `agentic`) in the spec, save it as
+   `campaigns/<type>/<date>-<slug>/spec.json`, then `bench/core/gen_campaign.py emit --spec <that file>`
+   → resumable `run.sh` (per-probe markers in `tmp/done/`) + a README skeleton in the same dir. Flesh out the
+   README prose (goal, decisions, out-of-scope). run.sh writes two roots: raw (per-probe run dirs, GPU sample
+   CSVs, markers) → `tmp/` (git-ignored); every probe's rows → `results/results.jsonl` once, plus `meta.txt`,
+   `failures.txt`, `skipped.txt`. Its **last step auto-generates SVG charts + `results/appendix.md` +
+   `results/gpu_peaks.json`** (`bench/core/report.py`) to embed in the write-up.
 
 7. **Hand off**: remind the user to (a) build fixtures (`build_prompt.py`, see `docs/guides/GUIDE.md` §2),
-   (b) run `bash campaigns/<date>-<slug>/run.sh` (resumable — rerun to continue; `ONLY=`/`REPS=` to
-   subset or shorten), (c) write up with the **benchmark-results** skill → co-located
-   `campaigns/<date>-<slug>/analysis.md`, then add a `<!-- meta -->` block and run `docs/reindex.py`.
+   (b) run `bash campaigns/<type>/<date>-<slug>/run.sh` (resumable — rerun to continue; `ONLY=`/`REPS=` to
+   subset or shorten), (c) write up with the **benchmark-results** skill → `docs/findings/<topic>/<date>-<slug>.md`
+   with `campaign: campaigns/<type>/<date>-<slug>` in its `<!-- meta -->` block, then run `docs/reindex.py`.
 
 ## vllm throughput specs: `image` and `env`
 For `engine: "vllm"` a spec may pin the docker **`image`** (default = the profile's `IMAGE`; a run-time
@@ -109,7 +112,7 @@ probe). Schema: `bench/core/gen_campaign.py example --agentic` (+ the module doc
 - **1 session per arm is n=1** — say so in the write-up; no significance claims. Use `reps` ≥ 3 for those.
 - **Emit-time validation** (fix the spec, don't hand-edit `run.sh`): claude settings port and model names
   vs `served_model`, `base` resolves to a sha in `repo`, every `install` src exists, `done_when.regex` compiles.
-- Hand-off is step 7 above, plus knobs `ONLY REPS CAP_S MAX_RESUMES RUN_DIR IMAGE`; see `docs/guides/GUIDE.md` §7.
+- Hand-off is step 7 above, plus knobs `ONLY REPS CAP_S MAX_RESUMES CAMPAIGN_DIR IMAGE`; see `docs/guides/GUIDE.md` §7.
 
 ## Token policy
 Planning is reasoning — do it in the main context. Shell out for `ls`/`vram-ctx`/gguf parsing
