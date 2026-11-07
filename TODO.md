@@ -11,6 +11,6 @@ Deferred items with a blocking precondition. Owner decisions live in
 - [ ] `stack/gpu/gpu_exclusive.sh` with a free-VRAM floor (plan 2.8)
 - [ ] One tiny throughput campaign end to end: raw → `tmp/`, rows → `results/`, charts + `gpu_peaks.json` (plan 3.6)
 
-## stack repo (github.com/dp-craft/stack — pushed 2026-11-07, commit c6fbde8)
+## stack repo (github.com/dp-craft/stack — pushed 2026-11-07, commit 4a750a1)
 
-- [ ] Write the stack repo's `README.md`: what the repo is (the machine — installs/builds/serves for the R9700), describe the five dirs (`gpu/`, `install/`, `llamacpp/`, `llama-swap/`, `serve/`) and their key scripts, current status (which builds exist and what `latest-*` points at, ROCm/Mesa fixpoints), and link the existing readmes (`llamacpp/README.md`, `llama-swap/README.md`, `serve/vllm/README.md`) plus back to `dp-craft/r9700`. New reports stay in r9700's `docs/`; this repo holds code + config only
+- [x] Write the stack repo's `README.md` — done 2026-11-07: `stack/README.md` (231 lines; overview, layout, quick start, current status, links to the three dir readmes + back to `dp-craft/r9700`), commit `4a750a1`. Facts verified by the main session against repo sources; one error (templates symlink) fixed before commit
