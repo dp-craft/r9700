@@ -2,21 +2,27 @@
 # run_capture.sh — Phase A driver for the 27B fine-tune quality/token campaign.
 # For each config (model × MTP): start one llama-server (fixed tuning), sample VRAM/GTT/power across
 # the whole probe, send every task via capture.py (streaming → full timings + TTFT), stop the server.
-# Resumable (per-config done markers), continues past a failed config. Then run deterministic scoring.
+# Resumable (per-config done markers in tmp/done/), continues past a failed config. Then run
+# deterministic scoring. This campaign keeps its own driver (a fixed 5-config bash array, scored by
+# score_deterministic.py — not the configs.jsonl + TS-grading pipeline of bench/quality/run_capture.sh);
+# it only reuses the shared tools under bench/quality/.
 #
 #   bash run_capture.sh                        # all 5 configs, reps 1
 #   ONLY='unsloth*' REPS=3 bash run_capture.sh # subset / more reps
 #   MODELS_DIR=/home/dev/models/gguf bash run_capture.sh
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO="$(cd "$HERE/../.." && pwd)"
+REPO="$(git -C "$HERE" rev-parse --show-toplevel 2>/dev/null)"
+[ -n "$REPO" ] || REPO="$(cd "$HERE/../../.." && pwd)"
+Q="$REPO/bench/quality"
 SERVE="$REPO/stack/serve/llamacpp/serve_llamacpp.sh"
 
 : "${MODELS_DIR:=/home/dev/models/gguf}"
 : "${PORT:=8081}" ; : "${CTX:=132768}" ; : "${KV:=f16}" ; : "${UB:=2048}" ; : "${B:=4096}"
 : "${REPS:=1}" ; : "${MAX_TOKENS:=8192}" ; : "${BACKEND:=vulkan}"   # generous: thinking models burn 1000s of tokens
-OUTDIR="$HERE/out" ; mkdir -p "$OUTDIR/done"
+OUTDIR="$HERE/tmp" ; mkdir -p "$OUTDIR/done"
 OUT="$OUTDIR/outputs.jsonl" ; VRAM="$OUTDIR/vram.jsonl"
+TASKS="$HERE/inputs/tasks/tasks.jsonl"
 
 # label | model filename (in MODELS_DIR) | mtp
 CONFIGS=(
@@ -56,7 +62,7 @@ for entry in "${CONFIGS[@]}"; do
         kill -0 "$SPID" 2>/dev/null || break; sleep 0.5
       done
     fi
-    python3 "$HERE/capture.py" --config "$label" --tasks "$HERE/tasks/tasks.jsonl" \
+    python3 "$Q/capture.py" --config "$label" --tasks "$TASKS" \
       --out "$OUT" --base-url "http://127.0.0.1:$PORT" --reps "$REPS" --max-tokens "$MAX_TOKENS" \
       && touch "$OUTDIR/done/$label"
     [ -n "$SPID" ] && { kill "$SPID" 2>/dev/null; wait "$SPID" 2>/dev/null || true; }
@@ -83,10 +89,10 @@ PY
 done
 
 echo; echo "=== deterministic scoring ==="
-python3 "$HERE/graders/score_deterministic.py" --tasks "$HERE/tasks/tasks.jsonl" \
-  --outputs "$OUT" --out "$OUTDIR/scores_deterministic.jsonl" || true
+python3 "$Q/graders/score_deterministic.py" --tasks "$TASKS" \
+  --outputs "$OUT" --out "$HERE/results/scores_deterministic.jsonl" || true
 echo
 echo "Phase A complete. Outputs: $OUT"
 echo "  per-config VRAM/peak/power: $VRAM   gpu samples: $OUTDIR/gpu_*.csv"
-echo "  deterministic scores: $OUTDIR/scores_deterministic.jsonl"
+echo "  deterministic scores: $HERE/results/scores_deterministic.jsonl"
 echo "Next: hand $OUT + $VRAM to the LLM-judge + aggregation step (Phase B/C)."

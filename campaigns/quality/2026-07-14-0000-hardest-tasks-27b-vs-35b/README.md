@@ -1,18 +1,18 @@
 # Campaign 4 — **Hardest tasks: 27B quant ladder vs 35B-A3B at 128k** (R9700)
 
-*Part of the agentic-config series. Reuses the quality-at-depth harness (`campaigns/quality/2026-07-13-1657-27b-quality-at-depth`) — grader, corpus, tasks, judge, charts — with the **grader bug fixed** and a **sharper, narrower matrix**.*
+*Part of the agentic-config series. Reuses the quality-at-depth harness — grader, corpus, tasks, judge, charts (shared tools under `bench/quality/`, designed by `campaigns/quality/2026-07-13-1657-27b-quality-at-depth`) — with the **grader bug fixed** and a **sharper, narrower matrix**.*
 
-**Status: READY TO RUN.** One command: `bash run_capture.sh`.
+**Status: READY TO RUN.** One command: `bash bench/quality/run_capture.sh campaigns/quality/2026-07-14-0000-hardest-tasks-27b-vs-35b`.
 
 ---
 
 ## 1. Why this campaign
 
-The previous run (`2026-07-13-27b-quality-at-depth`) established two things:
+The previous run (`campaigns/quality/2026-07-13-1657-27b-quality-at-depth`) established two things:
 1. The 27B is **not** below-haiku — it sits in the **haiku→sonnet band**; its real limiter is **strict
    `eslint`/`tsc` cleanliness**, not logic. *(That run's headline was corrupted by a grader bug — a
-   `vitest` execution failure zeroed `tests`+`edge` on all 120 replies; see that campaign's
-   `analysis_detailed.md`.)*
+   `vitest` execution failure zeroed `tests`+`edge` on all 120 replies; see that campaign's detailed
+   write-up `docs/findings/quality/2026-07-13-1657-27b-quality-at-depth-detailed.md`.)*
 2. Reasoning budget helped at 64k but saturated at 128k; the model **always spends its whole budget**.
 
 This campaign drills into the **4 hardest tasks** with the **bug fixed** and asks one focused question:
@@ -41,7 +41,7 @@ varies (KV is a forced exception on the two heaviest — flagged as a confound).
 **= 5 cells × 4 hardest tasks × 3 reps = 60 graded replies.** Config source of truth: `configs.jsonl`.
 The four 27B rows are a **quant ladder** (same weights, rising precision) — the primary axis.
 
-**Tasks (4 hardest, from `tasks.jsonl`):** `rate-limiter`, `lru-cache`, `async-memo`, `expr-eval`.
+**Tasks (4 hardest, from `inputs/tasks.jsonl`):** `rate-limiter`, `lru-cache`, `async-memo`, `expr-eval`.
 Dropped from the matrix (consistently strong — avg 84–89% last run): `deep-equal`, `store-remove`
 (kept as `matrix:false` for reference/smoke). Easy controls `count-words`/`shape-variant` are `SMOKE=1` only.
 
@@ -74,12 +74,13 @@ Q5/Q6's q8 KV explicitly and treat any Q5/Q6 delta as weight-quant *plus* a smal
 ## 4. How to run
 
 ```bash
+D=campaigns/quality/2026-07-14-0000-hardest-tasks-27b-vs-35b   # the campaign dir (run from the repo root)
 tmux new-session -d -s claude-run           # ONCE — the judge + summary drive claude through tmux
-bash run_capture.sh                          # FULL: capture → self-check → grade → judge → charts → analysis.md
-JUDGE_ENGINE=none SUMMARY=0 bash run_capture.sh   # capture + grade + charts only (no claude/tmux)
-ONLY='q6-*' bash run_capture.sh              # skip/isolate a cell (e.g. the heavy Q6)
+bash bench/quality/run_capture.sh "$D"      # FULL: capture → self-check → grade → judge → charts → write-up
+JUDGE_ENGINE=none SUMMARY=0 bash bench/quality/run_capture.sh "$D"   # capture + grade + charts only (no claude/tmux)
+ONLY='q6-*' bash bench/quality/run_capture.sh "$D"                 # skip/isolate a cell (e.g. the heavy Q6)
 ```
-Resumable (per-cell `out/done/` markers + row-level in `capture.py`); continues past a failed cell.
+Resumable (per-cell `tmp/done/` markers + row-level in `capture.py`); continues past a failed cell.
 All cells use **reasoning-budget 4096** (a safe, saturated value from the prior run — the budget sweep is a
 separate follow-up campaign, out of scope here).
 
@@ -87,24 +88,24 @@ separate follow-up campaign, out of scope here).
 
 - **A — fractional `lint`/`types` (built in).** `lint`/`types` are now `1 − min(1, errors/K)` (K=5/3)
   instead of binary 0/1, so cleanliness has resolution (1 error = 0.8, not 0). `hard_pass` still needs a
-  perfect 1.0. **Caveat:** the reference calibration (`calibration*.jsonl`) was graded **binary** — for
-  an exact ladder, re-grade the reference answers in `out/haiku/` with this grader before analysis
-  (`score_typescript.py response --response-file out/haiku/answer-<model>-<task>.txt --task ts-harness/tasks/<task>`).
-- **B — one-turn repair arm.** `bash run_repair.sh` (after the main run): relaunches each cell's server,
+  perfect 1.0. **Caveat:** the reference calibration (`inputs/calibration*.jsonl`) was graded **binary** —
+  for an exact ladder, re-grade the reference answers in `tmp/haiku/` with this grader before analysis
+  (`python3 bench/quality/score_typescript.py response --response-file tmp/haiku/answer-<model>-<task>.txt --task ts-harness/tasks/<task>`).
+- **B — one-turn repair arm.** `bash bench/quality/run_repair.sh "$D"` (after the main run): relaunches each cell's server,
   feeds the exact `tsc`+`eslint` errors of each failed reply back for ONE fix turn (`repair.py`), grades
-  the result to `out/scores_repair.jsonl`. Tests whether a cheap `eslint --fix`-style loop closes the gap
-  to Opus. Compare `scores_typescript.jsonl` (before) vs `scores_repair.jsonl` (after).
+  the result to `results/scores_repair.jsonl`. Tests whether a cheap `eslint --fix`-style loop closes the gap
+  to Opus. Compare `results/scores_typescript.jsonl` (before) vs `results/scores_repair.jsonl` (after).
 - **C — sampling sweep (Phase 2).** After the core, run around the winning budget:
   ```bash
-  CONFIGS=$PWD/configs_sampling.jsonl JUDGE_ENGINE=none SUMMARY=0 bash run_capture.sh
+  CONFIGS="$D/configs_sampling.jsonl" JUDGE_ENGINE=none SUMMARY=0 bash bench/quality/run_capture.sh "$D"
   ```
   `configs_sampling.jsonl` sweeps **temp {0.3, 0.6, 0.9}** (hypothesis: lower temp → cleaner lint/types),
   then top_k/top_p at the winning temp (examples included). Extend it once you see the temp result.
 - **D — complete the opus ladder.** `rate-limiter` and `lru-cache` lack an opus calibration point. Add
   them: run each task's prompt through opus **one-shot, no thinking**, save the answer, grade + append:
   ```bash
-  python3 score_typescript.py response --response-file <opus-answer>.txt --task ts-harness/tasks/rate-limiter --id opus
-  # then append {"model":"opus","task":"rate-limiter","score":…,"objectives":…} to calibration-hard.jsonl
+  python3 bench/quality/score_typescript.py response --response-file <opus-answer>.txt --task ts-harness/tasks/rate-limiter --id opus
+  # then append {"model":"opus","task":"rate-limiter","score":…,"objectives":…} to inputs/calibration-hard.jsonl
   ```
 
 ## 5b. Extension (2026-07-15): budget axis · 35B sampling sweep · pricing-deferred
@@ -119,8 +120,8 @@ it may OOM at ctx 163840; by request there is NO pre-flight guard). Do not reord
 this — the order drives the chart palette. Use ONLY:
 
 ```bash
-ONLY=q5-d128-f16-rb16384 bash run_capture.sh     # fail-fast: does Q5 fit at f16?
-bash run_capture.sh                              # then the rest (skips whatever is complete)
+ONLY=q5-d128-f16-rb16384 bash bench/quality/run_capture.sh "$D"   # fail-fast: does Q5 fit at f16?
+bash bench/quality/run_capture.sh "$D"                            # then the rest (skips whatever is complete)
 ```
 
 Axes:
@@ -139,13 +140,13 @@ cells rather than a confounded walk.
 
 ## 5c. Reference ladder at 3 reps + integrity fixes (2026-07-15)
 
-**`run_refs.sh`** collects the haiku/sonnet/opus ladder at 3 reps for every matrix task → `calibration-reps.jsonl`
+**`run_refs.sh`** collects the haiku/sonnet/opus ladder at 3 reps for every matrix task → `inputs/calibration-reps.jsonl`
 (rows carry `rep`; `aggregate.py` then reports mean±sd and hard_pass as k/n). Resumable; glue only — it composes
 `build_context.py` + `claude_ask.sh` + `score_typescript.py`.
 
 ```bash
-bash run_refs.sh                 # 3 models × 5 tasks × 3 reps
-GRADE_ONLY=1 bash run_refs.sh    # re-grade + re-emit the jsonl, ask nothing
+bash bench/quality/run_refs.sh "$D"             # 3 models × 5 tasks × 3 reps
+GRADE_ONLY=1 bash bench/quality/run_refs.sh "$D"   # re-grade + re-emit the jsonl, ask nothing
 ```
 
 - **Why reps:** at the measured rep noise a SINGLE reference sample carries ≈±19 pts — the old n=1 ladder could
@@ -170,17 +171,24 @@ causes: `CHARS_PER_TOK = 4` is an estimate, and `build_context.py` overshoots it
 appending a file). Deliberately NOT fixed — changing the prompt would invalidate all 210 replies. Every cell runs
 the identical prompt, so the comparison is sound; only the label is nominal.
 
-## 6. Outputs (in `out/`)
+## 6. Outputs
 
-`outputs.jsonl` (replies + tokens/latency) · `scores_typescript.jsonl` (objectives incl. fractional
-lint/types, or `grade_error` HARNESS rows) · `judge_scores.jsonl` (design/clarity/robustness) ·
-`vram.jsonl` + `gpu_*.csv` · `summary.md`/`summary.json` (deterministic digest — per-cell table + **per-rep
-detail table** (every rep + haiku/sonnet/opus refs, all objectives) + findings a–d) ·
-`charts/` (cell-level, `make_charts.py`) · `charts/detailed/` (per-task, `make_charts_detailed.py`) ·
-co-located `analysis.md` (auto-written) — plus optional `outputs_repair.jsonl`/`scores_repair.jsonl` (B).
+Raw (gitignored) in `tmp/`: `outputs.jsonl` (replies + tokens/latency) · `vram.jsonl` + `gpu_*.csv` ·
+`props_*.json` (per-server provenance) · `done/` markers · `summary_prompt.txt`/`summary_result.txt`
+(the claude write-up exchange; the original run's confirmation is committed as `results/summary_result.txt`).
+
+Committed in `results/`: `scores_typescript.jsonl` (objectives incl. fractional lint/types, or `grade_error`
+HARNESS rows) · `judge_scores.jsonl` (design/clarity/robustness) · `summary.md`/`summary.json`
+(deterministic digest — per-cell table + **per-rep detail table** (every rep + haiku/sonnet/opus refs, all
+objectives) + findings a–d) · `summary_by_task.json` · `appendix.md` + `charts/` (cell-level,
+`make_charts.py`) · `appendix-detailed.md` + `charts/detailed/` (per-task, `make_charts_detailed.py`).
+
+Write-up (auto-written): `docs/findings/quality/2026-07-14-0000-hardest-tasks-27b-vs-35b.md` — plus optional
+`tmp/outputs_repair.jsonl` + `results/scores_repair.jsonl` (B).
 
 ## 7. Reuse / provenance
 
 Harness, corpus, tasks, grader, judge, charts are inherited from `2026-07-13-27b-quality-at-depth`
-(model-agnostic — see that campaign's `REUSE.md`). Tests & difficulty design: `eval-design.md`.
-*Provenance:* this campaign's `out/` = `MEASURED`; external = `CLAIMED`; reasoned = `INFERRED`. Never blended.
+(now shared under `bench/quality/` — model-agnostic, see that campaign's `REUSE.md`). Tests & difficulty
+design: `eval-design.md`.
+*Provenance:* this campaign's `tmp/` + `results/` = `MEASURED`; external = `CLAIMED`; reasoned = `INFERRED`. Never blended.

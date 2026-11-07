@@ -4,7 +4,7 @@
 what the eval measures, every task in detail, how grading works, and — with real measurements — how
 good the test data is at telling configurations apart. All numbers here are MEASURED on this repo's
 harness (`score_typescript.py` running real `tsc`/`eslint`/`vitest`); the calibration rows are in
-`calibration.jsonl`.*
+`inputs/calibration.jsonl`.*
 
 ---
 
@@ -38,8 +38,9 @@ implementation and its own tests** (TDD) — so weak configs are caught either b
 writing tests too shallow to expose their own bugs.
 
 ## 3. How grading works — 7 objectives a weak config fails independently
-`score_typescript.py` stages the candidate into `ts-harness/` and runs the **real toolchain** plus static
-checks. Deps auto-install on first run (`npm install`; `package-lock.json` pinned for reproducibility).
+`score_typescript.py` stages the candidate into `bench/quality/ts-harness/` and runs the **real toolchain**
+plus static checks. Deps auto-install on first run (`npm install`; `package-lock.json` pinned for
+reproducibility).
 
 | objective | weight | how it's measured | rule source |
 |-----------|:---:|-------------------|-------------|
@@ -125,7 +126,8 @@ gate on top of the smooth score.
 ## 5. Test-data quality — the calibration measurements
 Method: give each task, one-shot with **no extended reasoning**, to a **weak** model (haiku, the floor)
 and a **strong** model (Sonnet, the ceiling). A task is only admitted if **haiku hard-fails it AND
-Sonnet scores clearly higher** — that gap is the band the 27B configs will land in. Data: `calibration.jsonl`.
+Sonnet scores clearly higher** — that gap is the band the 27B configs will land in. Data:
+`inputs/calibration.jsonl`.
 
 | task | haiku (floor) | Sonnet (ceiling) | band (Δscore) | ceiling hard-pass? | verdict |
 |------|------------:|------------:|:---:|:---:|---------|
@@ -172,7 +174,7 @@ Sonnet scores clearly higher** — that gap is the band the 27B configs will lan
 
 ## 5b. Harder tasks — the 3-model gradient (haiku / Sonnet / Opus-high)
 To find tasks that only a strong model *with thinking* clears, two multi/strict tasks were authored and
-graded across three capability tiers (data: `calibration-hard.jsonl`):
+graded across three capability tiers (data: `inputs/calibration-hard.jsonl`):
 
 | task | kind | haiku | Sonnet | Opus-high | tier |
 |------|------|:---:|:---:|:---:|---------|
@@ -205,27 +207,26 @@ Note: authoring these surfaced two **test-file** lint rules that unfairly failed
 
 ## 6. The context corpus (deep-context filler)
 - **545 sanitized files, ~682k tokens** (`.ts`/`.tsx`/`.test.ts`), vendored from the user's AiChatney
-  `src/` into `ts-harness/corpus/` — enough headroom to build any depth up to the model's 256k RoPE cap.
-  Every auth/crypto/secret file was **excluded** and the full corpus was scanned clean of secret patterns
-  (this is a shared knowledge-base repo). ~4.3 MB.
+  `src/` into `bench/quality/ts-harness/corpus/` — enough headroom to build any depth up to the model's
+  256k RoPE cap. Every auth/crypto/secret file was **excluded** and the full corpus was scanned clean of
+  secret patterns (this is a shared knowledge-base repo). ~4.3 MB.
 - `build_context.py` assembles a prompt: real code up to a target token count, with the **reuse-target
   utils placed deepest** (hardest retrieval), then the rules, then the task. Verified at 64k and **128k**
   (~130k tok).
 
 ## 7. Reproduce it yourself
 ```bash
-cd campaigns/quality/2026-07-13-1657-27b-quality-at-depth
-python3 score_typescript.py selftest          # auto-installs deps; asserts good=1.0 > mediocre > bad=0.0
-python3 build_context.py --task ts-harness/tasks/lru-cache --tokens 64000 --out /tmp/p.txt   # a depth prompt
-python3 score_typescript.py fixture --dir ts-harness/fixtures/count-words-good --task ts-harness/tasks/count-words
+python3 bench/quality/score_typescript.py selftest          # auto-installs deps; asserts good=1.0 > mediocre > bad=0.0
+python3 bench/quality/build_context.py --task ts-harness/tasks/lru-cache --tokens 64000 --out /tmp/p.txt   # a depth prompt
+python3 bench/quality/score_typescript.py fixture --dir bench/quality/ts-harness/fixtures/count-words-good --task ts-harness/tasks/count-words
 ```
-Everything needed lives in-repo (harness, corpus, tasks, reference fixtures, pinned lockfile). No external
-checkout required at runtime.
+Everything needed lives in-repo (harness, corpus, tasks, reference fixtures, pinned lockfile under
+`bench/quality/ts-harness/`). No external checkout required at runtime.
 
 ## 8. Status & next
 **Built & validated:** the multi-file grader, the difficulty method (3-model gradient), **8 tasks** spanning
 a full ladder — 2 easy controls, 4 Sonnet-tier, 2 Opus-tier — across 6 different problem kinds, each with a
-reference that scores 1.0 and a haiku/Sonnet/Opus tier confirmed (`calibration-hard.jsonl`). Corpus vendored
+reference that scores 1.0 and a haiku/Sonnet/Opus tier confirmed (`inputs/calibration-hard.jsonl`). Corpus vendored
 to ~682k tokens (self-contained; secrets excluded); 128k assembly verified. `selftest` green; deps auto-install.
 
 **Built — the depth driver + judge (ready to run).** Sampling is fixed at the Qwen3.6-thinking research
@@ -233,4 +234,5 @@ values (no sampling-lock phase needed); the grid is `reasoning-budget {1024,2048
 + a 128k f16-vs-q8 A/B + a jackrong cross-check, `REPS=2` (~120 replies, trimmed from 288 — see README §4).
 Tasks are assembled at depth via `build_context.py`, graded by `score_typescript.py batch`, judged (subjective
 design/clarity/robustness) by `judge.py` (blind, `JUDGE_BASE_URL`), charted by `make_charts.py`, then analyzed
-with the **benchmark-results** skill. Run: `bash run_capture.sh`. See `README.md`, `REUSE.md`, and the plan.
+with the **benchmark-results** skill. Run: `bash bench/quality/run_capture.sh <campaign dir>` (the campaign
+dir carries `configs.jsonl` + `campaign.env` + `inputs/tasks.jsonl`). See `README.md`, `REUSE.md`, and the plan.

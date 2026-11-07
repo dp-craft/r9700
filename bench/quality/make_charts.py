@@ -694,7 +694,7 @@ def main():
             "Objective breakdown (config × objective; 1.00 = clean, red = where it fails)",
             configs, OBJ_KEYS, ocell)
 
-    # 9. connected-parameter sweeps (optional): out/sweeps.json declares line charts over a swept
+    # 9. connected-parameter sweeps (optional): inputs/sweeps.json declares line charts over a swept
     #    scalar (e.g. reasoning-budget) so relationships read as trends, not unordered bars.
     METRICS = {  # metric key -> (pretty title, unit, fmt, value-dict)
         "det_pass_pct": ("Deterministic accuracy", "%", "{:.0f}", detpass),
@@ -713,7 +713,7 @@ def main():
         "ts_hardpass": ("Hard-pass rate", "%", "{:.0f}", tshard),
     }
     sweeps = []
-    for _root in roots(D):                                  # whole-file JSON array (not JSONL)
+    for _root in (os.path.join(D, "inputs"), *roots(D)):   # whole-file JSON array (not JSONL); a recipe input
         _sp = os.path.join(_root, "sweeps.json")
         if os.path.exists(_sp):
             sweeps = json.load(open(_sp))

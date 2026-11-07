@@ -1,20 +1,26 @@
 #!/usr/bin/env bash
 # run_repair.sh — add-on B orchestration: for each cell, relaunch its server and run ONE lint/type
 # repair turn (repair.py) on the replies that failed the strict gate, then grade the repaired set.
-# Reuses serve_llamacpp.sh exactly like run_capture.sh. Run AFTER run_capture.sh (needs out/outputs.jsonl
-# + out/scores_typescript.jsonl to know which replies failed). Idempotent (repair.py skips done rows).
+# Reuses serve_llamacpp.sh exactly like run_capture.sh. Run AFTER run_capture.sh (needs
+# <dir>/tmp/outputs.jsonl + <dir>/results/scores_typescript.jsonl to know which replies failed).
+# Idempotent (repair.py skips done rows).
 #
-#   bash run_repair.sh
-#   ONLY='un-*' bash run_repair.sh          # only 27B cells
+#   bash bench/quality/run_repair.sh <campaign_dir>      # or CAMPAIGN_DIR=<dir>
+#   ONLY='un-*' bash bench/quality/run_repair.sh <dir>   # only 27B cells
 set -uo pipefail
-HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO="$(cd "$HERE/../.." && pwd)"
+Q="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+D="${1:-${CAMPAIGN_DIR:-}}"
+[ -n "$D" ] || { echo "usage: run_repair.sh <campaign_dir> (or CAMPAIGN_DIR=<dir>)" >&2; exit 2; }
+D="$(cd "$D" 2>/dev/null && pwd)" || { echo "run_repair: campaign dir not found: ${1:-${CAMPAIGN_DIR:-}}" >&2; exit 2; }
+REPO="$(git -C "$D" rev-parse --show-toplevel 2>/dev/null)"
+[ -n "$REPO" ] || REPO="$(cd "$Q/../.." && pwd)"
 SERVE="$REPO/stack/serve/llamacpp/serve_llamacpp.sh"
-: "${MODELS_DIR:=/home/dev/models/gguf}" ; : "${CONFIGS:=$HERE/configs.jsonl}"
+: "${MODELS_DIR:=/home/dev/models/gguf}" ; : "${CONFIGS:=$D/configs.jsonl}"
 : "${PORT:=8081}" ; : "${BACKEND:=vulkan}" ; : "${UB:=2048}" ; : "${B:=4096}" ; : "${WAIT:=600}"
-OUTDIR="$HERE/out" ; OUT="$OUTDIR/outputs.jsonl" ; SCORES="$OUTDIR/scores_typescript.jsonl"
-ROUT="$OUTDIR/outputs_repair.jsonl"
-[ -s "$OUT" ] && [ -s "$SCORES" ] || { echo "need $OUT + $SCORES (run run_capture.sh first)"; exit 2; }
+RAW="$D/tmp"
+OUT="$RAW/outputs.jsonl" ; SCORES="$D/results/scores_typescript.jsonl"
+ROUT="$RAW/outputs_repair.jsonl"
+[ -s "$OUT" ] && [ -s "$SCORES" ] || { echo "need $OUT + $SCORES (run bench/quality/run_capture.sh \"$D\" first)" >&2; exit 2; }
 
 python3 -c '
 import json,sys
@@ -33,8 +39,8 @@ sys.exit(0 if fail else 1)" 2>/dev/null || { echo "skip (nothing failed): $label
   echo "=== repair $label ==="
   if MODEL="$mfile" BACKEND="$BACKEND" PORT="$PORT" CTX="$ctx" NP=1 UB="$UB" B="$B" FA=on \
        KV="$kv" MTP="$mtp" WAIT="$WAIT" EXTRA_ARGS="--reasoning-budget $budget" bash "$SERVE" start; then
-    python3 "$HERE/repair.py" --config "$label" --base-url "http://127.0.0.1:$PORT" \
-      --outputs "$OUT" --scores "$SCORES" --out "$ROUT" \
+    python3 "$Q/repair.py" --config "$label" --base-url "http://127.0.0.1:$PORT" \
+      --campaign "$D" --outputs "$OUT" --scores "$SCORES" --out "$ROUT" \
       --max-tokens $(( (budget>0?budget:8192) + 8192 )) || echo "repair.py failed for $label"
   else
     echo "server failed: $label"
@@ -43,8 +49,8 @@ sys.exit(0 if fail else 1)" 2>/dev/null || { echo "skip (nothing failed): $label
 done
 
 echo "=== grade repaired replies ==="
-python3 "$HERE/score_typescript.py" selftest >/dev/null || { echo "grader self-check failed; aborting"; exit 4; }
-python3 "$HERE/score_typescript.py" batch --outputs "$ROUT" --tasks "$HERE/tasks.jsonl" \
-  --out "$OUTDIR/scores_repair.jsonl"
-echo "repaired replies: $ROUT   scores: $OUTDIR/scores_repair.jsonl"
-echo "compare scores_typescript.jsonl (before) vs scores_repair.jsonl (after one repair turn)."
+python3 "$Q/score_typescript.py" selftest >/dev/null || { echo "grader self-check failed; aborting"; exit 4; }
+python3 "$Q/score_typescript.py" batch --campaign "$D" --outputs "$ROUT" \
+  --out "$D/results/scores_repair.jsonl"
+echo "repaired replies: $ROUT   scores: $D/results/scores_repair.jsonl"
+echo "compare results/scores_typescript.jsonl (before) vs results/scores_repair.jsonl (after one repair turn)."

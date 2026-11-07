@@ -24,8 +24,8 @@ The judge is **blind**: it is never told which config/model produced the code.
 >
 > `[TASK SPEC]` … (the task's `spec.md`) … `[CANDIDATE SOLUTION]` … (the model's code, thinking stripped) …
 
-Output rows (`out/judge_scores.jsonl`): `{config, task_id, rep, tier, design, clarity, robustness, notes}`.
-The full prompt + raw reply is also saved to `out/judge_raw.jsonl` — so every judgement is auditable.
+Output rows (`results/judge_scores.jsonl`): `{config, task_id, rep, tier, design, clarity, robustness, notes}`.
+The full prompt + raw reply is also saved to `tmp/judge_raw.jsonl` — so every judgement is auditable.
 `make_charts.py` averages whatever numeric axes it finds (the judge chart + per-task heatmap), so you
 can change `AXES`/`RUBRIC` (here and in `judge.py`) without touching the charts.
 
@@ -45,40 +45,39 @@ reasonable cheaper single-judge. Start the tmux session **once**, then the runne
 
 ```bash
 tmux new-session -d -s claude-run                      # ONCE (name overridable: CLAUDE_TMUX_SESSION)
-bash run_capture.sh                                    # judges (and writes analysis.md) automatically
+bash bench/quality/run_capture.sh <campaign dir>       # judges (and writes the write-up) automatically
 # or judge an existing run without re-capturing:
-python3 judge.py --engine claude-tmux --model opus --subagent-model opus \
-  --outputs out/outputs.jsonl --tasks tasks.jsonl \
-  --out out/judge_scores.jsonl --raw out/judge_raw.jsonl
+python3 bench/quality/judge.py --engine claude-tmux --campaign <campaign dir> \
+  --model opus --subagent-model opus
 ```
 Mechanism: **Python does the deterministic prep** — for each not-yet-judged reply it strips `<think>`,
-extracts the code to `out/.judge-io/candidates/<id>.txt`, and splits the work into batch manifests
-(`out/.judge-io/batches/*.jsonl`) plus a single `rubric.txt`. Then `claude_ask.sh` opens **one**
+extracts the code to `tmp/.judge-io/candidates/<id>.txt`, and splits the work into batch manifests
+(`tmp/.judge-io/batches/*.jsonl`) plus a single `rubric.txt`. Then `claude_ask.sh` opens **one**
 interactive `claude` in a tmux window and **types a one-line request** pointing it at an orchestration
 prompt (the heavy content lives in files, so only a short line is ever typed → reliable keystrokes). That
 claude session is a pure **orchestrator**: it launches one `--subagent-model` (`opus` by default) subagent
 per batch via the Task tool, each of which reads the rubric + a candidate's spec + code and writes
-`out/.judge-io/results/<id>.json`. **Python then re-collects and parses** those verdict files
-(`parse_scores`, robust to fenced/extra text) into `out/judge_scores.jsonl` — so the fragile bit stays
+`tmp/.judge-io/results/<id>.json`. **Python then re-collects and parses** those verdict files
+(`parse_scores`, robust to fenced/extra text) into `results/judge_scores.jsonl` — so the fragile bit stays
 deterministic. It runs `--cwd` inside the (trusted) repo (no folder-trust dialog; `acceptEdits` covers the
 in-workspace writes); each subagent sees only spec + code, never which model/config produced it, so the
 judge stays **blind**. If the tmux session is missing it **errors with the start command** — never a
-silent headless fallback. Resumable at both levels: replies already in `out/judge_scores.jsonl` are
+silent headless fallback. Resumable at both levels: replies already in `results/judge_scores.jsonl` are
 skipped in prep, and a subagent skips any candidate whose verdict file already exists.
 
 ### 2. Automatic — any stronger hosted model (OpenAI-compatible)
 ```bash
-JUDGE_BASE_URL=https://api.example/v1 JUDGE_MODEL=<name> JUDGE_API_KEY=<key> bash run_capture.sh
+JUDGE_BASE_URL=https://api.example/v1 JUDGE_MODEL=<name> JUDGE_API_KEY=<key> bash bench/quality/run_capture.sh <campaign dir>
 ```
 
 ### 3. Manual — a Claude session (no CLI needed)
 Open a Claude conversation and paste, per reply you want judged (strip `<think>…</think>` first):
 the rubric above + the task's `spec.md` + the candidate code. Record the returned JSON as a line in
-`out/judge_scores.jsonl` with `config`/`task_id`/`rep` added. This is exactly how Campaign 2's judge
+`results/judge_scores.jsonl` with `config`/`task_id`/`rep` added. This is exactly how Campaign 2's judge
 was done. Fine for spot-checks; use mode 1 for the whole run.
 
 ---
 
 *After judging, re-run the charts (the runner does this automatically):*
-`python3 ../2026-07-12-27b-finetune-quality/make_charts.py --dir out --charts charts --order <labels> --calibration calibration.jsonl,calibration-hard.jsonl`
+`python3 bench/quality/make_charts.py --campaign <campaign dir> --order <labels> --calibration <campaign dir>/inputs/calibration-reps.jsonl`
 → the judge score appears as its own chart, in the per-task heatmap, and as a panel in the budget sweep.

@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # run_capture.sh — Campaign 2 (quality tuning) driver. Sweeps SERVER configs (model × mtp × kv ×
 # EXTRA_ARGS: reasoning-budget / spec-draft flags) and, per server, SAMPLING points (temp/top_p/top_k
-# via capture.py). Reuses the finetune-quality capture.py + graders (no duplication). Streams each
-# config's replies + telemetry into out/outputs.jsonl, samples VRAM/power per server, resumable
-# (per-sampling markers in out/done/), continues past a failed server (out/failures.txt).
+# via capture.py). Reuses the shared capture.py + graders under bench/quality/ (no duplication).
+# Streams each config's replies + telemetry into tmp/outputs.jsonl, samples VRAM/power per server,
+# resumable (per-sampling markers in tmp/done/), continues past a failed server (tmp/failures.txt).
+# This campaign keeps its own driver (server/sampling sweep + score_deterministic.py, not the
+# configs.jsonl + TS-grading pipeline of bench/quality/run_capture.sh).
 #
 #   bash run_capture.sh                       # all configs
 #   ONLY='jr-*'  bash run_capture.sh          # subset by config name glob (server 'name' field)
@@ -11,21 +13,22 @@
 #   CONTEXT_PREFIX=codereview-16000.txt bash run_capture.sh   # prepend a fixed agentic code context
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO="$(cd "$HERE/../.." && pwd)"
-FT="$REPO/campaigns/quality/2026-07-12-1736-27b-finetune-quality"   # source of capture.py + graders (reused)
+REPO="$(git -C "$HERE" rev-parse --show-toplevel 2>/dev/null)"
+[ -n "$REPO" ] || REPO="$(cd "$HERE/../../.." && pwd)"
+Q="$REPO/bench/quality"
 SERVE="$REPO/stack/serve/llamacpp/serve_llamacpp.sh"
 : "${MODELS_DIR:=/home/dev/models/gguf}"
 : "${PORT:=8081}" ; : "${CTX:=32768}" ; : "${UB:=2048}" ; : "${B:=4096}" ; : "${BACKEND:=vulkan}"
 : "${REPS:=1}" ; : "${MAX_TOKENS:=8192}" ; : "${ONLY:=}" ; : "${CONTEXT_PREFIX:=}"
-OUTDIR="$HERE/out" ; mkdir -p "$OUTDIR/done"
+OUTDIR="$HERE/tmp" ; mkdir -p "$OUTDIR/done"
 OUT="$OUTDIR/outputs.jsonl" ; VRAM="$OUTDIR/vram.jsonl"
 SAMPLER="$REPO/stack/gpu/vram_sampler.py"
-TASKS="$HERE/tasks/tasks.jsonl"
+TASKS="$HERE/inputs/tasks/tasks.jsonl"
 # optional: build a tasks file whose prompts are prefixed with a fixed code context (agentic depth)
 if [ -n "$CONTEXT_PREFIX" ]; then
   echo "NOTE: CONTEXT_PREFIX=$CONTEXT_PREFIX — prepending to every task prompt (agentic operating point)"
   TASKS="$OUTDIR/tasks-ctx.jsonl"
-  python3 - "$HERE/tasks/tasks.jsonl" "$REPO/bench/workloads/tmp/$CONTEXT_PREFIX" "$TASKS" <<'PY'
+  python3 - "$HERE/inputs/tasks/tasks.jsonl" "$REPO/bench/workloads/tmp/$CONTEXT_PREFIX" "$TASKS" <<'PY'
 import json,sys
 src,ctxf,out=sys.argv[1],sys.argv[2],sys.argv[3]
 ctx=open(ctxf).read()
@@ -87,7 +90,7 @@ while IFS=$'\t' read -r kind a b c d e f; do
     if [ -f "$OUTDIR/done/$label" ]; then echo "  skip (done): $label"; continue; fi
     if ! want "$label" && ! want "${name:-}"; then echo "  skip (ONLY): $label"; continue; fi
     echo "  capture $label (temp=$temp top_p=$top_p top_k=$top_k reps=$REPS)"
-    if python3 "$FT/capture.py" --config "$label" --tasks "$TASKS" --out "$OUT" \
+    if python3 "$Q/capture.py" --config "$label" --tasks "$TASKS" --out "$OUT" \
          --base-url "http://127.0.0.1:$PORT" --reps "$REPS" --max-tokens "$MAX_TOKENS" \
          --temp "$temp" --top-p "$top_p" --top-k "$top_k"; then
       touch "$OUTDIR/done/$label"
@@ -117,13 +120,13 @@ done < <(emit)
 stop_cur
 
 echo "=== deterministic scoring ==="
-python3 "$FT/graders/score_deterministic.py" --tasks "$TASKS" --outputs "$OUT" \
-  --out "$OUTDIR/scores_deterministic.jsonl" || true
+python3 "$Q/graders/score_deterministic.py" --tasks "$TASKS" --outputs "$OUT" \
+  --out "$HERE/results/scores_deterministic.jsonl" || true
 
 echo "=== charts (make_charts.py; judge charts fill in after Phase B) ==="
 # canonical config order for palette + row order (make_charts appends any config not listed here).
 CHART_ORDER='jr-t06,jr-t10,jr-t07,jr-rb2048,jr-rb1024,jr-rb512,jr-rb0,jr-q8,un-t06,un-t10,un-t07,un-rb2048,un-rb1024,un-rb512,un-pmin05,un-pmin075,un-nmax5'
-python3 "$FT/make_charts.py" --dir "$OUTDIR" --charts "$HERE/charts" --order "$CHART_ORDER" || true
+python3 "$Q/make_charts.py" --campaign "$HERE" --order "$CHART_ORDER" || true
 
 echo "done. Phase B (LLM-judge of the 3 rubric tasks) + Phase C (aggregate/write-up) are Claude's — see README."
-echo "  (re-run the make_charts.py line above after Phase B writes out/judge_scores.jsonl to populate the judge charts.)"
+echo "  (re-run the make_charts.py line above after Phase B writes results/judge_scores.jsonl to populate the judge charts.)"
