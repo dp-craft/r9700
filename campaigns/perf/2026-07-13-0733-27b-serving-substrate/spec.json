@@ -1,6 +1,6 @@
 {
   "slug": "27b-serving-substrate",
-  "date": "2026-07-12",
+  "date": "2026-07-13-0733",
   "title": "27B serving substrate — real prefill curve, KV f16/q8_0, MTP decode, cache reuse",
   "model": "/home/dev/models/gguf/Qwen3.6-27B-MTP-Q4_K_M.gguf",
   "backend": "vulkan",

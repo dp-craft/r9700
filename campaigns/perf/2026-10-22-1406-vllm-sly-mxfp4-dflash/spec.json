@@ -1,6 +1,6 @@
 {
   "slug": "vllm-sly-mxfp4-dflash",
-  "date": "2026-10-22",
+  "date": "2026-10-22-1406",
   "title": "Sly radiance 1.6.0 \u00b7 Qwen3.8-27B MXFP4 \u00b7 fp8 KV \u00b7 DFlash2 k=7 \u2014 depth curve + growing conversation",
   "notes": [
     "identical to campaigns/perf/2026-10-22-1324-vllm-sly-mxfp4-depth except speculative decoding (one variable)",

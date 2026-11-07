@@ -1,4 +1,4 @@
-# Qwen3.8-27B UD-Q4_K_XL (llama-swap sharp row) - W2-08 blind review (RUNBOOK step A) quality vs RedHat MXFP4 delta 0 (R9700, 2026-10-31)
+# Qwen3.8-27B UD-Q4_K_XL (llama-swap sharp row) - W2-08 blind review (RUNBOOK step A) quality vs RedHat MXFP4 delta 0 (R9700, 2026-10-31-0000)
 
 Scaffolded by `bench/core/gen_campaign.py` (`kind: agentic`). The executable driver is **`run.sh`** in this folder.
 Each (rep, arm) loads the llama-swap row `qwen38-27b-q4kxl-q8-mtp-kvq8-mtp-sharp-planning` **fresh** (`gpu_exclusive.sh` unloads every model first, so the prefix cache never carries over), creates a **fresh git
@@ -64,13 +64,15 @@ Continue: follow docs/plans/2026-10-28-2239-dpf-tui-f0-f1/review/27b-fix/RUNBOOK
 ## Run / rerun / re-collect
 ```bash
 bash campaigns/agentic/2026-10-31-0000-q4kxl-sharp-w208-blind/run.sh
-# resume after interruption: same command (done/ markers skip finished arms)
+# resume after interruption: same command (tmp/done/ markers skip finished arms)
 # subset / shorter:  ONLY='s1-*' REPS=1 CAP_S=3600 MAX_RESUMES=2 bash campaigns/agentic/2026-10-31-0000-q4kxl-sharp-w208-blind/run.sh
-# another output dir: RUN_DIR=/path bash campaigns/agentic/2026-10-31-0000-q4kxl-sharp-w208-blind/run.sh
+# another campaign dir: CAMPAIGN_DIR=/path bash campaigns/agentic/2026-10-31-0000-q4kxl-sharp-w208-blind/run.sh
 ```
-Output: `campaigns/agentic/2026-10-31-0000-q4kxl-sharp-w208-blind/` (or `$RUN_DIR`): `summary.tsv` (rep, arm, status, wall_s, calls, resumes, done_line,
-main_unchanged, port_free, image, env), `failures.txt`, `driver.log`, and per (rep, arm) `rep<R>/<arm>/`: `server.txt`,
-`calls.tsv`, `session-N.jsonl`, `gpu_samples.csv`, `wt.diff`, `outputs/`, `tmp/`, `claude-project/`, `main-*.txt`.
+Output: `results/` (committed): `summary.tsv` (rep, arm, status, wall_s, calls, resumes, done_line,
+main_unchanged, port_free, image, env), `failures.txt`, `spec.resolved.json`; `tmp/` (git-ignored raw):
+`done/`, `started/`, `.lock`, `driver.log`, `agentic_helper.py`, `stale/`, and per (rep, arm) `rep<R>/<arm>/`:
+`server.txt`, `calls.tsv`, `session-N.jsonl`, `gpu_samples.csv`, `wt.diff`, `outputs/`, `tmp/`,
+`claude-project/`, `main-*.txt`.
 
 An **interrupted** arm (started marker, no done marker) is reported and skipped on every rerun. Nothing is deleted. To
 re-collect by hand use the commands `run.sh` prints (worktree status/diff, the spec's `collect` paths, the
@@ -78,4 +80,4 @@ re-collect by hand use the commands `run.sh` prints (worktree status/diff, the s
 `git worktree remove --force` its worktree, then rerun.
 
 ## Write-up
-**benchmark-results** skill -> co-located `docs/findings/agentic/2026-10-31-0000-q4kxl-sharp-w208-blind.md` (summary + table first).
+**Write-up:** [`2026-10-30-1552-dpf-brief-fix-heretic-vs-redhat.md`](../../../docs/findings/agentic/2026-10-30-1552-dpf-brief-fix-heretic-vs-redhat.md) · [`2026-10-31-0000-q4kxl-sharp-w208-blind.md`](../../../docs/findings/agentic/2026-10-31-0000-q4kxl-sharp-w208-blind.md) · [`2026-10-31-1745-reasoning-replay-sharp-template-cactus-loops.md`](../../../docs/findings/agentic/2026-10-31-1745-reasoning-replay-sharp-template-cactus-loops.md) (its `<!-- meta -->` block names this campaign).

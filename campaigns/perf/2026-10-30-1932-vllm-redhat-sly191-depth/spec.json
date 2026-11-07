@@ -1,6 +1,6 @@
 {
   "slug": "vllm-redhat-sly191-depth",
-  "date": "2026-10-30",
+  "date": "2026-10-30-1932",
   "title": "Sly 1.9.1 (official recipe) \u00b7 RedHatAI Qwen3.8-27B-MXFP4 \u00b7 no drafter \u00b7 fp8 KV \u00b7 depth 10k/50k/100k",
   "notes": [
     "rerun of campaigns/perf/2026-10-30-0742-vllm-redhat-sly-depth (Sly 1.8.1) on Sly 1.9.1: image = the sly-redhat profile default since the 2026-10-30 switch (ghcr.io/slybase/vllm-sly-radiance:1.9.1-rocm10.1; gen_campaign.py has no image field -- logged on each server's start line in campaigns/perf/2026-10-30-1932-vllm-redhat-sly191-depth/tmp/2026-10-30-sly191-depth-reruns.log); RADIANCE_CACTUS_DELTA 0.5 as before + 1.9.x fade 4096->16384 / cap 0.5 (code defaults); same probes, ctx, reps",

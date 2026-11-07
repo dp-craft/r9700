@@ -1,6 +1,6 @@
 {
   "slug": "27b-maxctx-v2",
-  "date": "2026-07-12",
+  "date": "2026-07-12-1736",
   "title": "27B dense — max context by VRAM-logged sweep (measure-then-calculate)",
   "model": "/home/dev/models/gguf/Qwen3.6-27B-Q4_K_S.gguf",
   "backend": "vulkan",

@@ -5,24 +5,33 @@
 # Behaviour baked in (no hand-editing needed):
 #   * CONTINUE-ON-FAILURE: wt_exists | gpu_busy | server_fail | served_name_mismatch | wt_fail | prep_fail |
 #     proxy_fail are recorded in failures.txt and the run moves on. They leave NO marker, so a rerun retries them.
-#   * <run>/started/rep<R>.<arm> is written when the session loop begins; <run>/done/... only for the RESULT
+#   * tmp/started/rep<R>.<arm> is written when the session loop begins; tmp/done/... only for the RESULT
 #     statuses done|cap|max_resumes (a cap is a measured outcome). Started-without-done = `interrupted`
 #     (also what a claude_error leaves): recorded, SKIPPED, never auto-deleted or auto-retried (iron rule 18).
+#   * TWO ROOTS: raw -> <campaign>/tmp/ (done/ started/ markers, .lock, driver.log, agentic_helper.py, stale/,
+#     per-arm dirs rep<R>/<arm>/ with server logs, transcripts, GPU CSV, diffs, outputs);
+#     results -> <campaign>/results/ (summary.tsv, failures.txt, spec.resolved.json).
 #   * reuse_server=true: the server is ALREADY RUNNING (user-managed, :8000). The driver does NOT boot, stop or
 #     unload it -- no GPU-exclusive, no kill of a process the driver does not own (iron rule 14). It verifies the
 #     served name (shared check) and samples the GPU (VRAM sampler) for the arm's memory column; teardown stops only
 #     the sampler/proxy, leaving the server untouched. summary.tsv's port_free column reads 'reused'.
-#   * Knobs: ONLY='armglob,..' REPS=N CAP_S=sec MAX_RESUMES=N RUN_DIR=dir.
+#   * Knobs: ONLY='armglob,..' REPS=N CAP_S=sec MAX_RESUMES=N CAMPAIGN_DIR=dir.
 #     Tool paths (stub testing): SERVE_VLLM VRAM_SAMPLER CAPTURE_PROXY CLAUDE_BIN CURL.
 
 set -uo pipefail
-ROOT="${ROOT:-/home/dev/work/dp-craft/amd}"
-EB="$ROOT/bench/engine-bench"; LIB="$ROOT/bench/lib"
-RUN_DIR="${RUN_DIR:-$ROOT/campaigns/agentic/2026-11-01-0000-redhat191-dp-sharp-w208-blind}"
-SERVE_VLLM="${SERVE_VLLM:-$EB/vllm/serve_vllm.sh}"
-GPU_EXCLUSIVE="${GPU_EXCLUSIVE:-$LIB/gpu_exclusive.sh}"
-VRAM_SAMPLER="${VRAM_SAMPLER:-$LIB/vram_sampler.py}"
-CAPTURE_PROXY="${CAPTURE_PROXY:-$EB/vllm/capture_proxy.py}"
+[ -z "${RUN_DIR:-}" ] || { echo "RUN_DIR is no longer a knob: set CAMPAIGN_DIR (raw -> \$CAMPAIGN_DIR/tmp, results -> \$CAMPAIGN_DIR/results)" >&2; exit 2; }
+HERE="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+ROOT="${ROOT:-$(git -C "$HERE" rev-parse --show-toplevel 2>/dev/null)}"
+[ -n "$ROOT" ] || { echo "run.sh: cannot find the repo root (git toplevel of $HERE) -- set ROOT=" >&2; exit 1; }
+CAMPAIGN_DIR="${CAMPAIGN_DIR:-$HERE}"
+mkdir -p "$CAMPAIGN_DIR" && CAMPAIGN_DIR="$(cd "$CAMPAIGN_DIR" && pwd)"
+RAW="$CAMPAIGN_DIR/tmp"; RES="$CAMPAIGN_DIR/results"   # raw (ignored) / results (committed)
+mkdir -p "$RAW" "$RES"
+RUN_DIR="$RAW"   # the raw root (markers, lock, driver log, per-arm dirs)
+SERVE_VLLM="${SERVE_VLLM:-$ROOT/stack/serve/vllm/serve_vllm.sh}"
+GPU_EXCLUSIVE="${GPU_EXCLUSIVE:-$ROOT/stack/gpu/gpu_exclusive.sh}"
+VRAM_SAMPLER="${VRAM_SAMPLER:-$ROOT/stack/gpu/vram_sampler.py}"
+CAPTURE_PROXY="${CAPTURE_PROXY:-$ROOT/bench/core/capture_proxy.py}"
 CLAUDE_BIN="${CLAUDE_BIN:-claude}"
 DOCKER="${DOCKER:-docker}"; CURL="${CURL:-curl}"; SS="${SS:-ss}"
 ONLY="${ONLY:-}"; REPS="${REPS:-1}"; CAP_S="${CAP_S:-5400}"; MAX_RESUMES="${MAX_RESUMES:-1}"
@@ -51,7 +60,7 @@ arm_conf() {  # sets A_* for the named arm (profile/image/server knobs/merged en
 
 mkdir -p "$RUN_DIR/done" "$RUN_DIR/started"
 exec 9>"$RUN_DIR/.lock"
-flock -n 9 || { echo "another run.sh holds $RUN_DIR/.lock -- refusing to run two drivers on one run dir" >&2; exit 1; }
+flock -n 9 || { echo "another run.sh holds $RUN_DIR/.lock -- refusing to run two drivers on one campaign dir" >&2; exit 1; }
 # provenance: the exact helper and resolved config this run used
 cat > "$RUN_DIR/agentic_helper.py" <<'GC_HELPER_EOF'
 #!/usr/bin/env python3
@@ -251,7 +260,7 @@ if __name__ == "__main__":
         sys.exit("usage: agentic_helper.py sid|models|subst|done|prep|collect ...")
     sys.exit(fn(sys.argv[2:]))
 GC_HELPER_EOF
-cat > "$RUN_DIR/spec.resolved.json" <<'GC_CFG_EOF'
+cat > "$RES/spec.resolved.json" <<'GC_CFG_EOF'
 {
  "install": [
   {
@@ -317,7 +326,7 @@ cat > "$RUN_DIR/spec.resolved.json" <<'GC_CFG_EOF'
  "spec": {
   "kind": "agentic",
   "slug": "redhat191-dp-sharp-w208-blind",
-  "date": "2026-11-01",
+  "date": "2026-11-01-0000",
   "title": "RedHat Qwen3.8-27B-MXFP4 on Sly 1.9.1 (DFlash2 k=7, fp8, 262000), Cactus delta 0, with the dp-sharp chat template (keep-all reasoning, froggeric v22.5 + the dp terse prompt) - W2-08 blind review (RUNBOOK step A); one variable vs r191-sharp-d0 -- only the terse prompt differs (keep-all replay + delta 0 held fixed)",
   "engine": "vllm",
   "port": 8000,
@@ -433,7 +442,7 @@ cat > "$RUN_DIR/spec.resolved.json" <<'GC_CFG_EOF'
  }
 }
 GC_CFG_EOF
-CFG="$RUN_DIR/spec.resolved.json"
+CFG="$RES/spec.resolved.json"
 
 pyh() { python3 -I "$RUN_DIR/agentic_helper.py" "$@"; }
 log() { echo "$(date +%H:%M:%S) [${CUR:-run}] $*" | tee -a "$RUN_DIR/driver.log"; }
@@ -448,16 +457,16 @@ summary_row() {
   local img="-" f="$ARM_DIR/server.txt"
   [ -s "$f" ] && img=$(sed -n 's/^#   IMAGE=//p' "$f" | head -1)
   [ -n "$img" ] || img="-"
-  [ -e "$RUN_DIR/summary.tsv" ] || printf 'rep\tarm\tstatus\twall_s\tcalls\tresumes\tdone_line\tmain_unchanged\tport_free\timage\tenv\n' \
-    > "$RUN_DIR/summary.tsv"
+  [ -e "$RES/summary.tsv" ] || printf 'rep\tarm\tstatus\twall_s\tcalls\tresumes\tdone_line\tmain_unchanged\tport_free\timage\tenv\n' \
+    > "$RES/summary.tsv"
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$REP" "$ARM" "$R_STATUS" "$R_WALL" "$R_CALLS" "$R_RESUMES" \
-    "$(printf '%s' "$R_DONE_LINE" | tr '\t\n' '  ')" "$R_MAIN" "$R_PORTFREE" "$img" "${A_ENV_STR:--}" >> "$RUN_DIR/summary.tsv"
+    "$(printf '%s' "$R_DONE_LINE" | tr '\t\n' '  ')" "$R_MAIN" "$R_PORTFREE" "$img" "${A_ENV_STR:--}" >> "$RES/summary.tsv"
 }
 end_arm() {  # status [detail]: record the outcome (non-result statuses also go to failures.txt)
   R_STATUS=$1
   case "$R_STATUS" in
     done|cap|max_resumes|stopped) ;;
-    *) printf 'rep%s\t%s\t%s\t%s\n' "$REP" "$ARM" "$R_STATUS" "${2:-}" >> "$RUN_DIR/failures.txt"
+    *) printf 'rep%s\t%s\t%s\t%s\n' "$REP" "$ARM" "$R_STATUS" "${2:-}" >> "$RES/failures.txt"
        log "FAILED $R_STATUS: ${2:-}" ;;
   esac
   summary_row
@@ -558,7 +567,7 @@ run_one() {
     log "  re-collect by hand:  git -C '$WT' status --porcelain; git -C '$WT' diff $BASE; copy the spec's collect paths;"
     log "                       the transcript is in ~/.claude/projects/<mangled worktree path>/"
     log "  retry from scratch:  rm $RUN_DIR/started/$key; mv $ARM_DIR $ARM_DIR.attempt1; git -C '$REPO_DIR' worktree remove --force '$WT'; rerun"
-    if ! grep -qF "$(printf 'rep%s\t%s\tinterrupted\t' "$REP" "$ARM")" "$RUN_DIR/failures.txt" 2>/dev/null; then
+    if ! grep -qF "$(printf 'rep%s\t%s\tinterrupted\t' "$REP" "$ARM")" "$RES/failures.txt" 2>/dev/null; then
       mkdir -p "$ARM_DIR"; end_arm interrupted "started marker without done marker; see driver.log"
     fi
     return 0
@@ -674,7 +683,7 @@ for ((rep = 1; rep <= REPS; rep++)); do
     run_one "$rep" "$arm"
   done
 done
-echo; echo "=== run done: $RUN_DIR ==="
-[ -f "$RUN_DIR/summary.tsv" ] && cat "$RUN_DIR/summary.tsv"
-[ -f "$RUN_DIR/failures.txt" ] && { echo "--- failures (nothing here is auto-retried if it was interrupted/claude_error) ---"; cat "$RUN_DIR/failures.txt"; }
+echo; echo "=== run done: $CAMPAIGN_DIR (results: $RES, raw: $RUN_DIR) ==="
+[ -f "$RES/summary.tsv" ] && cat "$RES/summary.tsv"
+[ -f "$RES/failures.txt" ] && { echo "--- failures (nothing here is auto-retried if it was interrupted/claude_error) ---"; cat "$RES/failures.txt"; }
 exit 0

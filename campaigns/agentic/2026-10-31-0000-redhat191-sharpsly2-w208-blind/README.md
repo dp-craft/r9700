@@ -1,4 +1,4 @@
-# RedHat Qwen3.8-27B-MXFP4 on Sly 1.9.1 (DFlash2 k=7, fp8, 262000), Cactus delta 0, with the sharp-sly2 chat template (sly2 replay rule = newest assistant reasoning only, plus sharp's terseness block) - W2-08 blind review (RUNBOOK step A); one variable vs the r191-sharp-d0 run (sharp = keep all reasoning) (R9700, 2026-10-31)
+# RedHat Qwen3.8-27B-MXFP4 on Sly 1.9.1 (DFlash2 k=7, fp8, 262000), Cactus delta 0, with the sharp-sly2 chat template (sly2 replay rule = newest assistant reasoning only, plus sharp's terseness block) - W2-08 blind review (RUNBOOK step A); one variable vs the r191-sharp-d0 run (sharp = keep all reasoning) (R9700, 2026-10-31-0000)
 
 Scaffolded by `bench/core/gen_campaign.py` (`kind: agentic`). The executable driver is **`run.sh`** in this folder.
 Each (rep, arm) boots a **fresh** vllm server (so the prefix cache never carries over), creates a **fresh git
@@ -62,13 +62,15 @@ Continue: follow docs/plans/2026-10-28-2239-dpf-tui-f0-f1/review/27b-fix/RUNBOOK
 ## Run / rerun / re-collect
 ```bash
 bash campaigns/agentic/2026-10-31-0000-redhat191-sharpsly2-w208-blind/run.sh
-# resume after interruption: same command (done/ markers skip finished arms)
+# resume after interruption: same command (tmp/done/ markers skip finished arms)
 # subset / shorter:  ONLY='s1-*' REPS=1 CAP_S=3600 MAX_RESUMES=2 bash campaigns/agentic/2026-10-31-0000-redhat191-sharpsly2-w208-blind/run.sh
-# another output dir: RUN_DIR=/path bash campaigns/agentic/2026-10-31-0000-redhat191-sharpsly2-w208-blind/run.sh
+# another campaign dir: CAMPAIGN_DIR=/path bash campaigns/agentic/2026-10-31-0000-redhat191-sharpsly2-w208-blind/run.sh
 ```
-Output: `campaigns/agentic/2026-10-31-0000-redhat191-sharpsly2-w208-blind/` (or `$RUN_DIR`): `summary.tsv` (rep, arm, status, wall_s, calls, resumes, done_line,
-main_unchanged, port_free, image, env), `failures.txt`, `driver.log`, and per (rep, arm) `rep<R>/<arm>/`: `server.txt`,
-`calls.tsv`, `session-N.jsonl`, `gpu_samples.csv`, `wt.diff`, `outputs/`, `tmp/`, `claude-project/`, `main-*.txt`.
+Output: `results/` (committed): `summary.tsv` (rep, arm, status, wall_s, calls, resumes, done_line,
+main_unchanged, port_free, image, env), `failures.txt`, `spec.resolved.json`; `tmp/` (git-ignored raw):
+`done/`, `started/`, `.lock`, `driver.log`, `agentic_helper.py`, `stale/`, and per (rep, arm) `rep<R>/<arm>/`:
+`server.txt`, `calls.tsv`, `session-N.jsonl`, `gpu_samples.csv`, `wt.diff`, `outputs/`, `tmp/`,
+`claude-project/`, `main-*.txt`.
 
 An **interrupted** arm (started marker, no done marker) is reported and skipped on every rerun. Nothing is deleted. To
 re-collect by hand use the commands `run.sh` prints (worktree status/diff, the spec's `collect` paths, the
@@ -76,4 +78,4 @@ re-collect by hand use the commands `run.sh` prints (worktree status/diff, the s
 `git worktree remove --force` its worktree, then rerun.
 
 ## Write-up
-**benchmark-results** skill -> co-located `docs/findings/agentic/2026-10-31-0000-redhat191-sharpsly2-w208-blind.md` (summary + table first).
+**Write-up:** [`2026-10-31-0000-redhat191-sharpsly2-w208-blind.md`](../../../docs/findings/agentic/2026-10-31-0000-redhat191-sharpsly2-w208-blind.md) (its `<!-- meta -->` block names this campaign).

@@ -1,7 +1,7 @@
 {
   "kind": "agentic",
   "slug": "redhat191-dp-sharp-w208-blind",
-  "date": "2026-11-01",
+  "date": "2026-11-01-0000",
   "title": "RedHat Qwen3.8-27B-MXFP4 on Sly 1.9.1 (DFlash2 k=7, fp8, 262000), Cactus delta 0, with the dp-sharp chat template (keep-all reasoning, froggeric v22.5 + the dp terse prompt) - W2-08 blind review (RUNBOOK step A); one variable vs r191-sharp-d0 -- only the terse prompt differs (keep-all replay + delta 0 held fixed)",
   "engine": "vllm",
   "port": 8000,

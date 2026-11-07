@@ -1,6 +1,6 @@
 {
   "slug": "27b-maxctx-f16",
-  "date": "2026-07-12",
+  "date": "2026-07-12-0006",
   "title": "27B dense — validate f16 max context (and highest q8_0 context)",
   "model": "/home/dev/models/gguf/Qwen3.6-27B-Q4_K_S.gguf",
   "backend": "vulkan",

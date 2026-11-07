@@ -1,6 +1,6 @@
 {
   "slug": "vllm-redhat-radiance-depth",
-  "date": "2026-10-30",
+  "date": "2026-10-30-0745",
   "title": "vllm-radiance 0.9.3 \u00b7 RedHatAI Qwen3.8-27B-MXFP4 \u00b7 no drafter \u00b7 fp8 KV \u00b7 depth 10k/50k/100k",
   "notes": [
     "short perf test: cold prefill (unique prompts) + decode at 3 depths; ctx 110000 (prompt+256 fits)",

@@ -1,6 +1,6 @@
 {
   "slug": "deep-context",
-  "date": "2026-07-11",
+  "date": "2026-07-11-2200",
   "title": "Deep-context campaign — max depth + parallel at the ceiling",
   "model": "/home/dev/models/gguf/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf",
   "backend": "vulkan",

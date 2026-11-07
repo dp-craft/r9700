@@ -1,6 +1,6 @@
 {
   "slug": "vllm-redhat-sly-dflash-depth",
-  "date": "2026-10-30",
+  "date": "2026-10-30-0840",
   "title": "Sly 1.8.1 \u00b7 RedHatAI Qwen3.8-27B-MXFP4 \u00b7 DFlash2 k=7 \u00b7 fp8 KV \u00b7 depth 10k/50k/100k",
   "notes": [
     "same probes/ctx as vllm-redhat-sly-depth (no-spec baseline); one variable = speculative method"

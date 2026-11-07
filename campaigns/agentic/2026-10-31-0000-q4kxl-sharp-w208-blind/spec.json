@@ -1,7 +1,7 @@
 {
   "kind": "agentic",
   "slug": "q4kxl-sharp-w208-blind",
-  "date": "2026-10-31",
+  "date": "2026-10-31-0000",
   "title": "Qwen3.8-27B UD-Q4_K_XL (llama-swap sharp row) - W2-08 blind review (RUNBOOK step A) quality vs RedHat MXFP4 delta 0",
   "engine": "llama-swap",
   "port": 9292,

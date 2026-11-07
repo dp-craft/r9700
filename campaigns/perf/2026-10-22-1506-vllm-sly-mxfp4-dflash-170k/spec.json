@@ -1,6 +1,6 @@
 {
   "slug": "vllm-sly-mxfp4-dflash-170k",
-  "date": "2026-10-22",
+  "date": "2026-10-22-1506",
   "title": "Sly radiance 1.6.0 · Qwen3.8-27B MXFP4 · fp8 KV · DFlash2 k=7 — 170k window: fill 150k, then think until full (memory over time)",
   "notes": [
     "question: is VRAM/GTT flat or creeping while a 170k window fills to the edge? find a safe max setting",

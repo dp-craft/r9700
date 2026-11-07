@@ -1,7 +1,7 @@
 {
   "kind": "agentic",
   "slug": "redhat191-sharp-w208-blind",
-  "date": "2026-10-31",
+  "date": "2026-10-31-0000",
   "title": "RedHat Qwen3.8-27B-MXFP4 on Sly 1.9.1 (DFlash2 k=7, fp8, 262000) with the sharp chat template - W2-08 blind review (RUNBOOK step A) at Cactus delta 0 / 0.3 / 0.5 (1.9.1 fade+cap at image defaults); quality, loops and speed vs the 1.8.1 + sharp + delta 0 run",
   "engine": "vllm",
   "port": 8000,

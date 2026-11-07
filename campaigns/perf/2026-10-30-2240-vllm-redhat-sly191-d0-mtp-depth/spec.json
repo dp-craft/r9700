@@ -1,6 +1,6 @@
 {
  "slug": "vllm-redhat-sly191-d0-mtp-depth",
- "date": "2026-10-30",
+ "date": "2026-10-30-2240",
  "title": "Sly 1.9.1 · RedHatAI Qwen3.8-27B-MXFP4 · MTP k=4 · CACTUS_DELTA=0 (stock sampling) · fp8 KV · ctx 262000 · depth 10k/50k/100k/150k",
  "engine": "vllm",
  "profile": "sly-redhat/redhat-mxfp4-mtp",

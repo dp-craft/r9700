@@ -1,6 +1,6 @@
 {
   "slug": "vllm-sly-mxfp4-depth",
-  "date": "2026-10-22",
+  "date": "2026-10-22-1324",
   "title": "Sly radiance 1.6.0 · Qwen3.8-27B MXFP4 · fp8 KV — depth curve + growing conversation",
   "notes": ["fp8 KV only (user decision: no 16-bit KV arm)", "ctx 150000 max (user cap)",
             "power: monitor only; phase avg < 150 W is flagged as a config suspect (card cap 210 W)",

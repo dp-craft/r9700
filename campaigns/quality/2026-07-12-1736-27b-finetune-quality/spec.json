@@ -1,7 +1,7 @@
 {
   "kind": "quality",
   "slug": "27b-finetune-quality",
-  "date": "2026-07-12",
+  "date": "2026-07-12-1736",
   "title": "Qwen3.6-27B fine-tune shootout — output quality + token usage",
   "notes": [
     "All 5 configs share the identical qwen35 HYBRID arch (16 full-attn + 48 SSM + 1 nextn),",

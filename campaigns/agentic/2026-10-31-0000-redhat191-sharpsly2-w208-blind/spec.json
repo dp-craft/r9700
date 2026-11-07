@@ -1,7 +1,7 @@
 {
   "kind": "agentic",
   "slug": "redhat191-sharpsly2-w208-blind",
-  "date": "2026-10-31",
+  "date": "2026-10-31-0000",
   "title": "RedHat Qwen3.8-27B-MXFP4 on Sly 1.9.1 (DFlash2 k=7, fp8, 262000), Cactus delta 0, with the sharp-sly2 chat template (sly2 replay rule = newest assistant reasoning only, plus sharp's terseness block) - W2-08 blind review (RUNBOOK step A); one variable vs the r191-sharp-d0 run (sharp = keep all reasoning)",
   "engine": "vllm",
   "port": 8000,

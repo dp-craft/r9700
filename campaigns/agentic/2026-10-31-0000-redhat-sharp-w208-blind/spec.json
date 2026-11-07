@@ -1,7 +1,7 @@
 {
   "kind": "agentic",
   "slug": "redhat-sharp-w208-blind",
-  "date": "2026-10-31",
+  "date": "2026-10-31-0000",
   "title": "RedHat Qwen3.8-27B-MXFP4 (Sly 1.8.1, Cactus delta 0, DFlash2 k=7) with the sharp chat template - W2-08 blind review (RUNBOOK step A); the RedHat delta-0 baseline with only the template changed",
   "engine": "vllm",
   "port": 8000,
