@@ -3,7 +3,7 @@
 Planted log lines are fiction and must never be cited as data."""
 import ast,glob,hashlib,json,os,random,re,shutil,statistics,sys,urllib.request
 root=sys.argv[1]
-AMD="/home/dev/work/dp-craft/amd"; DIP="/home/dev/work/dippe"
+AMD=os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))); DIP="/home/dev/work/dippe"
 def toks(s):
     n=0
     for i in range(0,len(s),400000):
@@ -21,7 +21,7 @@ PLANT=[("ERROR","(EngineCore pid=491) ERROR 10-30 17:12:44 [scheduler.py:912] Se
 ("BARE","Segmentation fault (core dumped) in worker 3"),
 ("BARE","RuntimeError: KV pool exhausted at 31204 MiB"),
 ("CRITICAL","(EngineCore pid=491) CRITICAL 10-30 18:01:17 [core.py:540] Engine core died unexpectedly, restarting")]
-LOGSRC=f"{AMD}/bench/runs/2026-10-30-0947-dpf-brief-ab/redhat/server-container.log"
+LOGSRC=f"{AMD}/campaigns/agentic/2026-10-30-0947-dpf-brief-ab/tmp/redhat/server-container.log"
 raw=[re.sub(r"\x1b\[[0-9;]*m","",l)[:600] for l in open(LOGSRC,errors="replace").read().split("\n")]
 LEVEL=re.compile(r"^\(\w+ pid=\d+\) (WARNING|ERROR|CRITICAL) |^[EW] [a-z]|^(Traceback|\S*Error:|\S*Exception:)")
 def norm(l):
@@ -51,12 +51,12 @@ for z,n in (("S",40),("M",150),("L",300)):
     t="\n".join(out); open(f"{d}/findings.txt","w").write(t); save(d,{"rows":k}); SIZES[f"bugs-{z}"]=toks(t)
 # ---- json: real benchmark results, questions with a python oracle
 J=[]
-for f in sorted(glob.glob(f"{AMD}/bench/runs/*/results.jsonl")):
+for f in sorted(glob.glob(f"{AMD}/campaigns/*/*/results/**/results.jsonl",recursive=True)):
     if os.path.getsize(f)>120000: continue
     for l in open(f):
         try: r=json.loads(l)
         except: continue
-        if isinstance(r,dict) and r.get("label") and r.get("kind")=="request" and isinstance(r.get("decode_tok_s"),(int,float)) and isinstance(r.get("prefill_tok_s"),(int,float)): r["source"]=os.path.basename(os.path.dirname(f));J.append(r)
+        if isinstance(r,dict) and r.get("label") and r.get("kind")=="request" and isinstance(r.get("decode_tok_s"),(int,float)) and isinstance(r.get("prefill_tok_s"),(int,float)): r["source"]=os.path.basename(os.path.dirname(f).removesuffix("/results"));J.append(r)
 random.Random(11).shuffle(J)
 def questions(rows):
     rnd=random.Random(len(rows)); labs=sorted({r["label"] for r in rows}); byl={}
@@ -83,7 +83,7 @@ for z,n in (("S",40),("M",200),("L",650)):
     save(d,{"answers":{f"Q{i}":a for i,(_,a) in enumerate(Q,1)},"rows":len(rows)}); SIZES[f"json-{z}"]=toks(t)
 # ---- summary: real reports
 def rd(p): return open(p,encoding="utf8").read()
-cands=[(toks(rd(p)),p) for p in sorted(glob.glob(f"{AMD}/docs/analysis/*.md"))+sorted(glob.glob(f"{AMD}/campaigns/*/analysis.md"))]
+cands=[(toks(rd(p)),p) for p in sorted(glob.glob(f"{AMD}/docs/findings/**/*.md",recursive=True))]
 def near(n): return min(cands,key=lambda c:abs(c[0]-n))
 for z,target in (("S",6000),("M",20000),("L",60000)):
     d=mk(f"summary-{z}"); t,p=near(target); shutil.copy(p,f"{d}/report.md"); save(d,{"src":os.path.relpath(p,AMD)}); SIZES[f"summary-{z}"]=t
@@ -93,8 +93,8 @@ CUTOFF=float(os.environ.get("PREP_CUTOFF",0))  # keep the classify pool as it wa
 def clean(ps):
     ps=[p for p in ps if not CUTOFF or os.path.getmtime(p)<CUTOFF]
     return sorted(p for p in ps if not re.search(r"/(\.gate-code|\.claude/worktrees|node_modules|tmp)/",p) and os.path.getsize(p)>400)
-G={"benchmark-report":clean(glob.glob(f"{AMD}/docs/analysis/*.md")+glob.glob(f"{AMD}/campaigns/*/analysis.md")),
-"research":clean(glob.glob(f"{AMD}/docs/research/*.md")+glob.glob(f"{DIP}/AiChatney/docs/research/**/*.md",recursive=True)),
+G={"benchmark-report":clean(glob.glob(f"{AMD}/docs/findings/**/*.md",recursive=True)),
+"research":clean(glob.glob(f"{AMD}/docs/research/**/*.md",recursive=True)+glob.glob(f"{DIP}/AiChatney/docs/research/**/*.md",recursive=True)),
 "feature-spec":clean(glob.glob(f"{DIP}/AiChatney/specs/*/spec.md")+glob.glob(f"{DIP}/dp-forge/specs/*/spec.md")),
 "task-list":clean(glob.glob(f"{DIP}/AiChatney/specs/*/tasks.md")+glob.glob(f"{DIP}/dp-forge/specs/*/tasks.md")),
 "code-review":clean(glob.glob(f"{DIP}/AiChatney/docs/reviews/**/*.md",recursive=True)+glob.glob(f"{DIP}/dp-forge/reviews/**/*.md",recursive=True)),
@@ -122,7 +122,7 @@ for z,n in (("S",40),("M",160),("L",min(420,len(pool)))):
         t.append(f"=== ITEM {i:03d} ===\n{head}\n");k[f"{i:03d}"]=lab
     s="\n".join(t);open(f"{d}/items.txt","w").write(s);save(d,{"labels":k});SIZES[f"classify-{z}"]=toks(s)
 # ---- codeinv: real python, ast oracle
-PY=sorted(glob.glob(f"{AMD}/bench/*.py")+glob.glob(f"{AMD}/bench/lib/*.py")+glob.glob(f"{AMD}/bench/model-bench/*.py"),key=os.path.getsize)
+PY=sorted(glob.glob(f"{AMD}/bench/core/*.py")+glob.glob(f"{AMD}/stack/gpu/*.py")+glob.glob(f"{AMD}/bench/build-check/*.py")+glob.glob(f"{AMD}/bench/perf/model-bench/*.py"),key=os.path.getsize)
 sz=[(toks(rd(p)),p) for p in PY]
 def pick(target):
     out=[];n=0

@@ -3,7 +3,7 @@
 docsplit: one report, split per top-level section. docreorg: H2 sections of 3 reports, shuffled with a fixed seed into one file.
 key.json holds the oracle. Set TOKENIZE=1 to count source tokens through the running server."""
 import json, os, random, re, sys, urllib.request
-REPO = "/home/dev/work/dp-craft/amd"
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 UC = sys.argv[1]
 SPLIT = {
     "P": "CLAUDE.md",

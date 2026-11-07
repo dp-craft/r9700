@@ -24,9 +24,9 @@ Manual / fallback (no systemd session):
 ```bash
 ~/.local/bin/llama-swap -config ~/.config/llama-swap/config.yaml -listen :9292 -watch-config
 ```
-> A manual instance is bound to `:9292` right now (`~/.config/llama-swap/logs/llama-swap.pid`).
+> A manual instance is bound to `:9292` right now (`~/.config/llama-swap/var/logs/llama-swap.pid`).
 > Stop it before enabling the systemd unit or the second one can't bind the port:
-> `kill $(cat ~/.config/llama-swap/logs/llama-swap.pid)`
+> `kill $(cat ~/.config/llama-swap/var/logs/llama-swap.pid)`
 
 Use in opencode: `/models` → **llama-swap (R9700 local)** → pick a model. First request loads it
 (20 GB gguf from the backup disk → allow ~30–70 s); later requests are instant until you switch.
