@@ -230,21 +230,23 @@ staged **in the HF cache** (not `models_dir`), so a campaign sets `MODEL=` to th
 **Runbook — new-model QUALITY campaign** (`gen_campaign.py`'s `kind: quality` does not cover the TS
 `tsc + eslint + vitest` harness; this track is the legit hand-written exception, iron rule 6 — but
 REUSE a grader-fixed harness, don't reinvent). **Worked example scaffold: `campaigns/quality/2026-07-19-0000-ornith-vs-gemma/`.**
-1. **Canonical harness = the TS `hardest-tasks` one** (`campaigns/quality/2026-07-14-0000-hardest-tasks-27b-vs-35b/`):
-   real `tsc + eslint + vitest` grading with a **pre-grade `score_typescript.py selftest`** that aborts
-   if vitest can't spawn (the fix for the silent tests=0 bug). It is **`configs.jsonl`-driven** (one JSON
-   cell/line: `label,model,mtp,kv,depth,tokens,ctx,budget,temp,top_p,top_k,min_p[,presence_penalty],role`).
-   `cp` it into `campaigns/<date>-<slug>/` (exclude `out/ charts/ __pycache__/ ts-harness/node_modules/`;
-   **symlink** node_modules; `capture.py`/`make_charts.py` stay referenced from the sibling
-   `2026-07-12-27b-finetune-quality/` dir). Write a NEW `configs.jsonl`; **patch the copied `run_capture.sh`
-   campaign identity** (title + the `SUMMARY` heredoc's paths) and default `JUDGE_ENGINE=none SUMMARY=0`.
-   (Lighter deterministic alt for non-TS tasks: `27b-finetune-quality/` `score_deterministic.py`.)
+1. **One shared driver: `bench/quality/run_capture.sh <campaign_dir>`** (real `tsc + eslint + vitest` grading
+   with a **pre-grade `score_typescript.py selftest`** that aborts if vitest can't spawn — the fix for the
+   silent tests=0 bug). A new campaign is just a dir `campaigns/quality/<YYYY-MM-DD-HHMM>-<slug>/` holding:
+   `configs.jsonl` (one JSON cell/line: `label,model,mtp,kv,depth,tokens,ctx,budget,temp,top_p,top_k,min_p[,presence_penalty],role`),
+   `campaign.env` (`KEY=value`: `TITLE`, `REPS`, `CALIB`, `JUDGE_ENGINE`, `SUMMARY`, …; the caller's env wins),
+   `inputs/tasks.jsonl` (+ `inputs/calibration*.jsonl`), and optionally `summary-prompt.md` (the campaign's own
+   SUMMARY=1 write-up questions). Copy those four from the worked example and edit them; nothing else is copied.
+   (Lighter deterministic alt for non-TS tasks: `bench/quality/graders/score_deterministic.py`, as the
+   `2026-07-12-1736-27b-finetune-quality` campaign's own driver does.)
 2. Point models at `MODELS_DIR=/home/dev/models/gguf` — **symlink HF-cache ggufs in** by clean filename;
    `configs.jsonl.model` is resolved as `$MODELS_DIR/$model`. Substrate = Vulkan · f16 · `-ub 2048 -b 4096
-   -fa on` (serve via `serve_llamacpp.sh`; the driver owns start/stop + VRAM sampling).
-3. `run_capture.sh` = capture → `score_typescript.py batch` (self-check gated) → `make_charts.py` +
-   `make_charts_detailed.py` → `aggregate.py` (→ `out/summary.md`); write co-located `analysis.md` via
-   **/benchmark-results** (memory column mandatory). Resumable: row-level in `capture.py` + `out/done/` markers.
+   -fa on` (the driver's defaults; it serves via `serve_llamacpp.sh` and owns start/stop + VRAM sampling).
+3. The driver = capture → `score_typescript.py batch` (self-check gated) → `make_charts.py` +
+   `make_charts_detailed.py` → `aggregate.py`. Raw (replies, VRAM, GPU CSVs, `done/` markers) → `<dir>/tmp/`;
+   scores, `summary.md`, charts, appendices, `gpu_peaks.json` → `<dir>/results/`. Write-up →
+   `docs/findings/quality/<dir basename>.md` via **/benchmark-results** (memory column mandatory), or
+   `SUMMARY=1`. Resumable: row-level in `capture.py` + `tmp/done/` markers.
 - Debugging/tracing: kill servers by pidfile `stack/serve/var/servers/<port>.pid` (iron rule 14); an orphan
   `llama-server` fabricates fake findings — verify port free + VRAM idle before relaunch.
 
