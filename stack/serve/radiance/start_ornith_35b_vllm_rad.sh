@@ -62,14 +62,23 @@ case "${1:-start}" in
         echo "ready: claude --settings $SETTINGS"; exit 0
       fi
       if [ "$(docker inspect -f '{{.State.Running}}' "$NAME" 2>/dev/null)" != true ]; then
-        echo "container exited during boot; last log lines:" >&2; docker logs --tail 40 "$NAME" >&2; exit 1
+        echo "container exited during boot; last log lines:" >&2; docker logs --tail 40 "$NAME" >&2
+        docker rm -f "$NAME" >/dev/null 2>&1 || true   # a failed boot must not leak the container (2026-11-08: bind race)
+        exit 1
       fi
       sleep 5
     done
-    echo "not up after ${WAIT}s; 'docker logs $NAME'" >&2; exit 1;;
+    echo "not up after ${WAIT}s; last log lines:" >&2; docker logs --tail 40 "$NAME" >&2
+    docker rm -f "$NAME" >/dev/null 2>&1 || true   # a failed boot must not leak the container
+    exit 1;;
   stop) docker stop -t 60 "$NAME" >/dev/null 2>&1 || true; docker rm -f "$NAME" >/dev/null 2>&1 || true
     for _ in $(seq 30); do ss -ltn | grep -q ":$PORT " || break; sleep 1; done
-    if ss -ltn | grep -q ":$PORT "; then echo "port $PORT still held" >&2; exit 1; fi;;
+    if ss -ltn | grep -q ":$PORT "; then echo "port $PORT still held" >&2; exit 1; fi
+    # TIME_WAIT: closed connections hold :$PORT for the kernel MSL (~60 s) with no LISTEN socket left,
+    # so a fresh bind fails EADDRINUSE in that window (seen 2026-11-08: stop->start back-to-back).
+    # Wait it out so "stopped" means the port is actually re-bindable.
+    for _ in $(seq 70); do ss -ltn state time-wait 2>/dev/null | grep -q ":$PORT " || break; sleep 1; done
+    ;;
   status) docker ps --filter "name=^$NAME$" --format '{{.Names}} {{.Image}} {{.Status}}'
     curl -s -m 3 "http://127.0.0.1:$PORT/v1/models" || true; echo;;
   logs) docker logs "$NAME";;

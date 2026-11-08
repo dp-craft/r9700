@@ -102,8 +102,11 @@ case "${1:-start}" in
   stop)
     if docker inspect "$NAME" >/dev/null 2>&1; then
       docker logs "$NAME" > "$LOGFILE" 2>&1 || true
-      # a GPU process wedged in the driver makes docker rm -f hang (D-state); the timeout turns that
-      # hang into a loud failure instead (iron rule 15: silence is not a clean run)
+      # graceful first -- the official stop for a dockerized engine (SIGTERM: it flushes and releases
+      # the GPU cleanly; a SIGKILL'd engine can wedge the card, iron rule 15). docker escalates to
+      # SIGKILL itself if 60 s pass; the rm -f below is the backstop (a GPU process wedged in the
+      # driver makes even that hang in D-state, so the timeout turns the hang into a loud failure).
+      docker stop -t 60 "$NAME" >/dev/null 2>&1 || true
       timeout 60 docker rm -f "$NAME" >/dev/null || {
         echo "FAILED to remove $NAME (docker rm -f timed out or was refused — GPU process may be wedged in the driver)" >&2
         echo "  check: ss -ltnp | grep :$PORT  ·  amd-smi process -g 0  ·  reboot if it persists" >&2
@@ -116,6 +119,11 @@ case "${1:-start}" in
         echo "  the process is stuck — if it persists the GPU may need a reboot (iron rule 15)" >&2
         exit 1
       fi
+      # TIME_WAIT: the engine's just-closed connections (incl. Claude sessions' keep-alives) hold :$PORT
+      # for the kernel MSL (~60 s) with NO LISTEN socket left -- a fresh docker bind fails EADDRINUSE in
+      # that window (seen 2026-11-08: stop->start back-to-back). Wait it out so "stopped" means the port
+      # is actually re-bindable.
+      for _ in $(seq 70); do ss -ltn state time-wait 2>/dev/null | grep -q ":$PORT " || break; sleep 1; done
       echo "stopped $NAME (log kept: $LOGFILE)"
     else
       rm -f "$CFILE"   # stale state without a container (crash/restart): stop must leave no state behind
@@ -302,7 +310,7 @@ if [ "${1:-start}" = start ]; then
       y|Y|yes|YES) ;;
       *) echo "aborted -- the running instance was not touched" >&2; exit 1;;
     esac
-    if container_exists; then docker rm -f "$NAME" >/dev/null 2>&1; rm -f "$CFILE"; fi
+    if container_exists; then docker stop -t 60 "$NAME" >/dev/null 2>&1 || true; timeout 60 docker rm -f "$NAME" >/dev/null 2>&1; rm -f "$CFILE"; fi
     for _ in $(seq 10); do port_held || break; sleep 1; done   # docker releases the port after the rm
     if port_held; then   # still owned: a foreign container publishing the port, or an orphaned process
       foreign=$(docker ps -q --filter "publish=$PORT")
