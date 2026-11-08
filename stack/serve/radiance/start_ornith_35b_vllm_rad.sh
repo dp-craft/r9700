@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# stack/serve/radiance/ornith_rad_mtp.sh — start/stop native Radiance serving keptn/ornith-1.5-35b-a3b-w4a8 (own MTP head, K=3) on one card.
-#   stack/serve/radiance/ornith_rad_mtp.sh start|stop|status|logs        then: claude --settings ~/.config/claude/local_vllm_direct/settings-redhat.json
+# stack/serve/radiance/start_ornith_35b_vllm_rad.sh — start/stop native Radiance ("rad") serving
+# keptn/ornith-1.5-35b-a3b-w4a8 (own MTP head, K=3) on one card. (was ornith_rad_mtp.sh, renamed 2026-11-08)
+#   start_ornith_35b_vllm_rad.sh start|stop|status|logs        then: claude --settings ~/.config/claude/local_vllm_direct/settings-redhat.json
 # Flags = the creator's deploy/compose/ornith-1.5-35b-a3b-w4a8-tp1.yaml (codeberg.org/StillDeadcode/radiance) verbatim.
 # Deviations from that compose file, none of them model-facing:
 #   --host 127.0.0.1 instead of :: (local only, so no API key); no restart policy (a reboot must not hold VRAM);
@@ -33,13 +34,16 @@ PORT=${PORT:-$SET_PORT}
 FREE_MIB_FLOOR=${FREE_MIB_FLOOR:-30000}
 WAIT=${WAIT:-900}
 NAME=radiance-$PORT
+# stack/ lives in the amd repo; the git-toplevel trick broke when this script got copied/symlinked
+# out of it (~/.config and dp-forge are their own git repos), so the root is explicit now.
+AMD_ROOT=${AMD_ROOT:-/home/dev/work/dp-craft/amd}
 
 case "${1:-start}" in
   start)
     if ss -ltn | grep -q ":$PORT "; then echo "port $PORT is in use -- stop that server first" >&2; exit 1; fi
     [ -f "$MODEL_DIR/ornith-1.5-35b-a3b-w4a8.rad" ] || { echo "checkpoint missing in $MODEL_DIR (see Fetch above)" >&2; exit 1; }
     docker rm -f "$NAME" >/dev/null 2>&1 || true
-    "$(git -C "$HERE" rev-parse --show-toplevel)/stack/gpu/gpu_exclusive.sh" "$FREE_MIB_FLOOR"
+    "$AMD_ROOT/stack/gpu/gpu_exclusive.sh" "$FREE_MIB_FLOOR"
     # shellcheck disable=SC2086
     docker run -d --name "$NAME" --init --network host --user "$(id -u):$(id -g)" \
       --device /dev/kfd --device /dev/dri \
@@ -53,7 +57,8 @@ case "${1:-start}" in
       --chat-template-kwargs '{"enable_thinking":true}' --reasoning-effort-map none=high,minimal=high ${EXTRA_ARGS:-} >/dev/null
     for ((i = 0; i < WAIT; i += 5)); do
       if curl -sf -m 3 "http://127.0.0.1:$PORT/v1/models" >/dev/null; then
-        echo "up after ${i}s on port $PORT: $IMAGE, served as $MODEL"
+        echo "up after ${i}s on port $PORT: $IMAGE (Ornith 1.5-35B-A3B w4a8, own MTP K=3)"
+        echo "served under alias $MODEL (settings-redhat.json is shared with the 27B server, so /v1/models shows that name)"
         echo "ready: claude --settings $SETTINGS"; exit 0
       fi
       if [ "$(docker inspect -f '{{.State.Running}}' "$NAME" 2>/dev/null)" != true ]; then

@@ -1,0 +1,1 @@
+stack/serve/vllm/start_heretic_27b.sh

@@ -90,15 +90,40 @@ watchdog() {
   done
 }
 
+port_holder() {   # describe whatever is LISTENing on :$PORT (containers first, then raw pids)
+  local f pid
+  f=$(docker ps --format '{{.Names}}' --filter "publish=$PORT" | tr '\n' ' ')
+  if [ -n "$f" ]; then echo "container(s) $f"; return; fi
+  pid=$(ss -ltnp 2>/dev/null | grep ":$PORT " | grep -oP 'pid=\K[0-9]+' | sort -u | head -3 | tr '\n' ' ')
+  echo "pid(s) ${pid:-unknown — ss -ltnp | grep :$PORT}"
+}
+
 case "${1:-start}" in
   stop)
     if docker inspect "$NAME" >/dev/null 2>&1; then
       docker logs "$NAME" > "$LOGFILE" 2>&1 || true
-      docker rm -f "$NAME" >/dev/null; rm -f "$CFILE"
+      # a GPU process wedged in the driver makes docker rm -f hang (D-state); the timeout turns that
+      # hang into a loud failure instead (iron rule 15: silence is not a clean run)
+      timeout 60 docker rm -f "$NAME" >/dev/null || {
+        echo "FAILED to remove $NAME (docker rm -f timed out or was refused — GPU process may be wedged in the driver)" >&2
+        echo "  check: ss -ltnp | grep :$PORT  ·  amd-smi process -g 0  ·  reboot if it persists" >&2
+        exit 1
+      }
+      rm -f "$CFILE"
       for _ in $(seq 30); do ss -ltn | grep -q ":$PORT " || break; sleep 1; done
+      if ss -ltn | grep -q ":$PORT "; then
+        echo "$NAME was removed but port $PORT is still held by: $(port_holder)" >&2
+        echo "  the process is stuck — if it persists the GPU may need a reboot (iron rule 15)" >&2
+        exit 1
+      fi
       echo "stopped $NAME (log kept: $LOGFILE)"
     else
       rm -f "$CFILE"   # stale state without a container (crash/restart): stop must leave no state behind
+      if ss -ltn | grep -q ":$PORT "; then
+        echo "no container $NAME, but port $PORT is still held by: $(port_holder)" >&2
+        echo "  stop it with ITS starter (e.g. start_ornith_35b_vllm_rad.sh stop for radiance-$PORT), not this one" >&2
+        exit 1
+      fi
       echo "no container $NAME"
     fi
     exit 0;;
@@ -283,7 +308,8 @@ if [ "${1:-start}" = start ]; then
       foreign=$(docker ps -q --filter "publish=$PORT")
       if [ -n "$foreign" ]; then
         echo "port $PORT is published by foreign container(s): $(docker ps --format '{{.Names}}' $foreign | tr '\n' ' ')" >&2
-        echo "removing them per your answer" >&2
+        echo "stopping them per your answer (graceful -- a SIGKILL'd engine can wedge the GPU, see iron rule 15)" >&2
+        docker stop -t 60 $foreign >/dev/null 2>&1 || true   # 60 s graceful; docker escalates to SIGKILL itself after
         docker rm -f $foreign >/dev/null 2>&1
       else
         pid=$(ss -ltnp 2>/dev/null | grep ":$PORT " | grep -oP 'pid=\K[0-9]+' | head -1) || true
