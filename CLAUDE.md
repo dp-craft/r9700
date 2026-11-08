@@ -64,8 +64,8 @@ docs/
   guides/              ← GUIDE.md (operator how-to, both tracks) · driver-upgrade-runbook.md · vllm/ (vLLM
                          knowledge base: versions, settings, known issues, workflows, sources)
   articles/            ← published write-ups
-.claude/skills/        ← benchmark-new-campaign · benchmark-results · llamacpp-build (personal skills and
-                         commands are git-ignored symlinks)
+.claude/skills/        ← benchmark-new-campaign · benchmark-results · llamacpp-build · vllm-image ·
+                         radiance-image (personal skills and commands are git-ignored symlinks)
 ```
 
 **Ignored anywhere:** every `tmp/` and `var/` dir (raw run data, builds, venvs, server state, logs),

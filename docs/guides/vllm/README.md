@@ -30,6 +30,9 @@ One engine per `stack/serve/vllm/profiles/<engine>/` folder, plus native Radianc
 | What does a flag / env knob do? | `settings.md` |
 | What's a live failure / fault / OOM? | `known-issues.md` |
 | How do I boot / observe / run / debug? | `workflows.md` |
+| Upgrade / try a new Sly image tag? | **`/vllm-image`** skill (`.claude/skills/vllm-image/`: check improvements → your call (continue/skip) → install → smoke → bench vs previous → your call → promote) |
+| Upgrade the native Radiance image? | **`/radiance-image`** skill (`.claude/skills/radiance-image/`, same shape) |
+| What changed in past image upgrades? | `stack/serve/vllm/UPGRADES.md` (append-only log) · `stack/serve/radiance/UPGRADES.md` |
 | Where to look externally (keywords + repos)? | `sources.md` |
 | A fix that was once a rule, now historical? | `historical.md` |
 
