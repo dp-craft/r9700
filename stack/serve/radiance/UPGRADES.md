@@ -6,6 +6,33 @@ citation) · verdict · action · rollback (old tags stay local + exact `IMAGE=`
 Driven by the `/radiance-image` skill (`.claude/skills/radiance-image/SKILL.md`); previous images/src checkouts are
 never deleted.
 
+## 2026-11-09 · no image change — `serve_radiance.sh` daemon modes + 27B config centralization (TDD)
+
+- **`serve_radiance.sh` now has daemon modes `start|stop|status|logs`** (before: `run|print` only — the skill's
+  step-6 `serve_radiance.sh start` did not exist until now). start: `gpu_exclusive.sh` free-VRAM floor → state file
+  (pid/cmdline) → boot → `/v1/models` poll (default `WAIT` 900 s; container death = loud abort + cleanup); stop:
+  `docker stop -t 60` (SIGTERM, iron rule 15) then `timeout 60 docker rm -f` backstop (a wedged GPU process hangs
+  `rm` → loud failure, never silent), then `wait_port_bindable` (serve_lib.sh: LISTEN gone + TIME_WAIT drained);
+  status/logs are port-scoped and work with no model. `run`/`print` unchanged (llama-swap compat; print stays
+  GPU-free — it is the unit-test seam).
+- **The 27B convention now has one home: `stack/serve/27b.conf`** (MAXLEN 262000 / MAXSEQS 2 / SPEC_K 7 /
+  HEADROOM_MIB 596, all `${VAR:-…}` so env still wins). Sourced by the iq4r-l-v4 starter + the 5 `claude-rad-*`
+  27B launchers (the qwen35 150000 launcher and the Ornith starter keep their own values — the conf is sourced
+  ONLY by 27B entry points, never by the engine drivers). `start_qwen38_27b_iq4r-l-v4_rad.sh` is now a thin
+  wrapper over the daemon modes; `rad_run` in `amd-private/clients/claude/_lib.sh` is the shared tail of every
+  `claude-rad-*` launcher (free_gpu → boot in background → wait_health → run_claude).
+- **Compaction fix** (the "compacted at 140k" bug, user flag 2026-11-09; full entry in the vllm log): `run_claude`
+  writes per-run settings via `write_claude_settings` — exactly one authoritative knob
+  `CLAUDE_CODE_AUTO_COMPACT_WINDOW = window − max-output` (262000−64000 = 198000); any base-file
+  `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` is dropped, never inherited.
+- **TDD:** `stack/serve/tests/check_27b_consistency.sh` red 24/36 → green 62/62 (GPU-free: bash -n over every
+  launcher/starter, conf = single source of truth, print-mode resolution of every 27B starter — iq4r prints
+  262000/2, Ornith negative-checked at its own 262144/3 — settings invariants); `tests/test_claude_settings.sh`
+  unit-tests the writer against a hostile base file (red → green). Pre-existing `serve_vllm_test.sh` still 31/31.
+- Verification: **no-GPU only** (print modes, bash -n, unit tests) — this session rides a live radiance container,
+  so the daemon's docker start/stop lifecycle is exercised by the first real boot (the 1.17.0 GPU queue below
+  runs through `serve_radiance.sh start`).
+
 ## 2026-11-08 · 1.16.0 (Ornith 1.5) / 1.11.0 (qwen3.8-27b + heretic) → 1.17.0 — GO (install done; GPU steps pending in a fresh session)
 
 - 1.17.0 is the newest Codeberg tag (https://codeberg.org/StillDeadcode/radiance). Upstream is release-snapshot style
@@ -65,10 +92,22 @@ never deleted.
   **Claude-test path: `amd-private/clients/claude/claude-rad-iq4rlv4.sh`** (same config via `serve_radiance.sh`;
   one command = server up → Claude → server down, the `claude-rad-mxfp4.sh` twin). Kept **both** (SRP, user
   2026-11-08): the starter owns the server lifecycle (start/stop/status/logs, VRAM floor, alias); the launcher
-  owns the one-command claude flow — no duplication, neither forks the other.
+  owns the one-command claude flow — no duplication, neither forks the other. dp-forge root: symlink to the amd
+  starter added 2026-11-09 (per the 2026-11-08 symlink batch — all dp-forge starters link into the amd repo; the
+  starter post-dated that batch, which is why it was initially missing there).
   **Downloaded + verified 2026-11-08 (MEASURED):** `qwen3.8-27b-iq4r-l-v4.rad` = 18,700,496,896 B (exact match with
   the HF listing), magic `RAD1\2` (RAD format v2), `SOURCE.txt` pinned to revision `e5f1b3ef70741d705a64a28b852acf3fcefcead7`
   → ready for the claude test and the bench (image `1.17.0` already local).
+- **Spec-decode A/B (user, 2026-11-09):** the IQR-V4 .rad carries the DFlash2 drafter **merged in** (MEASURED:
+  `DFlash2DraftModel` + `dflash.blk.*` tensors in the .rad header; card: "the vision tower and the
+  z-lab/Qwen3.8-27B-DFlash2 block-diffusion drafter are merged in"). Radiance auto-enables it
+  (`--num-speculative-tokens` default `auto` = the drafter's own 7). **No MTP head in the .rad** (MEASURED: no
+  mtp/nextn tensors in the header, no MTP lines in the server log — a bundled MTP head would auto-run with no
+  flag) → dflash-vs-mtp is not a testable pair with this file; MTP would need a re-converted .rad. Live state
+  (MEASURED, `/stats`): accept ~0.27 (~1.9 of 7 proposed), decode 76.6 t/s @ ~109k ctx (56.5 @ ~141k on
+  2026-11-08 — depth decay). A/B launchers (amd-private, differ only in the flag):
+  `claude-rad-iq4rlv4-dflash.sh` (`--num-speculative-tokens 7`) vs `claude-rad-iq4rlv4-nospec.sh` (`0`) — a pure
+  speed test: card "Drafts are verified, so they change the speed, never the output."
 - **Baseline config fix (2026-11-08, user flag):** `amd-private/clients/claude/claude-rad-mxfp4.sh` carried the stale
   card default (200000 ctx / 8 seqs) — the 27B config decision (2026-10-25: 262000 + 2 seqs, as in the sly twins
   `claude-sly-{redhat,heretic}.sh`) had not been copied at the migration. Fixed: `MAXLEN:=262000`, `MAXSEQS:=2`

@@ -54,6 +54,8 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"   # readlink: llama-swap runs it via ~/.config/llama-swap/serve_vllm.sh
 REPO="$(cd "$HERE/../../.." && pwd)"
+# shellcheck source=../serve_lib.sh
+source "$HERE/../serve_lib.sh"   # wait_port_bindable (stop): port re-bindable = LISTEN gone + TIME_WAIT drained
 
 : "${VLLM_ROOT:=/mnt/Lin1/work/vllm/sly-radiance}"
 : "${HF_CACHE:=/mnt/Lin1/work/hf}"   # shared with fetch_model.sh; default ACL keeps root-written files dev-writable
@@ -113,17 +115,14 @@ case "${1:-start}" in
         exit 1
       }
       rm -f "$CFILE"
-      for _ in $(seq 30); do ss -ltn | grep -q ":$PORT " || break; sleep 1; done
-      if ss -ltn | grep -q ":$PORT "; then
-        echo "$NAME was removed but port $PORT is still held by: $(port_holder)" >&2
-        echo "  the process is stuck — if it persists the GPU may need a reboot (iron rule 15)" >&2
-        exit 1
-      fi
       # TIME_WAIT: the engine's just-closed connections (incl. Claude sessions' keep-alives) hold :$PORT
       # for the kernel MSL (~60 s) with NO LISTEN socket left -- a fresh docker bind fails EADDRINUSE in
       # that window (seen 2026-11-08: stop->start back-to-back). Wait it out so "stopped" means the port
-      # is actually re-bindable.
-      for _ in $(seq 70); do ss -ltn state time-wait 2>/dev/null | grep -q ":$PORT " || break; sleep 1; done
+      # is actually re-bindable (serve_lib.sh: LISTEN wait + port_holder, then the TIME_WAIT drain).
+      if ! wait_port_bindable "$PORT" 30 70 port_holder; then
+        echo "$NAME was removed but the port is stuck — if it persists the GPU may need a reboot (iron rule 15)" >&2
+        exit 1
+      fi
       echo "stopped $NAME (log kept: $LOGFILE)"
     else
       rm -f "$CFILE"   # stale state without a container (crash/restart): stop must leave no state behind

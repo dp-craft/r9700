@@ -6,6 +6,33 @@ measured delta (campaign citation) · verdict · action · rollback (old tag sta
 Driven by the `/vllm-image` skill (`.claude/skills/vllm-image/SKILL.md`); previous images/caches/src checkouts are
 never deleted.
 
+## 2026-11-09 · no image change — 27B config centralization + compaction fix (TDD)
+
+- **The 27B convention now has one home: `stack/serve/27b.conf`** (MAXLEN 262000 / MAXSEQS 2 / SPEC_K 7 /
+  HEADROOM_MIB 596, all `${VAR:-…}`). Both 27B starters source it — **behavior change: `start_redhat_27b.sh` /
+  `start_heretic_27b.sh` now pass MAXSEQS 2, was the stale 1** (aligns with the 2026-10-25 user decision and the
+  sly launchers' measured-working 2). `sly-official/heretic-mxfp4.env` MAXLEN 260000→262000 (drift fixed; the
+  per-model default now matches the conf). The starters also gained a `print` pass-through and a served-name
+  contract check (`start` refuses if the profile's `--served-model-name` ≠ the settings file's ANTHROPIC_MODEL).
+- **Compaction fix (the "compacted at 140k" bug, user flag 2026-11-09):** the per-run settings writer
+  (`amd-private/clients/claude/_lib.sh` `write_claude_settings`, used by every launcher's `run_claude`) now emits
+  exactly ONE authoritative knob: `CLAUDE_CODE_AUTO_COMPACT_WINDOW = window − max-output` (262000−64000 = 198000,
+  ≈ the "200k would be optimal" the user stated), and any base-file `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` is dropped,
+  never inherited. Before: three conflicting knobs (base absolute 220000 + base PCT 95/100 + per-run PCT) made the
+  effective window non-deterministic, and 220000 > window−output could overflow on a full-length reply (HTTP 400).
+  Base files fixed: `~/.config/claude/local_vllm_direct/settings.json` (heretic base — model ×4
+  `qwen38-27b-redhat-mxfp4-dflash` → `swift-1.5`, the heretic profile's served name; 220000→198000, PCT 95 dropped)
+  and `settings-redhat.json` (220000→198000, PCT 100 dropped; model names were already correct).
+- **`serve_vllm.sh` stop** now uses the shared `wait_port_bindable` from `stack/serve/serve_lib.sh` (settings-file
+  reader + the LISTEN/TIME_WAIT port wait); behavior unchanged, the two hand-rolled loops replaced — same helper
+  the radiance daemon's stop uses.
+- **TDD:** `stack/serve/tests/check_27b_consistency.sh` red 24/36 → green 62/62 (GPU-free: bash -n over every
+  launcher/starter, conf = single source of truth, print-mode resolution of every 27B starter, settings
+  invariants); `tests/test_claude_settings.sh` unit-tests the writer against a hostile base file (red → green).
+  Pre-existing `serve_vllm_test.sh` still 31/31.
+- Verification: **no-GPU only** (print modes, bash -n, unit tests) — the docker lifecycle rides the 1.10.0 queue
+  below; the per-run settings writer is unit-tested, the base files hand-verified.
+
 ## 2026-11-08 · 1.9.1 → 1.10.0 — IN PROGRESS (user decision pending)
 
 - 1.10.0 released 2026-11-07 (commit `e516549`); **vLLM pin stays 0.32.0** (no engine bump).

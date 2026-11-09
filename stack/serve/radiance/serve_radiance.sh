@@ -3,18 +3,33 @@
 # https://codeberg.org/StillDeadcode/radiance), serving a single-file .rad model. This is NOT vLLM:
 # the vllm-radiance image (serve_vllm.sh) loads HF checkpoint dirs; this one loads `*.rad` containers
 # (weights + tokenizer + chat template + DFlash2 drafter in one file). Flags follow the model card
-# (HF StillDeadcode/qwen3.8-27b-mxfp4): --tp 1 --max-model-len 200000 --kv-cache-dtype fp8 --max-num-seqs 8.
+# (HF StillDeadcode/qwen3.8-27b-mxfp4): --tp 1 --max-model-len 200000 --kv-cache-dtype fp8 --max-num-seqs 8
+# (those two = the card default; the 27B starters/launchers pass 27b.conf's 262000/2 instead).
 #
 # Usage:
+#   RAD_FILE=/abs/model.rad PORT=8000 ./serve_radiance.sh [start]     # DAEMON (background); the normal path
 #   RAD_FILE=/abs/model.rad PORT=10005 CONTAINER_NAME=llama-swap-x ./serve_radiance.sh run   # FOREGROUND, for llama-swap
-#   RAD_FILE=/abs/model.rad ./serve_radiance.sh print                                       # show docker argv, no GPU
-# Stop with `docker rm -f <CONTAINER_NAME>` (llama-swap's cmdStop). Like serve_vllm.sh `run`, it does
-# NOT call gpu_exclusive.sh (that unloads llama-swap = its own parent); it waits up to FLOOR_WAIT s for
-# FREE_MIB_FLOOR of free VRAM and refuses below it (iron rule 14).
-# Knobs (env): RAD_FILE (required) IMAGE(stilldeadcode/radiance:1.11.0) PORT(8000) CONTAINER_NAME(radiance-$PORT)
-#   MAXLEN(200000) MAXSEQS(8) KV_DTYPE(fp8) TP(1) REASONING_MAP(high=xhigh) FREE_MIB_FLOOR(30000) FLOOR_WAIT(90) EXTRA_ARGS
-#   HIP_FORCE_DEV_KERNARG(0: iron-rule env, CLAUDE.md "ROCm engines")
+#   RAD_FILE=/abs/model.rad ./serve_radiance.sh print                 # show docker argv, no GPU
+#   PORT=8000 ./serve_radiance.sh stop|status|logs
+# `start` (default): docker run -d on the host network, gpu_exclusive.sh first, 5 s /v1/models health poll
+# with a container-death check + cleanup on failure, resolved argv recorded in
+# stack/serve/var/servers/$PORT.cmdline, stop is graceful (SIGTERM, -t 60) and waits the port out of
+# TIME_WAIT (serve_lib.sh wait_port_bindable). `stop|status|logs` are port-scoped (no RAD_FILE needed).
+# `run` is for llama-swap (or any process supervisor): the container runs in the foreground (--rm, no -d)
+# and the script exits when it does. Like before, `run` does NOT call gpu_exclusive.sh (that unloads
+# llama-swap = its own parent); it waits up to FLOOR_WAIT s for FREE_MIB_FLOOR of free VRAM and refuses
+# below it (iron rule 14).
+# Knobs (env): RAD_FILE (required for start/run/print) IMAGE(stilldeadcode/radiance:1.11.0) PORT(8000)
+#   CONTAINER_NAME(radiance-$PORT) MAXLEN(200000) MAXSEQS(8) KV_DTYPE(fp8) TP(1) REASONING_MAP(high=xhigh)
+#   SERVED_NAME(start mode: --served-model-name alias; empty = the model's native name)
+#   FREE_MIB_FLOOR(30000) FLOOR_WAIT(90, run mode) WAIT(900, start mode) EXTRA_ARGS
+#   HIP_FORCE_DEV_KERNARG(0: iron-rule env, CLAUDE.md "ROCm engines") EXCLUSIVE(gpu_exclusive.sh; override in unit tests)
 set -euo pipefail
+
+HERE="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+REPO="$(cd "$HERE/../../.." && pwd)"
+# shellcheck source=../serve_lib.sh
+source "$HERE/../serve_lib.sh"
 
 : "${IMAGE:=stilldeadcode/radiance:1.11.0}"
 : "${PORT:=8000}"
@@ -23,12 +38,42 @@ set -euo pipefail
 : "${MAXSEQS:=8}"
 : "${KV_DTYPE:=fp8}"
 : "${TP:=1}"
-: "${REASONING_MAP=high=xhigh}"   # space-separated FROM=TO pairs; set empty to pass none
+: "${REASONING_MAP=high=xhigh}"   # space-separated FROM=TO pairs (one pair may be comma-joined); set empty to pass none
+: "${SERVED_NAME:=}"
 : "${FREE_MIB_FLOOR:=30000}"
 : "${FLOOR_WAIT:=90}"
-: "${RAD_FILE:?set RAD_FILE=<absolute path to the .rad model>}"
+: "${WAIT:=900}"
+: "${EXCLUSIVE:=$REPO/stack/gpu/gpu_exclusive.sh}"
+NAME="$CONTAINER_NAME"
+RUNDIR="$REPO/stack/serve/var/servers"; mkdir -p "$RUNDIR"
+LOGFILE="$RUNDIR/$PORT.log"; CMDFILE="$RUNDIR/$PORT.cmdline"
 MODE="${1:-run}"
-case "$MODE" in run|print) ;; *) echo "usage: RAD_FILE=... $0 [run|print]" >&2; exit 2;; esac
+case "$MODE" in run|print|start|stop|status|logs) ;; *) echo "usage: RAD_FILE=... $0 [start|run|print|stop|status|logs]" >&2; exit 2;; esac
+
+# --- stop / status / logs: port-scoped, no RAD_FILE needed (same contract as serve_vllm.sh) ---
+if [ "$MODE" = stop ]; then
+  if docker inspect "$NAME" >/dev/null 2>&1; then
+    docker logs "$NAME" > "$LOGFILE" 2>&1 || true   # keep the last run's log
+    # graceful first (SIGTERM: the engine releases the GPU cleanly; SIGKILL can wedge the card, iron rule 15)
+    docker stop -t 60 "$NAME" >/dev/null 2>&1 || true
+    timeout 60 docker rm -f "$NAME" >/dev/null || { echo "FAILED to remove $NAME (docker rm -f timed out — GPU process may be wedged, iron rule 15)" >&2; exit 1; }
+    rm -f "$CMDFILE"
+    wait_port_bindable "$PORT" 30 70
+    # silent on success (starters_test C6 contract; the log is kept at $LOGFILE, the state file is gone)
+  else
+    if ss -ltn | grep -q ":$PORT "; then echo "no container $NAME, but port $PORT is still held — ss -ltnp | grep :$PORT" >&2; exit 1; fi
+    rm -f "$CMDFILE"   # stale state of a long-dead run; nothing else to do (silent)
+  fi
+  exit 0
+fi
+if [ "$MODE" = status ]; then
+  docker ps --filter "name=^$NAME$" --format '{{.Names}} {{.Image}} {{.Status}}'
+  curl -s -m 3 "http://127.0.0.1:$PORT/v1/models" || true; echo
+  exit 0
+fi
+if [ "$MODE" = logs ]; then docker logs "$NAME"; exit 0; fi
+
+: "${RAD_FILE:?set RAD_FILE=<absolute path to the .rad model>}"
 [ "${RAD_FILE:0:1}" = / ] && [ "${RAD_FILE##*.}" = rad ] || { echo "RAD_FILE must be an absolute path to a .rad file (got: $RAD_FILE)" >&2; exit 2; }
 
 vram_free_mib() {
@@ -42,39 +87,74 @@ vram_free_mib() {
 
 RENDER_GID=$(getent group render | cut -d: -f3); VIDEO_GID=$(getent group video | cut -d: -f3)
 # Flags/devices mirror the upstream deploy/compose/common.yaml: seccomp=unconfined (io_uring + NUMA mbind),
-# memlock unlimited, init, run as the host user, GPU groups. Port 8000 inside, ${PORT} on loopback outside.
-CMD=(docker run --rm --init --name "$CONTAINER_NAME"
+# memlock unlimited, init, run as the host user, GPU groups.
+# Networking: `run` maps 127.0.0.1:$PORT -> in-container 8000 (llama-swap's port convention); `start`
+# uses the host network with the in-container port set to $PORT (the old starters' convention).
+if [ "$MODE" = run ]; then
+  NET=(--rm -p "127.0.0.1:$PORT:8000"); SERVE_NET=(--host 0.0.0.0 --port 8000)
+else
+  NET=(-d --network host); SERVE_NET=(--host 127.0.0.1 --port "$PORT")
+fi
+CMD=(docker run "${NET[@]}" --init --name "$NAME"
      --device /dev/kfd --device /dev/dri --group-add "$VIDEO_GID" --group-add "$RENDER_GID"
      --security-opt seccomp=unconfined --ulimit memlock=-1:-1
-     --user "$(id -u):$(id -g)" -p "127.0.0.1:$PORT:8000"
+     --user "$(id -u):$(id -g)"
      -e HIP_FORCE_DEV_KERNARG="${HIP_FORCE_DEV_KERNARG:-0}"
      -v "$(dirname "$RAD_FILE"):/models:ro"
-     "$IMAGE" --model "/models/$(basename "$RAD_FILE")" --host 0.0.0.0 --port 8000
+     "$IMAGE" --model "/models/$(basename "$RAD_FILE")" "${SERVE_NET[@]}"
      --tp "$TP" --max-model-len "$MAXLEN" --kv-cache-dtype "$KV_DTYPE" --max-num-seqs "$MAXSEQS")
 # Qwen3.8's embedded template takes xhigh|medium|low only and 400s on OpenAI's `high` (opencode sends it).
 # The engine maps it before the template sees it and checks TO against the template at startup.
 for pair in $REASONING_MAP; do CMD+=(--reasoning-effort-map "$pair"); done
+[ -n "$SERVED_NAME" ] && CMD+=(--served-model-name "$SERVED_NAME")
 if [ -n "${EXTRA_ARGS:-}" ]; then read -r -a XA <<<"$EXTRA_ARGS"; CMD+=("${XA[@]}"); fi
 
 if [ "$MODE" = print ]; then printf '%q ' "${CMD[@]}"; echo; exit 0; fi
 
-[ -f "$RAD_FILE" ] || { echo "model not found: $RAD_FILE" >&2; exit 1; }
+[ -f "$RAD_FILE" ] || { echo "checkpoint missing in $(dirname "$RAD_FILE")" >&2; exit 1; }
 docker image inspect "$IMAGE" >/dev/null 2>&1 || { echo "image not present: $IMAGE (docker pull $IMAGE)" >&2; exit 1; }
-if docker inspect "$CONTAINER_NAME" >/dev/null 2>&1 && [ "$(docker inspect -f '{{.State.Running}}' "$CONTAINER_NAME")" != true ]; then
-  docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1   # dead leftover of a crashed supervised boot
+if docker inspect "$NAME" >/dev/null 2>&1 && [ "$(docker inspect -f '{{.State.Running}}' "$NAME")" != true ]; then
+  docker rm -f "$NAME" >/dev/null 2>&1   # dead leftover of a crashed supervised boot
 fi
-if ss -ltn | grep -q ":$PORT "; then echo "port $PORT held by a foreign process" >&2; exit 1; fi
+if ss -ltn | grep -q ":$PORT "; then echo "port $PORT is in use -- stop that server first" >&2; exit 1; fi
+
+if [ "$MODE" = start ]; then
+  "$EXCLUSIVE" "$FREE_MIB_FLOOR"
+  { printf '%q ' "${CMD[@]}"; echo
+    echo "# image=$IMAGE"; echo "# started_utc=$(date -u +%FT%TZ)"; } > "$CMDFILE"
+  "${CMD[@]}" >/dev/null
+  for ((i = 0; i < WAIT; i += 5)); do
+    if curl -sf -m 3 "http://127.0.0.1:$PORT/v1/models" >/dev/null; then
+      echo "up after ${i}s on port $PORT: $IMAGE ($(basename "$RAD_FILE"))${SERVED_NAME:+ — served under alias $SERVED_NAME}"
+      exit 0
+    fi
+    if [ "$(docker inspect -f '{{.State.Running}}' "$NAME" 2>/dev/null)" != true ]; then
+      echo "container exited during boot; last log lines:" >&2
+      docker logs --tail 40 "$NAME" >&2
+      docker rm -f "$NAME" >/dev/null 2>&1 || true   # a failed boot must not leak the container
+      rm -f "$CMDFILE"
+      exit 1
+    fi
+    sleep 5
+  done
+  echo "not up after ${WAIT}s; last log lines:" >&2
+  docker logs --tail 40 "$NAME" >&2
+  docker rm -f "$NAME" >/dev/null 2>&1 || true   # a failed boot must not leak the container
+  rm -f "$CMDFILE"
+  exit 1
+fi
+
+# --- run mode: foreground, supervised (llama-swap) ---
 for _ in $(seq "$FLOOR_WAIT"); do [ "$(vram_free_mib)" -ge "$FREE_MIB_FLOOR" ] && break; sleep 1; done
 f=$(vram_free_mib)
 if [ "$f" -lt "$FREE_MIB_FLOOR" ]; then
-  echo "refusing to boot $CONTAINER_NAME: ${f} MiB free < floor ${FREE_MIB_FLOOR} MiB — holders:" >&2
+  echo "refusing to boot $NAME: ${f} MiB free < floor ${FREE_MIB_FLOOR} MiB — holders:" >&2
   amd-smi process -g 0 >&2 2>/dev/null || true; exit 1
 fi
-
-echo "running $CONTAINER_NAME in the foreground on 127.0.0.1:$PORT ($IMAGE, $(basename "$RAD_FILE"))"
+echo "running $NAME in the foreground on 127.0.0.1:$PORT ($IMAGE, $(basename "$RAD_FILE"))"
 # Docker client as a background job + `wait`, so a TERM from the supervisor removes the container at once.
 "${CMD[@]}" & DP=$!
-trap 'docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1' TERM INT
+trap 'docker rm -f "$NAME" >/dev/null 2>&1' TERM INT
 rc=0; wait "$DP" || rc=$?
 if [ "$rc" -gt 128 ]; then wait "$DP" 2>/dev/null || true; fi
 exit "$rc"

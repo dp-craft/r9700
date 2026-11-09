@@ -42,7 +42,7 @@ C_LLAMA="$REPO/stack/llama-swap/start_llama_swap.sh"
 
 IMAGE=ghcr.io/slybase/vllm-sly-radiance:1.9.1-rocm10.1       # dummy-container image (= sly-redhat's image)
 HERETIC_IMAGE=ghcr.io/slybase/vllm-sly-radiance:1.8.1-rocm10.1   # sly-official's image (heretic start)
-SERVED_REDHAT=qwen38-27b-redhat-mxfp4-dflash   # ANTHROPIC_MODEL in both local_vllm_direct settings files
+SERVED_REDHAT=qwen38-27b-redhat-mxfp4-dflash   # ANTHROPIC_MODEL in settings-redhat.json (2026-11-09: settings.json carries the heretic served name swift-1.5)
 
 P1=19995   # B1 (stop: no container) + the ornith stop/start cases
 P2=19996   # B2 (stop: own container)
@@ -210,15 +210,19 @@ OUT=$(bash "$C_HER" badarg 2>&1); rc=$?
 [ "$rc" -eq 2 ] && ok "C3 exit 2" || bad "C3 rc=$rc"
 has "$OUT" "usage:" && ok "C3 usage line" || bad "C3 usage missing (got: $OUT)"
 
-echo "== C4: heretic starter — start: name check FAILS (swift-1.5 vs settings), exit 2, nothing else ran =="
-OUT=$(bash "$C_HER" start </dev/null 2>&1); rc=$?
+echo "== C4: heretic starter — start: name check FAILS (swift-1.5 vs redhat model), exit 2, nothing else ran =="
+# 2026-11-09: the real settings.json now carries the heretic served name (swift-1.5 — the approved rename;
+# the name check exists to catch exactly this drift), so the mismatch arm is built from a copy of
+# settings-redhat.json (model qwen38-...): same drift, deterministic, the real file untouched.
+cp /home/dev/.config/claude/local_vllm_direct/settings-redhat.json "$TMP/settings.json"
+OUT=$(SETTINGS="$TMP/settings.json" bash "$C_HER" start </dev/null 2>&1); rc=$?
 [ "$rc" -eq 2 ] && ok "C4 exit 2" || bad "C4 rc=$rc (got: $OUT)"
 has "$OUT" "profile sly-official/heretic-mxfp4 serves 'swift-1.5' but settings.json ANTHROPIC_MODEL is '$SERVED_REDHAT' -- fix one of them" \
   && ok "C4 exact name-mismatch message" || bad "C4 message (got: $OUT)"
 assert_8000_unchanged C4
 
 echo "== C5: heretic starter — start with SERVED_NAME override: name check PASSES, pre-boot abort =="
-OUT=$(SERVED_NAME="$SERVED_REDHAT" EXCLUSIVE=$STUB AUTO_PULL=0 bash "$C_HER" start </dev/null 2>&1); rc=$?
+OUT=$(SERVED_NAME="$SERVED_REDHAT" SETTINGS="$TMP/settings.json" EXCLUSIVE=$STUB AUTO_PULL=0 bash "$C_HER" start </dev/null 2>&1); rc=$?
 [ "$rc" -eq 1 ] && ok "C5 aborted pre-boot (rc=1)" || bad "C5 rc=$rc (got: $OUT)"
 has "$OUT" "serves '" && bad "C5 name check must PASS with the override (got: $OUT)" || ok "C5 name check passed (SERVED_NAME override honored)"
 if ! docker image inspect "$HERETIC_IMAGE" >/dev/null 2>&1; then
