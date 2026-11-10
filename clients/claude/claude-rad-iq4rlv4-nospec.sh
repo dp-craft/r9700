@@ -15,7 +15,8 @@ set -euo pipefail
 source "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/_lib.sh"
 # shellcheck source=/home/dev/work/dp-craft/amd/stack/serve/27b.conf
 source "$REPO/stack/serve/27b.conf"
-: "${RAD_FILE:=$(ls /mnt/Lin1/work/radiance/models/StillDeadcode__qwen3.8-27b-iqr-v4@*/qwen3.8-27b-iq4r-l-v4.rad | head -1)}"
+# pinned to the starter's snapshot @e5f1b3ef (iron rule 2): the old glob took any revision
+: "${RAD_FILE:=/mnt/Lin1/work/radiance/models/StillDeadcode__qwen3.8-27b-iqr-v4@e5f1b3ef/qwen3.8-27b-iq4r-l-v4.rad}"
 : "${IMAGE:=stilldeadcode/radiance:1.17.0}"
 : "${EXTRA_ARGS:=--gpu-headroom-mib $HEADROOM_MIB --num-speculative-tokens 0}"
 CT="radiance-$PORT"
