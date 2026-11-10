@@ -30,7 +30,7 @@ officially wants **temp 0.6** (`docs/research/models-sampling/2026-07-12-2310-qw
 ## 1. VRAM (skill step 2 — non-binding, documented)
 Both models ~15.4/15.9 GiB weights, 64 KiB/tok f16 (hybrid, from `bench/core/gguf_kv.py`). At **CTX 32768
 f16 → ~20.4 GiB predicted** (q8_0 ~19.4), ~12 GiB under the 32400 budget. No guard needed at this
-depth; the driver samples actual VRAM/GTT/power per server into `tmp/gpu_<name>.csv` → `tmp/vram.jsonl`.
+depth; the driver samples actual VRAM/GTT/power per server into `tmp/gpu_<name>.csv` → `results/vram.jsonl`.
 
 ## 2. The matrix — `configs.jsonl` (13 server configs · 17 sampling points)
 Each **server config** = model × mtp × kv × `extra_args` (reasoning-budget / spec-draft flags) → one
@@ -123,7 +123,7 @@ inputs/tasks/tasks.jsonl   14 hard tasks + grader specs (verified)
 inputs/sweeps.json         the reasoning-budget sweep declared for the charts (`make_charts.py`)
 configs.jsonl              13 server configs × 17 sampling points (the matrix)
 run_capture.sh             Phase-A driver (server sweep → capture.py → graders); reuses the shared tools `bench/quality/{capture.py,graders/}`
-tmp/                       GENERATED (gitignored): outputs.jsonl, vram.jsonl, gpu_<name>.csv, done/, failures.txt
-results/                   GENERATED (committed): scores_deterministic.jsonl, judge_scores.jsonl, charts/ (SVGs), appendix.md
+tmp/                       GENERATED (gitignored): outputs.jsonl, gpu_<name>.csv, done/, failures.txt
+results/                   GENERATED (committed): scores_deterministic.jsonl, judge_scores.jsonl, vram.jsonl, charts/ (SVGs), appendix.md
 write-up (Phase C)         docs/findings/quality/2026-07-13-1138-27b-quality-tuning.md
 ```

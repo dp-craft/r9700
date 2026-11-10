@@ -11,8 +11,8 @@ not architecture.
 **Layout**
 - recipe files: `spec.json` (configs/serving/VRAM guard), `plan.md` (runbook), `run.sh` (generated driver), `run_capture.sh` (this dir's Phase-A driver — drives `bench/quality/capture.py` + `bench/quality/graders/`)
 - `inputs/tasks/tasks.jsonl` — 12 tasks + grader specs (9 deterministic, 3 judge)
-- `results/` (committed): `scores_deterministic.jsonl`, `judge_scores.jsonl`, `charts/` (SVGs), `appendix.md`
-- `tmp/` (gitignored): `outputs.jsonl`, `vram.jsonl`, `gpu_<cfg>.csv`, `props_<cfg>.json`, `done/`, `failures.txt`
+- `results/` (committed): `scores_deterministic.jsonl`, `judge_scores.jsonl`, `vram.jsonl`, `charts/` (SVGs), `appendix.md`
+- `tmp/` (gitignored): `outputs.jsonl`, `gpu_<cfg>.csv`, `props_<cfg>.json`, `done/`, `failures.txt`
 
 **Reproduce** (per `plan.md`: reproduce the committed data with `run_capture.sh`; `run.sh` is the go-forward path for fresh work)
 ```bash

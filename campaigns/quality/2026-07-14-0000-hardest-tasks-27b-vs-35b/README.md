@@ -173,11 +173,11 @@ the identical prompt, so the comparison is sound; only the label is nominal.
 
 ## 6. Outputs
 
-Raw (gitignored) in `tmp/`: `outputs.jsonl` (replies + tokens/latency) · `vram.jsonl` + `gpu_*.csv` ·
+Raw (gitignored) in `tmp/`: `outputs.jsonl` (replies + tokens/latency) · `gpu_*.csv` ·
 `props_*.json` (per-server provenance) · `done/` markers · `summary_prompt.txt`/`summary_result.txt`
 (the claude write-up exchange; the original run's confirmation is committed as `results/summary_result.txt`).
 
-Committed in `results/`: `scores_typescript.jsonl` (objectives incl. fractional lint/types, or `grade_error`
+Committed in `results/`: `vram.jsonl` (per-config memory/power/thermal summary) · `scores_typescript.jsonl` (objectives incl. fractional lint/types, or `grade_error`
 HARNESS rows) · `judge_scores.jsonl` (design/clarity/robustness) · `summary.md`/`summary.json`
 (deterministic digest — per-cell table + **per-rep detail table** (every rep + haiku/sonnet/opus refs, all
 objectives) + findings a–d) · `summary_by_task.json` · `appendix.md` + `charts/` (cell-level,

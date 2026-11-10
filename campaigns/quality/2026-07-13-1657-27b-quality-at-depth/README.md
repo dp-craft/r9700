@@ -131,9 +131,9 @@ The deterministic aggregator has its own test suite — **`python3 bench/quality
 `bench/quality/aggregate.py`; the grader has `python3 bench/quality/score_typescript.py selftest`.
 
 **Outputs:** raw (gitignored) in `tmp/`: `outputs.jsonl` (replies + token/latency/throughput),
-`judge_raw.jsonl` (the full judge prompt & reply), `tasks-<N>k.jsonl` (per-depth prompts), `vram.jsonl` +
+`judge_raw.jsonl` (the full judge prompt & reply), `tasks-<N>k.jsonl` (per-depth prompts),
 `gpu_*.csv` (memory/power/thermal), `props_*.json` (per-server provenance), `done/` markers. Committed in
-`results/`: `scores_typescript.jsonl` (per-reply objectives + score + hard_pass), `judge_scores.jsonl`
+`results/`: `vram.jsonl` (per-config memory/power/thermal summary), `scores_typescript.jsonl` (per-reply objectives + score + hard_pass), `judge_scores.jsonl`
 (subjective design/clarity/robustness), `charts/*.svg` + `appendix.md`, `summary.md` + `summary.json`
 (the deterministic digest). The write-up is **`docs/findings/quality/2026-07-13-1657-27b-quality-at-depth.md`**.
 Commit the run data after eyeballing the write-up (the model wrote its prose from the digest — spot-check
