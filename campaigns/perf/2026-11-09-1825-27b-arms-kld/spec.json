@@ -1,0 +1,65 @@
+{
+  "slug": "27b-arms-kld",
+  "date": "2026-11-09-1825",
+  "title": "27B arm bench + KLD + upgrade validation (radiance 1.11.0/1.17.0, sly 1.11.0)",
+  "kind": "throughput",
+  "model": "/mnt/Lin1/work/vllm/sly-radiance/models/RedHatAI__Qwen3.8-27B-MXFP4@16a86728",
+  "engine": "vllm",
+  "profile": "sly-redhat/redhat-mxfp4-dflash",
+  "served_model": "qwen38-27b-redhat-mxfp4-dflash",
+  "image": "ghcr.io/slybase/vllm-sly-radiance:1.11.0-rocm10.1",
+  "port": 8000,
+  "env": {
+    "WATCHDOG_MIB": "32",
+    "GPU_UTIL": "0.93",
+    "CACTUS_DELTA": "0",
+    "CHAT_TEMPLATE": "/home/dev/work/dp-craft/amd/stack/serve/vllm/templates/dp-sharp-chat_template.jinja"
+  },
+  "servers": [
+    {
+      "name": "d-redhat-sly1100",
+      "ctx": 260000,
+      "np": 2,
+      "kv": "fp8",
+      "mtp": 0,
+      "probes": [
+        {"slug": "d-10k-tg512-n1",  "prompts": ["codereview-10000.txt"],  "max_tokens": 512,  "api": "completions", "concurrency": 1, "reps": 1, "prefix_mode": "unique"},
+        {"slug": "d-10k-tg512-n2",  "prompts": ["codereview-10000.txt"],  "max_tokens": 512,  "api": "completions", "concurrency": 2, "reps": 1, "prefix_mode": "unique"},
+        {"slug": "d-10k-tg1024-n1", "prompts": ["codereview-10000.txt"],  "max_tokens": 1024, "api": "completions", "concurrency": 1, "reps": 1, "prefix_mode": "unique"},
+        {"slug": "d-10k-tg1024-n2", "prompts": ["codereview-10000.txt"],  "max_tokens": 1024, "api": "completions", "concurrency": 2, "reps": 1, "prefix_mode": "unique"},
+        {"slug": "d-100k-tg512-n1", "prompts": ["codereview-100000.txt"], "max_tokens": 512,  "api": "completions", "concurrency": 1, "reps": 1, "prefix_mode": "unique", "warmup": 0},
+        {"slug": "d-100k-tg512-n2", "prompts": ["codereview-100000.txt"], "max_tokens": 512,  "api": "completions", "concurrency": 2, "reps": 1, "prefix_mode": "unique", "warmup": 0},
+        {"slug": "d-100k-tg1024-n1", "prompts": ["codereview-100000.txt"], "max_tokens": 1024, "api": "completions", "concurrency": 1, "reps": 1, "prefix_mode": "unique", "warmup": 0},
+        {"slug": "d-100k-tg1024-n2", "prompts": ["codereview-100000.txt"], "max_tokens": 1024, "api": "completions", "concurrency": 2, "reps": 1, "prefix_mode": "unique", "warmup": 0}
+      ]
+    }
+  ],
+  "notes": [
+    "Arm D (the emitted vllm block) = RedHat-MXFP4 @ sly 1.11.0-rocm10.1, starter-exact env (WATCHDOG_MIB 32,",
+    "  GPU_UTIL 0.93, CACTUS_DELTA 0, dp-sharp chat template) — the sly 1.11.0 validation arm (vs the 1.9.1 row).",
+    "Arms A/B/C are the NATIVE radiance runtime — not vllm-expressible in this spec (RULE-6 GAP: recommend",
+    "  gen_campaign learn server: radiance | vllm engine kinds). Hand-added server blocks below the D block:",
+    "  A = Quark-MXFP4 .rad @ stilldeadcode/radiance:1.11.0 (baseline), B = same .rad @ 1.17.0,",
+    "  C = IQ4R-L-V4 .rad @ 1.17.0 — all 260000 ctx / 2 seqs / fp8 KV / --gpu-headroom-mib 596 /",
+    "  --num-speculative-tokens 7 (27b.conf), slugs a-*/b-*/c-* (same 8 cells each).",
+    "Round 1 = 8 cells/arm: depths 10k/100k x tg 512/1024 x n 1/2, reps 1. Round 2 (--round 2, hand-added,",
+    "  ROUND-guarded) = 50k x tg{512,1024,4096} x n{1,2} + tg4096 x 10k/100k x n{1,2} (10 cells/arm).",
+    "KLD (WS3, bench/perf/kld_probe.py; method locked in research/ws3-kld-r2.md): paired greedy continuation",
+    "  (temp 0, logprobs 20, shared-prefix pairing, first-divergent position included; radiance never returns",
+    "  prompt logprobs so prompt-scoring cannot be the uniform mode — optional labeled bonus pass on sly pairs),",
+    "  KL(ref||arm) per sly kv4/kl_compare.py (floor for missing tokens => lower bound), cluster bootstrap",
+    "  CI (block = prompt) + pooled cross-check, 5-point live selftest per engine family (first radiance boot",
+    "  = arm A, first sly boot = arm D) that aborts the KLD pass only. Reference = Qwen__Qwen3.8-27B-FP8@",
+    "  017b9c7a on one dedicated boot (sly-radiance/qwen38-fp8, IMAGE pinned 1.11.0), its fetch cached in",
+    "  tmp/ (resumable). Calibration set: inputs/calibration-prompts.jsonl (file-head prompts, code-dominated",
+    "  mix from bench/workloads/corpus/, ~96-160 prompts x 200-2000-token heads, raw text no chat template),",
+    "  hash-pinned via inputs/calibration-manifest.jsonl + inputs/calibration.sha256. Noise floors: A-vs-B",
+    "  pair = engine-version floor; reference self-run = boot noise.",
+    "WS7 prologue (hand-added, before arm D): sly 1.11.0 first-boot phase breakdown (this boot = arm D's cold",
+    "  boot) -> stop -> warm reboot -> seconds; cache pre-check label from the session-1 CPU check.",
+    "Every probe run is wrapped by a Memory-Fault watcher on the serve log (iron rule 15); radiance residency",
+    "  (amd-smi process) recorded per boot (rule 15b).",
+    "This run.sh must be launched from a plain terminal with NO local-model Claude session running (it calls",
+    "  gpu_exclusive.sh per arm — that kills any session server, plan hard constraint)."
+  ]
+}
