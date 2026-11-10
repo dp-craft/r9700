@@ -50,24 +50,45 @@ LOGFILE="$RUNDIR/$PORT.log"; CMDFILE="$RUNDIR/$PORT.cmdline"
 MODE="${1:-run}"
 case "$MODE" in run|print|start|stop|status|logs) ;; *) echo "usage: RAD_FILE=... $0 [start|run|print|stop|status|logs]" >&2; exit 2;; esac
 
+port_holder() {   # describe whatever is LISTENing on :$PORT (wait_port_bindable's HOLDER_DESC)
+  local h
+  h=$(ss -ltnp 2>/dev/null | grep ":$PORT " | sed -nE 's/.*users:\(\("([^"]*)",pid=([0-9]+).*/\1 pid=\2/p' | sort -u | head -3 | tr '\n' ' ') || true
+  echo "${h:-unknown — ss -ltnp | grep :$PORT}"
+}
+
 # --- stop / status / logs: port-scoped, no RAD_FILE needed (same contract as serve_vllm.sh) ---
 if [ "$MODE" = stop ]; then
   if docker inspect "$NAME" >/dev/null 2>&1; then
     docker logs "$NAME" > "$LOGFILE" 2>&1 || true   # keep the last run's log
     # graceful first (SIGTERM: the engine releases the GPU cleanly; SIGKILL can wedge the card, iron rule 15)
-    docker stop -t 60 "$NAME" >/dev/null 2>&1 || true
-    timeout 60 docker rm -f "$NAME" >/dev/null || { echo "FAILED to remove $NAME (docker rm -f timed out — GPU process may be wedged, iron rule 15)" >&2; exit 1; }
+    # the call itself is bounded (docker waits out -t 60, then SIGKILLs and waits for the exit: a process
+    # wedged in the driver hangs it), so the rm -f backstop below is always reached
+    timeout 90 docker stop -t 60 "$NAME" >/dev/null 2>&1 || true
+    # a run-mode container is --rm: the daemon removes it after the stop, so rm -f may lose the race
+    # ("No such container" / "removal already in progress") — gone is success, still there is the failure
+    if ! rmerr=$(timeout 60 docker rm -f "$NAME" 2>&1 >/dev/null); then
+      for _ in 1 2 3 4 5; do timeout 10 docker inspect "$NAME" >/dev/null 2>&1 || break; sleep 1; done
+      if timeout 10 docker inspect "$NAME" >/dev/null 2>&1; then
+        echo "FAILED to remove $NAME (${rmerr:-docker rm -f timed out} — GPU process may be wedged, iron rule 15)" >&2; exit 1
+      fi
+    fi
     rm -f "$CMDFILE"
-    wait_port_bindable "$PORT" 30 70
+    wait_port_bindable "$PORT" 30 70 port_holder
     # silent on success (starters_test C6 contract; the log is kept at $LOGFILE, the state file is gone)
   else
-    if ss -ltn | grep -q ":$PORT "; then echo "no container $NAME, but port $PORT is still held — ss -ltnp | grep :$PORT" >&2; exit 1; fi
+    if ss -ltn | grep -q ":$PORT "; then echo "no container $NAME, but port $PORT is still held by: $(port_holder)" >&2; exit 1; fi
     rm -f "$CMDFILE"   # stale state of a long-dead run; nothing else to do (silent)
   fi
   exit 0
 fi
 if [ "$MODE" = status ]; then
-  docker ps --filter "name=^$NAME$" --format '{{.Names}} {{.Image}} {{.Status}}'
+  st=$(docker ps --filter "name=^$NAME$" --format '{{.Names}} {{.Image}} {{.Status}}')
+  if [ -z "$st" ]; then   # another engine's /v1/models on this port must not look like radiance being up
+    echo "radiance not running (no container $NAME)"
+    if ss -ltn | grep -q ":$PORT "; then echo "port $PORT is held by: $(port_holder)" >&2; fi
+    exit 0   # status query itself succeeded (starters_test C6e contract)
+  fi
+  echo "$st"
   curl -s -m 3 "http://127.0.0.1:$PORT/v1/models" || true; echo
   exit 0
 fi
@@ -107,6 +128,7 @@ CMD=(docker run "${NET[@]}" --init --name "$NAME"
 # The engine maps it before the template sees it and checks TO against the template at startup.
 for pair in $REASONING_MAP; do CMD+=(--reasoning-effort-map "$pair"); done
 [ -n "$SERVED_NAME" ] && CMD+=(--served-model-name "$SERVED_NAME")
+# EXTRA_ARGS is split on whitespace; quotes are NOT honoured (no JSON or quoted values in it)
 if [ -n "${EXTRA_ARGS:-}" ]; then read -r -a XA <<<"$EXTRA_ARGS"; CMD+=("${XA[@]}"); fi
 
 if [ "$MODE" = print ]; then printf '%q ' "${CMD[@]}"; echo; exit 0; fi
@@ -114,15 +136,19 @@ if [ "$MODE" = print ]; then printf '%q ' "${CMD[@]}"; echo; exit 0; fi
 [ -f "$RAD_FILE" ] || { echo "checkpoint missing in $(dirname "$RAD_FILE")" >&2; exit 1; }
 docker image inspect "$IMAGE" >/dev/null 2>&1 || { echo "image not present: $IMAGE (docker pull $IMAGE)" >&2; exit 1; }
 if docker inspect "$NAME" >/dev/null 2>&1 && [ "$(docker inspect -f '{{.State.Running}}' "$NAME")" != true ]; then
-  docker rm -f "$NAME" >/dev/null 2>&1   # dead leftover of a crashed supervised boot
+  # dead leftover of a crashed supervised boot; bounded, and a failure says why (the docker run below then hits the name)
+  timeout 60 docker rm -f "$NAME" >/dev/null 2>&1 || echo "warning: could not remove dead leftover container $NAME (docker rm -f failed or timed out)" >&2
 fi
-if ss -ltn | grep -q ":$PORT "; then echo "port $PORT is in use -- stop that server first" >&2; exit 1; fi
+if ss -ltn | grep -q ":$PORT "; then echo "port $PORT is in use -- stop that server first (held by: $(port_holder))" >&2; exit 1; fi
 
 if [ "$MODE" = start ]; then
+  wait_port_bindable "$PORT" 1 70 port_holder || exit 1   # LISTEN was checked above; this drains TIME_WAIT (the host-network bind fails inside it)
   "$EXCLUSIVE" "$FREE_MIB_FLOOR"
-  { printf '%q ' "${CMD[@]}"; echo
-    echo "# image=$IMAGE"; echo "# started_utc=$(date -u +%FT%TZ)"; } > "$CMDFILE"
   "${CMD[@]}" >/dev/null
+  # state file only once docker run has succeeded (else it describes a server that never started)
+  DIGEST=$(docker image inspect -f '{{index .RepoDigests 0}}' "$IMAGE" 2>/dev/null || echo "$IMAGE")
+  { printf '%q ' "${CMD[@]}"; echo
+    echo "# image=$IMAGE"; echo "# image_digest=$DIGEST"; echo "# started_utc=$(date -u +%FT%TZ)"; } > "$CMDFILE"
   for ((i = 0; i < WAIT; i += 5)); do
     if curl -sf -m 3 "http://127.0.0.1:$PORT/v1/models" >/dev/null; then
       echo "up after ${i}s on port $PORT: $IMAGE ($(basename "$RAD_FILE"))${SERVED_NAME:+ — served under alias $SERVED_NAME}"
