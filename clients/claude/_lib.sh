@@ -4,6 +4,7 @@
 #   CLAUDE_BASE_SETTINGS(~/.config/claude/local_vllm_direct/settings.json: env block reused, URL/model/window rewritten)
 REPO="${AMD_REPO:-$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/../../../amd" && pwd)}"   # amd/clients/claude -> repo root (readlink -f lands in the repo even via the amd-private copy)
 ENG="$REPO/stack/serve"      # vllm/serve_vllm.sh, radiance/serve_radiance.sh
+source "$ENG/serve_lib.sh"   # wait_port_bindable (free_gpu): port re-bindable = LISTEN gone + TIME_WAIT drained
 : "${PORT:=8000}"; : "${KEEP:=0}"; : "${WAIT:=1200}"
 : "${CLAUDE_BASE_SETTINGS:=$HOME/.config/claude/local_vllm_direct/settings.json}"
 RUNDIR="$REPO/stack/serve/var/servers"; mkdir -p "$RUNDIR"
@@ -17,17 +18,23 @@ free_gpu() {
     case "$img" in stilldeadcode/radiance*|ghcr.io/slybase/vllm-sly-radiance*) ;; *) continue;; esac
     echo "stopping container $name ($img) to free the GPU"
     docker update --restart=no "$id" >/dev/null 2>&1 || true   # fails on a container already marked for removal (Dead); must not abort under set -e
-    docker rm -f "$id" >/dev/null
+    # graceful first, like serve_vllm.sh / serve_radiance.sh (a SIGKILL'd engine can wedge the card); both bounded.
+    # || true: a run-mode container (--rm) is auto-removed as it stops, so the rm -f below may find nothing
+    timeout 90 docker stop -t 60 "$id" >/dev/null 2>&1 || true
+    timeout 60 docker rm -f "$id" >/dev/null 2>&1 || true
   done < <(docker ps -a --format '{{.ID}} {{.Image}} {{.Names}}')
-  for _ in $(seq 30); do ss -ltn | grep -q ":$PORT " || return 0; sleep 1; done
-  echo "port $PORT still held by a foreign process" >&2; return 1
+  wait_port_bindable "$PORT"   # LISTEN gone and TIME_WAIT drained: a fresh bind fails EADDRINUSE until then
 }
 
 # wait_health CONTAINER PID — /health must answer while the launcher PID stays alive (the container appears a few s after it)
+# Run mode is --rm, so a container that died during boot is usually already gone when PID exits: "no container" does not prove it never started.
 wait_health() {
   local t=0
   until curl -sf -m 3 "http://127.0.0.1:$PORT/health" >/dev/null 2>&1; do
-    kill -0 "$2" 2>/dev/null || { echo "container $1 died during boot — docker logs $1" >&2; return 1; }
+    kill -0 "$2" 2>/dev/null || {
+      if docker container inspect "$1" >/dev/null 2>&1; then echo "container $1 died during boot — docker logs $1" >&2
+      else echo "launch exited with no container $1 (never started, or died and --rm removed it) — see the log tail below" >&2; fi
+      return 1; }
     t=$((t+3)); [ "$t" -le "$WAIT" ] || { echo "no /health after ${WAIT}s" >&2; return 1; }
     sleep 3
   done
@@ -75,9 +82,13 @@ run_claude() {
 # (27B launchers source $REPO/stack/serve/27b.conf; the rest keep their own).
 rad_run() {
   local rad=$1 image=$2 extra=$3; shift 3
+  # refuse BEFORE free_gpu: a missing model or image must not cost the user the live server
+  [ -n "$rad" ] && [ -f "$rad" ] || { echo "rad_run: .rad model not found: '$rad' (RAD_FILE unset or not a file)" >&2; return 1; }
+  [ -z "$image" ] || docker image inspect "$image" >/dev/null 2>&1 || { echo "rad_run: image '$image' is not present locally — docker pull it first" >&2; return 1; }
   local img_env=(); [ -n "$image" ] && img_env=("IMAGE=$image")   # IMAGE only when set; an expansion-built prefix word is not an assignment, so it goes to env as an operand
   free_gpu
-  [ "$KEEP" = 1 ] || trap 'docker rm -f "$CT" >/dev/null 2>&1' EXIT
+  # graceful stop, then rm -f, both bounded; || true because under set -e a failing trap command aborts the trap and changes the exit status
+  [ "$KEEP" = 1 ] || trap 'timeout 90 docker stop -t 60 "$CT" >/dev/null 2>&1 || true; timeout 60 docker rm -f "$CT" >/dev/null 2>&1 || true' EXIT
   env "RAD_FILE=$rad" "${img_env[@]}" "PORT=$PORT" "MAXLEN=$MAXLEN" "MAXSEQS=$MAXSEQS" "EXTRA_ARGS=$extra" "CONTAINER_NAME=$CT" \
     "$ENG/radiance/serve_radiance.sh" run >"$RUNDIR/$PORT.log" 2>&1 &
   wait_health "$CT" $! || { tail -20 "$RUNDIR/$PORT.log" >&2; exit 1; }
