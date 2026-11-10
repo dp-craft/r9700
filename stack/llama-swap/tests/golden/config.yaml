@@ -245,53 +245,18 @@ models:
     cmdStop: docker rm -f llama-swap-qwen38-27b-mxfp4-mtp-kvfp8-vllm
     useModelName: qwen38-27b-mxfp4-mtp
 
-  "qwen38-27b-mxfp4-radiance-kvfp8-vllm":
-    name: "qwen38-27b-mxfp4-radiance-kvfp8-vllm  [vllm, profile=radiance/qwen38-mxfp4, ctx=150000, kv=fp8, np=1, ram-tier=off]"
+  "qwen38-27b-mxfp4-kvfp8-rad":
+    name: "qwen38-27b-mxfp4-kvfp8-rad  [radiance, file=qwen3.8-27b-mxfp4.rad, ctx=200000, kv=fp8, np=8]"
     cmd: |
       /usr/bin/env
-      PROFILE=radiance/qwen38-mxfp4
+      RAD_FILE=/mnt/Lin1/work/radiance/models/StillDeadcode__qwen3.8-27b-mxfp4@60bd4139/qwen3.8-27b-mxfp4.rad
       PORT=${PORT}
-      CONTAINER_NAME=llama-swap-qwen38-27b-mxfp4-radiance-kvfp8-vllm
-      SERVED_NAME=qwen38-27b-mxfp4-radiance
-      MAXLEN=150000
-      MAXSEQS=1
+      CONTAINER_NAME=llama-swap-qwen38-27b-mxfp4-kvfp8-rad
+      MAXLEN=200000
+      MAXSEQS=8
       KV_DTYPE=fp8
-      'EXTRA_ARGS=--override-generation-config {"temperature":1.0,"top_p":0.95,"top_k":20,"min_p":0.0,"presence_penalty":0.1}'
-      /home/dev/work/dp-craft/amd/stack/serve/vllm/serve_vllm.sh run
-    cmdStop: docker rm -f llama-swap-qwen38-27b-mxfp4-radiance-kvfp8-vllm
-    useModelName: qwen38-27b-mxfp4-radiance
-
-  "qwen38-27b-mxfp4-radiance-dflash-kvfp8-vllm":
-    name: "qwen38-27b-mxfp4-radiance-dflash-kvfp8-vllm  [vllm, profile=radiance/qwen38-mxfp4-dflash, ctx=190000, kv=fp8, np=1, ram-tier=off]"
-    cmd: |
-      /usr/bin/env
-      PROFILE=radiance/qwen38-mxfp4-dflash
-      PORT=${PORT}
-      CONTAINER_NAME=llama-swap-qwen38-27b-mxfp4-radiance-dflash-kvfp8-vllm
-      SERVED_NAME=qwen38-27b-mxfp4-radiance-dflash
-      MAXLEN=190000
-      MAXSEQS=1
-      KV_DTYPE=fp8
-      'EXTRA_ARGS=--override-generation-config {"temperature":1.0,"top_p":0.95,"top_k":20,"min_p":0.0,"presence_penalty":0.1}'
-      /home/dev/work/dp-craft/amd/stack/serve/vllm/serve_vllm.sh run
-    cmdStop: docker rm -f llama-swap-qwen38-27b-mxfp4-radiance-dflash-kvfp8-vllm
-    useModelName: qwen38-27b-mxfp4-radiance-dflash
-
-  "qwen38-27b-mxfp4-radiance-mtp-kvfp8-vllm":
-    name: "qwen38-27b-mxfp4-radiance-mtp-kvfp8-vllm  [vllm, profile=radiance/qwen38-mxfp4-mtp, ctx=190000, kv=fp8, np=1, ram-tier=off]"
-    cmd: |
-      /usr/bin/env
-      PROFILE=radiance/qwen38-mxfp4-mtp
-      PORT=${PORT}
-      CONTAINER_NAME=llama-swap-qwen38-27b-mxfp4-radiance-mtp-kvfp8-vllm
-      SERVED_NAME=qwen38-27b-mxfp4-radiance-mtp
-      MAXLEN=190000
-      MAXSEQS=1
-      KV_DTYPE=fp8
-      'EXTRA_ARGS=--override-generation-config {"temperature":1.0,"top_p":0.95,"top_k":20,"min_p":0.0,"presence_penalty":0.1}'
-      /home/dev/work/dp-craft/amd/stack/serve/vllm/serve_vllm.sh run
-    cmdStop: docker rm -f llama-swap-qwen38-27b-mxfp4-radiance-mtp-kvfp8-vllm
-    useModelName: qwen38-27b-mxfp4-radiance-mtp
+      /home/dev/work/dp-craft/amd/stack/serve/radiance/serve_radiance.sh run
+    cmdStop: docker rm -f llama-swap-qwen38-27b-mxfp4-kvfp8-rad
 
   "bge-reranker-v2-m3":
     name: "bge-reranker-v2-m3  [vulkan, rerank, ctx=8192, ub=8192]"
@@ -377,7 +342,5 @@ groups:
       - "ornith35b-a3b-hipfire-kvq8-hf"
       - "qwen38-27b-mxfp4-dflash-kvfp8-vllm"
       - "qwen38-27b-mxfp4-mtp-kvfp8-vllm"
-      - "qwen38-27b-mxfp4-radiance-kvfp8-vllm"
-      - "qwen38-27b-mxfp4-radiance-dflash-kvfp8-vllm"
-      - "qwen38-27b-mxfp4-radiance-mtp-kvfp8-vllm"
+      - "qwen38-27b-mxfp4-kvfp8-rad"
 

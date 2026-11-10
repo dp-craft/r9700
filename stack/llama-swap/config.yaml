@@ -220,7 +220,7 @@ models:
       MAXLEN=190000
       MAXSEQS=1
       KV_DTYPE=fp8
-      'EXTRA_ARGS=--override-generation-config {"temperature":1.0,"top_p":0.95,"top_k":20,"min_p":0.0,"presence_penalty":1}'
+      'EXTRA_ARGS=--override-generation-config {"temperature":1.0,"top_p":0.95,"top_k":20,"min_p":0.0,"presence_penalty":0.1}'
       KVCACHE=ram
       KVCACHE_RAM_GIB=8
       /home/dev/work/dp-craft/amd/stack/serve/vllm/serve_vllm.sh run
@@ -238,7 +238,7 @@ models:
       MAXLEN=190000
       MAXSEQS=1
       KV_DTYPE=fp8
-      'EXTRA_ARGS=--override-generation-config {"temperature":1.0,"top_p":0.95,"top_k":20,"min_p":0.0,"presence_penalty":1}'
+      'EXTRA_ARGS=--override-generation-config {"temperature":1.0,"top_p":0.95,"top_k":20,"min_p":0.0,"presence_penalty":0.1}'
       KVCACHE=ram
       KVCACHE_RAM_GIB=8
       /home/dev/work/dp-craft/amd/stack/serve/vllm/serve_vllm.sh run

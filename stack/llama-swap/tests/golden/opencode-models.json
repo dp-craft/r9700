@@ -137,33 +137,19 @@
     },
     "name": "qwen38-27b-mxfp4-dflash-kvfp8-vllm"
   },
+  "qwen38-27b-mxfp4-kvfp8-rad": {
+    "limit": {
+      "context": 200000,
+      "output": 32768
+    },
+    "name": "qwen38-27b-mxfp4-kvfp8-rad"
+  },
   "qwen38-27b-mxfp4-mtp-kvfp8-vllm": {
     "limit": {
       "context": 190000,
       "output": 32768
     },
     "name": "qwen38-27b-mxfp4-mtp-kvfp8-vllm"
-  },
-  "qwen38-27b-mxfp4-radiance-dflash-kvfp8-vllm": {
-    "limit": {
-      "context": 190000,
-      "output": 32768
-    },
-    "name": "qwen38-27b-mxfp4-radiance-dflash-kvfp8-vllm"
-  },
-  "qwen38-27b-mxfp4-radiance-kvfp8-vllm": {
-    "limit": {
-      "context": 150000,
-      "output": 32768
-    },
-    "name": "qwen38-27b-mxfp4-radiance-kvfp8-vllm"
-  },
-  "qwen38-27b-mxfp4-radiance-mtp-kvfp8-vllm": {
-    "limit": {
-      "context": 190000,
-      "output": 32768
-    },
-    "name": "qwen38-27b-mxfp4-radiance-mtp-kvfp8-vllm"
   },
   "qwen38-27b-q4kxl-f16-mtp-mtp-frog-planning": {
     "limit": {

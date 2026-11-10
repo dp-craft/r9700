@@ -880,7 +880,7 @@ def vllm_sampler(mid, purposes):
     # from context; penalties run inside the spec-decode path, so DFlash/MTP stay on. Explicit rather than
     # implied because this dict REPLACES the profile's override, which would otherwise silently fall back
     # to the checkpoint's generation_config.json value.
-    out.setdefault("presence_penalty", 1)
+    out.setdefault("presence_penalty", 0.1)
     return out
 
 
