@@ -19,9 +19,10 @@ free_gpu() {
     echo "stopping container $name ($img) to free the GPU"
     docker update --restart=no "$id" >/dev/null 2>&1 || true   # fails on a container already marked for removal (Dead); must not abort under set -e
     # graceful first, like serve_vllm.sh / serve_radiance.sh (a SIGKILL'd engine can wedge the card); both bounded.
-    # || true: a run-mode container (--rm) is auto-removed as it stops, so the rm -f below may find nothing
+    # a run-mode container (--rm) is auto-removed as it stops, so the rm -f below may find nothing: warn only if it is still there
     timeout 90 docker stop -t 60 "$id" >/dev/null 2>&1 || true
-    timeout 60 docker rm -f "$id" >/dev/null 2>&1 || true
+    timeout 60 docker rm -f "$id" >/dev/null 2>&1 || ! docker container inspect "$id" >/dev/null 2>&1 \
+      || echo "warning: $name is still there after stop + rm -f (GPU process may be wedged in the driver)" >&2
   done < <(docker ps -a --format '{{.ID}} {{.Image}} {{.Names}}')
   wait_port_bindable "$PORT"   # LISTEN gone and TIME_WAIT drained: a fresh bind fails EADDRINUSE until then
 }
@@ -83,7 +84,8 @@ run_claude() {
 rad_run() {
   local rad=$1 image=$2 extra=$3; shift 3
   # refuse BEFORE free_gpu: a missing model or image must not cost the user the live server
-  [ -n "$rad" ] && [ -f "$rad" ] || { echo "rad_run: .rad model not found: '$rad' (RAD_FILE unset or not a file)" >&2; return 1; }
+  # the same path rule as serve_radiance.sh (absolute, .rad), which would refuse it only after free_gpu
+  [ "${rad:0:1}" = / ] && [ "${rad##*.}" = rad ] && [ -f "$rad" ] || { echo "rad_run: .rad model not found: '$rad' (RAD_FILE unset, not an absolute .rad path, or not a file)" >&2; return 1; }
   [ -z "$image" ] || docker image inspect "$image" >/dev/null 2>&1 || { echo "rad_run: image '$image' is not present locally — docker pull it first" >&2; return 1; }
   local img_env=(); [ -n "$image" ] && img_env=("IMAGE=$image")   # IMAGE only when set; an expansion-built prefix word is not an assignment, so it goes to env as an operand
   free_gpu

@@ -6,12 +6,13 @@
 #   1 rad_run + image: the stub gets RAD_FILE/IMAGE/PORT/MAXLEN/MAXSEQS/EXTRA_ARGS (with a space)/CONTAINER_NAME; rc 0
 #   2 rad_run, empty image: the same, and IMAGE is unset in the stub
 #   3 rad_run, missing .rad: rc != 0 and no docker call at all (free_gpu never ran)
+#   3b rad_run, relative .rad path (exists): refused the same way (serve_radiance.sh would refuse only after free_gpu)
 #   4 rad_run, image docker says is missing: rc != 0 and the only docker call is `image inspect`
 #   5 free_gpu, one listed radiance container: update, then stop -t 60, then rm -f
 #   6 the EXIT trap after a successful rad_run: stop -t 60 before rm -f on the container
 # Rule 3 (2026-11-10, a helper without these killed a live server): this file and every script it writes start with
 # the fake bin first on PATH, DOCKER_HOST at a dead socket, and a guard that exits 99 unless `command -v docker` is
-# this run's own fake. Run: bash stack/serve/tests/test_rad_run.sh   (no GPU, no docker; exit 0 iff all six pass)
+# this run's own fake. Run: bash stack/serve/tests/test_rad_run.sh   (no GPU, no docker; exit 0 iff all pass)
 set -u
 REPO=$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/../../.." && pwd)
 mkdir -p "$REPO/tmp"; W=$(mktemp -d -p "$REPO/tmp") || exit 1
@@ -119,6 +120,13 @@ in_lib rad_run "$W/no-such.rad" "$IMG" "" >"$FAKE_DIR/case.out" 2>&1; rc=$?
 [ ! -s "$FAKE_DIR/docker.log" ] || err "docker calls: $(tr '\n' ';' < "$FAKE_DIR/docker.log")"
 [ ! -f "$FAKE_DIR/stub.env" ] || err "the stub ran"
 verdict "3 rad_run with a missing .rad: rc != 0, no docker call at all (free_gpu never ran)"
+
+# 3b: a relative .rad path that exists is refused too (serve_radiance.sh would refuse it, but only after free_gpu)
+fresh "$PS_RAD"
+( cd "$W" && in_lib rad_run model.rad "$IMG" "" ) >"$FAKE_DIR/case.out" 2>&1; rc=$?
+[ "$rc" -ne 0 ] || err "rc=0, want non-zero"
+[ ! -s "$FAKE_DIR/docker.log" ] || err "docker calls: $(tr '\n' ';' < "$FAKE_DIR/docker.log")"
+verdict "3b rad_run with a relative .rad path: rc != 0, no docker call at all"
 
 # 4: an image docker says is missing is refused after its one `image inspect`, before free_gpu
 fresh "$PS_RAD"
