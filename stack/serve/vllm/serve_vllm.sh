@@ -93,9 +93,12 @@ watchdog() {
 }
 
 port_holder() {   # describe whatever is LISTENing on :$PORT (containers first, then raw pids)
-  local f pid
-  f=$(docker ps --format '{{.Names}}' --filter "publish=$PORT" | tr '\n' ' ')
-  if [ -n "$f" ]; then echo "container(s) $f"; return; fi
+  local f r pid
+  f=$(docker ps --format '{{.Names}} ({{.Image}})' --filter "publish=$PORT" | tr '\n' ' ')
+  # the radiance engine runs --network host: nothing is "published", so look it up by its name
+  r=$(docker ps --format '{{.Names}} ({{.Image}})' --filter "name=^radiance-$PORT\$" | tr '\n' ' ')
+  case $f in *"radiance-$PORT "*) ;; *) f+="$r";; esac
+  if [ -n "$f" ]; then echo "container(s) ${f% }"; return; fi
   pid=$(ss -ltnp 2>/dev/null | grep ":$PORT " | grep -oP 'pid=\K[0-9]+' | sort -u | head -3 | tr '\n' ' ')
   echo "pid(s) ${pid:-unknown — ss -ltnp | grep :$PORT}"
 }
@@ -108,13 +111,13 @@ case "${1:-start}" in
       # the GPU cleanly; a SIGKILL'd engine can wedge the card, iron rule 15). docker escalates to
       # SIGKILL itself if 60 s pass; the rm -f below is the backstop (a GPU process wedged in the
       # driver makes even that hang in D-state, so the timeout turns the hang into a loud failure).
-      docker stop -t 60 "$NAME" >/dev/null 2>&1 || true
+      timeout 90 docker stop -t 60 "$NAME" >/dev/null 2>&1 || true   # bounded: a wedged stop must not skip the rm -f backstop
       timeout 60 docker rm -f "$NAME" >/dev/null || {
         echo "FAILED to remove $NAME (docker rm -f timed out or was refused — GPU process may be wedged in the driver)" >&2
         echo "  check: ss -ltnp | grep :$PORT  ·  amd-smi process -g 0  ·  reboot if it persists" >&2
         exit 1
       }
-      rm -f "$CFILE"
+      rm -f "$CFILE" "$CMDFILE"   # cmdline too: start reuses it as the "model" hint, a stale one misleads
       # TIME_WAIT: the engine's just-closed connections (incl. Claude sessions' keep-alives) hold :$PORT
       # for the kernel MSL (~60 s) with NO LISTEN socket left -- a fresh docker bind fails EADDRINUSE in
       # that window (seen 2026-11-08: stop->start back-to-back). Wait it out so "stopped" means the port
@@ -127,15 +130,25 @@ case "${1:-start}" in
     else
       rm -f "$CFILE"   # stale state without a container (crash/restart): stop must leave no state behind
       if ss -ltn | grep -q ":$PORT "; then
-        echo "no container $NAME, but port $PORT is still held by: $(port_holder)" >&2
-        echo "  stop it with ITS starter (e.g. start_ornith_35b_vllm_rad.sh stop for radiance-$PORT), not this one" >&2
+        holder=$(port_holder)
+        echo "no container $NAME, but port $PORT is still held by: $holder" >&2
+        case $holder in
+          *"radiance-$PORT "*) echo "  that is the radiance engine: stop it with ITS starter (start_ornith_35b_vllm_rad.sh stop or start_qwen38_27b_iq4r-l-v4_rad.sh stop, whichever started it), not this one" >&2;;
+          *) echo "  stop it with ITS starter (e.g. start_ornith_35b_vllm_rad.sh stop for radiance-$PORT), not this one" >&2;;
+        esac
         exit 1
       fi
+      rm -f "$CMDFILE"   # port free and no container: the cmdline is a leftover too (not touched while another engine holds the port)
       echo "no container $NAME"
     fi
     exit 0;;
   status)
-    if running; then echo "running $NAME: $(head -1 "$CMDFILE" 2>/dev/null)"; else echo "not running"; exit 1; fi
+    if running; then echo "running $NAME: $(head -1 "$CMDFILE" 2>/dev/null)"
+    else   # another engine's server on this port must not look like "nothing there"
+      echo "not running (no container $NAME)"
+      if ss -ltn | grep -q ":$PORT "; then echo "port $PORT is held by: $(port_holder)" >&2; fi
+      exit 1
+    fi
     exit 0;;
   logs) docker logs --tail 50 "$NAME"; exit 0;;
   start|print|run) ;;
@@ -243,6 +256,7 @@ CMD+=(${CT_MOUNT[@]+"${CT_MOUNT[@]}"} ${KVC_MOUNT[@]+"${KVC_MOUNT[@]}"})
 if [ -n "$KVC_PRELUDE" ]; then CMD+=(--entrypoint bash "$IMAGE" -c "$KVC_PRELUDE" _); else CMD+=("$IMAGE"); fi
 CMD+=(--model /model --served-model-name "$SERVED_NAME" --host 0.0.0.0 --port 8000
       --max-model-len "$MAXLEN" "${MODEL_ARGS[@]}" "${ENGINE_ARGS[@]}" ${KVC_ARGS[@]+"${KVC_ARGS[@]}"})
+# EXTRA_ARGS is split on whitespace; quotes are NOT honoured (no JSON or quoted values in it)
 if [ -n "${EXTRA_ARGS:-}" ]; then read -r -a XA <<<"$EXTRA_ARGS"; CMD+=("${XA[@]}"); fi
 
 if [ "${1:-start}" = print ]; then
@@ -298,7 +312,7 @@ if [ "${1:-start}" = start ]; then
     if container_exists; then
       echo "vllm instance $NAME is running on port $PORT with model '${model:-unknown}'"
     else
-      echo "a foreign process is holding port $PORT (model: '${model:-unknown}')"
+      echo "a foreign process is holding port $PORT: $(port_holder) (model: '${model:-unknown}')"
     fi
     if [ ! -t 0 ]; then
       echo "stop it first (PORT=$PORT $0 stop), or rerun from a TTY to confirm the takeover" >&2
@@ -309,15 +323,19 @@ if [ "${1:-start}" = start ]; then
       y|Y|yes|YES) ;;
       *) echo "aborted -- the running instance was not touched" >&2; exit 1;;
     esac
-    if container_exists; then docker stop -t 60 "$NAME" >/dev/null 2>&1 || true; timeout 60 docker rm -f "$NAME" >/dev/null 2>&1; rm -f "$CFILE"; fi
+    if container_exists; then
+      timeout 90 docker stop -t 60 "$NAME" >/dev/null 2>&1 || true   # bounded, so the rm -f backstop is reached
+      if timeout 60 docker rm -f "$NAME" >/dev/null 2>&1; then rm -f "$CFILE"
+      else echo "warning: could not remove $NAME (docker rm -f failed or timed out) -- the port check below decides" >&2; fi
+    fi
     for _ in $(seq 10); do port_held || break; sleep 1; done   # docker releases the port after the rm
     if port_held; then   # still owned: a foreign container publishing the port, or an orphaned process
-      foreign=$(docker ps -q --filter "publish=$PORT")
+      foreign=$({ docker ps -q --filter "publish=$PORT"; docker ps -q --filter "name=^radiance-$PORT\$"; } | sort -u)   # radiance: --network host, not "published"
       if [ -n "$foreign" ]; then
-        echo "port $PORT is published by foreign container(s): $(docker ps --format '{{.Names}}' $foreign | tr '\n' ' ')" >&2
+        echo "port $PORT is held by foreign container(s): $(port_holder)" >&2
         echo "stopping them per your answer (graceful -- a SIGKILL'd engine can wedge the GPU, see iron rule 15)" >&2
-        docker stop -t 60 $foreign >/dev/null 2>&1 || true   # 60 s graceful; docker escalates to SIGKILL itself after
-        docker rm -f $foreign >/dev/null 2>&1
+        timeout 90 docker stop -t 60 $foreign >/dev/null 2>&1 || true   # 60 s graceful; docker escalates to SIGKILL itself after
+        timeout 60 docker rm -f $foreign >/dev/null 2>&1 || echo "warning: docker rm -f of the foreign container(s) failed or timed out (a --rm one is already gone) -- the port check below decides" >&2
       else
         pid=$(ss -ltnp 2>/dev/null | grep ":$PORT " | grep -oP 'pid=\K[0-9]+' | head -1) || true
         if [ -n "$pid" ] && [ "$pid" != "$$" ]; then
@@ -331,6 +349,8 @@ if [ "${1:-start}" = start ]; then
       for _ in $(seq 30); do port_held || break; sleep 1; done
       port_held && { echo "port $PORT still held -- aborting (ss -ltnp | grep :$PORT)" >&2; exit 1; }
     fi
+    # LISTEN is gone; drain TIME_WAIT too, as `stop` does: a fresh bind fails EADDRINUSE inside it (2026-11-08)
+    wait_port_bindable "$PORT" 1 70 port_holder || exit 1
   fi
 else   # run mode: no prompts, no foreign kills -- the supervisor owns the lifecycle
   container_exists && { echo "$NAME exists — PORT=$PORT $0 stop first" >&2; exit 1; }
