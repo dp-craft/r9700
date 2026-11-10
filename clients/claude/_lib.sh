@@ -75,9 +75,10 @@ run_claude() {
 # (27B launchers source $REPO/stack/serve/27b.conf; the rest keep their own).
 rad_run() {
   local rad=$1 image=$2 extra=$3; shift 3
+  local img_env=(); [ -n "$image" ] && img_env=("IMAGE=$image")   # IMAGE only when set; an expansion-built prefix word is not an assignment, so it goes to env as an operand
   free_gpu
   [ "$KEEP" = 1 ] || trap 'docker rm -f "$CT" >/dev/null 2>&1' EXIT
-  RAD_FILE=$rad ${image:+IMAGE=$image} PORT=$PORT MAXLEN=$MAXLEN MAXSEQS=$MAXSEQS EXTRA_ARGS=$extra CONTAINER_NAME=$CT \
+  env "RAD_FILE=$rad" "${img_env[@]}" "PORT=$PORT" "MAXLEN=$MAXLEN" "MAXSEQS=$MAXSEQS" "EXTRA_ARGS=$extra" "CONTAINER_NAME=$CT" \
     "$ENG/radiance/serve_radiance.sh" run >"$RUNDIR/$PORT.log" 2>&1 &
   wait_health "$CT" $! || { tail -20 "$RUNDIR/$PORT.log" >&2; exit 1; }
   run_claude "$CT" "$MAXLEN" "$@"
