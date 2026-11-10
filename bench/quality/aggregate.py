@@ -6,13 +6,13 @@ The summary step must not slurp the raw JSONL — `outputs.jsonl` alone is 60 fu
 `results/summary.md` (+ `results/summary.json`): a per-cell table, a PER-REP detail table (every rep + the
 haiku/sonnet/opus references), and the campaign's relational findings (quant ladder, 27B-vs-35B,
 capability vs haiku/Sonnet/Opus). The LLM then only writes prose from this digest + `results/appendix.md`
-— it is explicitly told NOT to read the per-reply jsonl. Raw (outputs.jsonl, vram.jsonl) is read from
-`<campaign>/tmp/`, graded rows (scores_*.jsonl, judge_scores.jsonl) from `<campaign>/results/`,
+— it is explicitly told NOT to read the per-reply jsonl. Raw (outputs.jsonl) is read from
+`<campaign>/tmp/`, results rows (scores_*.jsonl, judge_scores.jsonl, vram.jsonl) from `<campaign>/results/`,
 calibration fixtures from `<campaign>/inputs/`.
 
   python3 aggregate.py --campaign campaigns/quality/<stamp>-<slug> --by-task
   # with --campaign (or $CAMPAIGN_DIR): reads <dir>/configs.jsonl, results/scores_*.jsonl +
-  # judge_scores.jsonl, tmp/outputs.jsonl + vram.jsonl, inputs/calibration*.jsonl; writes
+  # judge_scores.jsonl + vram.jsonl, tmp/outputs.jsonl, inputs/calibration*.jsonl; writes
   # results/summary.{md,json} (+ results/summary_by_task.json with --by-task)
   python3 aggregate.py --dir <flat-run-dir> --out <path>/summary.md   # explicit paths still win
 """

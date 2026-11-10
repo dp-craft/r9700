@@ -93,7 +93,7 @@ export CLAUDE_TMUX_SESSION
 TASKS="$D/inputs/tasks.jsonl"
 [ -f "$TASKS" ] || { echo "run_capture: missing $TASKS" >&2; exit 2; }
 RAW="$D/tmp" ; RES="$D/results" ; mkdir -p "$RAW/done" "$RES"
-OUT="$RAW/outputs.jsonl" ; VRAM="$RAW/vram.jsonl"
+OUT="$RAW/outputs.jsonl" ; VRAM="$RES/vram.jsonl"   # one summary row per config: a RESULT, so results/ (readers search results/ then tmp/)
 
 # --- 0. FAIL FAST: the judge/summary run claude through tmux; require the session BEFORE the long
 #        capture so we never burn hours only to fail at the judge. ---
