@@ -35,7 +35,7 @@ stack/                 ← the machine: everything that installs, builds or serv
                          generate.py → config.yaml; start/restart scripts; tests/; logs in var/logs
   serve/               ← launchers: llamacpp/ (serve_llamacpp.sh, serve_llamaswap.sh) · vllm/ (serve_vllm.sh,
                          profiles/, settings/, templates/, fetch_model.sh) · radiance/ (serve_radiance.sh,
-                         ornith_rad_mtp.sh) · ollama/; runtime state var/servers/<port>.{pid,log,cmdline}
+                         start_ornith_35b_vllm_rad.sh) · ollama/; runtime state var/servers/<port>.{pid,log,cmdline}
 bench/                 ← reusable tools (see bench/README.md); how-to in docs/guides/GUIDE.md
   core/                ← gen_campaign.py (spec.json → resumable run.sh + README; kinds throughput | quality |
                          agentic; `vram-ctx`) · gguf_kv.py (KV geometry → guard block) · capture_engine.py

@@ -24,7 +24,7 @@ an issue cross-links to `known-issues.md`. `HIP_FORCE_DEV_KERNARG=0` is **not** 
 
 ## `--gpu-headroom-mib` (native Radiance only)
 - **what-for:** the VRAM native Radiance leaves unclaimed. Default 96.
-- **how-to-use:** recommended only, not required: `EXTRA_ARGS="--gpu-headroom-mib 2048" ./ornith_rad_mtp.sh start`. The
+- **how-to-use:** recommended only, not required: `EXTRA_ARGS="--gpu-headroom-mib 2048" ./dp_start_ornith_35b_vllm_rad.sh start`. The
   alternative is to keep the default and close Chrome if VRAM gets tight.
 - **side-effect:** at 96 only about 232 MiB stayed free and the desktop crashed (see `known-issues.md`). 2048 should cost
   about 1.9 GiB of KV: about 3.1 sessions at 262k instead of 3.8 (INFERRED, because all weights stay resident).

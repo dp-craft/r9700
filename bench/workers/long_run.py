@@ -4,7 +4,7 @@ Log: longrun.jsonl. Reordered at 19 min: retyping cost far more than estimated (
 import json, os, subprocess, sys, time
 RUN = "/home/dev/work/dp-craft/amd/campaigns/workers/2026-11-05-0320-ornith-usecases/results/2026-11-05-0320-ornith-usecases"
 H = f"{RUN}/harness"
-STARTER = "/home/dev/work/dp-craft/amd/stack/serve/radiance/ornith_rad_mtp.sh"
+STARTER = "/home/dev/work/dp-craft/amd/stack/serve/radiance/start_ornith_35b_vllm_rad.sh"
 P2 = "--temp 0.6 --presence-penalty 0"
 LIMIT = int(os.environ.get("LIMIT_S", 7200))
 T0 = float(os.environ.get("T0_EPOCH", time.time()))

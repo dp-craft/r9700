@@ -20,7 +20,7 @@ One engine per `stack/serve/vllm/profiles/<engine>/` folder, plus native Radianc
 | `sly-official/` | `ghcr.io/slybase/vllm-sly-radiance:1.8.1-rocm10.1` | **Sly-docs official recipe** — the **current model under test** (Swift-1.5 heretic GPTQ-MXFP4 + DFlash2), flag-for-flag from the Sly docs. |
 | `sly-redhat/` | `ghcr.io/slybase/vllm-sly-radiance:1.9.1-rocm10.1` (vLLM 0.32.0) since 2026-10-30; was 1.8.1 (rollback: profile comment) | **RedHatAI/Qwen3.8-27B-MXFP4 + DFlash2** on sly-official's engine layer (sources `sly-official/_engine.env`, overrides only the image). |
 | `sly-amd/` | `ghcr.io/slybase/vllm-sly-radiance:1.9.1-rocm10.1` (vLLM 0.32.0) | **amd/Qwen3.5-35B-A3B-MXFP4 + z-lab DFlash**. The profile defaults to the slow `EMULATION` MoE backend; the archived starters in `stack/serve/vllm/retired/` override it with `triton_unfused`: `qwen35_sly_dflash.sh`, and `ornith_sly_dflash.sh`, which reuses the profile for Ornith 1.5 MXFP4 + official DFlash (checkpoints deleted). See `known-issues.md`. |
-| native Radiance (`stack/serve/radiance/ornith_rad_mtp.sh`, repo root) | `stilldeadcode/radiance:1.16.0` | **keptn/ornith-1.5-35b-a3b-w4a8 `.rad`** with the creator's single-card flags. A separate engine with its own CLI, so `serve_vllm.sh` does not drive it. Read the headroom issue in `known-issues.md` before starting it. |
+| native Radiance (`stack/serve/radiance/start_ornith_35b_vllm_rad.sh`, repo root `dp_start_ornith_35b_vllm_rad.sh`) | `stilldeadcode/radiance:1.16.0` | **keptn/ornith-1.5-35b-a3b-w4a8 `.rad`** with the creator's single-card flags. A separate engine with its own CLI, so `serve_vllm.sh` does not drive it. Read the headroom issue in `known-issues.md` before starting it. |
 
 ## Routing table
 
@@ -39,7 +39,7 @@ One engine per `stack/serve/vllm/profiles/<engine>/` folder, plus native Radianc
 ## Quickstart
 
 - **Boot the MXFP4 model** (starter, no drafter): `PROFILE=sly-radiance/qwen38-mxfp4 PORT=8000 stack/serve/vllm/serve_vllm.sh` — see `workflows.md` (boot).
-- **Boot Ornith 1.5 on native Radiance**: `./ornith_rad_mtp.sh start` (close Chrome if VRAM gets tight; extra headroom is recommended only) — see `workflows.md` (boot) and `known-issues.md` (headroom).
+- **Boot Ornith 1.5 on native Radiance**: `./dp_start_ornith_35b_vllm_rad.sh start` (close Chrome if VRAM gets tight; extra headroom is recommended only) — see `workflows.md` (boot) and `known-issues.md` (headroom).
 - **Observe a running server** (no GPU, read-only): `python3 stack/gpu/monitor.py --port 8000` — see `workflows.md` (observe).
 - **Run a campaign**: `stack/serve/vllm/serve_vllm.sh` + `bench/core/capture_engine.py` — see `workflows.md` (run a campaign).
 - **Add a model to llama-swap** → **Plan B** (`notes/plans/2026-10-25-vllm-llama-swap-path.md`), not this track.

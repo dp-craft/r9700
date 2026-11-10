@@ -40,7 +40,7 @@ an issue lives in `settings.md`; a fix that was version/env-specific lives in `h
   readable from the account that ran the test.
 - **version seen:** `stilldeadcode/radiance:1.16.0`, Ornith 1.5 w4a8, 2026-11-04.
 - **workaround (recommended only, not required):** the operator's choice is to keep the launcher at the default and close
-  Chrome if VRAM gets tight. `EXTRA_ARGS="--gpu-headroom-mib 2048" ./ornith_rad_mtp.sh start` is the optional
+  Chrome if VRAM gets tight. `EXTRA_ARGS="--gpu-headroom-mib 2048" ./dp_start_ornith_35b_vllm_rad.sh start` is the optional
   alternative. **Unmeasured.** It should shrink only the KV cache, from 11.37 GiB to about 9.5 GiB (INFERRED). The launcher
   has no VRAM watchdog.
 - **not affected:** the 27B on `sly-redhat` is stable as configured and needs no extra headroom (operator report; 1,427 MiB
@@ -69,7 +69,7 @@ an issue lives in `settings.md`; a fix that was version/env-specific lives in `h
 - **status:** **live**. Only `EMULATION` is left, not tested because it ran the Qwen 35B at about 16 tok/s. A failed load leaves
   the container up, so the launcher waits until `WAIT` runs out.
 - **version seen:** sly 1.9.1 (vLLM 0.32.0), 2026-11-04.
-- **workaround:** use `stack/serve/radiance/ornith_rad_mtp.sh` for MTP. DFlash K=3 does load on Sly (`stack/serve/vllm/retired/ornith_sly_dflash.sh`; its checkpoints were deleted, fetch commands in its header). Native Radiance is not affected: its
+- **workaround:** use `stack/serve/radiance/start_ornith_35b_vllm_rad.sh` for MTP. DFlash K=3 does load on Sly (`stack/serve/vllm/retired/ornith_sly_dflash.sh`; its checkpoints were deleted, fetch commands in its header). Native Radiance is not affected: its
   image has no vLLM, and it measured MTP K=3 at 219.8 tok/s.
 - **not the same as:** vLLM's comment `TRITON_UNFUSED has bug with MTP support` (`oracle/mxfp4.py`:403, :442), whose symptom nobody
   documents ([#49446](https://github.com/vllm-project/vllm/issues/49446), open).

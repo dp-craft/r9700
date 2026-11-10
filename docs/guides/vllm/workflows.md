@@ -23,15 +23,15 @@ Native Radiance has its own launcher, because `serve_vllm.sh` builds vLLM argume
 
 ```bash
 stack/serve/vllm/fetch_model.sh keptn/ornith-1.5-35b-a3b-w4a8 cfed0f8f07d0ef8d0c7dcf4d29a07eeb6a402472
-./ornith_rad_mtp.sh start    # port 8000
-./ornith_rad_mtp.sh stop|status|logs
+./dp_start_ornith_35b_vllm_rad.sh start    # port 8000
+./dp_start_ornith_35b_vllm_rad.sh stop|status|logs
 ```
 
 It runs the `gpu_exclusive.sh` floor first but has no VRAM watchdog and writes no `.cmdline`. It leaves about 232 MiB free,
 which crashed the desktop once, so close Chrome if VRAM gets tight. `EXTRA_ARGS="--gpu-headroom-mib 2048"` is recommended
 only, and unmeasured (see `known-issues.md`).
 
-`stack/serve/radiance/ornith_rad_mtp.sh` is the fastest 35B. Its Claude config is
+`stack/serve/radiance/start_ornith_35b_vllm_rad.sh` is the fastest 35B. Its Claude config is
 `claude --settings ~/.config/claude/local_vllm_direct/settings-redhat.json`; it serves under that file's model name.
 
 The slower Sly starters are archived and use the same port, so run one at a time. `qwen35_sly_dflash.sh` uses
