@@ -125,9 +125,19 @@ elif guard_ok 'redhat-sly191-d0-dflash-fp8kv-ctx262000' -1; then
 fi
 
 # ===== report (last step): theme-aware SVG charts + appendix.md, embedded in the write-up =====
+# re-run APPENDS its report under a separator (appendix.md is the merged DFlash-vs-MTP run's report)
 if [ -f "$RES/results.jsonl" ]; then
-  python3 "$ROOT/bench/core/report.py" "$CAMPAIGN_DIR" \
-    && echo "charts: $RES/charts/  ·  appendix: $RES/appendix.md"
+  if [ -s "$RES/appendix.md" ]; then
+    stamp="$(date +%Y%m%d-%H%M%S)" ; apf="$RAW/appendix-run-$stamp.md"
+    python3 "$ROOT/bench/core/report.py" "$CAMPAIGN_DIR" --charts "$RES/charts/run-$stamp" --appendix "$apf" \
+      && sed "s#](charts/#](charts/run-$stamp/#g" "$apf" > "$apf.rw" && mv "$apf.rw" "$apf" \
+      && { echo; echo "--------- new run $(date '+%Y-%m-%d %H:%M') ---------"; echo; cat "$apf"; } >> "$RES/appendix.md" \
+      && rm -f "$apf" \
+      && echo "charts: $RES/charts/run-$stamp/  ·  appendix: $RES/appendix.md (appended under separator)"
+  else
+    python3 "$ROOT/bench/core/report.py" "$CAMPAIGN_DIR" \
+      && echo "charts: $RES/charts/  ·  appendix: $RES/appendix.md"
+  fi
 fi
 echo "campaign done. consolidated results: $RES/results.jsonl  (raw: $RAW/)"
 [ -f "$RES/skipped.txt" ] && { echo "--- guard-skipped (over budget) ---"; cat "$RES/skipped.txt"; } || true
