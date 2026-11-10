@@ -1925,7 +1925,7 @@ def validate_spec(spec):
             sys.exit("config labels must be unique across the campaign")
         if not (spec.get("vram") or {}).get("kv_kib_per_tok"):
             print("⚠️  WARNING: no vram.kv_kib_per_tok — the pre-flight VRAM guard is DISABLED "
-                  "(configs launch regardless of budget). Add vram.kv_kib_per_tok to enable it.")
+                  "(configs launch regardless of budget). Add vram.kv_kib_per_tok to enable it.", file=sys.stderr)
         return "plan.md"
     for k in ("slug", "model", "servers"):
         if k not in spec:
@@ -1959,10 +1959,10 @@ def validate_spec(spec):
                 sys.exit(f'"{k}" is vllm-only (llamacpp builds are picked by backend / serve_llamacpp.sh)')
     unpredictable = [s["name"] for s in spec["servers"] if predict_vram_mib(spec, s) < 0]
     if unpredictable and spec.get("engine") != "vllm":
-        print("⚠️  WARNING: no VRAM prediction for server(s): " + ", ".join(unpredictable))
-        print("    → the pre-flight guard is DISABLED for them; they WILL launch regardless of the")
-        print("      VRAM budget (risk of GTT spill / GPU freeze at high context).")
-        print("    Add a `vram` block to the spec: weights_gib + kv_kib_per_tok (per KV type used).")
+        print("⚠️  WARNING: no VRAM prediction for server(s): " + ", ".join(unpredictable), file=sys.stderr)
+        print("    → the pre-flight guard is DISABLED for them; they WILL launch regardless of the", file=sys.stderr)
+        print("      VRAM budget (risk of GTT spill / GPU freeze at high context).", file=sys.stderr)
+        print("    Add a `vram` block to the spec: weights_gib + kv_kib_per_tok (per KV type used).", file=sys.stderr)
     return "README.md"
 
 
