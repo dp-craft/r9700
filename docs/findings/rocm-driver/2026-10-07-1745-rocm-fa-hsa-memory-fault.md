@@ -1,5 +1,6 @@
 <!-- meta
 date: 2026-10-07 17:45
+campaign: campaigns/build-check/2026-10-07-1221-llamacpp-b790cf51aa-stew675-10.1-rocm
 takeaway: Every ROCm bench with `-fa on` crashes with `HSA_STATUS_ERROR_MEMORY_FAULT`; `sudo dmesg` confirms a real GPU page **permission** fault in `llama-bench` (PERMISSION_FAULTS=0x3, MAPPING_ERROR=0 — not OOM/contention). Reproduced twice (bench run + isolated test on a free GPU) and identically on both the 10.0 and 10.1 runtimes; `-fa off` is clean. No matching upstream issue found (4 searches, 2026-10-07). Kernel diff -34→-38 (done): six amdkfd/SVM/userq-fence patches landed in that window — one **gfx12-specific** (`6c1f4f7`, EOP interrupt routing) — a coherent suspect set for the signature. Attribution test = reboot to 7.0.0-34 (installed). ROCm bench arms are blocked until resolved; `latest-rocm` stays on the 10.0 build per user decision.
 -->
 

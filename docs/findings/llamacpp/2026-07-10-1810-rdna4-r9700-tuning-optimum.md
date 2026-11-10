@@ -305,7 +305,7 @@ All scripts are version-controlled under `bench/harness/` and write JSONL via th
 
 **Data files:** `bench/harness/results_2026-07-10_1548.jsonl` (baseline: KV 8/16, MTP) ·
 `bench/harness/results_tuning_2026-07-10_1714.jsonl` (ub/b sweeps, backends, num_batch, MTP@auto, vLLM) ·
-transformers-HF rows in `bench/harness/results.jsonl`.
+transformers-HF rows in `bench/harness/results.jsonl`. (Archived, not in this repo: `amd-private/archive/payload/bench/legacy/harness/`.)
 
 **Builds:** llama.cpp ROCm = lemonade **b1295** gfx120X (bundled ROCm 7.15, dir `stack/llamacpp/var/builds/b9949-rocm/bin/`) · llama.cpp Vulkan = ggml-org
 release **b9950** (dir `stack/llamacpp/var/builds/b9950-vulkan/bin/`) · ollama **0.31.2** (bundled ROCm 7.2) · Mesa RADV **25.2.8** ·

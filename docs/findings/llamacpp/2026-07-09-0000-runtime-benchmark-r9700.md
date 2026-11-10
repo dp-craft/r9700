@@ -64,5 +64,5 @@ takeaway: 100K context, ROCm. Qwen3-Coder-30B-A3B Q4_K_M ~90 tok/s decode; ollam
 
 ## Környezet / módszertan
 - Modellek: a helyi ollama-store GGUF-jai (HF-blokk feloldva → a 35B-MTP GGUF letöltve). A HauhauCS 35B egy „uncensored" finomhangolás — sebességre reprezentatív, kódminőségre a hivatalos base (73.4% SWE-bench) a mérvadó.
-- Benchmark scriptek: `bench/*.sh`, `/home/dev/work2/amd-bench/*`; nyers adat: `bench/*.jsonl`, `work2/amd-bench/matrix_results.jsonl`.
+- Benchmark scriptek: `bench/*.sh`, `/home/dev/work2/amd-bench/*`; nyers adat: `bench/*.jsonl`, `work2/amd-bench/matrix_results.jsonl`. (Archived, not in this repo: `amd-private/archive/payload/bench/legacy/` — `llamacpp_results.jsonl`, `matrix_results.jsonl`, `ollama_results.jsonl`.)
 - llama.cpp build: `lemonade-sdk/llamacpp-rocm` b1294 gfx120X (HIP 7.14, saját hipBLASLt) — **ROCm backend igazolva** a logban (`ROCm0: AMD Radeon AI PRO R9700`).
