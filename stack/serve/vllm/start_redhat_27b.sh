@@ -41,8 +41,7 @@ case "${1:-start}" in
     served=$(PROFILE=$PROFILE PORT=$PORT MAXLEN=$MAXLEN "$SERVE" print | grep -oP '(?<=--served-model-name )\S+')
     [ "$served" = "$MODEL" ] || {
       echo "profile $PROFILE serves '$served' but $(basename "$SETTINGS") ANTHROPIC_MODEL is '$MODEL' -- fix one of them" >&2; exit 2; }
-    serve_env
-    "$SERVE" start
+    ( serve_env; "$SERVE" start )   # subshell: the serve exports stay out of the shell that execs claude below
     echo "ready: claude --settings $SETTINGS"
     claude --settings "$SETTINGS" --verbose;;
   stop|status|logs) PORT=$PORT "$SERVE" "$1";;
