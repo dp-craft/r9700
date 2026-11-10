@@ -4,7 +4,7 @@
 # the vllm-radiance image (serve_vllm.sh) loads HF checkpoint dirs; this one loads `*.rad` containers
 # (weights + tokenizer + chat template + DFlash2 drafter in one file). Flags follow the model card
 # (HF StillDeadcode/qwen3.8-27b-mxfp4): --tp 1 --max-model-len 200000 --kv-cache-dtype fp8 --max-num-seqs 8
-# (those two = the card default; the 27B starters/launchers pass 27b.conf's 262000/2 instead).
+# (those two = the card default; the 27B starters/launchers pass 27b.conf's 260000/2 instead).
 #
 # Usage:
 #   RAD_FILE=/abs/model.rad PORT=8000 ./serve_radiance.sh [start]     # DAEMON (background); the normal path

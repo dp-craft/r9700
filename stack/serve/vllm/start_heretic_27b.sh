@@ -6,7 +6,7 @@
 # Single source of truth = settings.json: MAXLEN comes from CLAUDE_CODE_MAX_CONTEXT_TOKENS, the port from
 # ANTHROPIC_BASE_URL, and ANTHROPIC_MODEL must equal the profile's served name (serve_vllm.sh aborts if the server
 # answers with another name).
-# MAXSEQS comes from 27b.conf (27B convention 262000/2, user decision 2026-10-25) — the sly launchers and
+# MAXSEQS comes from 27b.conf (27B convention 260000/2, user decision 2026-10-25, DC1 re-tune 2026-11-09) — the sly launchers and
 # this starter agree on it. 2026-11-09: this starter previously passed the stale MAXSEQS=1.
 # `start` runs gpu_exclusive.sh (unloads llama-swap, refuses below FREE_MIB_FLOOR). llama-swap reloads
 # its model on its next request and would then contend for VRAM -- don't use both at once.

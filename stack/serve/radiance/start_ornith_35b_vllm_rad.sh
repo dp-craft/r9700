@@ -34,7 +34,7 @@ IMAGE=${IMAGE:-stilldeadcode/radiance:1.16.0}
 PORT=${PORT:-$SET_PORT}
 FREE_MIB_FLOOR=${FREE_MIB_FLOOR:-30000}
 WAIT=${WAIT:-900}
-# the creator's compose values (35B — deliberately not 27b.conf's 262000/2)
+# the creator's compose values (35B — deliberately not 27b.conf's 260000/2)
 MAXLEN=262144; MAXSEQS=3
 # compose's reasoning map, verbatim (single comma-joined flag); sampler + MTP + headroom via EXTRA_ARGS
 REASONING_MAP=${REASONING_MAP:-"none=high,minimal=high"}

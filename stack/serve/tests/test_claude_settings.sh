@@ -11,8 +11,8 @@
 set -u
 SELF=$(readlink -f "${BASH_SOURCE[0]}")
 ROOT=$(cd "$(dirname "$SELF")/../../.." && pwd)
-APRIV=$(cd "$ROOT/../amd-private/clients/claude" 2>/dev/null && pwd || true)
-[ -n "${APRIV:-}" ] || { echo "FAIL - amd-private repo not found next to $ROOT" >&2; exit 1; }
+APRIV=$(cd "$ROOT/clients/claude" 2>/dev/null && pwd || true)
+[ -n "${APRIV:-}" ] || { echo "FAIL - clients/claude not found in $ROOT (the launcher home)" >&2; exit 1; }
 BASE_SETTINGS=${BASE_SETTINGS:-/home/dev/.config/claude/local_vllm_direct/settings.json}
 [ -f "$BASE_SETTINGS" ] || { echo "FAIL - base settings not found: $BASE_SETTINGS" >&2; exit 1; }
 
@@ -33,7 +33,7 @@ if ! type write_claude_settings >/dev/null 2>&1; then
   echo "FAIL - _lib.sh has no write_claude_settings function (run_claude must expose it)" >&2
   exit 1
 fi
-if ! write_claude_settings "$TMP/base.json" "$TMP/out.json" qwen35 262000 8000; then
+if ! write_claude_settings "$TMP/base.json" "$TMP/out.json" qwen35 260000 8000; then
   echo "FAIL - write_claude_settings errored" >&2
   exit 1
 fi
@@ -47,9 +47,9 @@ for k in ("ANTHROPIC_MODEL", "ANTHROPIC_DEFAULT_HAIKU_MODEL", "ANTHROPIC_DEFAULT
         errs.append(f"{k} = {e.get(k)!r}, want qwen35")
 if e.get("ANTHROPIC_BASE_URL") != "http://127.0.0.1:8000":
     errs.append(f"ANTHROPIC_BASE_URL = {e.get('ANTHROPIC_BASE_URL')!r}")
-if e.get("CLAUDE_CODE_MAX_CONTEXT_TOKENS") != "262000":
-    errs.append(f"CLAUDE_CODE_MAX_CONTEXT_TOKENS = {e.get('CLAUDE_CODE_MAX_CONTEXT_TOKENS')!r}, want 262000")
-want = 262000 - int(e.get("CLAUDE_CODE_MAX_OUTPUT_TOKENS", 64000))
+if e.get("CLAUDE_CODE_MAX_CONTEXT_TOKENS") != "260000":
+    errs.append(f"CLAUDE_CODE_MAX_CONTEXT_TOKENS = {e.get('CLAUDE_CODE_MAX_CONTEXT_TOKENS')!r}, want 260000")
+want = 260000 - int(e.get("CLAUDE_CODE_MAX_OUTPUT_TOKENS", 64000))
 if e.get("CLAUDE_CODE_AUTO_COMPACT_WINDOW") != str(want):
     errs.append(f"CLAUDE_CODE_AUTO_COMPACT_WINDOW = {e.get('CLAUDE_CODE_AUTO_COMPACT_WINDOW')!r}, want {want}")
 if "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE" in e:

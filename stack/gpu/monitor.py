@@ -49,8 +49,12 @@ import calendar
 import json
 import os
 import re
+import select
 import subprocess
+import sys
+import termios
 import time
+import tty
 import urllib.request
 from collections import deque
 
@@ -67,6 +71,16 @@ def fetch_metrics(url):
 
 
 GAUGE_MAX = {"vllm:kv_cache_usage_perc", "vllm:gpu_prefix_cache_hit_rate"}  # per-engine fractions; take max, not sum
+
+# The one detail block after the finished-requests table: shown exclusively (xor), cycled by
+# pressing space in the live view. Default is the out-size histogram ("out"); the log table and
+# the 5-min average are the other two states (kept, not deleted).
+VIEWS = ("out", "log", "avg")
+
+# Spec-decoding counters, per engine — the same pair regardless of the method (dflash, MTP, …):
+# accepted draft tokens / issued draft tokens.
+_SPEC_ACCEPTED = ("vllm:spec_decode_num_accepted_tokens_total", "radiance:draft_accepted_total")
+_SPEC_DRAFT = ("vllm:spec_decode_num_draft_tokens_total", "radiance:draft_tokens_total")
 
 
 def parse_prom(text):
@@ -139,6 +153,15 @@ def _delta(cur, prev):
 def _diff(m, prev, name):
     """Delta of a named counter between polls (see _delta)."""
     return _delta(m.get(name), prev.get(name))
+
+
+def _diff_first(m, prev, names):
+    """Delta of the first present counter among `names` (engine-specific aliases, see _first)."""
+    for n in names:
+        d = _diff(m, prev, n)
+        if d is not None:
+            return d
+    return None
 
 
 def _avg_diff(m, prev, base):
@@ -355,6 +378,8 @@ def collect(m, prev, prev_t, g, log_lines):
             "decode_t": decode_t,
             "prefill_tps": prefill_tps,
             "decode_tps": _ratio(out_tok, decode_t),
+            "acc_acc": _diff_first(m, prev, _SPEC_ACCEPTED),   # spec-decode (dflash/MTP) deltas -> per-row acceptance
+            "acc_draft": _diff_first(m, prev, _SPEC_DRAFT),
         }
 
     # session (cumulative): all requests since the server started
@@ -487,6 +512,55 @@ def _bar(value, max_value, width=16, color=None):
     return _COLORS[color] + bar + _RESET if color else bar
 
 
+# Output-size buckets (generated tokens per finished request): [lo, hi), last open.
+OUT_SIZE_BUCKETS = ((0, 200, "0-200"), (200, 500, "200-500"), (500, 1000, "500-1000"),
+                    (1000, 2500, "1000-2500"), (2500, 5000, "2500-5000"), (5000, 10000, "5000-10000"),
+                    (10000, 20000, "10000-20000"), (20000, 30000, "20000-30000"),
+                    (30000, 40000, "30000-40000"), (40000, None, "40000+"))
+
+
+def out_size_bucket(out_tok):
+    """Bucket index (0..9) of an output size (see OUT_SIZE_BUCKETS); -1 for None."""
+    if out_tok is None:
+        return -1
+    for i, (lo, hi, _) in enumerate(OUT_SIZE_BUCKETS):
+        if out_tok >= lo and (hi is None or out_tok < hi):
+            return i
+    return -1
+
+
+def out_size_add(tally, out_tok):
+    """Add one finished request to the running out-size tally (one count per bucket).
+    The tally is CUMULATIVE since the monitor started — it is not bounded by the
+    history window of the finished-requests table. None out size -> no-op. Returns tally."""
+    i = out_size_bucket(out_tok)
+    if i >= 0:
+        tally[i] += 1
+    return tally
+
+
+def out_size_counts(rows):
+    """One count per bucket over finished-request rows, by the row's out_tok. A row can hold
+    several requests (non-radiance polls fold them), so it counts once at its total size."""
+    counts = [0] * len(OUT_SIZE_BUCKETS)
+    for r in rows or []:
+        out_size_add(counts, (r.get("per") or {}).get("out_tok"))
+    return counts
+
+
+def out_size_chart(counts, width=20):
+    """Char bar chart of the finished requests' output sizes: one line per bucket —
+    label, one '#' per request (scaled to `width` when a bucket exceeds it), count.
+    `counts` is the running tally (one integer per bucket); None -> all zero."""
+    counts = list(counts or [0] * len(OUT_SIZE_BUCKETS))
+    top = max(counts) if counts else 0
+    lines = []
+    for (lo, hi, label), n in zip(OUT_SIZE_BUCKETS, counts):
+        bar = "#" * (n if n <= width else max(1, round(n / top * width)))
+        lines.append(f"{label:<11} {bar} {n}")
+    return lines
+
+
 def _human(n):
     """Human-friendly number: 1.2M, 93.7k, 500, etc.; 'n/a' if None."""
     if n is None:
@@ -608,8 +682,12 @@ def _fold_request(pending, per):
                   n_req=_window_sum(pair, "n_req"),
                   ttft_s=_window_avg(pair, "ttft_s", "n_req"),
                   computed_tok=_window_sum(pair, "computed_tok"),
-                  prefill_t=_window_sum(pair, "prefill_t"))
+                  prefill_t=_window_sum(pair, "prefill_t"),
+                  acc_acc=_window_sum(pair, "acc_acc"),
+                  acc_draft=_window_sum(pair, "acc_draft"))
     merged["prefill_tps"] = _ratio(merged["computed_tok"] or None, merged["prefill_t"])  # nothing computed -> no rate
+    merged["acc_rate"] = _ratio(merged["acc_acc"], merged["acc_draft"])  # no drafts issued -> no rate
+    merged["acc_len"] = (1 + merged["acc_rate"]) if merged["acc_rate"] is not None else None  # mean tokens per step
     return (merged, {}) if per.get("in_tok") else (None, merged)
 
 
@@ -676,7 +754,7 @@ def _avg_line(cur, prev):
             f"out {_pad(_with_unit(cur['out'], '.0f', ' tok'), 11)}")
 
 
-def render(a, snap, history, log_lines, log_is_stale, cur_avg, prev_avg):
+def render(a, snap, history, log_lines, log_is_stale, cur_avg, prev_avg, view="out", tally=None):
     per, session = snap["per"], snap["session"]
     state, g = snap["state"], snap["gpu"]
 
@@ -742,15 +820,21 @@ def render(a, snap, history, log_lines, log_is_stale, cur_avg, prev_avg):
         ("cache / queue / spec", cache_lines),
         (server_title, _session_rows(session)),
         (requests_title, live_lines + request_rows),
-        ("avg (last 5 min)", [_avg_line(cur_avg, prev_avg)]),
     ]
-    if snap.get("log_tail"):
-        blocks.append((f"log  (docker logs {a.container})", snap["log_tail"]))
-    elif log_lines:
-        if log_is_stale:
-            blocks.append(("log", ["(log stale — not the current server)"]))
-        else:
-            blocks.append(("log  (last 5 entries)", log_table(log_lines)))
+    # Detail block: exactly one of the out-size histogram / log table / 5-min average (view
+    # cycled with space in the live view — the log and avg code is kept, just not shown by default).
+    if view == "out":
+        blocks.append(("out size (since monitor start)", out_size_chart(tally)))
+    elif view == "avg":
+        blocks.append(("avg (last 5 min)", [_avg_line(cur_avg, prev_avg)]))
+    elif view == "log":
+        if snap.get("log_tail"):
+            blocks.append((f"log  (docker logs {a.container})", snap["log_tail"]))
+        elif log_lines:
+            if log_is_stale:
+                blocks.append(("log", ["(log stale — not the current server)"]))
+            else:
+                blocks.append(("log  (last 5 entries)", log_table(log_lines)))
 
     # Every box shares one width — the widest content line — plus the
     # section's uniform 2-char padding, so all boxes line up edge-to-edge.
@@ -790,10 +874,12 @@ def _history_rows(history):
     on radiance, else a _fold_request result, so requests finishing in the same poll share it).
     Columns: time | req (request count) | in (prompt tokens, not a rate; big for long-context/agentic requests) |
     comp (non-cached prompt tokens, what was actually prefilled) | out (generated) | TTFT (includes prefill) |
-    prefill TPS | decode TPS | full (full round trip, request start to last token, e2e = TTFT + decode) |
+    prefill TPS | decode TPS | accLen (mean acceptance length, tokens per step) | acc(%) (draft acceptance rate,
+    accepted/drafted spec tokens — dflash/MTP; n/a when the engine reports no spec counters or the row has none) |
+    full (full round trip, request start to last token, e2e = TTFT + decode) |
     KV(%) (KV cache usage, retained prefix cache included), GPU(%) (both sampled at the poll's end, not over the request)."""
     rows = [
-        f"{'time':>8} {'req':>4} {'in':>8} {'comp':>8} {'out':>8} {'TTFT(s)':>8} {'prefill(t/s)':>12} {'decode(t/s)':>12} {'full(s)':>9} {'KV(%)':>6} {'GPU(%)':>7}",
+        f"{'time':>8} {'req':>4} {'in':>8} {'comp':>8} {'out':>8} {'TTFT(s)':>8} {'prefill(t/s)':>12} {'decode(t/s)':>12} {'accLen':>7} {'acc(%)':>7} {'full(s)':>9} {'KV(%)':>6} {'GPU(%)':>7}",
     ]
     for h in reversed(list(history)):
         per, state, g = h["per"], h["state"], h["gpu"]
@@ -806,6 +892,8 @@ def _history_rows(history):
             f"{_fmt(per.get('ttft_s'), 8, '.2f')} "
             f"{_fmt(per.get('prefill_tps'), 12, '.0f')} "
             f"{_fmt(per.get('decode_tps'), 12, '.1f')} "
+            f"{_fmt(per.get('acc_len'), 7, '.2f')} "
+            f"{_fmt((per.get('acc_rate') or 0) * 100 if per.get('acc_rate') is not None else None, 7, '.1f')} "
             f"{_fmt(per.get('e2e_s'), 9, '.2f')} "
             f"{_fmt_color(state.get('kv_pct'), 6, '.1f', 50, 80)} "
             f"{_fmt_color(g[8] if g else None, 7, '.0f', 50, 80)}")
@@ -854,6 +942,20 @@ def _default_log_path(port):
     return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "serve", "var", "servers", f"{port}.log")
 
 
+def _poll_key(keyfd):
+    """Non-blocking read of one key from `keyfd` (a TTY in cbreak mode); None if nothing pending.
+    Only ever called with a real fd — a None keyfd means key handling is off (not a TTY / --once)."""
+    if keyfd is None:
+        return None
+    try:
+        r, _, _ = select.select([keyfd], [], [], 0)
+        if not r:
+            return None
+        return os.read(keyfd, 1).decode("ascii", "ignore")
+    except OSError:
+        return None
+
+
 def main():
     ap = argparse.ArgumentParser(
         description="live vLLM server monitor — read-only: polls /metrics + rocm-smi + the logs, never touches the server",
@@ -867,9 +969,11 @@ def main():
                "  GPU               VRAM/GTT + 5 colored bars (GPU use / power / VRAM / edge temp / mem temp) + fan + clocks; red over 80/90 C\n"
                "  cache/queue/spec  KV % (colored), prefix-cache % cached + block hit rate (radiance: + recomputed = tokens the attention cache held but no linear checkpoint let it skip, since server start), spec acceptance (accepted/draft tokens), running/waiting\n"
                "  server            cumulative since server start (uptime shown in the title; req, in/cached/comp/out, TTFT, prefill/decode TPS, gap = inter-token latency, queue, full = mean full round trip)\n"
-               "  finished requests live row (elapsed + progress tokens + GPU % + W + KV %) + one row per poll where a request finished, on radiance one row per request, newest first (in = total prompt tokens, not a rate; full = full round trip, request start to last token, TTFT + decode; KV(%) = KV cache usage, GPU(%) = GPU busy, both sampled at the poll's end)\n"
-               "  avg (last 5 min)  weighted-average TTFT/prefill/decode (TPS by time, TTFT by requests; trend arrows) + window req/comp/out totals\n"
-               "  log               parsed table of the last 5 loggers.py/metrics.py entries (stale mtime > 120 s -> flagged); on radiance the last 5 `docker logs` lines\n\n"
+               "  finished requests live row (elapsed + progress tokens + GPU % + W + KV %) + one row per poll where a request finished, on radiance one row per request, newest first (in = total prompt tokens, not a rate; accLen/acc(%) = spec-decode (dflash/MTP) mean acceptance length / draft acceptance rate from the per-poll accepted/drafted token deltas — n/a when the engine reports no spec counters or the row has none; full = full round trip, request start to last token, TTFT + decode; KV(%) = KV cache usage, GPU(%) = GPU busy, both sampled at the poll's end)\n"
+               "  detail block      exactly ONE of three, cycled by pressing space in the live view (default: out-size chart):\n"
+               "    out size        char bar chart of the finished requests' output sizes, counted since the monitor started (cumulative — not the table's window), one line per bucket: 0-200 / 200-500 / 500-1000 / 1000-2500 / 2500-5000 / 5000-10000 / 10000-20000 / 20000-30000 / 30000-40000 / 40000+ (one '#' per request; requests finishing in the same poll share a row)\n"
+               "    log             parsed table of the last 5 loggers.py/metrics.py entries (stale mtime > 120 s -> flagged); on radiance the last 5 `docker logs` lines\n"
+               "    avg (last 5 min)  weighted-average TTFT/prefill/decode (TPS by time, TTFT by requests; trend arrows) + window req/comp/out totals\n\n"
                "radiance request rows:\n"
                "  read from the \"I req ... done\" lines of `docker logs --tail 200 <container>` each poll, so they need docker access\n"
                "  (default container radiance-<port>, see --container); poll deltas cannot split comp and prefill time per request.\n"
@@ -900,10 +1004,18 @@ def main():
     pending = {}  # deltas of the request in progress (see _fold_request)
     seen = None  # request ids in the last request-log read (see _finished_rows)
     history = deque(maxlen=a.history) if a.history > 0 else None
+    tally = [0] * len(OUT_SIZE_BUCKETS)  # cumulative out-size counts (the chart) — grows for the whole session
     prev_avg = {"ttft": None, "prefill": None, "decode": None, "n_req": None, "comp": None, "out": None}
     flight_start = None  # time.time() when running went 0->>0 (in-flight request elapsed base)
     flight_base = None   # gen_counter when running went 0->>0 (progress token base)
     out = open(a.out, "a") if a.out else None
+    view_i = 0  # detail block: VIEWS[view_i], cycled by pressing space (default: the out-size chart)
+    keyfd, old_term = None, None
+    # Key handling needs a real terminal on both ends; cbreak mode keeps signal chars (Ctrl-C) working.
+    if not a.once and sys.stdin.isatty() and sys.stdout.isatty():
+        old_term = termios.tcgetattr(sys.stdin.fileno())
+        tty.setcbreak(sys.stdin.fileno())
+        keyfd = sys.stdin.fileno()
 
     try:
         while True:
@@ -942,11 +1054,16 @@ def main():
                 window.append((snap["ts"], snap["per"]))
             window = [(ts, p) for ts, p in window if snap["ts"] - ts <= 300]
             rows, pending, seen = _finished_rows(snap, pending, seen, a.container)
+            for r in rows:
+                out_size_add(tally, r["per"].get("out_tok"))
             if history is not None:
                 history.extend(rows)
 
             cur_avg = _avg_snapshot(window)
-            render(a, snap, history, log_lines, log_stale(a.log), cur_avg, prev_avg)
+            # space cycles the detail block: out chart -> log -> 5-min avg -> ...
+            if _poll_key(keyfd) == " ":
+                view_i = (view_i + 1) % len(VIEWS)
+            render(a, snap, history, log_lines, log_stale(a.log), cur_avg, prev_avg, VIEWS[view_i], tally)
             prev_avg = cur_avg
 
             # record one row per poll (the session record)
@@ -963,6 +1080,8 @@ def main():
     finally:
         if out:
             out.close()
+        if old_term is not None:  # restore the terminal (cbreak was set for space-key cycling)
+            termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, old_term)
 
 
 if __name__ == "__main__":

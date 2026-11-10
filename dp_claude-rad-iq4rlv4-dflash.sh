@@ -1,0 +1,1 @@
+/home/dev/work/dp-craft/amd/clients/claude/claude-rad-iq4rlv4-dflash.sh

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # monitor.sh — live view of the booted vLLM server (thin wrapper around stack/gpu/monitor.py):
-# per-call tokens/TTFT/TPS + GPU + log table. Read-only — it never touches the server.
+# per-call tokens/TTFT/TPS + GPU + detail block (out-size chart by default; space cycles
+# chart / log table / 5-min avg). Read-only — it never touches the server.
 # Records the session to stack/serve/var/servers/<port>.session.jsonl by default.
 # Usage: ./monitor.sh [monitor args]        Knobs (env): PORT (8000)
 #   e.g. ./monitor.sh --once          ./monitor.sh --history 50          ./monitor.sh --out /tmp/s.jsonl

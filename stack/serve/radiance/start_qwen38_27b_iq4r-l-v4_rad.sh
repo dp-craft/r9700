@@ -2,7 +2,7 @@
 # stack/serve/radiance/start_qwen38_27b_iq4r-l-v4_rad.sh — start/stop native Radiance ("rad") serving
 # StillDeadcode/qwen3.8-27b-iqr-v4 @ qwen3.8-27b-iq4r-l-v4.rad (IQR-V4 ladder: 4.793 bpw, source KL
 # 0.00297 vs bf16 — 24 % below the official FP8 checkpoint's KL at 55 % of its size) on one card.
-# It is the 27B comparison twin of claude-rad-mxfp4.sh — same context config (27b.conf: 262000 ctx,
+# It is the 27B comparison twin of claude-rad-mxfp4.sh — same context config (27b.conf: 260000 ctx,
 # 2 seqs; user decision 2026-10-25) and same engine flags, so the A/B is quantization-only.
 #   start_qwen38_27b_iq4r-l-v4_rad.sh start|stop|status|logs|print   then: claude --settings ~/.config/claude/local_vllm_direct/settings-redhat.json
 # Thin over serve_radiance.sh `start` (which owns: gpu_exclusive, VRAM floor, health poll, cmdline

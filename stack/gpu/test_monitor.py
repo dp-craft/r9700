@@ -464,7 +464,27 @@ class TestCollect(unittest.TestCase):
     def test_per_keys(self):
         self.assertEqual(set(self._snap(time.time() - 2)["per"]),
                          {"in_tok", "out_tok", "computed_tok", "n_req", "ttft_s", "e2e_s",
-                          "prefill_t", "decode_t", "prefill_tps", "decode_tps"})
+                          "prefill_t", "decode_t", "prefill_tps", "decode_tps",
+                          "acc_acc", "acc_draft"})
+
+    def test_per_spec_deltas(self):
+        # Per-poll spec-decode (dflash/MTP) deltas: current - prev on the accepted/draft counters.
+        per = self._snap(time.time() - 2)["per"]
+        self.assertEqual(per["acc_acc"], 62649 - 58000)       # 4649
+        self.assertEqual(per["acc_draft"], 105255 - 96000)    # 9255
+
+    def test_per_spec_deltas_radiance(self):
+        prev = dict(RAD_PREV, **{"radiance:draft_accepted_total": 200.0,
+                                 "radiance:draft_tokens_total": 500.0})
+        per = self._rad(RAD_CUR, prev)["per"]
+        self.assertEqual(per["acc_acc"], 276630 - 200)
+        self.assertEqual(per["acc_draft"], 664017 - 500)
+
+    def test_per_spec_absent_when_no_counters(self):
+        per = monitor.collect({"vllm:request_prompt_tokens_sum": 10},
+                              {"vllm:request_prompt_tokens_sum": 5}, time.time() - 2, None, [])["per"]
+        self.assertIsNone(per["acc_acc"])
+        self.assertIsNone(per["acc_draft"])
 
     def test_gpu_passed_through_unchanged(self):
         snap = monitor.collect(RAD_CUR, RAD_PREV, time.time() - 2, GPU10, [])
@@ -516,6 +536,24 @@ class TestFoldRequest(unittest.TestCase):
         self.assertEqual(row["n_req"], 4)
         self.assertEqual(row["ttft_s"], (1.0 * 1 + 2.0 * 3) / 4)
 
+    def test_fold_merges_spec_deltas(self):
+        row, pend = monitor._fold_request({}, _per(acc_acc=10, acc_draft=20))
+        self.assertIsNone(row)
+        row, _ = monitor._fold_request(pend, _per(in_tok=100, n_req=1, acc_acc=15, acc_draft=20))
+        self.assertEqual(row["acc_acc"], 25)
+        self.assertEqual(row["acc_draft"], 40)
+        self.assertTrue(approx(row["acc_rate"], 25 / 40))
+        self.assertTrue(approx(row["acc_len"], 1 + 25 / 40))
+
+    def test_fold_spec_absent_or_flat(self):
+        # No spec counters at all -> n/a; flat counters (0/0) also n/a, not a misleading 0%.
+        row, _ = monitor._fold_request({}, _per(in_tok=10))
+        self.assertIsNone(row["acc_rate"])
+        self.assertIsNone(row["acc_len"])
+        row, _ = monitor._fold_request({}, _per(in_tok=10, acc_acc=0, acc_draft=0))
+        self.assertIsNone(row["acc_rate"])
+        self.assertIsNone(row["acc_len"])
+
     def test_idle_polls_leave_nothing_behind(self):
         row, pend = monitor._fold_request({}, {})                              # first poll
         self.assertIsNone(row)
@@ -525,6 +563,113 @@ class TestFoldRequest(unittest.TestCase):
         self.assertEqual(row["computed_tok"], 70)
         self.assertEqual(row["prefill_t"], 2.0)
         self.assertEqual(row["prefill_tps"], 35.0)
+
+
+# --------------------------------------------------------------------------- out-size chart
+def _out_entry(out_tok):
+    return {"ts": time.time(), "per": _per(out_tok=out_tok), "state": {}, "gpu": None}
+
+
+class TestOutSizeChart(unittest.TestCase):
+    def test_bucket_boundaries(self):
+        # Bucket = [lo, hi), last open: 200 goes to the second bucket, 40000+ to the last.
+        cases = [(0, 0), (199, 0), (200, 1), (499, 1), (500, 2), (999, 2), (1000, 3),
+                 (2499, 3), (2500, 4), (4999, 4), (5000, 5), (9999, 5), (10000, 6),
+                 (19999, 6), (20000, 7), (29999, 7), (30000, 8), (39999, 8), (40000, 9),
+                 (999999, 9)]
+        for out_tok, want in cases:
+            with self.subTest(out_tok=out_tok):
+                self.assertEqual(monitor.out_size_bucket(out_tok), want)
+
+    def test_counts(self):
+        rows = [_out_entry(n) for n in (100, 300, 300, 3000, 50000)]
+        self.assertEqual(monitor.out_size_counts(rows), [1, 2, 0, 0, 1, 0, 0, 0, 0, 1])  # 3000 -> 2500-5000
+
+    def test_none_out_is_skipped(self):
+        self.assertEqual(sum(monitor.out_size_counts([_out_entry(None)])), 0)
+
+    def test_chart_lines(self):
+        # the chart takes the running tally (one count per bucket), not the rows
+        lines = monitor.out_size_chart([1, 2, 0, 1, 0, 0, 0, 0, 0, 0])
+        self.assertEqual(len(lines), 10)
+        self.assertEqual(lines[0], "0-200       # 1")
+        self.assertEqual(lines[1], "200-500     ## 2")
+        self.assertEqual(lines[2], "500-1000     0")
+        self.assertEqual(lines[3], "1000-2500   # 1")
+        self.assertEqual(lines[9].split()[0], "40000+")
+        # fixed label column: the bar always starts at column 12 (11 label + 1 space)
+        for l in lines:
+            self.assertEqual(l[11], " ")
+            self.assertIn(l[12], ("#", " "))
+
+    def test_chart_zero_tally(self):
+        lines = monitor.out_size_chart(None)
+        self.assertEqual(len(lines), 10)
+        self.assertTrue(all(l.endswith(" 0") for l in lines))
+
+    def test_out_size_add(self):
+        # the cumulative tally: one increment per finished row, None out sizes are skipped
+        tally = [0] * len(monitor.OUT_SIZE_BUCKETS)
+        for n in (100, 300, 300, 50000, None, 40000):
+            monitor.out_size_add(tally, n)
+        self.assertEqual(tally, [1, 2, 0, 0, 0, 0, 0, 0, 0, 2])
+        # the tally is not bounded by the history window: it keeps growing past 15 rows
+        for n in (300,) * 20:
+            monitor.out_size_add(tally, n)
+        self.assertEqual(tally[1], 22)
+
+
+# --------------------------------------------------------------------------- views / keys
+class TestViews(unittest.TestCase):
+    def test_views_order_default_first(self):
+        self.assertEqual(monitor.VIEWS, ("out", "log", "avg"))
+
+    def _text(self, snap, log_lines=(), view="out", history=(), tally=None):
+        none = dict.fromkeys(("ttft", "prefill", "decode", "n_req", "comp", "out"))
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            monitor.render(types.SimpleNamespace(port=8000, container="radiance-8000"),
+                           snap, list(history), list(log_lines), False, none, none, view, tally)
+        return strip(buf.getvalue())
+
+    def test_views_xor(self):
+        snap = monitor.collect(METRICS_CURRENT, METRICS_PREV, time.time() - 2, None, LOG_LINES)
+        out, log, avg = (self._text(snap, LOG_LINES, v) for v in monitor.VIEWS)
+        self.assertIn("out size (since monitor start)", out)
+        self.assertNotIn("log  (last 5 entries)", out)
+        self.assertNotIn("avg (last 5 min)", out)
+        self.assertIn("log  (last 5 entries)", log)
+        self.assertNotIn("out size", log)
+        self.assertNotIn("avg (last 5 min)", log)
+        self.assertIn("avg (last 5 min)", avg)
+        self.assertNotIn("out size", avg)
+        self.assertNotIn("log  (last 5 entries)", avg)
+
+    def test_chart_shows_the_cumulative_tally(self):
+        # the chart counts finished requests since the monitor started — not the 15-row table window
+        snap = monitor.collect(METRICS_CURRENT, METRICS_PREV, time.time() - 2, None, LOG_LINES)
+        tally = [0] * len(monitor.OUT_SIZE_BUCKETS)
+        for _ in range(37):  # far past the default history window
+            monitor.out_size_add(tally, 7587)
+        text = self._text(snap, view="out", tally=tally)
+        self.assertIn("out size (since monitor start)", text)
+        self.assertIn("5000-10000", text)
+        self.assertIn(" 37", text)
+
+
+class TestKeyPoll(unittest.TestCase):
+    def test_poll_key(self):
+        r, w = os.pipe()
+        try:
+            self.assertIsNone(monitor._poll_key(r))      # nothing pending
+            os.write(w, b" ")
+            self.assertEqual(monitor._poll_key(r), " ")  # non-blocking read
+        finally:
+            os.close(r)
+            os.close(w)
+
+    def test_poll_key_none_fd(self):
+        self.assertIsNone(monitor._poll_key(None))
 
 
 # --------------------------------------------------------------------------- log
@@ -680,8 +825,8 @@ class TestIdleAndAvg(unittest.TestCase):
 
 # --------------------------------------------------------------------------- render
 class TestTables(unittest.TestCase):
-    HEADER = ["time", "req", "in", "comp", "out", "TTFT(s)", "prefill(t/s)", "decode(t/s)", "full(s)",
-              "KV(%)", "GPU(%)"]
+    HEADER = ["time", "req", "in", "comp", "out", "TTFT(s)", "prefill(t/s)", "decode(t/s)",
+              "accLen", "acc(%)", "full(s)", "KV(%)", "GPU(%)"]
 
     def _entry(self, per, kv_pct=70.0, g=GPU10):
         return {"ts": time.time(), "per": per, "state": {"kv_pct": kv_pct}, "gpu": g}
@@ -703,6 +848,21 @@ class TestTables(unittest.TestCase):
         self.assertEqual(len(rows), 3)
         for r in rows[1:]:
             self.assertEqual(monitor._visible_len(r), monitor._visible_len(rows[0]))
+
+    def test_history_rows_spec_columns(self):
+        # history rows are _fold_request outputs: the acc fields are derived there.
+        per, _ = monitor._fold_request({}, _per(in_tok=5000, out_tok=50, computed_tok=350, n_req=1,
+                                                ttft_s=2.0, e2e_s=12.34, prefill_tps=77.0, decode_tps=31.5,
+                                                acc_acc=25, acc_draft=48))
+        rows = monitor._history_rows([self._entry(per)])
+        line = rows[1]
+        self.assertIn("1.52", line)   # acc_len = 1 + 25/48
+        self.assertIn("52.1", line)   # acc% = 25/48
+        # radiance-style rows carry no acc counters -> n/a in exactly the two acc columns
+        rad = _per(in_tok=100, out_tok=10, n_req=1, computed_tok=90, ttft_s=1.0, e2e_s=2.0,
+                   prefill_tps=10.0, decode_tps=5.0)
+        rows = monitor._history_rows([self._entry(rad)])
+        self.assertEqual(len([c for c in rows[1].split() if c == "n/a"]), 2)
 
     def test_session_rows_shape(self):
         session = {
@@ -893,17 +1053,18 @@ class TestRender(unittest.TestCase):
             monitor.render(types.SimpleNamespace(port=8000, container="radiance-8000"), snap, [], [], False, none, none)
         self.assertIn("docker logs radiance-8000 failed", strip(buf.getvalue()))
 
-    def _text(self, snap, log_lines=(), stale=False):
+    def _text(self, snap, log_lines=(), stale=False, view="out"):
         none = dict.fromkeys(("ttft", "prefill", "decode", "n_req", "comp", "out"))
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf):
-            monitor.render(types.SimpleNamespace(port=8000, container="radiance-8000"), snap, [], list(log_lines), stale, none, none)
+            monitor.render(types.SimpleNamespace(port=8000, container="radiance-8000"), snap, [],
+                           list(log_lines), stale, none, none, view)
         return strip(buf.getvalue())
 
     def test_render_container_log_block(self):
         snap = monitor.collect(RAD_CUR, RAD_PREV, time.time() - 2, None, [])
         snap["log_tail"] = ["09:00:00 I gbnf: compiled", "09:00:01 " + "x" * (monitor.LOG_TAIL_WIDTH - 9)]
-        text = self._text(snap)
+        text = self._text(snap, view="log")
         self.assertIn("log  (docker logs radiance-8000)", text)
         self.assertIn("I gbnf: compiled", text)
         self.assertNotIn("log stale", text)
@@ -912,8 +1073,8 @@ class TestRender(unittest.TestCase):
 
     def test_render_vllm_log_block_unchanged(self):
         snap = monitor.collect(METRICS_CURRENT, METRICS_PREV, time.time() - 2, None, LOG_LINES)
-        self.assertIn("log  (last 5 entries)", self._text(snap, LOG_LINES))
-        self.assertIn("log stale", self._text(snap, LOG_LINES, stale=True))
+        self.assertIn("log  (last 5 entries)", self._text(snap, LOG_LINES, view="log"))
+        self.assertIn("log stale", self._text(snap, LOG_LINES, stale=True, view="log"))
 
     def test_render_recomputed_only_when_reported(self):
         cur = dict(RAD_CUR, **{"radiance:prefix_hit_cut_tokens_total": 22256.0, "vllm:num_requests_running": 1.0})

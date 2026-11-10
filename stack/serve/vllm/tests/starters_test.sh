@@ -122,14 +122,28 @@ check_link() {   # <path> <expected canonical (absolute)>
   [ "$(sha256sum "$p" | cut -d' ' -f1)" = "$(sha256sum "$want" | cut -d' ' -f1)" ] || { bad "A $p content differs from $want"; return; }
   ok "A $p -> ${want#"$REPO"/}"
 }
-echo "== A: symlink integrity (repo root, dp-forge, ~/.config/claude) =="
-check_link "$REPO/start_redhat_27b.sh"                 "$C_RED"
-check_link "$REPO/start_heretic_27b.sh"                "$C_HER"
-check_link "$REPO/start_ornith_35b_vllm_rad.sh"        "$C_ORN"
-check_link "$REPO/start_llama_swap.sh"                 "$C_LLAMA"
-check_link /home/dev/work/dippe/dp-forge/start_redhat_27b.sh        "$C_RED"
-check_link /home/dev/work/dippe/dp-forge/start_heretic_27b.sh       "$C_HER"
-check_link /home/dev/work/dippe/dp-forge/start_ornith_35b_vllm_rad.sh "$C_ORN"
+# 2026-11-09 (D7): the installed launcher set is the 12 dp_-prefixed links of the managed scripts
+# (stack/serve/install.sh) — checked in the repo root and dp-forge. The legacy prefix-less links are
+# migrated away by the installer. The ~/.config/claude/local_vllm_direct aliases (vllm.sh /
+# vllm-heretic.sh / ornith_rad_mtp.sh) are NOT in the managed set — checked as-is, never touched by
+# install/uninstall.
+managed_links() {   # <target-dir> — the 12 dp_ links install.sh manages
+  local dir=$1 n want
+  for n in start_ornith_35b_vllm_rad.sh start_qwen38_27b_iq4r-l-v4_rad.sh start_heretic_27b.sh start_redhat_27b.sh \
+           claude-rad-mxfp4.sh claude-rad-iq4rlv4.sh claude-rad-iq4rlv4-dflash.sh claude-rad-iq4rlv4-nospec.sh \
+           claude-rad-heretic.sh claude-sly-redhat.sh claude-sly-heretic.sh claude-sly-amd.sh; do
+    case "$n" in
+      start_ornith*|start_qwen38*) want="$REPO/stack/serve/radiance/$n";;
+      start_*)                    want="$REPO/stack/serve/vllm/$n";;
+      *)                          want="$REPO/clients/claude/$n";;
+    esac
+    check_link "$dir/dp_$n" "$want"
+  done
+}
+echo "== A: symlink integrity (managed dp_ set in repo root + dp-forge; legacy aliases as-is) =="
+managed_links "$REPO"
+managed_links /home/dev/work/dippe/dp-forge
+check_link "$REPO/start_llama_swap.sh"                 "$C_LLAMA"   # not managed — out of scope
 check_link /home/dev/work/dippe/dp-forge/vllm.sh              "$C_RED"
 check_link /home/dev/work/dippe/dp-forge/vllm-heretic.sh      "$C_HER"
 check_link /home/dev/.config/claude/local_vllm_direct/vllm.sh         "$C_RED"
@@ -299,14 +313,14 @@ else
   ok "C7c stop SKIPPED (llama-swap is running — the unit test must not stop it)"
 fi
 
-echo "== C8: no-cd operation via the repo-root symlinks, cwd=/tmp =="
-OUT=$(cd /tmp && bash "$REPO/start_redhat_27b.sh" badarg 2>&1); rc=$?
+echo "== C8: no-cd operation via the repo-root symlinks (dp_ set), cwd=/tmp =="
+OUT=$(cd /tmp && bash "$REPO/dp_start_redhat_27b.sh" badarg 2>&1); rc=$?
 [ "$rc" -eq 2 ] && has "$OUT" "usage:" && ok "C8a redhat badarg via symlink" || bad "C8a rc=$rc (got: $OUT)"
-OUT=$(cd /tmp && bash "$REPO/start_heretic_27b.sh" badarg 2>&1); rc=$?
+OUT=$(cd /tmp && bash "$REPO/dp_start_heretic_27b.sh" badarg 2>&1); rc=$?
 [ "$rc" -eq 2 ] && has "$OUT" "usage:" && ok "C8b heretic badarg via symlink" || bad "C8b rc=$rc (got: $OUT)"
-OUT=$(cd /tmp && bash "$REPO/start_ornith_35b_vllm_rad.sh" badarg 2>&1); rc=$?
+OUT=$(cd /tmp && bash "$REPO/dp_start_ornith_35b_vllm_rad.sh" badarg 2>&1); rc=$?
 [ "$rc" -eq 2 ] && has "$OUT" "usage:" && ok "C8c ornith badarg via symlink" || bad "C8c rc=$rc (got: $OUT)"
-OUT=$(cd /tmp && PORT=$P1 MODEL_DIR="$MDIR" bash "$REPO/start_ornith_35b_vllm_rad.sh" start 2>&1); rc=$?
+OUT=$(cd /tmp && PORT=$P1 MODEL_DIR="$MDIR" bash "$REPO/dp_start_ornith_35b_vllm_rad.sh" start 2>&1); rc=$?
 [ "$rc" -eq 1 ] && has "$OUT" "checkpoint missing in $MDIR" && ok "C8d ornith start via symlink reaches the checkpoint check (no-cd)" || bad "C8d rc=$rc (got: $OUT)"
 OUT=$(cd /tmp && bash "$REPO/start_llama_swap.sh" status 2>&1); rc=$?
 [ "$rc" -eq 0 ] && ok "C8e llama-swap status via symlink exit 0" || bad "C8e rc=$rc (got: $OUT)"

@@ -1,0 +1,1 @@
+/home/dev/work/dp-craft/amd/stack/serve/radiance/start_qwen38_27b_iq4r-l-v4_rad.sh
