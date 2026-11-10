@@ -8,6 +8,8 @@
 #   (no args)      = round-1 grid (8 cells/arm, arms A-D) + KLD pass + WS7 prologue
 #   --round 2      = + the 10 round-2 cells/arm (50k depth + tg4096)
 #   --kld heretic  = KLD-only pass for arm E (heretic @ sly 1.8.1); skips the grid
+#   run-short.sh   = short validation pass (arms C+D, 2 cells each, REPS=2, KLD_N=16) in a
+#                    UNIQUE dir tmp/runs/<RUN_TAG>/ — repeated runs never overwrite each other
 #
 # Must run from a plain terminal with NO local-model Claude session on port 8000: the serve
 # scripts call gpu_exclusive.sh and will kill it (plan hard constraint).
@@ -48,7 +50,19 @@ ROOT="${ROOT:-$(git -C "$HERE" rev-parse --show-toplevel 2>/dev/null)}"
 [ -n "$ROOT" ] || { echo "run.sh: cannot find the repo root (git toplevel of $HERE) -- set ROOT=" >&2; exit 1; }
 CAMPAIGN_DIR="${CAMPAIGN_DIR:-$HERE}"
 mkdir -p "$CAMPAIGN_DIR" && CAMPAIGN_DIR="$(cd "$CAMPAIGN_DIR" && pwd)"
-RAW="$CAMPAIGN_DIR/tmp"; RES="$CAMPAIGN_DIR/results"   # raw (ignored) / results (committed)
+# RUN_TAG (run-short.sh, or manually): isolates ALL outputs of this run in a unique dir under
+# the gitignored tmp/ so repeated runs never overwrite each other (done markers included —
+# a re-run with a new tag RE-DOES the cells, doubling the data; pin RUN_TAG to resume).
+# Everything stays in project tmp/, never machine /tmp (repo rule — reboot wipes /tmp).
+RUN_TAG="${RUN_TAG:-}"
+if [ -n "$RUN_TAG" ]; then
+  RUN_DIR="$CAMPAIGN_DIR/tmp/runs/$RUN_TAG"
+  RAW="$RUN_DIR/tmp"; RES="$RUN_DIR/results"
+  PROBE_CAMPAIGN="$RUN_DIR"          # engine-bench per-probe raw dirs follow the tag
+else
+  RUN_DIR=""; RAW="$CAMPAIGN_DIR/tmp"; RES="$CAMPAIGN_DIR/results"   # raw (ignored) / results (committed)
+  PROBE_CAMPAIGN="$CAMPAIGN_DIR"
+fi
 mkdir -p "$RAW" "$RES"
 EB="$ROOT/bench/perf/engine-bench"
 GEN="$ROOT/bench/workloads/tmp"
@@ -89,7 +103,7 @@ MAXTOK_OVERRIDE="${MAX_TOKENS:-}"  # override every probe's max_tokens
 IMAGE="${IMAGE:-ghcr.io/slybase/vllm-sly-radiance:1.11.0-rocm10.1}"  # docker image (spec "image"); arm D
 mkdir -p "$RAW/done"
 if [ ! -f "$RES/meta.txt" ]; then
-  { echo "date=$(date -Iseconds)"; echo "model=$MODEL"; echo "engine=vllm profile=sly-redhat/redhat-mxfp4-dflash served_model=qwen38-27b-redhat-mxfp4-dflash"; echo "image=${IMAGE:-profile default}"; echo "round=$ROUND"; echo "kld_heretic=$KLD_E"; echo 'env[d-redhat-sly1100]=WATCHDOG_MIB=32 GPU_UTIL=0.93 CACTUS_DELTA=0 CHAT_TEMPLATE=/home/dev/work/dp-craft/amd/stack/serve/vllm/templates/dp-sharp-chat_template.jinja'; echo "vram_budget_mib=$VRAM_BUDGET_MIB"; } > "$RES/meta.txt"
+  { echo "date=$(date -Iseconds)"; echo "run_tag=${RUN_TAG:-canonical}"; echo "model=$MODEL"; echo "engine=vllm profile=sly-redhat/redhat-mxfp4-dflash served_model=qwen38-27b-redhat-mxfp4-dflash"; echo "image=${IMAGE:-profile default}"; echo "round=$ROUND"; echo "kld_heretic=$KLD_E"; echo 'env[d-redhat-sly1100]=WATCHDOG_MIB=32 GPU_UTIL=0.93 CACTUS_DELTA=0 CHAT_TEMPLATE=/home/dev/work/dp-craft/amd/stack/serve/vllm/templates/dp-sharp-chat_template.jinja'; echo "vram_budget_mib=$VRAM_BUDGET_MIB"; echo "only=${ONLY:-<all>}"; echo "reps_override=${REPS_OVERRIDE:-<default 1>}"; echo "kld_n=${KLD_N:-<full>}"; } > "$RES/meta.txt"
 fi
 
 # probe-cell templates (x- substituted per arm); ascending depth order in arm_cells
@@ -152,7 +166,7 @@ run_probe () {  # slug conc reps max_tokens api prefix prompt_files...
   [ -n "$REPS_OVERRIDE" ] && reps="$REPS_OVERRIDE"
   [ -n "$MAXTOK_OVERRIDE" ] && maxt="$MAXTOK_OVERRIDE"
   local files=""; local f; for f in "$@"; do files="$files $GEN/$f"; done
-  if CAMPAIGN_DIR="$CAMPAIGN_DIR" PROMPT_FILE="$files" SLUG="$slug" MAX_TOKENS="$maxt" CONCURRENCY="$conc" \
+  if CAMPAIGN_DIR="$PROBE_CAMPAIGN" PROMPT_FILE="$files" SLUG="$slug" MAX_TOKENS="$maxt" CONCURRENCY="$conc" \
        REPS="$reps" API="$api" PREFIX_MODE="$prefix" SAMPLE_VRAM=1 "$EB/run.sh"; then
     touch "$RAW/done/$slug"   # engine-bench/run.sh appended its rows to $RES/results.jsonl (success only)
   else echo "  FAILED: $slug" | tee -a "$RES/failures.txt"; fi; }
@@ -241,6 +255,7 @@ residency_check () {  # arm
 KLD="$ROOT/bench/perf/kld_probe.py"
 KLD_URL="http://localhost:8000/v1"
 KLD_CAL="$CAMPAIGN_DIR/inputs/calibration-prompts.jsonl"
+KLD_N="${KLD_N:-}"   # short pass: first N calibration prompts only (empty = full 128)
 
 kld_selftest () {  # family (radiance|sly) served — marker-gated once per family
   local family=$1 served=$2
@@ -258,8 +273,10 @@ kld_selftest () {  # family (radiance|sly) served — marker-gated once per fami
 kld_fetch () {  # served out — cached (resumable), per-arm during its own boot
   local served=$1 out=$2
   [ -f "$out" ] && { echo "  KLD fetch cached: $(basename "$out")"; return 0; }
+  local lim=""; [ -n "$KLD_N" ] && lim="--limit $KLD_N"
+  # shellcheck disable=SC2086  # $lim is intentionally word-split (empty or --limit N)
   python3 "$KLD" fetch --url "$KLD_URL" --model "$served" \
-    --calibration "$KLD_CAL" --repo-root "$ROOT" --out "$out" \
+    --calibration "$KLD_CAL" --repo-root "$ROOT" --out "$out" $lim \
     || echo "KLD FETCH FAILED: $served (KLD pass only; campaign continues)" | tee -a "$RES/failures.txt"
 }
 
@@ -322,7 +339,10 @@ ws7_prologue () {
 
 ws7_warm () {   # timed warm reboot after arm D's cells (item 6/7)
   [ -f "$RAW/done/ws7-warm" ] && { echo "  WS7 warm reboot already recorded"; return 0; }
-  if server_needed $D_SLUGS; then echo "  WS7 warm reboot skipped (arm D not complete in this run)"; return 0; fi
+  local sel="" s
+  for s in $D_SLUGS; do want_probe "$s" && sel="$sel $s"; done   # gate on SELECTED slugs (ONLY filter)
+  if [ -z "$sel" ] || server_needed $sel; then
+    echo "  WS7 warm reboot skipped (arm D not complete in this run)"; return 0; fi
   echo ">>> WS7 warm reboot (after arm D cells)"
   stop_server
   local t0=$SECONDS
@@ -470,7 +490,8 @@ PY
 
 make_report () {  # theme-aware SVG charts + appendix.md, embedded in the write-up
   [ -f "$RES/results.jsonl" ] || return 0
-  python3 "$ROOT/bench/core/report.py" "$CAMPAIGN_DIR" \
+  # RUN_DIR is itself a two-root layout (results/ + tmp/) -> report.py charts it directly
+  python3 "$ROOT/bench/core/report.py" "${RUN_DIR:-$CAMPAIGN_DIR}" \
     && echo "charts: $RES/charts/  ·  appendix: $RES/appendix.md"
 }
 

@@ -186,6 +186,12 @@ embedded via `results/appendix.md`.
 18. **An interrupted run is not a result.** A cut stream, a killed job, a partial file: quarantine it
     and re-collect. Never let it enter the data as a normal row (2026-07-15: a killed generation was
     graded as a real reply — 0.603 with tests=0.0 — and moved a published cell mean by 1.1 pts).
+19. **Temporary results go in the project's gitignored `tmp/`, never machine `/tmp`** (user rule
+    2026-11-10, global). A PC restart deletes `/tmp` and every sub-result in it — so scratch,
+    intermediate captures, probe raw, and short/ad-hoc run outputs all live under a project
+    gitignored `tmp/` (the campaign's `tmp/`, `bench/**/tmp/`, or a session job tmp dir). Short
+    runs additionally isolate into a **unique dir per invocation** (`tmp/runs/<RUN_TAG>/`,
+    `run-short.sh` sets it) so repeated runs accumulate instead of overwriting.
 
 ## Tools — the deterministic layer (use these, never hand-roll their output)
 

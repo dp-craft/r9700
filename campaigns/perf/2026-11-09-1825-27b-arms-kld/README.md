@@ -105,8 +105,30 @@ cold vs warm-first (measured 1.9.1 cold = 400–475 s, 2026-10-30, stands as the
 **Precondition:** no local-model Claude session running — `run.sh` calls `gpu_exclusive.sh` per arm (inherited
 from `serve_radiance.sh` / `serve_vllm.sh` start modes) and kills any session server on port 8000.
 
+### Short validation run first (user decision 2026-11-10 — no 3–4 h unattended pass up front)
+
+The round-1 run was **split**: run the short pass first, check that every measurement path works and
+the data looks sane, *then* decide on the full grid after analysis.
+
 ```sh
 cd /home/dev/work/dp-craft/amd
+bash campaigns/perf/2026-11-09-1825-27b-arms-kld/run-short.sh      # ~1 h, unique dir per run
+```
+
+- **Arms C + D only** (the redhat-vs-iq4 pair the user cares about most): D = RedHat-MXFP4 @ sly 1.11.0
+  (WS7 cold+warm prologue included — the first 1.11.0 boot *is* the WS7 cold measurement), C = IQ4R-L-V4 @
+  radiance 1.17.0.
+- **Cells**: 10k/100k × tg512 × n1 (2 per arm), **REPS=2** (n=2; no 3-rep run up front — if a value
+  looks suspicious or high-spread, re-run: the new unique dir **doubles** the data, never overwrites).
+- **KLD**: selftest + fetch with **KLD_N=16** prompts (short; the full 128 stays for the canonical run —
+  decide after analysis) + score.
+- **Unique dir per invocation**: `tmp/runs/short-<YYYYmmdd-HHMMSS>/` (results + raw + done markers).
+  Pin `RUN_TAG=<same>` to **resume** an interrupted short run; a bare re-run gets a fresh dir.
+- Knobs (env): `REPS` `KLD_N` `RUN_TAG` + every run.sh pin (`IMAGE`, `IMG_RAD_BC`, `RAD_IQRV4`, …).
+- All temporary output in the project gitignored `tmp/`, never machine `/tmp` (repo rule — a reboot
+  wipes `/tmp` and would lose every sub-result).
+
+```sh
 bash campaigns/perf/2026-11-09-1825-27b-arms-kld/run.sh            # round 1: A→D × 8 cells + KLD + WS7
 # ... round-1 summary table prints at the end ...
 bash campaigns/perf/2026-11-09-1825-27b-arms-kld/run.sh --round 2  # optional: 50k/tg4096 cells

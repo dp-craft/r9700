@@ -372,6 +372,8 @@ def main():
     fp.add_argument("--model", required=True)
     fp.add_argument("--calibration", required=True, help="prompts jsonl (id, src, char_cut)")
     fp.add_argument("--max-tokens", type=int, default=N_MAX)
+    fp.add_argument("--limit", type=int, default=None,
+                    help="first N calibration prompts only (short pass; the hash-pinned file is untouched)")
     fp.add_argument("--repo-root", default=os.getcwd())
     fp.add_argument("--out", required=True)
 
@@ -395,6 +397,8 @@ def main():
             sys.exit(1)
     elif a.cmd == "fetch":
         prompts = load_prompts(a.calibration, a.repo_root)
+        if a.limit is not None:
+            prompts = prompts[: a.limit]
         t0 = time.time()
         blocks = fetch(a.url, a.model, prompts, max_tokens=a.max_tokens)
         _write_jsonl(blocks, a.out)
