@@ -86,8 +86,10 @@ watchdog() {
   while sleep 0.2; do
     local f; f=$(vram_free_mib)
     if [ "$f" -lt "$WATCHDOG_MIB" ]; then
-      timeout 60 docker kill "$NAME" >/dev/null 2>&1 || true
-      echo "free_mib=$f utc=$(date -u +%T.%N | cut -c1-12)" > "$RUNDIR/$PORT.watchdog"; return
+      if timeout 60 docker kill "$NAME" >/dev/null 2>&1; then
+        echo "free_mib=$f utc=$(date -u +%T.%N | cut -c1-12)" > "$RUNDIR/$PORT.watchdog"
+      else echo "warning: WATCHDOG could not kill $NAME (${f} MiB free; docker kill failed or timed out)" >&2; fi
+      return
     fi
   done
 }
@@ -384,9 +386,11 @@ if [ "${1:-start}" = run ]; then
     while sleep 0.2; do
       f=$(vram_free_mib)
       if [ "$WATCHDOG_MIB" -gt 0 ] && [ "$f" -lt "$WATCHDOG_MIB" ]; then
-        timeout 60 docker kill "$NAME" >/dev/null 2>&1 || true
-        echo "free_mib=$f utc=$(date -u +%T.%N | cut -c1-12)" > "$RUNDIR/$PORT.watchdog"
-        echo "WATCHDOG killed $NAME: VRAM nearly full during boot (${f} MiB free)" >&2; return
+        if timeout 60 docker kill "$NAME" >/dev/null 2>&1; then
+          echo "free_mib=$f utc=$(date -u +%T.%N | cut -c1-12)" > "$RUNDIR/$PORT.watchdog"
+          echo "WATCHDOG killed $NAME: VRAM nearly full during boot (${f} MiB free)" >&2
+        else echo "warning: WATCHDOG could not kill $NAME (${f} MiB free; docker kill failed or timed out)" >&2; fi
+        return
       fi
       n=$((n + 1)); [ $((n % 10)) = 0 ] || continue
       curl -sf -m 1 "http://127.0.0.1:$PORT/health" >/dev/null 2>&1 && return
@@ -399,7 +403,7 @@ if [ "${1:-start}" = run ]; then
   # removes the container at once instead of hanging until it dies on its own.
   "${CMD[@]}" & DP=$!
   # set -e applies inside the trap: boot_guard may already be gone, so its kill must not abort the rm
-  trap 'kill "$BG" 2>/dev/null || true; timeout 60 docker rm -f "$NAME" >/dev/null 2>&1 || echo "warning: could not remove $NAME (docker rm -f failed or timed out)" >&2' TERM INT
+  trap 'kill "$BG" 2>/dev/null || true; timeout 60 docker rm -f "$NAME" >/dev/null 2>&1 || { echo "warning: could not remove $NAME (docker rm -f failed or timed out)" >&2; exit 1; }' TERM INT
   rc=0; wait "$DP" || rc=$?
   if [ "$rc" -gt 128 ]; then wait "$DP" 2>/dev/null || true; fi
   kill "$BG" 2>/dev/null || true
@@ -419,7 +423,7 @@ for i in $(seq "$WAIT"); do
     timeout 60 docker rm -f "$NAME" >/dev/null 2>&1 || echo "warning: could not remove $NAME (docker rm -f failed or timed out)" >&2; rm -f "$CFILE"; exit 1
   fi
   if curl -sf -m 2 "http://127.0.0.1:$PORT/health" >/dev/null 2>&1; then
-    [ -n "$WD" ] && kill "$WD" 2>/dev/null; WD=""
+    [ -z "$WD" ] || kill "$WD" 2>/dev/null || true; WD=""   # the watchdog may already have returned
     SERVED=$(curl -sf -m 5 "http://127.0.0.1:$PORT/v1/models" | python3 -c 'import json,sys; print(json.load(sys.stdin)["data"][0]["id"])' 2>/dev/null || true)
     if [ "$SERVED" != "$SERVED_NAME" ]; then
       echo "port $PORT serves '$SERVED', expected '$SERVED_NAME' — aborting" >&2; "$0" stop; exit 1

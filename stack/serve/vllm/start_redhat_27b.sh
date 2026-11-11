@@ -33,8 +33,8 @@ if read -r MAXLEN PORT MODEL < <(read_settings_file "$SETTINGS" 2>/dev/null); th
   [[ "$MAXLEN" =~ ^[0-9]+$ ]] || { echo "$SETTINGS: CLAUDE_CODE_MAX_CONTEXT_TOKENS is not an integer ($MAXLEN)" >&2; exit 2; }
 else
   case "${1:-start}" in
-    status|logs) echo "warning: $SETTINGS missing, unreadable or its URL has no port -- $1 uses PORT=$FALLBACK_PORT" >&2; PORT=$FALLBACK_PORT;;
-    start|stop|print) echo "$SETTINGS: missing, unreadable or its URL has no port -- ${1:-start} needs it" >&2; exit 2;;
+    status|logs) echo "warning: $SETTINGS missing, unreadable or without a valid URL port -- $1 uses PORT=$FALLBACK_PORT" >&2; PORT=$FALLBACK_PORT;;
+    start|stop|print) echo "$SETTINGS: missing, unreadable or without a valid URL port -- ${1:-start} needs it" >&2; exit 2;;
   esac
 fi
 

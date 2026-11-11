@@ -157,7 +157,7 @@ if [ "$MODE" = start ]; then
     if [ "$(docker inspect -f '{{.State.Running}}' "$NAME" 2>/dev/null)" != true ]; then
       echo "container exited during boot; last log lines:" >&2
       docker logs --tail 40 "$NAME" >&2
-      timeout 60 docker rm -f "$NAME" >/dev/null 2>&1 || true   # a failed boot must not leak the container
+      timeout 60 docker rm -f "$NAME" >/dev/null 2>&1 || echo "warning: could not remove $NAME (docker rm -f failed or timed out)" >&2   # a failed boot must not leak the container
       rm -f "$CMDFILE"
       exit 1
     fi
@@ -165,7 +165,7 @@ if [ "$MODE" = start ]; then
   done
   echo "not up after ${WAIT}s; last log lines:" >&2
   docker logs --tail 40 "$NAME" >&2
-  timeout 60 docker rm -f "$NAME" >/dev/null 2>&1 || true   # a failed boot must not leak the container
+  timeout 60 docker rm -f "$NAME" >/dev/null 2>&1 || echo "warning: could not remove $NAME (docker rm -f failed or timed out)" >&2   # a failed boot must not leak the container
   rm -f "$CMDFILE"
   exit 1
 fi
@@ -180,7 +180,7 @@ fi
 echo "running $NAME in the foreground on 127.0.0.1:$PORT ($IMAGE, $(basename "$RAD_FILE"))"
 # Docker client as a background job + `wait`, so a TERM from the supervisor removes the container at once.
 "${CMD[@]}" & DP=$!
-trap 'timeout 60 docker rm -f "$NAME" >/dev/null 2>&1 || echo "warning: could not remove $NAME (docker rm -f failed or timed out)" >&2' TERM INT
+trap 'timeout 60 docker rm -f "$NAME" >/dev/null 2>&1 || { echo "warning: could not remove $NAME (docker rm -f failed or timed out)" >&2; exit 1; }' TERM INT
 rc=0; wait "$DP" || rc=$?
 if [ "$rc" -gt 128 ]; then wait "$DP" 2>/dev/null || true; fi
 exit "$rc"
