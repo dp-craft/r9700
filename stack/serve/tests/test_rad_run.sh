@@ -2,13 +2,15 @@
 # test_rad_run.sh — GPU-free regression test for rad_run and free_gpu in clients/claude/_lib.sh
 # (F2-1 env prefix, F2-5 graceful free_gpu, F2-10 refuse before destroying; 2026-11-10).
 # It sources a copy of the real _lib.sh and serve_lib.sh from a fake repo under this repo's tmp/, with fake docker,
-# curl and claude first on PATH and a stub serve_radiance.sh that dumps the env it was given, then checks the calls:
+# ss, curl and claude first on PATH and a stub serve_radiance.sh that dumps the env it was given, then checks the calls:
 #   1 rad_run + image: the stub gets RAD_FILE/IMAGE/PORT/MAXLEN/MAXSEQS/EXTRA_ARGS (with a space)/CONTAINER_NAME; rc 0
 #   2 rad_run, empty image: the same, and IMAGE is unset in the stub
 #   3 rad_run, missing .rad: rc != 0 and no docker call at all (free_gpu never ran)
 #   3b rad_run, relative .rad path (exists): refused the same way (serve_radiance.sh would refuse only after free_gpu)
+#   3c rad_run, absolute path that is not a .rad (exists): refused the same way
 #   4 rad_run, image docker says is missing: rc != 0 and the only docker call is `image inspect`
-#   5 free_gpu, one listed radiance container: update, then stop -t 60, then rm -f
+#   5 free_gpu, one listed radiance container: update, then stop -t 60, then rm -f; no warning; LISTEN + TIME_WAIT wait
+#   5b free_gpu, a container that survives rm -f: warning on stderr, rc 0
 #   6 the EXIT trap after a successful rad_run: stop -t 60 before rm -f on the container
 # Rule 3 (2026-11-10, a helper without these killed a live server): this file and every script it writes start with
 # the fake bin first on PATH, DOCKER_HOST at a dead socket, and a guard that exits 99 unless `command -v docker` is
@@ -33,7 +35,8 @@ echo "$*" >> "$FAKE_DIR/docker.log"
 case "$1" in
   ps) cat "$FAKE_DIR/ps.out" ;;
   image) case "${3:-}" in missing*) echo "Error: No such image: $3" >&2; exit 1 ;; esac ;;
-  container) exit 1 ;;
+  rm) case "${3:-}" in wedged*) exit 1 ;; esac ;;
+  container) case "${3:-}" in wedged*) exit 0 ;; esac; exit 1 ;;
 esac
 exit 0
 EOF
@@ -49,6 +52,9 @@ echo "$*" >> "$FAKE_DIR/claude.log"
 exit 0
 EOF
 [ "$(command -v docker)" = "$W/bin/docker" ] || { echo "real docker reachable - refusing" >&2; exit 99; }
+script "$W/bin/ss" <<'EOF'
+echo "$*" >> "$FAKE_DIR/ss.log"
+EOF
 
 # the stub serve_radiance.sh: dumps the env rad_run gave it (IMAGE=<unset> when absent), then exits 0
 script "$W/fake-repo/stack/serve/radiance/serve_radiance.sh" <<'EOF'
@@ -80,7 +86,7 @@ verdict() {
 }
 # fresh [PS_LINE]: clears the call logs; `docker ps` prints PS_LINE (nothing when empty)
 fresh() {
-  rm -f "$FAKE_DIR"/{docker.log,curl.log,claude.log,stub.env,case.out}
+  rm -f "$FAKE_DIR"/{docker.log,ss.log,curl.log,claude.log,stub.env,case.out}
   : > "$FAKE_DIR/docker.log"
   if [ -n "${1:-}" ]; then echo "$1" > "$FAKE_DIR/ps.out"; else : > "$FAKE_DIR/ps.out"; fi
 }
@@ -119,6 +125,7 @@ in_lib rad_run "$W/no-such.rad" "$IMG" "" >"$FAKE_DIR/case.out" 2>&1; rc=$?
 [ "$rc" -ne 0 ] || err "rc=0, want non-zero"
 [ ! -s "$FAKE_DIR/docker.log" ] || err "docker calls: $(tr '\n' ';' < "$FAKE_DIR/docker.log")"
 [ ! -f "$FAKE_DIR/stub.env" ] || err "the stub ran"
+grep -q 'rad_run: .rad model not found' "$FAKE_DIR/case.out" || err "no refusal message"
 verdict "3 rad_run with a missing .rad: rc != 0, no docker call at all (free_gpu never ran)"
 
 # 3b: a relative .rad path that exists is refused too (serve_radiance.sh would refuse it, but only after free_gpu)
@@ -126,7 +133,17 @@ fresh "$PS_RAD"
 ( cd "$W" && in_lib rad_run model.rad "$IMG" "" ) >"$FAKE_DIR/case.out" 2>&1; rc=$?
 [ "$rc" -ne 0 ] || err "rc=0, want non-zero"
 [ ! -s "$FAKE_DIR/docker.log" ] || err "docker calls: $(tr '\n' ';' < "$FAKE_DIR/docker.log")"
+grep -q 'rad_run: .rad model not found' "$FAKE_DIR/case.out" || err "no refusal message"
 verdict "3b rad_run with a relative .rad path: rc != 0, no docker call at all"
+
+# 3c: an absolute path that exists but is not a .rad is refused too
+: > "$W/model.gguf"
+fresh "$PS_RAD"
+in_lib rad_run "$W/model.gguf" "$IMG" "" >"$FAKE_DIR/case.out" 2>&1; rc=$?
+[ "$rc" -ne 0 ] || err "rc=0, want non-zero"
+[ ! -s "$FAKE_DIR/docker.log" ] || err "docker calls: $(tr '\n' ';' < "$FAKE_DIR/docker.log")"
+grep -q 'rad_run: .rad model not found' "$FAKE_DIR/case.out" || err "no refusal message"
+verdict "3c rad_run with an absolute non-.rad path: rc != 0, no docker call at all"
 
 # 4: an image docker says is missing is refused after its one `image inspect`, before free_gpu
 fresh "$PS_RAD"
@@ -144,7 +161,16 @@ in_lib free_gpu >"$FAKE_DIR/case.out" 2>&1
 got=$(grep -v '^ps ' "$FAKE_DIR/docker.log")
 want=$'update --restart=no abc123def456\nstop -t 60 abc123def456\nrm -f abc123def456'
 [ "$got" = "$want" ] || err "docker calls: ${got//$'\n'/; }, want update; stop -t 60; rm -f"
+! grep -q '^warning:' "$FAKE_DIR/case.out" || err "warned although rm -f succeeded"
+grep -qx -- '-ltn' "$FAKE_DIR/ss.log" && grep -qx -- '-ltn state time-wait' "$FAKE_DIR/ss.log" || err "no LISTEN + TIME_WAIT port wait"
 verdict "5 free_gpu with one listed radiance container: update, then stop -t 60, then rm -f"
+
+# 5b: a container that survives stop + rm -f gets the warning, and free_gpu still returns 0 under set -e
+fresh "wedged000001 $IMG radiance-old"
+in_lib free_gpu >"$FAKE_DIR/case.out" 2>&1; rc=$?
+[ "$rc" -eq 0 ] || err "rc=$rc, want 0"
+grep -q '^warning: radiance-old is still there' "$FAKE_DIR/case.out" || err "no warning for a container that survived rm -f"
+verdict "5b free_gpu, a container survives rm -f: warning on stderr, rc 0"
 
 # 6: the EXIT trap after a successful rad_run: stop -t 60 before rm -f (nothing is listed, so only the trap touches it)
 fresh
