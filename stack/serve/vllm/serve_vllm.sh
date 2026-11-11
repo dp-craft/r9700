@@ -398,7 +398,7 @@ if [ "${1:-start}" = run ]; then
   # until a FOREGROUND child exits, but `wait` is interruptible -- so a TERM from the supervisor
   # removes the container at once instead of hanging until it dies on its own.
   "${CMD[@]}" & DP=$!
-  trap 'kill "$BG" 2>/dev/null; docker rm -f "$NAME" >/dev/null 2>&1' TERM INT
+  trap 'kill "$BG" 2>/dev/null; timeout 60 docker rm -f "$NAME" >/dev/null 2>&1' TERM INT
   rc=0; wait "$DP" || rc=$?
   if [ "$rc" -gt 128 ]; then wait "$DP" 2>/dev/null || true; fi
   kill "$BG" 2>/dev/null || true
@@ -415,7 +415,7 @@ for i in $(seq "$WAIT"); do
       echo "WATCHDOG killed $NAME: VRAM nearly full during boot ($(cat "$RUNDIR/$PORT.watchdog"), floor ${WATCHDOG_MIB} MiB)" >&2
     fi
     echo "container DIED during startup — last log lines ($LOGFILE):" >&2; tail -15 "$LOGFILE" >&2
-    docker rm -f "$NAME" >/dev/null 2>&1; rm -f "$CFILE"; exit 1
+    timeout 60 docker rm -f "$NAME" >/dev/null 2>&1; rm -f "$CFILE"; exit 1
   fi
   if curl -sf -m 2 "http://127.0.0.1:$PORT/health" >/dev/null 2>&1; then
     [ -n "$WD" ] && kill "$WD" 2>/dev/null; WD=""
