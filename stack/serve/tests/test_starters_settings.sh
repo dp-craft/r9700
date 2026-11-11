@@ -2,9 +2,10 @@
 # test_starters_settings.sh — how the four settings-file starters treat a missing or bad settings file
 # (start_heretic_27b.sh, start_redhat_27b.sh, start_qwen38_27b_iq4r-l-v4_rad.sh, start_ornith_35b_vllm_rad.sh):
 #   - missing file: start/stop/print exit 2 with NO docker call (stop never guesses a port);
-#     status falls back to ${PORT:-8000} and reaches docker with that port
+#     status and logs fall back to ${PORT:-8000} and reach docker with that port
 #   - ANTHROPIC_BASE_URL without an explicit port: read_settings_file fails, so stop exits 2 (was: port 80)
-#   - a valid file: stop reaches docker with the file's port
+#   - a valid file: stop reaches docker on the port the starter resolves (file and PORT agree here: the
+#     vLLM starters let the file win, the radiance ones PORT -- an open owner decision)
 # GPU-free and docker-free: a logging stub docker (exit 1) is first on PATH and DOCKER_HOST points nowhere.
 # Test port 19992 only, pre-checked free. Run: bash stack/serve/tests/test_starters_settings.sh
 set -u
@@ -43,6 +44,8 @@ for s in "$ROOT/stack/serve/vllm/start_heretic_27b.sh" "$ROOT/stack/serve/vllm/s
   done
   run "$TMP/missing.json" status "$s"
   [ "$rc" -ne 2 ] && grep -q -- "-$P" <<<"$calls" && ok "missing file: status falls back to PORT=$P" || bad "missing file: status rc=$rc calls=[$calls]"
+  run "$TMP/missing.json" logs "$s"
+  [ "$rc" -ne 2 ] && grep -q -- "-$P" <<<"$calls" && ok "missing file: logs falls back to PORT=$P" || bad "missing file: logs rc=$rc calls=[$calls]"
   run "$TMP/noport.json" stop "$s"
   [ "$rc" -eq 2 ] && [ -z "$calls" ] && ok "URL without a port: stop exits 2, no docker call" || bad "URL without a port: stop rc=$rc calls=[$calls]"
   run "$TMP/valid.json" stop "$s"

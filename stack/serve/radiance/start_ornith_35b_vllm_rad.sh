@@ -31,8 +31,8 @@ SETTINGS=${SETTINGS:-$HOME/.config/claude/local_vllm_direct/settings-redhat.json
 # whatever else holds that port.
 if ! read -r _ SET_PORT MODEL < <(read_settings_file "$SETTINGS" 2>/dev/null); then
   case "${1:-start}" in
-    status|logs) echo "warning: $SETTINGS missing or unreadable -- $1 uses PORT=${PORT:-8000}" >&2; SET_PORT=${PORT:-8000};;
-    start|stop|print) echo "$SETTINGS: missing or unreadable -- ${1:-start} needs it" >&2; exit 2;;
+    status|logs) echo "warning: $SETTINGS missing, unreadable or its URL has no port -- $1 uses PORT=${PORT:-8000}" >&2; SET_PORT=${PORT:-8000};;
+    start|stop|print) echo "$SETTINGS: missing, unreadable or its URL has no port -- ${1:-start} needs it" >&2; exit 2;;
   esac
 fi
 VLLM_ROOT=${VLLM_ROOT:-/mnt/Lin1/work/vllm/sly-radiance}

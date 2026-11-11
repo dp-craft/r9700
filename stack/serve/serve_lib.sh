@@ -11,7 +11,7 @@ read_settings_file() {
 import json, sys, urllib.parse
 e = json.load(open(sys.argv[1]))["env"]
 port = urllib.parse.urlparse(e["ANTHROPIC_BASE_URL"]).port
-if port is None:
+if not port:
     sys.exit(f"{sys.argv[1]}: ANTHROPIC_BASE_URL has no explicit port")
 print(e["CLAUDE_CODE_MAX_CONTEXT_TOKENS"], port, e["ANTHROPIC_MODEL"])
 EOF
