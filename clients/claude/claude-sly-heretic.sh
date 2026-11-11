@@ -9,8 +9,16 @@ source "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/_lib.sh"
 # shellcheck source=/home/dev/work/dp-craft/amd/stack/serve/27b.conf
 source "$REPO/stack/serve/27b.conf"
 : "${IMAGE:=ghcr.io/slybase/vllm-sly-radiance:1.8.1-rocm10.1}"; : "${WATCHDOG_MIB:=32}"; CT="vllm-$PORT"
+# serve_vllm.sh refuses a missing model or drafter (exit 1) only AFTER free_gpu has stopped the live server, so check the
+# same two files first, on the paths of its read-only `print` preview (no GPU). The image is pulled here too, before free_gpu:
+# serve_vllm.sh would pull it only after free_gpu. The name is this launcher's IMAGE, the value its `start` call is given.
+preview=$(PROFILE=sly-official/heretic-mxfp4 MAXLEN=$MAXLEN MAXSEQS=$MAXSEQS "$ENG/vllm/serve_vllm.sh" print)
+model_dir=$(sed -n 's/^#   MODEL_DIR=//p' <<<"$preview"); draft_dir=$(sed -n 's/^#   DRAFT_DIR=\([^ ]*\).*/\1/p' <<<"$preview")
+[ -f "$model_dir/config.json" ] && { [ "$draft_dir" = none ] || [ -f "$draft_dir/config.json" ]; } \
+  || { echo "claude-sly-heretic: model or drafter not found (model: '$model_dir', drafter: '$draft_dir'; fetch_model.sh) -- the running server was NOT touched" >&2; exit 1; }
+docker image inspect "$IMAGE" >/dev/null 2>&1 || docker pull "$IMAGE" || { echo "claude-sly-heretic: image $IMAGE not present and docker pull failed -- the running server was NOT touched" >&2; exit 1; }
 free_gpu
 [ "$KEEP" = 1 ] || trap 'PORT=$PORT "$ENG/vllm/serve_vllm.sh" stop >/dev/null 2>&1' EXIT
-PROFILE=sly-official/heretic-mxfp4 IMAGE=$IMAGE PORT=$PORT MAXLEN=$MAXLEN MAXSEQS=$MAXSEQS WATCHDOG_MIB=$WATCHDOG_MIB WAIT=$WAIT "$ENG/vllm/serve_vllm.sh" start >"$RUNDIR/$PORT.boot" 2>&1 \
+PROFILE=sly-official/heretic-mxfp4 IMAGE=$IMAGE PORT=$PORT MAXLEN=$MAXLEN MAXSEQS=$MAXSEQS SPEC_K=$SPEC_K WATCHDOG_MIB=$WATCHDOG_MIB WAIT=$WAIT "$ENG/vllm/serve_vllm.sh" start >"$RUNDIR/$PORT.boot" 2>&1 \
   || { tail -20 "$RUNDIR/$PORT.boot" >&2; exit 1; }
 run_claude "$CT" "$MAXLEN" "$@"
