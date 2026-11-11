@@ -6,7 +6,7 @@ Extra args go to `claude` (`-c`, `-p "…"`). Verified 2026-10-24: each answered
 
 | Script | Engine / image | Model file | Boot | Served name | Notes |
 |---|---|---|---|---|---|
-| `claude-rad-mxfp4.sh` | native radiance `stilldeadcode/radiance:1.11.0` | `/mnt/Lin1/work/radiance/models/StillDeadcode__qwen3.8-27b-mxfp4@60bd4139/qwen3.8-27b-mxfp4.rad` (18 GiB, incl. vision + DFlash2 drafter) | ~55 s | `qwen35` | tp1, fp8 KV, 8 seqs, ctx 200000 |
+| `claude-rad-mxfp4.sh` | native radiance `stilldeadcode/radiance:1.11.0` | `/mnt/Lin1/work/radiance/models/StillDeadcode__qwen3.8-27b-mxfp4@60bd4139/qwen3.8-27b-mxfp4.rad` (18 GiB, incl. vision + DFlash2 drafter) | ~55 s | `qwen35` | tp1, fp8 KV, 2 seqs, ctx 260000 |
 | `claude-rad-heretic.sh` | native radiance (same image) | `/mnt/Lin1/work/vllm/sly-radiance/models/swift-heretic-gptq/*.rad` (16.8 GiB, target only, no drafter) | ~55 s | `qwen35` | research-only, safety removed; flags from the file's README |
 | `claude-sly-amd.sh` | `ghcr.io/slybase/vllm-sly-radiance:1.6.0-rocm10.1` (vLLM 0.32) | `amd/Qwen3.8-27B-Quark-AWQ-MXFP4@5233554c` (HF checkpoint) | ~3 min (+compile on a new image tag) | `qwen38-27b-mxfp4` | profile `sly-radiance/qwen38-mxfp4`, ctx 150000, drafter off |
 | `claude-sly-heretic.sh` | `vllm-sly-radiance:1.6.0` (vLLM) | `slybase/Swift-1.5-Qwen3.8-27B-heretic-MXFP4-GPTQ@3bb379dc` (compressed-tensors GPTQ-MXFP4, HF checkpoint, ~20 GB) | ~3 min | `swift-1.5-heretic` | profile `sly-radiance/qwen38-heretic-mxfp4`; research-only, safety removed |
