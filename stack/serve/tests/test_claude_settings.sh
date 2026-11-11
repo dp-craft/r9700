@@ -16,7 +16,7 @@ APRIV=$(cd "$ROOT/clients/claude" 2>/dev/null && pwd || true)
 BASE_SETTINGS=${BASE_SETTINGS:-/home/dev/.config/claude/local_vllm_direct/settings.json}
 [ -f "$BASE_SETTINGS" ] || { echo "FAIL - base settings not found: $BASE_SETTINGS" >&2; exit 1; }
 
-TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
+mkdir -p "$ROOT/tmp"; TMP=$(mktemp -d -p "$ROOT/tmp"); trap 'rm -rf "$TMP"' EXIT
 # hostile fixture: the stale values the real base file carried (2026-11-09), so a lazy writer fails
 python3 - "$BASE_SETTINGS" "$TMP/base.json" <<'PY'
 import json, sys

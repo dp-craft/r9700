@@ -33,7 +33,7 @@ PASS=0; FAIL=0
 ok()  { PASS=$((PASS+1)); echo "PASS: $*"; }
 bad() { FAIL=$((FAIL+1)); echo "FAIL: $*" >&2; }
 
-TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
+mkdir -p "$ROOT/tmp"; TMP=$(mktemp -d -p "$ROOT/tmp"); trap 'rm -rf "$TMP"' EXIT
 T1="$TMP/t1-install"; T2="$TMP/t2-migrate"; T3="$TMP/t3-survivors"; T4="$TMP/t4-uninstall"; T5="$TMP/t5-uninstall-safety"
 for d in "$T1" "$T2" "$T3" "$T4" "$T5"; do mkdir -p "$d"; done
 
