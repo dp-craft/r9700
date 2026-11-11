@@ -9,8 +9,8 @@
 #   3. every 27B starter RESOLVES to the convention — via its GPU-free `print` mode (the resolved
 #      docker argv). Ornith (35B) is a negative check: it must keep its own 262144/3, not the conf.
 #   4. the claude settings files: exactly one compaction knob (window - max output = 205000), served
-#      model names matching what the profiles actually serve, and the RedHat window = 27b.conf MAXLEN.
-# Run: bash stack/serve/tests/check_27b_consistency.sh   (no GPU, no docker calls, ~10 s)
+#      model names matching what the profiles actually serve, and both windows (RedHat, heretic) = 27b.conf MAXLEN.
+# Run: bash stack/serve/tests/check_27b_consistency.sh   (no GPU; serve_vllm.sh print makes read-only docker image inspect calls, ~10 s)
 set -u
 SELF=$(readlink -f "${BASH_SOURCE[0]}")
 ROOT=$(cd "$(dirname "$SELF")/../../.." && pwd)
@@ -103,7 +103,7 @@ for s in start_redhat_27b.sh start_heretic_27b.sh; do
 done
 
 echo "== 4. claude settings files: one compaction knob, correct served names =="
-python3 - "$SVC/settings-redhat.json" "$SVC/settings.json" "${C_M:-}" <<'PY' && ok "settings-redhat.json + settings.json invariants (redhat window = 27b.conf MAXLEN)" || bad "settings files: see messages above"
+python3 - "$SVC/settings-redhat.json" "$SVC/settings.json" "${C_M:-}" <<'PY' && ok "settings-redhat.json + settings.json invariants (both windows = 27b.conf MAXLEN)" || bad "settings files: see messages above"
 import json, sys
 red = json.load(open(sys.argv[1]))["env"]
 her = json.load(open(sys.argv[2]))["env"]
@@ -118,9 +118,11 @@ for name, e, want in (("settings-redhat.json", red, "qwen38-27b-redhat-mxfp4-dfl
         errs.append(f"{name}: AUTO_COMPACT_WINDOW = {e.get('CLAUDE_CODE_AUTO_COMPACT_WINDOW')!r}, want {m - o} (= window - max output)")
     if "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE" in e:
         errs.append(f"{name}: stale CLAUDE_AUTOCOMPACT_PCT_OVERRIDE")
-# radiance (IQ4) serves 27b.conf MAXLEN, vLLM RedHat serves this window: keep them equal (values never printed)
-if str(red.get("CLAUDE_CODE_MAX_CONTEXT_TOKENS")) != sys.argv[3]:
-    errs.append("settings-redhat.json: CLAUDE_CODE_MAX_CONTEXT_TOKENS differs from 27b.conf MAXLEN")
+# the vLLM starters serve these windows, the radiance track and the claude-sly launchers 27b.conf MAXLEN:
+# keep them equal (values never printed)
+for name, e in (("settings-redhat.json", red), ("settings.json", her)):
+    if str(e.get("CLAUDE_CODE_MAX_CONTEXT_TOKENS")) != sys.argv[3]:
+        errs.append(f"{name}: CLAUDE_CODE_MAX_CONTEXT_TOKENS differs from 27b.conf MAXLEN")
 for x in errs: print("  " + x, file=sys.stderr)
 sys.exit(1 if errs else 0)
 PY
