@@ -3,7 +3,7 @@
 # single-R9700 recipe (profile sly-official/heretic-mxfp4: DFlash2 k=7, cudagraphs, Cactus 0.5, util 0.98, thinking ON, no kernarg fix) at image 1.8.1.
 # 27B context config = 27b.conf (260000 ctx + 2 seqs; user decision 2026-10-25, DC1 re-tune 2026-11-09; the model card says 65536 — the pre-decision default).
 # The 1.8.1 boot dips to ~250 MiB free (MEASURED 2026-10-24 at MAXLEN 150000, settles ~1.1 GiB), under serve_vllm.sh's 256 MiB watchdog default, so WATCHDOG_MIB=32 here (24 MiB free killed the desktop on 2026-10-22). First boot compiles ~10 min (cache is per image tag under /mnt/Lin1/work/vllm/sly-radiance/cache/).
-# Usage: ./claude-sly-heretic.sh [claude args]        Knobs: _lib.sh + 27b.conf + IMAGE WATCHDOG_MIB(32) EXTRA_ARGS (serve_vllm.sh)
+# Usage: ./claude-sly-heretic.sh [claude args]        Knobs: _lib.sh + 27b.conf + IMAGE AUTO_PULL(1; 0 = refuse a missing image) WATCHDOG_MIB(32) EXTRA_ARGS (serve_vllm.sh)
 set -euo pipefail
 source "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/_lib.sh"
 # shellcheck source=/home/dev/work/dp-craft/amd/stack/serve/27b.conf

@@ -3,7 +3,8 @@
 # A .rad is NOT loadable by vLLM / vllm-sly-radiance — it needs stilldeadcode/radiance >= 1.2.3. Flags = the file's README
 # "Launch" block (batched tokens 2048, --reasoning-effort medium). The .rad on disk has a mangled name (ra~ce), so it is globbed.
 # 27B context config = 27b.conf (260000 ctx + 2 seqs; user decision 2026-10-25, DC1 re-tune 2026-11-09).
-# IMAGE: serve_radiance.sh's default (1.11.0; the .rad needs >= 1.2.3), pinned here so rad_run checks it before free_gpu.
+# IMAGE pinned to 1.11.0 (serve_radiance.sh's default today; the .rad needs >= 1.2.3), so rad_run checks it before
+# free_gpu. Keep it in sync when serve_radiance.sh's default moves.
 # Usage: ./claude-rad-heretic.sh [claude args]    Knobs: _lib.sh + 27b.conf + IMAGE RAD_FILE EXTRA_ARGS (serve_radiance.sh)
 set -euo pipefail
 source "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/_lib.sh"

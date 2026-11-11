@@ -3,7 +3,7 @@
 Five launchers: each frees the GPU, boots ONE server (via `radiance/serve_radiance.sh` or `vllm/serve_vllm.sh`),
 waits for `/health`, writes per-run Claude settings, runs `claude`, and stops the server when Claude exits (`KEEP=1` leaves it up).
 Extra args go to `claude` (`-c`, `-p "…"`). Smoke-tested 2026-10-24 (each answered a `claude -p` prompt; log: `stack/serve/var/servers/8000.{log,boot}`), before the
-2026-10-25 27B context decision (260000 ctx, 2 seqs) and the later image changes; not re-run since.
+2026-10-25 27B context decision (262000 ctx, 2 seqs; 260000 since the 2026-11-09 re-tune) and the later image changes; not re-run since.
 
 | Script | Engine / image | Model file | Boot | Served name | Notes |
 |---|---|---|---|---|---|
@@ -13,7 +13,7 @@ Extra args go to `claude` (`-c`, `-p "…"`). Smoke-tested 2026-10-24 (each answ
 | `claude-sly-heretic.sh` | `vllm-sly-radiance:1.6.0` (vLLM) | `slybase/Swift-1.5-Qwen3.8-27B-heretic-MXFP4-GPTQ@3bb379dc` (compressed-tensors GPTQ-MXFP4, HF checkpoint, ~20 GB) | ~3 min | `swift-1.5-heretic` | profile `sly-radiance/qwen38-heretic-mxfp4`; research-only, safety removed |
 | `claude-sly-redhat.sh` | `ghcr.io/slybase/vllm-sly-radiance:1.9.1-rocm10.1` (vLLM 0.32.0; since 2026-10-30, was 1.8.1 — `IMAGE=…:1.8.1-rocm10.1` rolls back) | `RedHatAI/Qwen3.8-27B-MXFP4@16a86728` (compressed-tensors MXFP4, HF checkpoint, 19 GB) + `syvai/Qwen3.8-27B-DFlash2-W4A16@4d30ec73` drafter | ~7 min (400–419 s) | `qwen38-27b-redhat-mxfp4-dflash` | profile `sly-redhat/redhat-mxfp4-dflash` (heretic's sly-official engine layer), DFlash2 k=7, ctx 260000, `WATCHDOG_MIB=32` |
 
-Knobs: `PORT` (8000) `KEEP` `WAIT` `MAXLEN` `IMAGE` `RAD_FILE` `EXTRA_ARGS` `CLAUDE_BASE_SETTINGS`. The Claude env block comes from
+Knobs: `PORT` (8000) `KEEP` `WAIT` `MAXLEN` `IMAGE` `AUTO_PULL` (sly: 0 = refuse a missing image) `RAD_FILE` `EXTRA_ARGS` `CLAUDE_BASE_SETTINGS`. The Claude env block comes from
 `~/.config/claude/local_vllm_direct/settings.json`; the launcher rewrites URL, model names, context window and the autocompact % (so compaction fires before prompt+output > window).
 
 **Heretic on sly vs on radiance:** sly uses the GPTQ checkpoint (the .rad's source); radiance uses the `.rad`.

@@ -4,7 +4,7 @@
 # Benchmarked 2026-10-30 (docs/findings/radiance/2026-10-30-0900-vllm-redhat-mxfp4-depth-transposed.md, ctx 110000, slower of 2 reps): decode 122.72/86.34/86.24 tok/s at 10k/50k/100k on 1.9.1 (1.8.1: 122.27/84.76/87.36).
 # 27B context config = 27b.conf (260000 ctx + 2 seqs; user decision 2026-10-25, DC1 re-tune 2026-11-09): MEASURED 2026-10-30 at MAXLEN 262000, GPU KV cache 370,702 tokens (1.41x); boot 419 s and 400 s (two boots, MEASURED).
 # WATCHDOG_MIB=32: the RedHat 1.8.1 boot dipped to 71 MiB free on 2026-10-30 (killed at the 256 MiB default).
-# Usage: ./claude-sly-redhat.sh [claude args]        Knobs: _lib.sh + 27b.conf + IMAGE WATCHDOG_MIB(32) EXTRA_ARGS (serve_vllm.sh)
+# Usage: ./claude-sly-redhat.sh [claude args]        Knobs: _lib.sh + 27b.conf + IMAGE AUTO_PULL(1; 0 = refuse a missing image) WATCHDOG_MIB(32) EXTRA_ARGS (serve_vllm.sh)
 set -euo pipefail
 source "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/_lib.sh"
 # shellcheck source=/home/dev/work/dp-craft/amd/stack/serve/27b.conf
