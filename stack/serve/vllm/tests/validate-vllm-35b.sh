@@ -81,17 +81,19 @@ fi
 SERVED=$(curl -sf -m 5 "http://127.0.0.1:$PORT/v1/models" | python3 -c 'import json,sys;print(json.load(sys.stdin)["data"][0]["id"])')
 [ "$SERVED" = "$SERVED_EXPECTED" ] && pass "served model: $SERVED" || fail "served model '$SERVED' != expected '$SERVED_EXPECTED'"
 
-CODE=$(curl -s -m 600 -o /tmp/validate-35b-smoke.json -w '%{http_code}' "http://127.0.0.1:$PORT/v1/chat/completions" \
+mkdir -p "$REPO/tmp"
+SMOKE="$(mktemp -d -p "$REPO/tmp")/validate-35b-smoke.json"
+CODE=$(curl -s -m 600 -o "$SMOKE" -w '%{http_code}' "http://127.0.0.1:$PORT/v1/chat/completions" \
   -H 'content-type: application/json' \
   -d "{\"model\": \"$SERVED_EXPECTED\", \"messages\": [{\"role\": \"user\", \"content\": \"Reply with exactly: 35b-ok\"}], \"max_tokens\": 64}")
 if [ "$CODE" = 200 ] && python3 -c '
 import json,sys
-d=json.load(open("/tmp/validate-35b-smoke.json"))
+d=json.load(open(sys.argv[1]))
 t=d["choices"][0]["message"]["content"]
-sys.exit(0 if isinstance(t,str) and t.strip() else 1)'; then
-  pass "smoke request: HTTP 200, reply: $(python3 -c 'import json;print(json.load(open("/tmp/validate-35b-smoke.json"))["choices"][0]["message"]["content"][:120])')"
+sys.exit(0 if isinstance(t,str) and t.strip() else 1)' "$SMOKE"; then
+  pass "smoke request: HTTP 200, reply: $(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["choices"][0]["message"]["content"][:120])' "$SMOKE")"
 else
-  fail "smoke request: HTTP $CODE / empty reply"; head -c 400 /tmp/validate-35b-smoke.json >&2; echo
+  fail "smoke request: HTTP $CODE / empty reply"; head -c 400 "$SMOKE" >&2; echo
 fi
 
 LOG=$(PORT=$PORT "$SERVE" logs 2>/dev/null | tail -400)

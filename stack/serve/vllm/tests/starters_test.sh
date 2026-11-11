@@ -49,8 +49,9 @@ P2=19996   # B2 (stop: own container)
 P3=19997   # B3 (stop: foreign container)
 P4=19998   # B4 (stop: foreign raw pid)
 
-TMP=$(mktemp -d)
-MDIR=$(mktemp -d)   # empty dir -> ornith "checkpoint missing"
+mkdir -p "$REPO/tmp"
+TMP=$(mktemp -d -p "$REPO/tmp")
+MDIR=$(mktemp -d -p "$REPO/tmp")   # empty dir -> ornith "checkpoint missing"
 STUB="$TMP/exclusive_stub.sh"
 cat > "$STUB" <<'EOF'
 #!/usr/bin/env bash

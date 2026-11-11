@@ -27,7 +27,8 @@ NAME="vllm-$PORT"
 PROFILE=${PROFILE:-sly-redhat/redhat-mxfp4-dflash}
 IMAGE=${IMAGE:-ghcr.io/slybase/vllm-sly-radiance:1.9.1-rocm10.1}
 
-TMP=$(mktemp -d)
+mkdir -p "$REPO/tmp"
+TMP=$(mktemp -d -p "$REPO/tmp")
 STUB="$TMP/exclusive_stub.sh"
 cat > "$STUB" <<'EOF'
 #!/usr/bin/env bash
