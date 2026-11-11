@@ -6,6 +6,16 @@ citation) · verdict · action · rollback (old tags stay local + exact `IMAGE=`
 Driven by the `/radiance-image` skill (`.claude/skills/radiance-image/SKILL.md`); previous images/src checkouts are
 never deleted.
 
+## 2026-11-10 · no image change — 27B MAXLEN 262000 → 260000 (`27b.conf`, commit `6f9d1a4`)
+
+- **MAXLEN 262000 → 260000** in `stack/serve/27b.conf` (DC1 re-tune 2026-11-09; the 27B convention is the user
+  decision of 2026-10-25). The conf accepts the lower window without re-testing, because 262000 fit on the vLLM track
+  (MEASURED 2026-10-30, `campaigns/perf/2026-10-30-1745-sly-1.9.1-smoke/results/`, MAXSEQS 1). MAXSEQS 2, SPEC_K 7 and
+  HEADROOM_MIB 596 are unchanged. The 1 → 2 MAXSEQS fix was the vLLM starters' (`e217e6c`), not a radiance change.
+- **Applies to:** `start_qwen38_27b_iq4r-l-v4_rad.sh` and the `claude-rad-*` 27B launchers; `MAXLEN=` in the
+  environment still overrides.
+- **Rollback:** `MAXLEN=262000` in the environment (no file change).
+
 ## 2026-11-09 · no image change — `serve_radiance.sh` daemon modes + 27B config centralization (TDD)
 
 - **`serve_radiance.sh` now has daemon modes `start|stop|status|logs`** (before: `run|print` only — the skill's

@@ -6,6 +6,21 @@ measured delta (campaign citation) · verdict · action · rollback (old tag sta
 Driven by the `/vllm-image` skill (`.claude/skills/vllm-image/SKILL.md`); previous images/caches/src checkouts are
 never deleted.
 
+## 2026-11-10 · no image change — 27B MAXLEN 262000 → 260000 (`27b.conf` + heretic profile, commit `6f9d1a4`)
+
+- **MAXLEN 262000 → 260000** in `stack/serve/27b.conf` and `sly-official/heretic-mxfp4.env` (both changed by
+  `6f9d1a4`; DC1 re-tune 2026-11-09). The conf accepts the lower window without re-testing, because 262000 fit
+  (MEASURED 2026-10-30, `campaigns/perf/2026-10-30-1745-sly-1.9.1-smoke/results/`, MAXSEQS 1, util 0.93). MAXSEQS 2
+  (the `e217e6c` fix), SPEC_K 7 and HEADROOM_MIB 596 are unchanged.
+- **Where it is read:** `claude-sly-redhat.sh` and `claude-sly-heretic.sh` take MAXLEN from `27b.conf`. The vLLM
+  starters (`start_redhat_27b.sh`, `start_heretic_27b.sh`) take `CLAUDE_CODE_MAX_CONTEXT_TOKENS` from the settings
+  file instead, which the conf calls authoritative on this track.
+- **Supersedes** the 2026-11-09 heretic-profile bullet below (`MAXLEN 260000→262000`, "drift fixed"): `6f9d1a4`
+  reverses that fix. The bullet stays as history.
+- **Rollback:** `MAXLEN` back to 262000 in `27b.conf` and in the heretic profile; for the starters, also
+  `CLAUDE_CODE_MAX_CONTEXT_TOKENS` in the settings file. The 260000 asserts in
+  `stack/serve/tests/check_27b_consistency.sh` then need updating too.
+
 ## 2026-11-09 · no image change — 27B config centralization + compaction fix (TDD)
 
 - **The 27B convention now has one home: `stack/serve/27b.conf`** (MAXLEN 262000 / MAXSEQS 2 / SPEC_K 7 /
