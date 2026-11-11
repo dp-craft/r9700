@@ -7,6 +7,9 @@
 set -euo pipefail
 source "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/_lib.sh"
 : "${IMAGE:=ghcr.io/slybase/vllm-sly-radiance:1.6.0-rocm10.1}"; : "${MAXLEN:=150000}"; CT="vllm-$PORT"
+# The image is pulled here, before free_gpu:
+# serve_vllm.sh would pull it only after free_gpu. The name is this launcher's IMAGE, the value its `start` call is given.
+docker image inspect "$IMAGE" >/dev/null 2>&1 || docker pull "$IMAGE" || { echo "claude-sly-amd: image $IMAGE not present and docker pull failed -- the running server was NOT touched" >&2; exit 1; }
 free_gpu
 [ "$KEEP" = 1 ] || trap 'PORT=$PORT "$ENG/vllm/serve_vllm.sh" stop >/dev/null 2>&1' EXIT
 PROFILE=sly-radiance/qwen38-mxfp4 IMAGE=$IMAGE PORT=$PORT MAXLEN=$MAXLEN WAIT=$WAIT "$ENG/vllm/serve_vllm.sh" start >"$RUNDIR/$PORT.boot" 2>&1 \
