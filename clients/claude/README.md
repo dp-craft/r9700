@@ -1,6 +1,7 @@
 # Claude Code on local radiance / vllm-sly-radiance
 
-Five launchers: each frees the GPU, boots ONE server (via `radiance/serve_radiance.sh` or `vllm/serve_vllm.sh`),
+Eight launchers (the table lists five; the three `claude-rad-iq4rlv4*.sh` serve the IQR-V4 .rad on radiance 1.17.0, see
+their headers): each frees the GPU, boots ONE server (via `radiance/serve_radiance.sh` or `vllm/serve_vllm.sh`),
 waits for `/health`, writes per-run Claude settings, runs `claude`, and stops the server when Claude exits (`KEEP=1` leaves it up).
 Extra args go to `claude` (`-c`, `-p "…"`). Smoke-tested 2026-10-24 (each answered a `claude -p` prompt; log: `stack/serve/var/servers/8000.{log,boot}`), before the
 2026-10-25 27B context decision (262000 ctx, 2 seqs; 260000 since the 2026-11-09 re-tune) and the later image changes; not re-run since.
@@ -10,7 +11,7 @@ Extra args go to `claude` (`-c`, `-p "…"`). Smoke-tested 2026-10-24 (each answ
 | `claude-rad-mxfp4.sh` | native radiance `stilldeadcode/radiance:1.11.0` | `/mnt/Lin1/work/radiance/models/StillDeadcode__qwen3.8-27b-mxfp4@60bd4139/qwen3.8-27b-mxfp4.rad` (18 GiB, incl. vision + DFlash2 drafter) | ~55 s | `qwen35` | tp1, fp8 KV, 2 seqs, ctx 260000 |
 | `claude-rad-heretic.sh` | native radiance (same image) | `/mnt/Lin1/work/vllm/sly-radiance/models/swift-heretic-gptq/*.rad` (16.8 GiB, target only, no drafter) | ~55 s | `qwen35` | research-only, safety removed; flags from the file's README |
 | `claude-sly-amd.sh` | `ghcr.io/slybase/vllm-sly-radiance:1.6.0-rocm10.1` (vLLM 0.32) | `amd/Qwen3.8-27B-Quark-AWQ-MXFP4@5233554c` (HF checkpoint) | ~3 min (+compile on a new image tag) | `qwen38-27b-mxfp4` | profile `sly-radiance/qwen38-mxfp4`, ctx 150000, drafter off |
-| `claude-sly-heretic.sh` | `vllm-sly-radiance:1.6.0` (vLLM) | `slybase/Swift-1.5-Qwen3.8-27B-heretic-MXFP4-GPTQ@3bb379dc` (compressed-tensors GPTQ-MXFP4, HF checkpoint, ~20 GB) | ~3 min | `swift-1.5-heretic` | profile `sly-radiance/qwen38-heretic-mxfp4`; research-only, safety removed |
+| `claude-sly-heretic.sh` | `ghcr.io/slybase/vllm-sly-radiance:1.8.1-rocm10.1` (vLLM) | `slybase/Swift-1.5-Qwen3.8-27B-heretic-MXFP4-GPTQ@3bb379dc` (compressed-tensors GPTQ-MXFP4, HF checkpoint, ~20 GB) | ~3 min | `swift-1.5` | profile `sly-official/heretic-mxfp4`; research-only, safety removed |
 | `claude-sly-redhat.sh` | `ghcr.io/slybase/vllm-sly-radiance:1.9.1-rocm10.1` (vLLM 0.32.0; since 2026-10-30, was 1.8.1 — `IMAGE=…:1.8.1-rocm10.1` rolls back) | `RedHatAI/Qwen3.8-27B-MXFP4@16a86728` (compressed-tensors MXFP4, HF checkpoint, 19 GB) + `syvai/Qwen3.8-27B-DFlash2-W4A16@4d30ec73` drafter | ~7 min (400–419 s) | `qwen38-27b-redhat-mxfp4-dflash` | profile `sly-redhat/redhat-mxfp4-dflash` (heretic's sly-official engine layer), DFlash2 k=7, ctx 260000, `WATCHDOG_MIB=32` |
 
 Knobs: `PORT` (8000) `KEEP` `WAIT` `MAXLEN` `IMAGE` `AUTO_PULL` (sly: 0 = refuse a missing image) `RAD_FILE` `EXTRA_ARGS` `CLAUDE_BASE_SETTINGS`. The Claude env block comes from
@@ -37,13 +38,13 @@ In the repo: `stack/serve/radiance/serve_radiance.sh` (native engine), `stack/se
 
 ## Configs that matter
 
-- Both ROCm containers: `HIP_FORCE_DEV_KERNARG=0` (else random MEMORY_FAULT; set by the launchers). GPU groups are numeric GIDs read from the host. Desktop shares the card, so sly uses `GPU_UTIL=0.90` and a boot VRAM watchdog (`WATCHDOG_MIB`=256).
+- Both ROCm containers: `HIP_FORCE_DEV_KERNARG=0` (else random MEMORY_FAULT; set by the launchers). GPU groups are numeric GIDs read from the host. Desktop shares the card, so sly uses a reduced `GPU_UTIL` (amd 0.90, redhat and heretic 0.93) and a boot VRAM watchdog (`WATCHDOG_MIB`: amd 256, redhat and heretic 32).
 - radiance: `--reasoning-effort-map high=xhigh` (template rejects OpenAI's `high`); heretic adds `--reasoning-effort medium` (default xhigh adds a system block) and `--max-num-batched-tokens 2048`. KV `fp8`; `fp8_v4`/`k6_v4` exist for more context (see `--help`).
 - sly: MXFP4 needs `RADIANCE_MXFP4=1` + the W4A8 set in `qwen38-mxfp4.env`; `--enforce-eager`, Cactus off (`RADIANCE_CACTUS_DELTA=0`), DFlash2 drafter off in the profile (the README quickstart uses it with k=7).
 
 ## Upgrading / debugging
 
-- **New radiance image:** `docker pull stilldeadcode/radiance:<tag>`, then `IMAGE=… ./claude-rad-mxfp4.sh`; make it the default in `radiance/serve_radiance.sh` only after a clean run. Re-check `--help` (flags change) and that the `.rad` version requirement is met (model README "Needs radiance >= x").
+- **New radiance image:** `docker pull stilldeadcode/radiance:<tag>`, then `IMAGE=… ./claude-rad-mxfp4.sh`; make it the default in `radiance/serve_radiance.sh` only after a clean run, and move the `IMAGE` pin in `claude-rad-mxfp4.sh` and `claude-rad-heretic.sh` with it. Re-check `--help` (flags change) and that the `.rad` version requirement is met (model README "Needs radiance >= x").
 - **New sly image:** pull, `git -C src fetch` the matching tag into `src/<tag>/` (diff CHANGELOG + the README options table against `_engine.env`/`qwen38-mxfp4.env`), then `IMAGE=… ./claude-sly-amd.sh`. **1.8.0 currently fails the boot watchdog** (free VRAM 90 MiB just after `lm_head quantised to int4`, 2026-10-24) — next step: read the 1.7/1.8 CHANGELOG for load-memory changes, retry with `WATCHDOG_MIB=0` only while watching VRAM (the desktop can die), or lower `GPU_UTIL`.
 - **Boot fails:** `stack/serve/var/servers/8000.log` (radiance) / `8000.boot` + `8000.log` (sly) / `8000.watchdog` (watchdog trip). Never leave an orphan: `docker rm -f radiance-8000 vllm-8000`, then check `amd-smi metric -g 0 -m` FREE_VRAM (iron rule 14).
 - **Heretic dir clean-up (not done):** it holds a 99 KB HTML file named `swift-1.5-heretic-mxfp4-radiance-1.2.3` (a failed HF download saved as the file name) and the real `.rad` has a mangled name (`…-ra~ce-1.2.3.rad`); `rad.sha256`, LICENSE and NOTICE are missing, so the file is unverified beyond its `RAD1` header and README-matching size.
