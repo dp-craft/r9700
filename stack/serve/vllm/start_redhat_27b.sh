@@ -26,14 +26,15 @@ SETTINGS=${SETTINGS:-/home/dev/.config/claude/local_vllm_direct/settings-redhat.
 # shellcheck source=../27b.conf
 source "$HERE/../27b.conf"
 
-# stop/status/logs need only the port: a missing or unreadable settings file falls back to ${PORT:-8000}
+# status/logs need only the port: a missing or unreadable settings file falls back to ${PORT:-8000}.
+# stop refuses instead, so it never stops whatever else holds that port.
 FALLBACK_PORT=${PORT:-8000}
 if read -r MAXLEN PORT MODEL < <(read_settings_file "$SETTINGS" 2>/dev/null); then
   [[ "$MAXLEN" =~ ^[0-9]+$ ]] || { echo "$SETTINGS: CLAUDE_CODE_MAX_CONTEXT_TOKENS is not an integer ($MAXLEN)" >&2; exit 2; }
 else
   case "${1:-start}" in
-    stop|status|logs) echo "warning: $SETTINGS missing or unreadable -- $1 uses PORT=$FALLBACK_PORT" >&2; PORT=$FALLBACK_PORT;;
-    start|print) echo "$SETTINGS: missing or unreadable -- ${1:-start} needs it" >&2; exit 2;;
+    status|logs) echo "warning: $SETTINGS missing or unreadable -- $1 uses PORT=$FALLBACK_PORT" >&2; PORT=$FALLBACK_PORT;;
+    start|stop|print) echo "$SETTINGS: missing or unreadable -- ${1:-start} needs it" >&2; exit 2;;
   esac
 fi
 
