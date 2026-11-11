@@ -7,8 +7,13 @@
 set -euo pipefail
 source "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/_lib.sh"
 : "${IMAGE:=ghcr.io/slybase/vllm-sly-radiance:1.6.0-rocm10.1}"; : "${MAXLEN:=150000}"; CT="vllm-$PORT"
-# The image is pulled here, before free_gpu:
+# serve_vllm.sh refuses a missing model or drafter (exit 1) only AFTER free_gpu has stopped the live server, so check the
+# same two files first, on the paths of its read-only `print` preview (no GPU). The image is pulled here too, before free_gpu:
 # serve_vllm.sh would pull it only after free_gpu. The name is this launcher's IMAGE, the value its `start` call is given.
+preview=$(PROFILE=sly-radiance/qwen38-mxfp4 MAXLEN=$MAXLEN "$ENG/vllm/serve_vllm.sh" print)
+model_dir=$(sed -n 's/^#   MODEL_DIR=//p' <<<"$preview"); draft_dir=$(sed -n 's/^#   DRAFT_DIR=\([^ ]*\).*/\1/p' <<<"$preview")
+[ -f "$model_dir/config.json" ] && { [ "$draft_dir" = none ] || [ -f "$draft_dir/config.json" ]; } \
+  || { echo "claude-sly-amd: model or drafter not found (model: '$model_dir', drafter: '$draft_dir'; fetch_model.sh) -- the running server was NOT touched" >&2; exit 1; }
 docker image inspect "$IMAGE" >/dev/null 2>&1 || { [ "${AUTO_PULL:-1}" = 1 ] && docker pull "$IMAGE"; } || { echo "claude-sly-amd: image $IMAGE not present and docker pull failed (or AUTO_PULL=0) -- the running server was NOT touched" >&2; exit 1; }
 free_gpu
 [ "$KEEP" = 1 ] || trap 'PORT=$PORT "$ENG/vllm/serve_vllm.sh" stop >/dev/null 2>&1' EXIT
