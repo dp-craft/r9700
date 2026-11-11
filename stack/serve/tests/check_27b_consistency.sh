@@ -112,10 +112,10 @@ for name, e, want in (("settings-redhat.json", red, "qwen38-27b-redhat-mxfp4-dfl
                       ("settings.json", her, "swift-1.5")):
     for k in ("ANTHROPIC_MODEL", "ANTHROPIC_DEFAULT_HAIKU_MODEL", "ANTHROPIC_DEFAULT_SONNET_MODEL", "ANTHROPIC_DEFAULT_OPUS_MODEL"):
         if e.get(k) != want:
-            errs.append(f"{name}: {k} = {e.get(k)!r}, want {want!r}")
+            errs.append(f"{name}: {k} differs from the served name {want!r}")
     m = int(e["CLAUDE_CODE_MAX_CONTEXT_TOKENS"]); o = int(e.get("CLAUDE_CODE_MAX_OUTPUT_TOKENS", 0))
     if e.get("CLAUDE_CODE_AUTO_COMPACT_WINDOW") != str(m - o):
-        errs.append(f"{name}: AUTO_COMPACT_WINDOW = {e.get('CLAUDE_CODE_AUTO_COMPACT_WINDOW')!r}, want {m - o} (= window - max output)")
+        errs.append(f"{name}: AUTO_COMPACT_WINDOW differs from window - max output")
     if "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE" in e:
         errs.append(f"{name}: stale CLAUDE_AUTOCOMPACT_PCT_OVERRIDE")
 # the vLLM starters serve these windows, the radiance track and the claude-sly launchers 27b.conf MAXLEN:

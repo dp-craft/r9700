@@ -1185,8 +1185,10 @@ def validate_agentic(spec):
     url = senv.get("ANTHROPIC_BASE_URL")
     if url:
         u = urllib.parse.urlparse(url)
-        if (u.port or 80) != spec["port"]:
-            sys.exit(f"agentic spec: settings ANTHROPIC_BASE_URL port {u.port or 80} != spec port {spec['port']} ({sp})")
+        if u.port is None:
+            sys.exit(f"agentic spec: settings ANTHROPIC_BASE_URL has no explicit port ({sp})")
+        if u.port != spec["port"]:
+            sys.exit(f"agentic spec: settings ANTHROPIC_BASE_URL port {u.port} != spec port {spec['port']} ({sp})")
     for label, val in _settings_models(settings):
         if val != served:
             sys.exit(f"agentic spec: settings {label}={val!r} != served_model {served!r} ({sp})")
