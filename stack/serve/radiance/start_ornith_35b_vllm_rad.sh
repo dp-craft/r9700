@@ -10,7 +10,9 @@
 #   --host 127.0.0.1 instead of :: (local only, so no API key); no restart policy (a reboot must not hold VRAM);
 #   image pinned instead of :latest (iron rule 2); --served-model-name = the usual Claude settings' ANTHROPIC_MODEL.
 # Claude: port and served name come from SETTINGS (default the 27b's settings-redhat.json), so the same config works
-# unchanged. The name is an alias: Claude and /v1/models show the 27b's name while Ornith answers.
+# unchanged. A readable file's port always wins, even over an exported PORT (as in the vLLM starters); PORT is the
+# fallback only when the file is unreadable (status/logs). The name is an alias: Claude and /v1/models show the
+# 27b's name while Ornith answers.
 # VRAM: Radiance claims all free VRAM minus the headroom, whatever --max-model-len is; the KV cache takes the rest.
 # The default 96 left about 232 MiB free (MEASURED), which crashed the desktop once, so the headroom is 500 MiB higher;
 # not measured yet. Close Chrome if VRAM gets tight.
@@ -39,7 +41,7 @@ VLLM_ROOT=${VLLM_ROOT:-/mnt/Lin1/work/vllm/sly-radiance}
 MODEL_DIR=${MODEL_DIR:-$VLLM_ROOT/models/keptn__ornith-1.5-35b-a3b-w4a8@cfed0f8f}
 RAD_FILE=${RAD_FILE:-$MODEL_DIR/ornith-1.5-35b-a3b-w4a8.rad}
 IMAGE=${IMAGE:-stilldeadcode/radiance:1.16.0}
-PORT=${PORT:-$SET_PORT}
+PORT=${SET_PORT:-${PORT:-8000}}   # the settings file's port wins; an exported PORT only when the file is unreadable
 FREE_MIB_FLOOR=${FREE_MIB_FLOOR:-30000}
 WAIT=${WAIT:-900}
 # the creator's compose values (35B — deliberately not 27b.conf's 260000/2)

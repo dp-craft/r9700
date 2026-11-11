@@ -253,12 +253,26 @@ if [ "$V8000_UP" -eq 0 ]; then
   container_exists vllm-8000 && bad "C5 vllm-8000 container appeared (docker run must not have run)" || ok "C5 no container created (abort before docker run)"
 fi
 
+# C6 and C8d: the radiance starters let a readable settings file's port win over an exported PORT,
+# so every ornith call below gets SETTINGS=$SETTINGS_ORN: a copy of the real settings-redhat.json whose base-URL
+# port is rewritten to P1 (path and other values kept; nothing is printed). No ornith call can reach port 8000.
+SETTINGS_ORN="$TMP/settings-orn.json"
+python3 - "/home/dev/.config/claude/local_vllm_direct/settings-redhat.json" "$SETTINGS_ORN" "$P1" <<'PY' || { echo "cannot build the ornith settings fixture" >&2; exit 2; }
+import json, sys, urllib.parse
+src, dst, port = sys.argv[1], sys.argv[2], sys.argv[3]
+with open(src) as f:
+    d = json.load(f)
+u = urllib.parse.urlsplit(d["env"]["ANTHROPIC_BASE_URL"])
+d["env"]["ANTHROPIC_BASE_URL"] = f"{u.scheme}://127.0.0.1:{port}{u.path}"
+with open(dst, "w") as f:
+    json.dump(d, f)
+PY
 echo "== C6: ornith starter (no EXCLUSIVE hook — only pre-gpu_exclusive paths) =="
-OUT=$(bash "$C_ORN" badarg 2>&1); rc=$?
+OUT=$(SETTINGS="$SETTINGS_ORN" bash "$C_ORN" badarg 2>&1); rc=$?
 [ "$rc" -eq 2 ] && ok "C6a exit 2" || bad "C6a rc=$rc"
 has "$OUT" "usage:" && ok "C6a usage line" || bad "C6a usage missing (got: $OUT)"
 
-OUT=$(PORT=$P1 MODEL_DIR="$MDIR" bash "$C_ORN" start 2>&1); rc=$?
+OUT=$(SETTINGS="$SETTINGS_ORN" PORT=$P1 MODEL_DIR="$MDIR" bash "$C_ORN" start 2>&1); rc=$?
 [ "$rc" -eq 1 ] && ok "C6b exit 1" || bad "C6b rc=$rc (got: $OUT)"
 has "$OUT" "checkpoint missing in $MDIR" && ok "C6b checkpoint-missing message" || bad "C6b message (got: $OUT)"
 STATE_OK=1
@@ -266,22 +280,22 @@ container_exists "radiance-$P1" && STATE_OK=0
 for f in container cmdline log watchdog; do [ ! -e "$RUNDIR/$P1.$f" ] || STATE_OK=0; done
 [ "$STATE_OK" -eq 1 ] && ok "C6b no container created, no state file appeared" || bad "C6b container/state side effect"
 
-OUT=$(PORT=$P1 bash "$C_ORN" stop 2>&1); rc=$?
+OUT=$(SETTINGS="$SETTINGS_ORN" PORT=$P1 bash "$C_ORN" stop 2>&1); rc=$?
 [ "$rc" -eq 0 ] && ok "C6c stop (no container, free port) exit 0" || bad "C6c rc=$rc (got: $OUT)"
 [ -z "$OUT" ] && ok "C6c stop silent" || bad "C6c stop not silent (got: $OUT)"
 
-OUT=$(PORT=$P1 bash "$C_ORN" logs 2>&1); rc=$?
+OUT=$(SETTINGS="$SETTINGS_ORN" PORT=$P1 bash "$C_ORN" logs 2>&1); rc=$?
 [ "$rc" -ne 0 ] && ok "C6d logs (no container) non-zero exit (docker logs error, no crash)" || bad "C6d rc=$rc"
 
-OUT=$(PORT=$P1 bash "$C_ORN" status 2>&1); rc=$?
+OUT=$(SETTINGS="$SETTINGS_ORN" PORT=$P1 bash "$C_ORN" status 2>&1); rc=$?
 [ "$rc" -eq 0 ] && ok "C6e status (no container) exit 0, no crash" || bad "C6e rc=$rc (got: $OUT)"
 
 if start_dummy "radiance-$P1" "$P1"; then
-  OUT=$(PORT=$P1 bash "$C_ORN" start 2>&1); rc=$?
+  OUT=$(SETTINGS="$SETTINGS_ORN" PORT=$P1 bash "$C_ORN" start 2>&1); rc=$?
   [ "$rc" -eq 1 ] && ok "C6f start on busy port exit 1" || bad "C6f rc=$rc (got: $OUT)"
   has "$OUT" "port $P1 is in use -- stop that server first" && ok "C6f port-busy message" || bad "C6f message (got: $OUT)"
   container_running "radiance-$P1" && ok "C6f dummy untouched" || bad "C6f dummy was touched"
-  OUT=$(PORT=$P1 bash "$C_ORN" stop 2>&1); rc=$?
+  OUT=$(SETTINGS="$SETTINGS_ORN" PORT=$P1 bash "$C_ORN" stop 2>&1); rc=$?
   [ "$rc" -eq 0 ] && ok "C6g stop (dummy holding port) exit 0" || bad "C6g rc=$rc (got: $OUT)"
   [ -z "$OUT" ] && ok "C6g stop silent" || bad "C6g stop not silent (got: $OUT)"
   container_exists "radiance-$P1" && bad "C6g dummy still exists" || ok "C6g container removed"
@@ -321,7 +335,7 @@ OUT=$(cd /tmp && bash "$REPO/dp_start_heretic_27b.sh" badarg 2>&1); rc=$?
 [ "$rc" -eq 2 ] && has "$OUT" "usage:" && ok "C8b heretic badarg via symlink" || bad "C8b rc=$rc (got: $OUT)"
 OUT=$(cd /tmp && bash "$REPO/dp_start_ornith_35b_vllm_rad.sh" badarg 2>&1); rc=$?
 [ "$rc" -eq 2 ] && has "$OUT" "usage:" && ok "C8c ornith badarg via symlink" || bad "C8c rc=$rc (got: $OUT)"
-OUT=$(cd /tmp && PORT=$P1 MODEL_DIR="$MDIR" bash "$REPO/dp_start_ornith_35b_vllm_rad.sh" start 2>&1); rc=$?
+OUT=$(cd /tmp && SETTINGS="$SETTINGS_ORN" PORT=$P1 MODEL_DIR="$MDIR" bash "$REPO/dp_start_ornith_35b_vllm_rad.sh" start 2>&1); rc=$?
 [ "$rc" -eq 1 ] && has "$OUT" "checkpoint missing in $MDIR" && ok "C8d ornith start via symlink reaches the checkpoint check (no-cd)" || bad "C8d rc=$rc (got: $OUT)"
 OUT=$(cd /tmp && bash "$REPO/start_llama_swap.sh" status 2>&1); rc=$?
 [ "$rc" -eq 0 ] && ok "C8e llama-swap status via symlink exit 0" || bad "C8e rc=$rc (got: $OUT)"

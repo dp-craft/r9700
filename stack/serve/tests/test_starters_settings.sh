@@ -5,15 +5,17 @@
 #     status and logs fall back to ${PORT:-8000} and reach docker with that port
 #   - ANTHROPIC_BASE_URL without a valid port (none, 0, 70000, abc): read_settings_file fails, so stop exits 2
 #     (was: port 80 for none)
-#   - a valid file: stop reaches docker on the port the starter resolves (file and PORT agree here: the
-#     vLLM starters let the file win, the radiance ones PORT -- an open owner decision)
+#   - a valid file: its port wins over an exported PORT on all four starters (the file says 19993, PORT is
+#     19992): stop reaches docker on 19993 and never on 19992
 # GPU-free and docker-free: a logging stub docker (exit 1) is first on PATH and DOCKER_HOST points nowhere.
-# Test port 19992 only, pre-checked free. Run: bash stack/serve/tests/test_starters_settings.sh
+# Test ports 19992 (exported PORT) and 19993 (the valid file's port), both pre-checked free.
+# Run: bash stack/serve/tests/test_starters_settings.sh
 set -u
 SELF=$(readlink -f "${BASH_SOURCE[0]}")
 ROOT=$(cd "$(dirname "$SELF")/../../.." && pwd)
-P=19992
-ss -ltn | grep -q ":$P " && { echo "FAIL - test port $P is in use" >&2; exit 1; }
+P=19992    # exported PORT in every run
+FP=19993   # the port written into the valid settings file
+for p in $P $FP; do ss -ltn | grep -q ":$p " && { echo "FAIL - test port $p is in use" >&2; exit 1; }; done
 mkdir -p "$ROOT/tmp"; TMP=$(mktemp -d -p "$ROOT/tmp"); trap 'rm -rf "$TMP"' EXIT
 mkdir -p "$TMP/bin"
 printf '#!/usr/bin/env bash\necho "$*" >> "%s/calls.log"\nexit 1\n' "$TMP" > "$TMP/bin/docker"; chmod +x "$TMP/bin/docker"
@@ -28,7 +30,7 @@ json.dump({"env": {"CLAUDE_CODE_MAX_CONTEXT_TOKENS": "260000", "ANTHROPIC_BASE_U
                    "ANTHROPIC_MODEL": "test-model"}}, open(sys.argv[2], "w"))
 PY
 }
-settings "http://127.0.0.1:$P" "$TMP/valid.json"
+settings "http://127.0.0.1:$FP" "$TMP/valid.json"
 settings "http://127.0.0.1" "$TMP/noport.json"
 settings "http://127.0.0.1:0" "$TMP/port0.json"
 settings "http://127.0.0.1:70000" "$TMP/port70000.json"
@@ -55,7 +57,7 @@ for s in "$ROOT/stack/serve/vllm/start_heretic_27b.sh" "$ROOT/stack/serve/vllm/s
     [ "$rc" -eq 2 ] && [ -z "$calls" ] && ok "$b URL: stop exits 2, no docker call" || bad "$b URL: stop rc=$rc calls=[$calls]"
   done
   run "$TMP/valid.json" stop "$s"
-  grep -q -- "-$P" <<<"$calls" && ok "valid file: stop reaches docker on port $P" || bad "valid file: stop rc=$rc calls=[$calls]"
+  grep -q -- "-$FP" <<<"$calls" && ! grep -q -- "$P" <<<"$calls" && ok "valid file: stop reaches docker on the file's port $FP, never on PORT=$P" || bad "valid file: stop rc=$rc calls=[$calls]"
 done
 
 echo
