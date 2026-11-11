@@ -2,7 +2,8 @@
 
 Five launchers: each frees the GPU, boots ONE server (via `radiance/serve_radiance.sh` or `vllm/serve_vllm.sh`),
 waits for `/health`, writes per-run Claude settings, runs `claude`, and stops the server when Claude exits (`KEEP=1` leaves it up).
-Extra args go to `claude` (`-c`, `-p "…"`). Verified 2026-10-24: each answered a `claude -p` prompt (log: `stack/serve/var/servers/8000.{log,boot}`).
+Extra args go to `claude` (`-c`, `-p "…"`). Smoke-tested 2026-10-24 (each answered a `claude -p` prompt; log: `stack/serve/var/servers/8000.{log,boot}`), before the
+2026-10-25 27B context decision (260000 ctx, 2 seqs) and the later image changes; not re-run since.
 
 | Script | Engine / image | Model file | Boot | Served name | Notes |
 |---|---|---|---|---|---|
