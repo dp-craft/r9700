@@ -15,6 +15,8 @@ HERE="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"   # readli
 SERVE="$HERE/serve_vllm.sh"
 # shellcheck source=../serve_lib.sh
 source "$HERE/../serve_lib.sh"
+# dp-sharp chat template, as in start_redhat_27b.sh (owner 2026-11-11: one template on every 27B vLLM path).
+DP_SHARP="$HERE/templates/dp-sharp-chat_template.jinja"
 : "${PROFILE:=sly-official/heretic-mxfp4}"   # Sly 1.8.1 official recipe, served as swift-1.5 (DFlash2 drafter, MXFP4)
 SETTINGS=${SETTINGS:-/home/dev/.config/claude/local_vllm_direct/settings.json}
 # the 27B convention (env still wins); MAXLEN itself stays with the settings file (see above)
@@ -36,7 +38,7 @@ fi
 # the env every resolved-argv call uses (start and print must agree)
 serve_env() {
   export PROFILE PORT MAXLEN MAXSEQS SPEC_K
-  export KV_DTYPE=fp8 WATCHDOG_MIB=32 GPU_UTIL=0.93
+  export KV_DTYPE=fp8 WATCHDOG_MIB=32 GPU_UTIL=0.93 CHAT_TEMPLATE="$DP_SHARP"
 }
 
 case "${1:-start}" in

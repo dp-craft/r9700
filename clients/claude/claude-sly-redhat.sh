@@ -19,8 +19,10 @@ model_dir=$(sed -n 's/^#   MODEL_DIR=//p' <<<"$preview"); draft_dir=$(sed -n 's/
 [ -f "$model_dir/config.json" ] && { [ "$draft_dir" = none ] || [ -f "$draft_dir/config.json" ]; } \
   || { echo "claude-sly-redhat: model or drafter not found (model: '$model_dir', drafter: '$draft_dir'; fetch_model.sh) -- the running server was NOT touched" >&2; exit 1; }
 docker image inspect "$IMAGE" >/dev/null 2>&1 || { [ "${AUTO_PULL:-1}" = 1 ] && docker pull "$IMAGE"; } || { echo "claude-sly-redhat: image $IMAGE not present and docker pull failed (or AUTO_PULL=0) -- the running server was NOT touched" >&2; exit 1; }
+# dp-sharp chat template on every 27B vLLM path (owner 2026-11-11: one template, easy to update and compare).
+: "${CHAT_TEMPLATE:=$ENG/vllm/templates/dp-sharp-chat_template.jinja}"
 free_gpu
 [ "$KEEP" = 1 ] || trap 'PORT=$PORT "$ENG/vllm/serve_vllm.sh" stop >/dev/null 2>&1' EXIT
-PROFILE=sly-redhat/redhat-mxfp4-dflash IMAGE=$IMAGE PORT=$PORT MAXLEN=$MAXLEN MAXSEQS=$MAXSEQS SPEC_K=$SPEC_K CACTUS_DELTA=$CACTUS_DELTA WATCHDOG_MIB=$WATCHDOG_MIB WAIT=$WAIT "$ENG/vllm/serve_vllm.sh" start >"$RUNDIR/$PORT.boot" 2>&1 \
+PROFILE=sly-redhat/redhat-mxfp4-dflash IMAGE=$IMAGE CHAT_TEMPLATE=$CHAT_TEMPLATE PORT=$PORT MAXLEN=$MAXLEN MAXSEQS=$MAXSEQS SPEC_K=$SPEC_K CACTUS_DELTA=$CACTUS_DELTA WATCHDOG_MIB=$WATCHDOG_MIB WAIT=$WAIT "$ENG/vllm/serve_vllm.sh" start >"$RUNDIR/$PORT.boot" 2>&1 \
   || { tail -20 "$RUNDIR/$PORT.boot" >&2; exit 1; }
 run_claude "$CT" "$MAXLEN" "$@"

@@ -15,8 +15,10 @@ model_dir=$(sed -n 's/^#   MODEL_DIR=//p' <<<"$preview"); draft_dir=$(sed -n 's/
 [ -f "$model_dir/config.json" ] && { [ "$draft_dir" = none ] || [ -f "$draft_dir/config.json" ]; } \
   || { echo "claude-sly-amd: model or drafter not found (model: '$model_dir', drafter: '$draft_dir'; fetch_model.sh) -- the running server was NOT touched" >&2; exit 1; }
 docker image inspect "$IMAGE" >/dev/null 2>&1 || { [ "${AUTO_PULL:-1}" = 1 ] && docker pull "$IMAGE"; } || { echo "claude-sly-amd: image $IMAGE not present and docker pull failed (or AUTO_PULL=0) -- the running server was NOT touched" >&2; exit 1; }
+# dp-sharp chat template on every 27B vLLM path (owner 2026-11-11: one template, easy to update and compare).
+: "${CHAT_TEMPLATE:=$ENG/vllm/templates/dp-sharp-chat_template.jinja}"
 free_gpu
 [ "$KEEP" = 1 ] || trap 'PORT=$PORT "$ENG/vllm/serve_vllm.sh" stop >/dev/null 2>&1' EXIT
-PROFILE=sly-radiance/qwen38-mxfp4 IMAGE=$IMAGE PORT=$PORT MAXLEN=$MAXLEN WAIT=$WAIT "$ENG/vllm/serve_vllm.sh" start >"$RUNDIR/$PORT.boot" 2>&1 \
+PROFILE=sly-radiance/qwen38-mxfp4 IMAGE=$IMAGE CHAT_TEMPLATE=$CHAT_TEMPLATE PORT=$PORT MAXLEN=$MAXLEN WAIT=$WAIT "$ENG/vllm/serve_vllm.sh" start >"$RUNDIR/$PORT.boot" 2>&1 \
   || { tail -20 "$RUNDIR/$PORT.boot" >&2; exit 1; }
 run_claude "$CT" "$MAXLEN" "$@"
