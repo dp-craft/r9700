@@ -86,7 +86,7 @@ watchdog() {
   while sleep 0.2; do
     local f; f=$(vram_free_mib)
     if [ "$f" -lt "$WATCHDOG_MIB" ]; then
-      docker kill "$NAME" >/dev/null 2>&1
+      timeout 60 docker kill "$NAME" >/dev/null 2>&1 || true
       echo "free_mib=$f utc=$(date -u +%T.%N | cut -c1-12)" > "$RUNDIR/$PORT.watchdog"; return
     fi
   done
@@ -384,7 +384,7 @@ if [ "${1:-start}" = run ]; then
     while sleep 0.2; do
       f=$(vram_free_mib)
       if [ "$WATCHDOG_MIB" -gt 0 ] && [ "$f" -lt "$WATCHDOG_MIB" ]; then
-        docker kill "$NAME" >/dev/null 2>&1
+        timeout 60 docker kill "$NAME" >/dev/null 2>&1 || true
         echo "free_mib=$f utc=$(date -u +%T.%N | cut -c1-12)" > "$RUNDIR/$PORT.watchdog"
         echo "WATCHDOG killed $NAME: VRAM nearly full during boot (${f} MiB free)" >&2; return
       fi
@@ -398,7 +398,8 @@ if [ "${1:-start}" = run ]; then
   # until a FOREGROUND child exits, but `wait` is interruptible -- so a TERM from the supervisor
   # removes the container at once instead of hanging until it dies on its own.
   "${CMD[@]}" & DP=$!
-  trap 'kill "$BG" 2>/dev/null; timeout 60 docker rm -f "$NAME" >/dev/null 2>&1' TERM INT
+  # set -e applies inside the trap: boot_guard may already be gone, so its kill must not abort the rm
+  trap 'kill "$BG" 2>/dev/null || true; timeout 60 docker rm -f "$NAME" >/dev/null 2>&1 || echo "warning: could not remove $NAME (docker rm -f failed or timed out)" >&2' TERM INT
   rc=0; wait "$DP" || rc=$?
   if [ "$rc" -gt 128 ]; then wait "$DP" 2>/dev/null || true; fi
   kill "$BG" 2>/dev/null || true
@@ -415,7 +416,7 @@ for i in $(seq "$WAIT"); do
       echo "WATCHDOG killed $NAME: VRAM nearly full during boot ($(cat "$RUNDIR/$PORT.watchdog"), floor ${WATCHDOG_MIB} MiB)" >&2
     fi
     echo "container DIED during startup — last log lines ($LOGFILE):" >&2; tail -15 "$LOGFILE" >&2
-    timeout 60 docker rm -f "$NAME" >/dev/null 2>&1; rm -f "$CFILE"; exit 1
+    timeout 60 docker rm -f "$NAME" >/dev/null 2>&1 || echo "warning: could not remove $NAME (docker rm -f failed or timed out)" >&2; rm -f "$CFILE"; exit 1
   fi
   if curl -sf -m 2 "http://127.0.0.1:$PORT/health" >/dev/null 2>&1; then
     [ -n "$WD" ] && kill "$WD" 2>/dev/null; WD=""
