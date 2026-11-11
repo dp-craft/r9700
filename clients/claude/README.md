@@ -40,7 +40,7 @@ In the repo: `stack/serve/radiance/serve_radiance.sh` (native engine), `stack/se
 
 - Both ROCm containers: `HIP_FORCE_DEV_KERNARG=0` (else random MEMORY_FAULT) is set by `serve_radiance.sh` and the sly-radiance (amd) engine layer; the sly-official layer (heretic, redhat) deliberately leaves it unset. GPU groups are numeric GIDs read from the host. Desktop shares the card, so sly uses a reduced `GPU_UTIL` (amd 0.90, redhat and heretic 0.93) and a boot VRAM watchdog (`WATCHDOG_MIB`: amd 256, redhat and heretic 32).
 - radiance: `--reasoning-effort-map high=xhigh` (template rejects OpenAI's `high`); heretic adds `--reasoning-effort medium` (default xhigh adds a system block) and `--max-num-batched-tokens 2048`. KV `fp8`; `fp8_v4`/`k6_v4` exist for more context (see `--help`).
-- sly amd (`sly-radiance/qwen38-mxfp4`): MXFP4 needs `RADIANCE_MXFP4=1` + the W4A8 set in `qwen38-mxfp4.env`; `--enforce-eager`, Cactus off (`RADIANCE_CACTUS_DELTA=0`), DFlash2 drafter off in the profile (the README quickstart uses it with k=7). Heretic and redhat use the sly-official layer instead: Cactus 0.5, DFlash2 k=7, cudagraphs (not eager).
+- sly amd (`sly-radiance/qwen38-mxfp4`): MXFP4 needs `RADIANCE_MXFP4=1` + the W4A8 set in `qwen38-mxfp4.env`; `--enforce-eager`, Cactus off (`RADIANCE_CACTUS_DELTA=0`), DFlash2 drafter off in the profile (the README quickstart uses it with k=7). Heretic and redhat use the sly-official layer instead: DFlash2 k=7, cudagraphs (not eager); Cactus 0.5 for heretic, delta 0 for redhat (0.5 loops on agentic work, `docs/findings/agentic/2026-10-30-1552-dpf-brief-fix-heretic-vs-redhat.md`).
 
 ## Upgrading / debugging
 
