@@ -26,7 +26,15 @@ HERE="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"   # readli
 source "$HERE/../serve_lib.sh"
 SERVE="$HERE/serve_radiance.sh"
 SETTINGS=${SETTINGS:-$HOME/.config/claude/local_vllm_direct/settings-redhat.json}
-read -r _ SET_PORT MODEL < <(read_settings_file "$SETTINGS")
+# status/logs need only the port: a missing or unreadable settings file falls back to ${PORT:-8000}
+# (read leaves MODEL empty; status/logs never use the alias). stop refuses instead, so it never stops
+# whatever else holds that port.
+if ! read -r _ SET_PORT MODEL < <(read_settings_file "$SETTINGS" 2>/dev/null); then
+  case "${1:-start}" in
+    status|logs) echo "warning: $SETTINGS missing or unreadable -- $1 uses PORT=${PORT:-8000}" >&2; SET_PORT=${PORT:-8000};;
+    start|stop|print) echo "$SETTINGS: missing or unreadable -- ${1:-start} needs it" >&2; exit 2;;
+  esac
+fi
 VLLM_ROOT=${VLLM_ROOT:-/mnt/Lin1/work/vllm/sly-radiance}
 MODEL_DIR=${MODEL_DIR:-$VLLM_ROOT/models/keptn__ornith-1.5-35b-a3b-w4a8@cfed0f8f}
 RAD_FILE=${RAD_FILE:-$MODEL_DIR/ornith-1.5-35b-a3b-w4a8.rad}
