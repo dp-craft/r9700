@@ -11,6 +11,12 @@ Deferred items with a blocking precondition. Owner decisions live in
 - [ ] `stack/gpu/gpu_exclusive.sh` with a free-VRAM floor (plan 2.8)
 - [ ] One tiny throughput campaign end to end: raw → `tmp/`, rows → `results/`, charts + `gpu_peaks.json` (plan 3.6)
 
+## Owner run — real docker, no GPU (2026-11-11)
+
+- [ ] Run `bash stack/serve/vllm/tests/starters_test.sh` once: `1742be1` changed its C6/C8d ornith calls to a settings
+      fixture on port 19995 (the radiance starters now let the settings file's port win), and it was not run (it uses
+      real docker and the real settings file). It never targets port 8000.
+
 ## stack repo (github.com/dp-craft/stack — pushed 2026-11-07, commit 4a750a1)
 
 - [x] Write the stack repo's `README.md` — done 2026-11-07: `stack/README.md` (231 lines; overview, layout, quick start, current status, links to the three dir readmes + back to `dp-craft/r9700`), commit `4a750a1`. Facts verified by the main session against repo sources; one error (templates symlink) fixed before commit
