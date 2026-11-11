@@ -29,10 +29,10 @@ source "$HERE/../serve_lib.sh"
 SERVE="$HERE/serve_radiance.sh"
 SETTINGS=${SETTINGS:-$HOME/.config/claude/local_vllm_direct/settings-redhat.json}
 # stop/status/logs need only the port: a missing or unreadable settings file falls back to ${PORT:-8000}
-# (MODEL stays empty: stop/status/logs never use the alias, and set -u needs it defined)
+# (read leaves MODEL empty; stop/status/logs never use the alias)
 if ! read -r _ SET_PORT MODEL < <(read_settings_file "$SETTINGS" 2>/dev/null); then
   case "${1:-start}" in
-    stop|status|logs) echo "warning: $SETTINGS missing or unreadable -- $1 uses PORT=${PORT:-8000}" >&2; SET_PORT=${PORT:-8000}; MODEL=;;
+    stop|status|logs) echo "warning: $SETTINGS missing or unreadable -- $1 uses PORT=${PORT:-8000}" >&2; SET_PORT=${PORT:-8000};;
     start|print) echo "$SETTINGS: missing or unreadable -- ${1:-start} needs it" >&2; exit 2;;
   esac
 fi
