@@ -4,7 +4,7 @@
 
 # read_settings_file FILE — print "MAXLEN PORT MODEL" from a claude settings JSON's env block:
 # CLAUDE_CODE_MAX_CONTEXT_TOKENS, the ANTHROPIC_BASE_URL port, and ANTHROPIC_MODEL.
-# A URL without an explicit port fails (prints nothing) instead of silently meaning 80.
+# A URL without a valid explicit port (none, 0, out of range, not a number) fails (prints nothing) instead of meaning 80.
 # Replaces the per-starter python heredocs (2026-11-09 consolidation).
 read_settings_file() {
   python3 - "$1" <<'EOF'
@@ -12,7 +12,7 @@ import json, sys, urllib.parse
 e = json.load(open(sys.argv[1]))["env"]
 port = urllib.parse.urlparse(e["ANTHROPIC_BASE_URL"]).port
 if not port:
-    sys.exit(f"{sys.argv[1]}: ANTHROPIC_BASE_URL has no explicit port")
+    sys.exit(f"{sys.argv[1]}: ANTHROPIC_BASE_URL has no valid port")
 print(e["CLAUDE_CODE_MAX_CONTEXT_TOKENS"], port, e["ANTHROPIC_MODEL"])
 EOF
 }

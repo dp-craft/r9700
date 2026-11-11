@@ -107,8 +107,9 @@ an issue cross-links to `known-issues.md`. `HIP_FORCE_DEV_KERNARG=0` is **not** 
   the host (992/44 here, README assumes 109/44); containers run as root (cache files root-owned).
 - **version measured:** sly-radiance 1.6.0.
 
-## `HIP_FORCE_DEV_KERNARG=0` — **not a current setting**
-- The current `sly-official` recipe does **not** set it, and the `radiance_mxfp4_fp8_gemm_atiled`
+## `HIP_FORCE_DEV_KERNARG=0` — **not set by `sly-official`**
+- The current `sly-official` recipe (heretic, redhat) does **not** set it (user decision 2026-10-24);
+  `serve_radiance.sh` (default 0) and the `sly-radiance` (amd) engine layer still do. The `radiance_mxfp4_fp8_gemm_atiled`
   GEMM fault it fixed is **historical** (graduated to `historical.md`). It was the default in the
   `sly-radiance`/`radiance` profiles during the 2026-10-22/23 fault window; it is a *diagnostic* for
   a bit-44 kernarg-pointer corruption, not a general rule. If a future image/driver reintroduces the

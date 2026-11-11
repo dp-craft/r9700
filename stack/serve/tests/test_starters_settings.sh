@@ -3,7 +3,8 @@
 # (start_heretic_27b.sh, start_redhat_27b.sh, start_qwen38_27b_iq4r-l-v4_rad.sh, start_ornith_35b_vllm_rad.sh):
 #   - missing file: start/stop/print exit 2 with NO docker call (stop never guesses a port);
 #     status and logs fall back to ${PORT:-8000} and reach docker with that port
-#   - ANTHROPIC_BASE_URL without an explicit port: read_settings_file fails, so stop exits 2 (was: port 80)
+#   - ANTHROPIC_BASE_URL without a valid port (none, 0, 70000, abc): read_settings_file fails, so stop exits 2
+#     (was: port 80 for none)
 #   - a valid file: stop reaches docker on the port the starter resolves (file and PORT agree here: the
 #     vLLM starters let the file win, the radiance ones PORT -- an open owner decision)
 # GPU-free and docker-free: a logging stub docker (exit 1) is first on PATH and DOCKER_HOST points nowhere.
@@ -29,6 +30,9 @@ PY
 }
 settings "http://127.0.0.1:$P" "$TMP/valid.json"
 settings "http://127.0.0.1" "$TMP/noport.json"
+settings "http://127.0.0.1:0" "$TMP/port0.json"
+settings "http://127.0.0.1:70000" "$TMP/port70000.json"
+settings "http://127.0.0.1:abc" "$TMP/portabc.json"
 run() {   # SETTINGS ACTION STARTER -> rc in $rc, docker calls in $calls
   : > "$TMP/calls.log"
   SETTINGS=$1 PORT=$P bash "$3" "$2" </dev/null >"$TMP/out" 2>&1; rc=$?
@@ -46,8 +50,10 @@ for s in "$ROOT/stack/serve/vllm/start_heretic_27b.sh" "$ROOT/stack/serve/vllm/s
   [ "$rc" -ne 2 ] && grep -q -- "-$P" <<<"$calls" && ok "missing file: status falls back to PORT=$P" || bad "missing file: status rc=$rc calls=[$calls]"
   run "$TMP/missing.json" logs "$s"
   [ "$rc" -ne 2 ] && grep -q -- "-$P" <<<"$calls" && ok "missing file: logs falls back to PORT=$P" || bad "missing file: logs rc=$rc calls=[$calls]"
-  run "$TMP/noport.json" stop "$s"
-  [ "$rc" -eq 2 ] && [ -z "$calls" ] && ok "URL without a port: stop exits 2, no docker call" || bad "URL without a port: stop rc=$rc calls=[$calls]"
+  for b in noport port0 port70000 portabc; do
+    run "$TMP/$b.json" stop "$s"
+    [ "$rc" -eq 2 ] && [ -z "$calls" ] && ok "$b URL: stop exits 2, no docker call" || bad "$b URL: stop rc=$rc calls=[$calls]"
+  done
   run "$TMP/valid.json" stop "$s"
   grep -q -- "-$P" <<<"$calls" && ok "valid file: stop reaches docker on port $P" || bad "valid file: stop rc=$rc calls=[$calls]"
 done
