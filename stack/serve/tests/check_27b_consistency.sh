@@ -5,6 +5,7 @@
 #   1. syntax: every shell file the refactor touches parses (bash -n, + shellcheck if installed)
 #   2. the convention lives ONCE in stack/serve/27b.conf — no hardcoded 262000 / MAXSEQS=1 copies
 #      in any 27B starter or launcher (non-comment lines only)
+#   2b. the pinned .rad snapshot path: the four effective RAD_FILE defaults are identical and non-empty (sed only)
 #   3. every 27B starter RESOLVES to the convention — via its GPU-free `print` mode (the resolved
 #      docker argv). Ornith (35B) is a negative check: it must keep its own 262144/3, not the conf.
 #   4. the claude settings files: exactly one compaction knob (window - max output = 205000), served
@@ -60,16 +61,21 @@ fi
 
 echo "== 2b. the pinned .rad snapshot path is one path across its four launchers =="
 # effective default of one launcher: the claude-rad-*.sh RAD_FILE default, or (radiance starter) MODEL_DIR default + RAD_FILE tail.
-# Compared to each other, never to a literal: a deliberate move of the snapshot is one edit per file.
+# The four effective defaults must agree with each other, never with a literal. NOT covered: (a) the same hash also sits in comments and records
+# (launcher comments, starter fetch header, radiance/UPGRADES.md, 27b-arms-kld run.sh); (b) an unconditional RAD_FILE= after a default (none today).
 snap_default() {
-  local d; d=$(sed -n 's/^MODEL_DIR=\${MODEL_DIR:-\(.*\)}$/\1/p' "$1")
-  if [ -n "$d" ]; then echo "$d$(sed -n 's/^RAD_FILE=\${RAD_FILE:-\$MODEL_DIR\(.*\)}$/\1/p' "$1")"; else sed -n 's/^: "\${RAD_FILE:=\(.*\)}"$/\1/p' "$1"; fi
+  local d t; d=$(sed -n 's/^MODEL_DIR=\${MODEL_DIR:-\(.*\)}$/\1/p' "$1")
+  if [ -n "$d" ]; then t=$(sed -n 's/^RAD_FILE=\${RAD_FILE:-\$MODEL_DIR\(.*\)}$/\1/p' "$1"); [ -n "$t" ] && echo "$d$t"; else sed -n 's/^: "\${RAD_FILE:=\(.*\)}"$/\1/p' "$1"; fi
 }
 SNAP=("$APRIV/claude-rad-iq4rlv4.sh" "$APRIV/claude-rad-iq4rlv4-dflash.sh" "$APRIV/claude-rad-iq4rlv4-nospec.sh" "$ROOT/stack/serve/radiance/start_qwen38_27b_iq4r-l-v4_rad.sh")
-snap_ref=$(for f in "${SNAP[@]}"; do snap_default "$f"; done | sort | uniq -c | sort -rn | head -1 | sed 's/^ *[0-9]* //')
+snap_val=(); for f in "${SNAP[@]}"; do snap_val+=("$(snap_default "$f")"); done
 snap_bad=0
-for f in "${SNAP[@]}"; do p=$(snap_default "$f"); [ -n "$p" ] && [ "$p" = "$snap_ref" ] || { bad "pinned .rad path: $(basename "$f") = '${p:-<no RAD_FILE default>}' (reference: '$snap_ref')"; snap_bad=1; }; done
-[ "$snap_bad" = 0 ] && ok "pinned .rad snapshot path agrees across the four launchers"
+for p in "${snap_val[@]}"; do [ -n "$p" ] && [ "$p" = "${snap_val[0]}" ] || snap_bad=1; done
+if [ "$snap_bad" = 0 ]; then ok "pinned .rad snapshot path agrees across the four launchers"
+else
+  bad "pinned .rad snapshot path: the four effective defaults are not identical and non-empty (each below)"
+  for i in "${!SNAP[@]}"; do echo "  $(basename "${SNAP[$i]}") = '${snap_val[$i]:-<no parsable RAD_FILE default>}'" >&2; done
+fi
 
 echo "== 3. every 27B starter resolves to the convention (GPU-free print modes) =="
 has_flag() { if grep -q -- "$2" <<<"$1"; then ok "$3"; else bad "$3 — resolved argv lacks '$2'"; fi; }
