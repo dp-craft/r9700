@@ -301,7 +301,7 @@ running_model() {   # what the server on $PORT actually serves (empty if not hea
 }
 if container_exists && ! running; then
   echo "$NAME is a dead leftover (crashed boot or host restart) -- removing it + its state file" >&2
-  docker rm -f "$NAME" >/dev/null 2>&1; rm -f "$CFILE"
+  timeout 60 docker rm -f "$NAME" >/dev/null 2>&1; rm -f "$CFILE"
 fi
 if [ -f "$CFILE" ] && ! container_exists; then rm -f "$CFILE"; fi   # stale state without a container
 
