@@ -50,6 +50,7 @@ import json
 import math
 import os
 import random
+import re
 import sys
 import time
 import urllib.error
@@ -68,6 +69,34 @@ def _mass(entries):
     return sum(math.exp(lp) for _, lp in entries)
 
 
+SPECIAL_BUCKET = "<special>"
+_SPECIAL_RE = re.compile(r"<\|[^|<>]*\|>|<tts_[A-Za-z_]+>")
+
+
+def canon_tok(tok):
+    """One string per token across engines. llama.cpp renders control specials (<|im_end|>, <|endoftext|>…) as ''
+    and vLLM/Radiance as their text, so every special — and '' — maps to one bucket. 2026-11-12: string keys made
+    the q8 self-floor read 0.11 nats/tok (several '' in one top-20 collided in a dict) and charged ~20 nats at
+    every end-of-turn position across engines. Non-special added tokens (<think>, <tool_call>) keep their text."""
+    if not isinstance(tok, str):
+        return tok                        # token ids (synthetic fixtures) are already unambiguous
+    return SPECIAL_BUCKET if tok == "" or _SPECIAL_RE.fullmatch(tok) else tok
+
+
+def canon_top(top):
+    """A top-k list over canonical tokens: entries that share a canonical string merge by logsumexp (a coarser
+    event space applied identically to both sides, so the KL stays a lower bound). Sorted by logprob, descending."""
+    m = {}
+    for tok, lp in top:
+        t = canon_tok(tok)
+        if t in m:
+            hi, lo = max(m[t], lp), min(m[t], lp)
+            m[t] = hi + math.log1p(math.exp(lo - hi))
+        else:
+            m[t] = lp
+    return sorted(m.items(), key=lambda kv: -kv[1])
+
+
 def kl_position(ref_top, arm_top):
     """KL(ref ‖ arm) at one position (sly kv4/kl_compare.py, a lower bound, clamped ≥ 0).
 
@@ -75,6 +104,7 @@ def kl_position(ref_top, arm_top):
     list of (token, logprob) — the arm's top-20. Returns (kl, ref_mass, arm_mass): kl in
     nats; masses = each side's top-20 coverage (the resolution statistic, r2 §4).
     """
+    ref_top, arm_top = canon_top(ref_top), canon_top(arm_top)
     arm_map = dict(arm_top)
     floor = min(lp for _, lp in arm_top)
     ref_mass = _mass(ref_top)
@@ -335,11 +365,28 @@ def _content_ids(lp):
     return ids if ids and all(isinstance(i, int) for i in ids) else None
 
 
-def forced_positions(n, k=FORCED_K):
-    """k evenly spaced positions over a reference continuation of n tokens (all of them when n <= k)."""
-    if n <= k:
-        return list(range(n))
-    return sorted({round(j * (n - 1) / (k - 1)) for j in range(k)})
+POSITION_RULE = "skip-partial-utf8-v1"
+
+
+def partial_utf8_positions(ref_pos):
+    """Reference positions whose chosen token or top-1 alternative is a partial UTF-8 byte ('\ufffd').
+    2026-11-12 (q8f, calibration v2): llama.cpp answers max_tokens=1 at such a position with NO logprobs
+    (it holds the incomplete character back), and every partial byte prints as the same '\ufffd' string,
+    so those rows can neither be fetched nor matched. They are left out of the forced positions."""
+    bad = set()
+    for i, (tok, top) in enumerate(ref_pos):
+        if "\ufffd" in (tok or "") or (top and "\ufffd" in (top[0][0] or "")):
+            bad.add(i)
+    return bad
+
+
+def forced_positions(n, k=FORCED_K, skip=None):
+    """k evenly spaced positions over a reference continuation of n tokens, leaving out `skip`
+    (all remaining positions when ≤ k are left)."""
+    valid = [i for i in range(n) if not skip or i not in skip]
+    if len(valid) <= k:
+        return valid
+    return sorted({valid[round(j * (len(valid) - 1) / (k - 1))] for j in range(k)})
 
 
 def _tokenize(url, model, text):
@@ -384,7 +431,7 @@ def fetch_forced(url, model, prompts, refs, k=FORCED_K, timeout=1800, reuse=None
             if ref.get("prompt_tokens") is not None and ref["prompt_tokens"] != len(pids):
                 raise RuntimeError(f"tokenizer mismatch: {len(pids)} prompt ids here vs "
                                    f"{ref['prompt_tokens']} in the reference")
-            positions = forced_positions(len(rids), k)
+            positions = forced_positions(len(rids), k, skip=partial_utf8_positions(ref["pos"]))
             rows = []
             for i in positions:
                 sent = pids + rids[:i]
@@ -494,7 +541,7 @@ def calibration_ids(path):
     return [json.loads(l)["id"] for l in open(path, encoding="utf-8") if l.strip()]
 
 
-FORCED_KEY_FIELDS = ("mode", "ref_sha256", "positions")
+FORCED_KEY_FIELDS = ("mode", "ref_sha256", "positions", "position_rule")
 
 
 def cache_key(calibration, limit, max_tokens, model, image, forced_ref=None, positions=None):
@@ -502,14 +549,15 @@ def cache_key(calibration, limit, max_tokens, model, image, forced_ref=None, pos
     max_tokens, TOP_K, served model, image. Stored in <out>.key.json; a cache is reused only on an
     exact match (2026-11-11: a KLD_N=2 file must never be reused by an N=16/128 run).
     forced_ref (teacher-forced fetch): adds mode "forced", the reference file's sha256 and the positions
-    per prompt; a greedy key has no `mode` field (its bytes are unchanged) and reads as "greedy"."""
+    per prompt, and the position rule; a greedy key has no `mode` field (its bytes are unchanged) and reads as "greedy"."""
     ids = calibration_ids(calibration)
     n = len(ids) if limit is None else min(int(limit), len(ids))
     key = {"n": n, "calibration_sha256": hashlib.sha256(open(calibration, "rb").read()).hexdigest(),
            "max_tokens": int(max_tokens), "top_k": TOP_K, "model": model, "image": image}
     if forced_ref is not None:
         key.update({"mode": "forced", "ref_sha256": hashlib.sha256(open(forced_ref, "rb").read()).hexdigest(),
-                    "positions": int(positions if positions is not None else FORCED_K)})
+                    "positions": int(positions if positions is not None else FORCED_K),
+                    "position_rule": POSITION_RULE})
     return key
 
 
@@ -819,11 +867,12 @@ def score_forced(ref_blocks, arm_blocks, label, ref_label):
             kl, _rm, _am = kl_position(rtop, atop)
             block.append(kl)
             pooled.append(kl)
-            if max(rtop, key=lambda kv: kv[1])[0] == max(atop, key=lambda kv: kv[1])[0]:
+            arm_lens.append(len(atop))
+            rtok, rtop, atop = canon_tok(rtok), canon_top(rtop), canon_top(atop)
+            if rtop[0][0] == atop[0][0]:
                 top1 += 1
             amap = dict(atop)
-            dnll.append(dict(rtop).get(rtok, min(v for _, v in rtop)) - amap.get(rtok, min(v for _, v in atop)))
-            arm_lens.append(len(atop))
+            dnll.append(dict(rtop).get(rtok, rtop[-1][1]) - amap.get(rtok, atop[-1][1]))
             keys = set(amap)
             ref_missing += sum(1 for t, _ in rtop if t not in keys)
             ref_entries += len(rtop)
@@ -851,6 +900,46 @@ def score_forced(ref_blocks, arm_blocks, label, ref_label):
         "ref_missing_frac": round(ref_missing / ref_entries, 6) if ref_entries else None,
         "lower_bound_note": "KL is a lower bound: reference top-20 support, floor for tokens missing "
                             "from the arm top-20, lumped tail bucket, clamped ≥ 0 (sly kv4/kl_compare.py)",
+    }
+
+
+def score_forced_diff(ref_blocks, a_blocks, b_blocks, label_a, label_b, ref_label):
+    """Paired difference KL(ref‖a) − KL(ref‖b) of two teacher-forced arms, position by position (both arms saw the
+    SAME contexts), cluster bootstrap by prompt. Cancels the "this prompt is hard for everyone" variance that two
+    separate CIs carry, so it resolves close pairs that overlapping per-arm CIs cannot. A prompt errored in either
+    arm (or the reference) is excluded and counted (rule 18)."""
+    if not (len(ref_blocks) >= len(a_blocks) == len(b_blocks)):
+        raise ValueError(f"prompt counts: ref {len(ref_blocks)}, a {len(a_blocks)}, b {len(b_blocks)}")
+    blocks, ka, kb, n_err, a_lower, used = [], [], [], 0, 0, 0
+    for rb, ab, bb in zip(ref_blocks, a_blocks, b_blocks):
+        if not (rb.get("id") == ab.get("id") == bb.get("id")):
+            raise ValueError(f"prompt id order mismatch: {rb.get('id')} / {ab.get('id')} / {bb.get('id')}")
+        if rb.get("error") or ab.get("error") or bb.get("error"):
+            n_err += 1
+            continue
+        if list(ab["positions"]) != list(bb["positions"]):
+            raise ValueError(f"{ab['id']}: the two arms were forced at different positions")
+        d, sa, sb = [], 0.0, 0.0
+        for i, (_ta, atop), (_tb, btop) in zip(ab["positions"], ab["pos"], bb["pos"]):
+            if not 0 <= i < len(rb["pos"]):
+                raise ValueError(f"{ab['id']}: position {i} outside the reference ({len(rb['pos'])} tokens)")
+            rtop = rb["pos"][i][1]
+            x, y = kl_position(rtop, atop)[0], kl_position(rtop, btop)[0]
+            d.append(x - y); ka.append(x); kb.append(y); sa += x; sb += y
+        if d:
+            blocks.append(d); used += 1
+            a_lower += sa < sb
+    if not blocks:
+        raise ValueError("no scored positions (all prompts failed or empty)")
+    mean, lo, hi = cluster_bootstrap_ci(blocks)
+    verdict = f"{label_a} lower" if hi < 0 else f"{label_b} lower" if lo > 0 else "not resolved"
+    return {
+        "kind": "kld_forced_diff", "label_a": label_a, "label_b": label_b, "reference_label": ref_label,
+        "n_prompts_used": used, "n_prompt_errors": n_err, "n_positions": len(ka),
+        "kl_a": round(sum(ka) / len(ka), 6), "kl_b": round(sum(kb) / len(kb), 6),
+        "diff_nats_per_tok": round(mean, 6), "ci95_nats": [round(lo, 6), round(hi, 6)],
+        "ci_method": "cluster bootstrap of the per-position difference (block=prompt, B=2000, percentile 95%)",
+        "verdict": verdict, "frac_prompts_a_lower": round(a_lower / used, 5),
     }
 
 
@@ -994,6 +1083,15 @@ def main():
     sf.add_argument("--ref-label", required=True)
     sf.add_argument("--out", required=True)
 
+    sd = sub.add_parser("score-forced-diff", help="paired KL difference of two forced arms on the same reference")
+    sd.add_argument("--ref", required=True)
+    sd.add_argument("--arm-a", required=True)
+    sd.add_argument("--arm-b", required=True)
+    sd.add_argument("--label-a", required=True)
+    sd.add_argument("--label-b", required=True)
+    sd.add_argument("--ref-label", required=True)
+    sd.add_argument("--out", required=True)
+
     mx = sub.add_parser("matrix", help="kld-pair-*.json in --dir → pairwise markdown table")
     mx.add_argument("--dir", required=True)
     mx.add_argument("--out", required=True)
@@ -1059,6 +1157,14 @@ def main():
             print(f"  first error ({first['id']}): {first['error']}")
         if len(errs) == len(blocks):
             sys.exit(1)
+    elif a.cmd == "score-forced-diff":
+        res = score_forced_diff(_read_jsonl(a.ref), _read_jsonl(a.arm_a), _read_jsonl(a.arm_b),
+                                a.label_a, a.label_b, a.ref_label)
+        with open(a.out, "w") as f:
+            json.dump(res, f, indent=2)
+            f.write("\n")
+        print(f"{a.label_a} − {a.label_b} (forced, vs {a.ref_label}): {res['diff_nats_per_tok']} "
+              f"[{res['ci95_nats'][0]}, {res['ci95_nats'][1]}] -> {res['verdict']} -> {a.out}")
     elif a.cmd == "score-forced":
         res = score_forced(_read_jsonl(a.ref), _read_jsonl(a.arm), a.label, a.ref_label)
         with open(a.out, "w") as f:

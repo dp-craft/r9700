@@ -1,0 +1,10 @@
+  WARN (rule 15b): arm q8 residency 0.00 GiB < INFERRED floor 16.4 GiB — see /home/dev/work/dp-craft/amd/campaigns/perf/2026-11-09-1825-27b-arms-kld/tmp/runs/forced-20261112-093746/results/residency-q8.txt
+  WARN (rule 15b): arm q8f residency 0.00 GiB < INFERRED floor 16.4 GiB — see /home/dev/work/dp-craft/amd/campaigns/perf/2026-11-09-1825-27b-arms-kld/tmp/runs/forced-20261112-093746/results/residency-q8f.txt
+  FAILED: d-10k-tg512-n1
+  FAILED: d-20k-tg512-n1
+  FAILED: d-50k-tg512-n1
+  FAILED: d-100k-tg512-n1
+  FAILED: d0-100k-tg512-n1
+  WARN (rule 15b): arm q8f residency 0.00 GiB < INFERRED floor 16.4 GiB — see /home/dev/work/dp-craft/amd/campaigns/perf/2026-11-09-1825-27b-arms-kld/tmp/runs/forced-20261112-093746/results/residency-q8f-2.txt
+SERVER-FAILED: radiance arm a (image=stilldeadcode/radiance:1.11.0) start_rc=1 waited_s=41 boot tail: /home/dev/work/dp-craft/amd/campaigns/perf/2026-11-09-1825-27b-arms-kld/tmp/runs/forced-20261112-093746/tmp/boot-a.txt
+  WARN (rule 15b): arm q4kxl residency 0.00 GiB < INFERRED floor 16.4 GiB — see /home/dev/work/dp-craft/amd/campaigns/perf/2026-11-09-1825-27b-arms-kld/tmp/runs/forced-20261112-093746/results/residency-q4kxl.txt

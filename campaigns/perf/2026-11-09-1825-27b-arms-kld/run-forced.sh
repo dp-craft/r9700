@@ -15,6 +15,8 @@
 #      d      RedHat-MXFP4 @ sly 1.11.0, DFlash k=7 (arm D)        + depth cells 10k/20k/50k/100k
 #      d0     d without DFlash (profile sly-redhat/redhat-mxfp4)   + depth cells
 #      dfh    d0 with a full-precision lm head (sly-redhat/redhat-mxfp4-fullhead), KLD only, ctx 8192
+#      d0f    d0 again (fresh boot), KLD only                     -> vLLM boot noise floor (2026-11-12)
+#      bf     b again (fresh boot), KLD only                      -> radiance boot noise floor (2026-11-12)
 #      a b c c0 q4kxl q6k   as in run-compare.sh                 + depth cells
 #      q4mtp  q4kxl with MTP=1, KLD only: a GREEDY fetch of the first DIAG_N prompts
 #    DIAG_ARMS (d d0 c c0 q4kxl) also get a greedy fetch of the first DIAG_N prompts (kld-<arm>-greedy.jsonl):
@@ -29,8 +31,8 @@ set -uo pipefail
 HERE="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 ARMS="${ARMS:-q8 q8f d d0 dfh a b c c0 q4kxl q4mtp q6k e}"
 for _a in $ARMS; do
-  case "$_a" in q8|q8f|d|d0|dfh|a|b|c|c0|q4kxl|q4mtp|q6k|e) ;;
-    *) echo "unknown arm '$_a' (only: q8 q8f d d0 dfh a b c c0 q4kxl q4mtp q6k e)" >&2; exit 1 ;; esac
+  case "$_a" in q8|q8f|d|d0|d0f|dfh|a|b|bf|c|c0|q4kxl|q4mtp|q6k|e) ;;
+    *) echo "unknown arm '$_a' (only: q8 q8f d d0 d0f dfh a b bf c c0 q4kxl q4mtp q6k e)" >&2; exit 1 ;; esac
 done
 RUN_TAG="${RUN_TAG:-forced-$(date +%Y%m%d-%H%M%S)}"; export RUN_TAG
 export KLD_N="${KLD_N:-128}" REPS="${REPS:-2}" DEPTH=1
@@ -39,7 +41,7 @@ export KLD_CAL="${KLD_CAL:-$HERE/inputs/calibration-v2-prompts.jsonl}"
 if [ -z "${ONLY:-}" ]; then
   _o=""; for _a in $ARMS; do
     case "$_a" in
-      q8f|dfh|q4mtp|e) ;;                                                    # KLD only
+      q8f|d0f|dfh|bf|q4mtp|e) ;;                                             # KLD only
       q8) _o="$_o,q8-10k-tg512-n1,q8-20k-tg512-n1" ;;                        # ctx 32768
       *)  _o="$_o,$_a-10k-tg512-n1,$_a-20k-tg512-n1,$_a-50k-tg512-n1,$_a-100k-tg512-n1" ;;
     esac; done
@@ -102,9 +104,11 @@ for _a in $ARMS; do
     q8f)   KLD_ONLY=1 LLAMA_KV=f16 LLAMA_CTX=32768 LLAMA_NP=1 arm_llama q8f "$GGUF_Q8" qwen38-27b-q8 ;;
     d)     arm_d ;;
     d0)    arm_sly_kld d0 d0-redhat-sly1100 110000 2 qwen38-27b-redhat-mxfp4-sly 1 ;;
+    d0f)   arm_sly_kld d0f d0-redhat-sly1100 110000 2 qwen38-27b-redhat-mxfp4-sly ;;   # vLLM floor: d0 re-boot
     dfh)   arm_sly_kld dfh dfh-redhat-sly1100 8192 1 qwen38-27b-redhat-mxfp4-fullhead ;;
     a)     arm_rad a  "$IMG_RAD_A"  "$RAD_MXFP4" qwen38-27b-mxfp4 ;;
     b)     arm_rad b  "$IMG_RAD_BC" "$RAD_MXFP4" qwen38-27b-mxfp4 ;;
+    bf)    KLD_ONLY=1 arm_rad bf "$IMG_RAD_BC" "$RAD_MXFP4" qwen38-27b-mxfp4 ;;     # radiance floor: b re-boot
     c)     arm_rad c  "$IMG_RAD_BC" "$RAD_IQRV4" qwen38-27b-iq4r-l-v4 ;;
     c0)    arm_rad c0 "$IMG_RAD_BC" "$RAD_IQRV4" qwen38-27b-iq4r-l-v4 0 ;;
     q4kxl) arm_llama q4kxl "$GGUF_Q4KXL" qwen38-27b-ud-q4kxl ;;

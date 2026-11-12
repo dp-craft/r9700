@@ -20,6 +20,41 @@ def lp(p):
     return math.log(p)
 
 
+class TestCanonicalTokens(unittest.TestCase):
+    """2026-11-12: llama.cpp renders control specials as '' and vLLM as '<|im_end|>'; several '' entries in one
+    top-20 collided in a dict (the q8 self-floor read 0.11 nats/tok, ~20 nats at each end-of-turn position)."""
+    def test_canon_tok(self):
+        for s in ("", "<|im_end|>", "<|endoftext|>", "<tts_pad>"):
+            self.assertEqual(K.canon_tok(s), K.SPECIAL_BUCKET)
+        for s in ("<tool_call>", "</think>", "\n", "|", "<|", "a"):
+            self.assertEqual(K.canon_tok(s), s)
+
+    def test_canon_top_merges_duplicates_by_logsumexp(self):
+        top = K.canon_top([("", math.log(0.5)), ("x", math.log(0.2)), ("<|im_end|>", math.log(0.25))])
+        self.assertEqual([t for t, _ in top], [K.SPECIAL_BUCKET, "x"])
+        self.assertAlmostEqual(math.exp(top[0][1]), 0.75)
+
+    def test_duplicate_empty_strings_do_not_inflate_kl(self):
+        ref = [("", -0.0001), ("\n", -9.0), ("", -25.0)]
+        self.assertLess(K.kl_position(ref, list(ref))[0], 1e-9)
+
+    def test_cross_engine_special_rendering_is_the_same_token(self):
+        ref = [("", -0.001), ("\n", -7.0)]
+        arm = [("<|im_end|>", -0.001), ("\n", -7.0)]
+        self.assertLess(K.kl_position(ref, arm)[0], 1e-9)
+
+    def test_score_forced_top1_and_missing_use_canonical_tokens(self):
+        ref = [{"id": "p1", "toks": [""], "ids": [5], "prompt_tokens": 3, "error": None,
+                "pos": [("", [("", -0.001), ("\n", -7.0)])]}]
+        arm = [{"id": "p1", "mode": "forced", "positions": [0], "error": None,
+                "pos": [("", [("<|im_end|>", -0.001), ("\n", -7.0)])]}]
+        r = K.score_forced(ref, arm, "x", "q8")
+        self.assertEqual(r["top1_agreement"], 1.0)
+        self.assertEqual(r["ref_missing_frac"], 0.0)
+        self.assertLess(r["kl_nats_per_tok"], 1e-6)
+        self.assertLess(abs(r["dnll_nats_per_tok"]), 1e-9)
+
+
 class TestKLPosition(unittest.TestCase):
     def test_two_token_hand_computed(self):
         # ref = (0.5, 0.5) over {a,b}; arm = (0.9, 0.1); full coverage both sides →
@@ -931,6 +966,19 @@ class TestForcedPositions(unittest.TestCase):
     def test_exactly_k(self):
         self.assertEqual(K.forced_positions(32, 32), list(range(32)))
 
+    def test_skip_excludes_and_respreads(self):
+        p = K.forced_positions(512, 32, skip={0, 511, 100})
+        self.assertEqual(len(p), 32)
+        self.assertFalse({0, 511, 100} & set(p))
+        self.assertEqual((p[0], p[-1]), (1, 510))
+        self.assertEqual(K.forced_positions(5, 32, skip={2}), [0, 1, 3, 4])
+
+    def test_partial_utf8_positions(self):
+        pos = [("a", [("a", -0.1)]), ("\ufffd", [("\ufffd", -0.2)]), ("b", [("\ufffd", -0.1), ("b", -0.3)]),
+               ("c", [("c", -0.1), ("\ufffd", -2.0)])]
+        # the chosen token or the top-1 alternative is a partial UTF-8 byte; a lower alternative is fine
+        self.assertEqual(K.partial_utf8_positions(pos), {1, 2})
+
 
 class _ForcedServer:
     """Loopback 'token model': /tokenize answers fixed prompt ids; /v1/completions takes an int-list
@@ -1034,6 +1082,15 @@ class TestFetchForced(unittest.TestCase):
         blk = self._run(_ForcedServer(llama_shape=True), _ref_block())
         self.assertIsNone(blk["error"])
         self.assertEqual(len(blk["pos"]), 4)
+
+    def test_partial_utf8_reference_positions_skipped(self):
+        ref = _ref_block()
+        ref["pos"][1] = ("\ufffd", [("\ufffd", -0.05), ("z", -3.0)])
+        srv = _ForcedServer()
+        blk = self._run(srv, ref)
+        self.assertIsNone(blk["error"])
+        self.assertEqual(blk["positions"], [0, 2, 3])
+        self.assertEqual(len(srv.completions()), 3)
 
     def test_positions_capped_at_k(self):
         srv = _ForcedServer()
@@ -1149,8 +1206,21 @@ class TestForcedCLI(unittest.TestCase):
         self.assertEqual(rows[0]["positions"], [0, 1, 2, 3])
         key = json.load(open(self.out + ".key.json"))
         self.assertEqual((key["mode"], key["positions"]), ("forced", 32))
+        self.assertEqual(key["position_rule"], K.POSITION_RULE)
         self.assertEqual(len(key["ref_sha256"]), 64)
         self.assertEqual(self._status(), 0)
+
+    def test_old_position_rule_cache_is_a_key_mismatch(self):
+        srv = _ForcedServer()
+        try:
+            self._forced(srv)
+        finally:
+            srv.close()
+        kp = self.out + ".key.json"
+        key = json.load(open(kp))
+        del key["position_rule"]   # a fetch made before the partial-UTF-8 skip rule
+        json.dump(key, open(kp, "w"))
+        self.assertEqual(self._status(), 2)
 
     def test_complete_forced_cache_is_not_rerequested(self):
         srv = _ForcedServer()
@@ -1194,6 +1264,57 @@ class TestForcedCLI(unittest.TestCase):
         self.assertEqual((r["kind"], r["label"], r["reference_label"], r["n_positions"]),
                          ("kld_forced", "x", "q8", 4))
 
+
+
+class TestScoreForcedDiff(unittest.TestCase):
+    """Paired difference of two forced arms on the SAME reference positions (user 2026-11-12: '128 + paired diff')."""
+    def setUp(self):
+        self.ref = [_ref_block(f"p{i}", ids=(10, 11)) for i in range(6)]
+        self.same = [_forced_block(b["id"], list(b["pos"])) for b in self.ref]
+        off = ("r10", [("z", -0.05), ("r10", -3.0)])
+        self.worse = [_forced_block(b["id"], [off, b["pos"][1]]) for b in self.ref]
+
+    def test_identical_arms_diff_zero_unresolved(self):
+        r = K.score_forced_diff(self.ref, self.same, self.same, "a", "b", "q8")
+        self.assertEqual(r["kind"], "kld_forced_diff")
+        self.assertAlmostEqual(r["diff_nats_per_tok"], 0.0, places=9)
+        self.assertEqual(r["verdict"], "not resolved")
+
+    def test_worse_arm_resolved_and_sign(self):
+        r = K.score_forced_diff(self.ref, self.worse, self.same, "worse", "same", "q8")
+        k = K.kl_position(self.ref[0]["pos"][0][1], [("z", -0.05), ("r10", -3.0)])[0]
+        self.assertAlmostEqual(r["diff_nats_per_tok"], round(k / 2, 6), places=6)
+        self.assertGreater(r["ci95_nats"][0], 0)
+        self.assertEqual(r["verdict"], "same lower")
+        self.assertEqual(r["frac_prompts_a_lower"], 0.0)
+        self.assertAlmostEqual(r["kl_a"] - r["kl_b"], r["diff_nats_per_tok"], places=5)
+
+    def test_prompt_errored_in_either_arm_excluded(self):
+        b = [dict(x) for x in self.same]
+        b[0]["error"] = "boom"
+        r = K.score_forced_diff(self.ref, self.worse, b, "a", "b", "q8")
+        self.assertEqual((r["n_prompts_used"], r["n_prompt_errors"]), (5, 1))
+
+    def test_order_mismatch_raises(self):
+        with self.assertRaises(ValueError):
+            K.score_forced_diff(self.ref, self.same, list(reversed(self.same)), "a", "b", "q8")
+
+    def test_different_positions_raise(self):
+        b = [_forced_block(x["id"], list(x["pos"]), positions=[1, 0]) for x in self.ref]
+        with self.assertRaises(ValueError):
+            K.score_forced_diff(self.ref, self.same, b, "a", "b", "q8")
+
+    def test_cli(self):
+        d = _scratch("forced-diff-cli")
+        files = {}
+        for name, blocks in (("ref", self.ref), ("a", self.worse), ("b", self.same)):
+            files[name] = os.path.join(d, f"{name}.jsonl")
+            with open(files[name], "w") as f:
+                f.writelines(json.dumps(x) + "\n" for x in blocks)
+        out = os.path.join(d, "diff.json")
+        _run_main(["score-forced-diff", "--ref", files["ref"], "--arm-a", files["a"], "--arm-b", files["b"],
+                   "--label-a", "a", "--label-b", "b", "--ref-label", "q8", "--out", out])
+        self.assertEqual(json.load(open(out))["verdict"], "b lower")
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

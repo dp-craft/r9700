@@ -50,6 +50,16 @@ ROOT="${ROOT:-$(git -C "$HERE" rev-parse --show-toplevel 2>/dev/null)}"
 [ -n "$ROOT" ] || { echo "run.sh: cannot find the repo root (git toplevel of $HERE) -- set ROOT=" >&2; exit 1; }
 CAMPAIGN_DIR="${CAMPAIGN_DIR:-$HERE}"
 mkdir -p "$CAMPAIGN_DIR" && CAMPAIGN_DIR="$(cd "$CAMPAIGN_DIR" && pwd)"
+# no parallel runs (2026-11-12): one run.sh / run-forced.sh / run-arm.sh per campaign at a time. A pid file, not
+# flock — a server launched from here would inherit the lock fd and hold it after the run exits.
+RUN_LOCK="$CAMPAIGN_DIR/tmp/run.lock"
+mkdir -p "$CAMPAIGN_DIR/tmp"
+_lock_pid=$(cat "$RUN_LOCK" 2>/dev/null || true)
+if [ -n "$_lock_pid" ] && [ "$_lock_pid" != "$$" ] && kill -0 "$_lock_pid" 2>/dev/null; then
+  echo "RUN REFUSED: pid $_lock_pid ($(ps -o args= -p "$_lock_pid" 2>/dev/null | cut -c1-80)) already runs this campaign ($RUN_LOCK)" >&2
+  exit 1
+fi
+echo "$$" > "$RUN_LOCK"
 # RUN_TAG (run-short.sh, or manually): isolates ALL outputs of this run in a unique dir under
 # the gitignored tmp/ so repeated runs never overwrite each other (done markers included —
 # a re-run with a new tag RE-DOES the cells, doubling the data; pin RUN_TAG to resume).
@@ -861,6 +871,9 @@ arm_d () {
   else
     echo "  KLD fetch skipped for arm D (selftest failed — logprobs unsupported?)"
   fi
+  # set, never inherit: run-forced.sh sources this file, so a llama arm before D left its own list
+  # exported and D's probes asked vLLM for the GGUF's served name -> 404 (2026-11-12)
+  export ENGINES_LIST="vllm-sly-redhat-redhat-mxfp4-dflash|http://localhost:8000/v1|qwen38-27b-redhat-mxfp4-dflash"
   arm_cells d
   stop_server
 }
