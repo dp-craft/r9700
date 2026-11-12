@@ -242,5 +242,16 @@ class Layout(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(self.camp, "results", "appendix.md")))
 
 
+class LabelDepth(unittest.TestCase):
+    def test_label_forms(self):
+        self.assertEqual(report.label_depth("cr8192"), 8192)
+        self.assertEqual(report.label_depth("llamacpp-d16384"), 16384)
+        self.assertEqual(report.label_depth("q8-10k-tg512-n1"), 10000)
+        self.assertEqual(report.label_depth("d0-100k-tg512-n1"), 100000)
+        self.assertEqual(report.label_depth("c0-20k-tg512"), 20000)
+        for lab in ("thinking", "agentic-c4", "q8-10k", None, 7):
+            self.assertIsNone(report.label_depth(lab), lab)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,1 @@
+q8 reference: identical copy (sha256 a804da5863b10251…) of results/forced-20261112-093746 run's kld-q8.jsonl; scores use that reference.

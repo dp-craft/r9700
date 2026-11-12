@@ -493,6 +493,21 @@ def loglog_fit(xs, ys):
     return round(k, 3), (round(1 - ss_res / ss_tot, 3) if ss_tot else 1.0), len(pts)
 
 
+def label_depth(lab):
+    """Prompt depth encoded in a throughput row label, or None.
+
+    "cr8192" (code-review fixture), "<engine>-d8192" (campaign depth rows), or
+    "<arm>-10k-tg512-n1" (engine-bench cell labels: depth in k tokens).
+    """
+    if not isinstance(lab, str):
+        return None
+    m = re.fullmatch(r"cr(\d+)|.+[-_](?:cr|d)(\d+)", lab)
+    if m:
+        return int(m.group(1) or m.group(2))
+    m = re.fullmatch(r".+?-(\d+)k-tg\d+(?:-.*)?", lab)
+    return int(m.group(1)) * 1000 if m else None
+
+
 def render_throughput(d):
     rows = load_jsonl(_find(d, "results.jsonl"))
     ag = [r for r in rows if r.get("kind") == "aggregate" and "error" not in r]
@@ -511,13 +526,8 @@ def render_throughput(d):
     S = slot_map(engines)
     files = OrderedDict()
 
-    # depth labels: "cr8192" (code-review fixture) or "<engine>-d8192" (campaign depth rows)
     def depth_of(r):
-        lab = r.get("label")
-        if not isinstance(lab, str):
-            return None
-        m = re.fullmatch(r"cr(\d+)|.+[-_](?:cr|d)(\d+)", lab)
-        return int(m.group(1) or m.group(2)) if m else None
+        return label_depth(r.get("label"))
 
     cr = [r for r in ag if depth_of(r) is not None]
     depths = sorted(d for d in {depth_of(r) for r in cr} if d is not None)

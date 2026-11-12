@@ -45,55 +45,182 @@ arm. The plan's earlier "45–70 min" covered cells + boots only (the KLD design
 
 ## KLD (WS3)
 
-`bench/perf/kld_probe.py` (math core TDD: `bench/perf/test_kld_probe.py`, 60/60 OK on synthetic
-fixtures). Method locked by `research/ws3-kld-r1.md` / `r2.md` (every choice sourced there):
+The final write-up is [`docs/findings/quality/2026-11-09-1825-27b-arms-kld.md`](../../../docs/findings/quality/2026-11-09-1825-27b-arms-kld.md).
+Every number below comes from it or from the score files it cites. Which arm to pick for which goal is its
+[§2.2](../../../docs/findings/quality/2026-11-09-1825-27b-arms-kld.md#22-decision-guide); per-arm pins, boot times and VRAM are its [§12.4](../../../docs/findings/quality/2026-11-09-1825-27b-arms-kld.md#124-per-arm-reproducibility-record-pins-boot-memory). "F1" is short for
+`results/forced-20261112-093746/` (the main batch) and "F2" for `results/forced-r2-20261112-200238/` (round 2).
 
-- **Mode — paired greedy continuation (r2 §2):** reference and each arm generate N=512 tokens at
-  temp 0 with `logprobs: 20`; positions pair **while the generated tokens match** (contexts then
-  identical by construction); the first-divergent position IS included (its context is still
-  identical), the rest of that prompt is dropped. **Radiance never returns prompt logprobs**
-  (1.17.0 `oai.cpp`: "never leave the card") — so prompt-scoring cannot be the uniform campaign
-  mode; it stays an optional labeled bonus pass on sly-served pairs (r2 §5.8), not mixed in.
-- **KL — sly `kv4/kl_compare.py` verbatim (r2 §3):** per position `KL(ref ‖ arm)` =
+### What KLD is, in plain words
+
+A language model writes one word-piece (a "token") at a time. Before each one, it gives every possible
+next token a probability, for example "`return` 70%, `if` 20%, `for` 5%, …". A compressed (quantized) copy of
+the model, or the same model on another engine, should give almost the same probabilities.
+
+**KLD (Kullback–Leibler divergence)** is one number for how far apart two of those probability lists are.
+Think of two weather forecasters. One says "70% rain, 20% cloud, 10% sun"; the other says "60% rain, 30% cloud,
+10% sun". They mostly agree, and KLD would be small. If the second said "10% rain, 80% sun", KLD would be large.
+KLD pays most attention to the outcomes the reference forecaster thinks likely. 0 means identical; bigger means
+more different. The unit is "nats per token", averaged over many steps.
+
+### How it works here
+
+- **One reference.** The Q8_0 model on llama.cpp (an 8-bit copy, very close to the original) is the yardstick.
+  It continues each test text with its single most likely token at every step, and records its top 20
+  candidates and their probabilities.
+- **Same questions for everyone.** Every other setup ("arm") gets exactly the same text, at exactly the same
+  points. This is **teacher forcing**: at each test point, the arm is shown the text plus the reference's own
+  continuation so far, and asked only "what comes next?". It never writes on its own, so it can never drift
+  onto a different path. Think of a driving examiner who puts every candidate at the same crossroads and asks
+  "which way?", instead of letting each one drive their own route.
+- **Compare and average.** At each point the arm's top 20 list is compared with the reference's, and the
+  KLD is averaged over all points.
+
+### What it needs
+
+- **A reference model** that every arm is compared against: Q8_0 on llama.cpp here.
+- **Log-probabilities ("logprobs") from the engine:** the engine must return its top 20 candidates with their
+  probabilities, as computed before any sampling settings are applied. All three engines (llama.cpp, Sly vLLM,
+  radiance) passed a live check of this at boot (MEASURED, `kld-selftest-*.json` in F1 and F2). llama.cpp's MTP
+  speed mode returns no logprobs for the tokens it accepts, so MTP could not be measured this way (CLAIMED,
+  llama.cpp source, per the engine audit).
+- **A fixed set of test texts** ("calibration v2"): 128 snippets cut mid-text so the model has something to
+  continue: 90 code (45 TypeScript, 45 Python), 14 prose (Markdown) and 24 chat turns (12 agentic, 12 tool use),
+  the chat ones in the production chat format (MEASURED, `inputs/calibration-v2-manifest.jsonl`). It replaced
+  v1, whose whole-file prompts made the model stop at once on 78 of 128 texts (CLAIMED, `run-forced.sh` header).
+  The file is hash-pinned, so every arm sees byte-identical prompts.
+
+### What was measured, and how
+
+- **12 arms** (quant × engine × setting): Q8_0 again, UD-Q4_K_XL on llama.cpp, IQ4R-L-V4 and Quark-MXFP4 on
+  radiance, RedHat-MXFP4 on Sly vLLM (with and without DFlash, with a full-precision output layer, and on the
+  older Sly 1.8.1), and the heretic fine-tune. The per-arm table is §2 of the report.
+- **128 prompts × 32 points = 4096 scored points per arm**, the same points for every arm, with 0 failed
+  prompts in every arm (MEASURED, `kldf2-*.json` in F1 and F2).
+- **Noise floors from re-runs:** the reference was run a second time on llama.cpp, and the vLLM and radiance
+  servers were each re-booted once and measured again. That shows how much of a number is just noise.
+
+### Why it is useful to us
+
+- **Choosing a quant, engine or setting without a slow quality campaign.** A forced KLD fetch is minutes per
+  arm (about 12–30 min for the vLLM arms: MEASURED, raw local file, not committed, the fetch-file mtimes in `tmp/runs/*/results/`, report §12.6), not a multi-task generation
+  run. It rules out clearly lossy options early: here it separated the two near-Q8 quants from the MXFP4 family.
+- **Catching silent quality loss from upgrades.** An engine upgrade can change outputs without any error. KLD
+  checks it directly: old minus new was +0.0023 for radiance 1.11.0 vs 1.17.0 and +0.0024 for Sly 1.8.1 vs 1.11.0
+  (the newer version is nominally closer to Q8_0), and neither is resolved from noise, while a single setting, the int4 output layer, showed a resolved cost of 0.0045
+  (MEASURED, F1 `kld-diffs.d/diff2-a-b.json`, `diff2-dfh-d0.json`; F2 `kld-diffs.d/diff2-d181-d.json`).
+
+### How reliable it is
+
+- **Noise floors are about 0.** Q8_0 re-run on llama.cpp: 0.0018. vLLM re-boot: +0.000004, with 4083 of 4096
+  points bit-identical. Radiance re-boot: exactly 0 (MEASURED, F1 `kldf2-q8f.json`, `diff2-d0f-d0.json`,
+  `diff2-bf-b.json`; the 4083 is MEASURED, raw local file, not committed, a recount of `tmp/runs/forced-20261112-093746/results/kld-d0.jsonl`
+  vs `kld-d0f.jsonl`).
+- **Every number has a 95% range** (confidence interval). It is computed by resampling whole prompts, because
+  points inside one text are not independent. Two arms are compared point by point on the same contexts, which
+  removes the "this text is hard for everyone" part. A difference whose range includes zero is "not resolved":
+  the data cannot tell the two apart.
+- **A scorer bug was found and fixed.** The first scoring gave the Q8_0 re-run 0.1106, 60× too high (MEASURED,
+  engine audit Q5, `research/ws3-kld-engine-logprob-audit-2026-11-12.md`). Engines spell control tokens such as "end of turn" differently, and every such point was
+  charged as a near-total disagreement. After the fix, all control tokens count as one shared "special" token on
+  both sides, and the re-run scores 0.0018 (MEASURED, F1 `kldf2-q8f.json`). Without the fix, every
+  cross-engine number would have been inflated.
+- **Only the top 20 candidates are compared.** Engines return only their top 20, so the rest is lumped into one
+  bucket. That makes the number slightly too low, roughly 5–15% (CLAIMED data from another tool, extrapolation
+  INFERRED), in the same direction for every arm. Rankings are kept; absolute values are not comparable with
+  other tools' KLD tables.
+- **KLD is not task accuracy.** It measures closeness to Q8_0, not whether the code is correct. Near the
+  reference, KLD stops predicting task scores (CLAIMED, arXiv 2606.19558). The test texts are also short
+  (246–4681 tokens, MEASURED, raw local file, not committed: `tmp/runs/forced-20261112-093746/results/kld-q8.jsonl`); long-context behaviour
+  is not covered.
+- **Compared with published numbers.** Unsloth publishes KLD for the same quant types against the original
+  BF16 weights (CLAIMED, https://unsloth.ai/docs/basics/dynamic-3.0-ggufs, read off charts). Our values have the
+  same size and the same ranking, but our UD-Q4_K_XL is about 2× theirs (0.0164 vs ≈0.0075). The main reason
+  (INFERRED): we measure the setup as it runs in production, so the compressed KV cache counts too, while
+  Unsloth measures the weights alone. Three additional arms (Q6 with q8_0 KV, Q6 with f16 KV, Q4_K_XL with f16 KV)
+  would split the two and answer "is arm c as close as a Q6?" (report §7.9 and §10 item 11).
+
+### How to read the numbers (this campaign)
+
+| KL nats/token | What it means here | Example in this campaign |
+|--:|---|---|
+| about 0.002 | measurement noise: the same model run twice | Q8_0 re-run, 0.0018 (MEASURED, F1 `kldf2-q8f.json`) |
+| about 0.008 | very close to the reference | IQ4R-L-V4 on radiance, arm c, 0.0079 (MEASURED, F1 `kldf2-c.json`) |
+| about 0.016 | close; a good 4-bit copy | UD-Q4_K_XL on llama.cpp, 0.0164 (MEASURED, F1 `kldf2-q4kxl.json`) |
+| 0.056–0.066 | clearly further away, about 7× arm c | every MXFP4 arm, on radiance and on both Sly versions (MEASURED, F1 `kldf2-{a,b,d,d0,dfh}.json`, F2 `kldf2-d181.json`) |
+| about 0.089 | a different model, not just a different copy | heretic fine-tune, arm e, 0.0887 (MEASURED, F1 `kldf2-e.json`) |
+
+![How far each arm is from Q8_0: KL and top-1 disagreement](results/kld-final/charts/kld-scorecard.svg)
+
+*All 12 arms on one chart, closest to Q8_0 at the top. Left: the dot is the score (mean KL), the shaded band its 95% range. Right: how often the top choice differs. Hollow dots and outlined bars are re-runs that show the noise floor. Details and the other charts are in the [report](../../../docs/findings/quality/2026-11-09-1825-27b-arms-kld.md).*
+
+Rules of thumb (INFERRED from the table above, valid for this test set only):
+- Below about 0.02, a quant behaves very much like Q8_0 here; task benchmarks decide between such options.
+- Around 0.06, the quant is measurably different; check task scores before relying on it.
+- Whether a *difference* between two arms is real depends on its paired range, not its size. Here +0.002 to
+  +0.003 changes were not resolved, while the 0.0045 output-layer cost was (MEASURED, F1 and F2 `kld-diffs.d/`).
+- Top-1 agreement is the easier companion number: how often both models pick the same next token. Arm c agrees
+  98.7% of the time (a different pick about once every 80 tokens); the MXFP4 arms 95.3–96.1% (about once every
+  21–26 tokens) (MEASURED, `kldf2-*.json`; "once every N" INFERRED as 1 / (1 − agreement)).
+
+### Technical details (operators)
+
+`bench/perf/kld_probe.py` (math core TDD: `bench/perf/test_kld_probe.py`, synthetic fixtures). Method first
+locked by `research/ws3-kld-r1.md` / `r2.md`; the 2026-11-12 forced batch changed the mode and the reference
+(user decisions "q8 should be the baseline", "option B teacher-forced", recorded in the `run-forced.sh` header).
+
+- **Mode — teacher-forced against q8 (current):** the q8 reference fetch is a temp-0 greedy continuation of up
+  to 512 tokens per prompt with `logprobs: 20` (`kld_probe.py fetch`). Each arm is then sent the prompt ids plus
+  the reference's first *i* generated ids as an int-list `/v1/completions` prompt, at `KLD_POSITIONS` (32)
+  evenly spaced *i* per prompt, `max_tokens 1, temperature 0, logprobs 20` (`kld_probe.py forced`). Every arm
+  is scored at the same positions. `POSITION_RULE = skip-partial-utf8-v1` drops positions whose token or top-1
+  alternative is a partial UTF-8 byte. Spec decoding is invisible in this mode (`max_tokens 1`); DFlash was
+  checked with a separate greedy on/off diagnostic (`DIAG_ARMS`, `DIAG_N` 16). **Historical:** the 2026-11-11
+  compare batch (`run-compare.sh`, `results/compare-20261111-210235/`) used *paired greedy continuation*
+  (positions pair while the generated tokens match, first divergence included) with the pre-fix scorer; it is
+  superseded (report §11). **Radiance never returns prompt logprobs** (1.17.0 `oai.cpp`: "never leave the
+  card"), so prompt-scoring cannot be the uniform mode.
+- **KL — sly `kv4/kl_compare.py` (r2 §3):** per position `KL(ref ‖ arm)` =
   `max(0, Σ_{t∈ref top-20} p_t·(r_t − a_t) + rt·ln(rt/at))` with a **floor** (arm's min top-20
-  logprob) for tokens missing from the arm's top-20 ⇒ the estimate is a **lower bound**; ε=1e-9.
-- **CI:** cluster bootstrap (block = prompt), B=2000, percentile 95 % (headline); pooled
-  1.96·SD/√n (sly convention) reported alongside as cross-check (synthetic study: pooled is ~1.46×
-  too narrow at intra-text ρ≈0.3). Per-1k segments of the pooled KL.
-- **Extras (r2 §3/§4):** paired dNLL, top-1 agreement over all generated positions, mean top-20
-  coverage (ref and arm), median/mean first-divergent position. **Noise floors must accompany every
-  number:** the A-vs-B pair (same checkpoint, radiance 1.11.0 vs 1.17.0) = engine-version floor; a
-  reference self-run bounds boot noise.
-- **Reference:** local FP8 `Qwen__Qwen3.8-27B-FP8@017b9c7a` (D8 — bf16 unavailable on this stack;
-  the limitation is stated in the report). One dedicated boot (profile `sly-radiance/qwen38-fp8`,
-  IMAGE pinned to 1.11.0 for logprob-semantics parity with arm D); its fetch cached in `tmp/`
-  (resumable). ref and arm D are same-engine ⇒ D's delta = quantization-only; A/B/C deltas also
-  carry the engine-family difference (r2 §5.1).
-- **Calibration set:** `inputs/calibration-prompts.jsonl` — file-head prompts (first `char_cut`
-  chars of a corpus file, raw text, NO chat template: templates differ between engine families and
-  would break pairing) from `bench/workloads/corpus/`, ~96–160 prompts × 200–2000-token heads
-  (code-dominated mix, r2 §3-item-5; target n ≈ 20k paired positions ⇒ 95 % half-width ≈ 1.6e-4
-  nats/tok). **Hash-pinned**: `inputs/calibration-manifest.jsonl` (per-source sha256 + bytes + cut)
-  + `inputs/calibration.sha256` over the prompts file. Selection rule (deterministic, no randomness):
-  per corpus dir (`py-rich`, `ts-agentic-code-runner`), all `.py`/`.ts` files ≥ 800 B, sorted
-  lexicographically by full path, first 64 each → **128 prompts** (64/64), ids `cal-001…cal-128` in
-  global sorted order, char_cut = min(bytes, 8000) — heads ≈ 828–8000 chars ≈ 207–2000 tokens
-  (token estimate at 4 chars/tok; the manifest pins bytes, not tokens).
-- **Live selftest per engine family (r2 §2, 5 checks):** first radiance boot (arm A) AND first sly
-  boot (arm D): (1) `logprobs:20` shape, (2) `prompt_logprobs` availability (informational),
-  (3) `/tokenize` ids recorded (`ids` or `tokens` key; `prompt` or `content` body) — the enforced
-  tokenizer guard is at score time: every report carries `tokenizer_check`, the per-prompt
-  `usage.prompt_tokens` of ref vs arm (`ok` | `MISMATCH` with the prompt ids | `unavailable`),
-  (4) logprobs identical at temp 0 vs 1 (raw distribution), (5) every sly fetch (D, E, reference) —
-  no `RADIANCE_LMHEAD_INT2` (other than `=0`) in the live `vllm-8000` container env (`docker inspect`;
-  the two-stage greedy head returns garbage non-winner logprobs) — checked in `kld_fetch`, which
-  refuses the fetch otherwise. `RADIANCE_LMHEAD_FP8`/`INT4` (arm D's profile) are a full-row lm_head
-  quantization and are measured, not refused (verified in the 1.11.0 image source, 2026-11-11).
-  llama.cpp's `content`-style logprobs are normalized to the same rows (`normalize_logprobs`). A failed selftest aborts **the KLD pass only**, not the campaign;
-  logprobs-refusing arms fall out of the KLD pass with the reason recorded (r2 §5.2: arm A's
-  1.11.0 support is unverified — the selftest covers it at runtime).
-- KLD results land in `results/kld-<arm>.json` (the score compares each arm to the cached
-  reference fetch, same boots — one boot per arm).
+  logprob) for tokens missing from the arm's top-20 ⇒ the estimate is approximately a **lower bound**; ε=1e-9.
+  Since the 2026-11-12 scorer fix, both rows first pass `canon_top`: `''` and every `<|…|>` / `<tts_…>` special
+  map to one `<special>` bucket, and entries sharing a canonical string merge by logsumexp (report §7.5).
+- **CI:** cluster bootstrap (block = prompt), B=2000, percentile 95 %. Paired differences
+  (`score-forced-diff`) bootstrap the per-position difference; "resolved" only when the CI excludes 0. (The
+  pooled 1.96·SD/√n cross-check belongs to the greedy `score` mode; forced scores report the cluster CI only.)
+- **Extras (forced scores):** top-1 agreement, dNLL of the reference token, per-position median/p90/max,
+  `ref_missing_frac`, `arm_topk_short`. **Noise floors accompany every number:** q8f (llama.cpp re-run), d0f
+  (vLLM re-boot), bf (radiance re-boot). a vs b (radiance 1.11.0 vs 1.17.0) and d181 vs d (Sly 1.8.1 vs
+  1.11.0) are engine-version comparisons on the same weights.
+- **Reference:** unsloth `Qwen3.8-27B-Q8_0.gguf` on llama.cpp `latest-vulkan` (b11448), f16 KV, ctx 32768, 1
+  slot (arm `q8`, `run-forced.sh`). Its fetch is cached in `tmp/runs/<tag>/results/kld-q8.jsonl`; a later run
+  may reuse a byte-identical copy (round 2 did, `REFERENCE.txt`). **Historical:** the plan's reference was the
+  local FP8 `Qwen__Qwen3.8-27B-FP8@017b9c7a` on Sly 1.11.0 (D8; `KLD_FP8=1` in `run-compare.sh`); the forced
+  batch did not use it.
+- **Calibration set:** `inputs/calibration-v2-prompts.jsonl` (sha256 `1cbf84f1…921ad`, pinned in every key),
+  built by `bench/perf/kld_calibration.py` with deterministic mid-text cuts, per-prompt `kind` in
+  `inputs/calibration-v2-manifest.jsonl` (counts above). `run-forced.sh` uses it by default (`KLD_CAL`).
+  **Historical v1:** `inputs/calibration-prompts.jsonl` (sha256 `91dfac5a…b019a`, `inputs/calibration-manifest.jsonl`):
+  file-head prompts (first `char_cut` chars, raw text, NO chat template), per corpus dir (`py-rich`,
+  `ts-agentic-code-runner`) all `.py`/`.ts` files ≥ 800 B, sorted by full path, first 64 each → 128 prompts,
+  char_cut = min(bytes, 8000). Used by the short and compare runs.
+- **Live selftest per engine family (r2 §2, 5 checks):** at the first boot of each family: (1) `logprobs:20`
+  shape, (2) `prompt_logprobs` availability (informational), (3) `/tokenize` ids recorded (`ids` or `tokens` key;
+  `prompt` or `content` body) — in forced mode, every request also checks `usage.prompt_tokens == len(sent ids)`,
+  (4) logprobs identical at temp 0 vs 1 (raw distribution), (5) every sly fetch — no `RADIANCE_LMHEAD_INT2`
+  (other than `=0`) in the live `vllm-8000` container env (`docker inspect`; the two-stage greedy head returns
+  garbage non-winner logprobs) — checked in `kld_fetch`, which refuses the fetch otherwise.
+  `RADIANCE_LMHEAD_FP8`/`INT4` (arm D's profile) are a full-row lm_head quantization and are measured, not
+  refused (verified in the 1.11.0 image source, 2026-11-11). llama.cpp's `content`-style logprobs are normalized
+  to the same rows (`normalize_logprobs`). A failed selftest aborts **the KLD pass only**, not the campaign;
+  logprobs-refusing arms fall out of the KLD pass with the reason recorded.
+- **How to run:** `ARMS="…" bash run-forced.sh` (q8 first; `RUN_TAG=forced-<stamp>` to resume). Round 2 was
+  `ARMS=d181` (arm d's boot with `IMAGE=$IMG_SLY_E`, the 1.8.1 image; its boot name stays `d-redhat-sly1100`).
+- **Where results land:** raw fetches + cache keys → `tmp/runs/<tag>/results/kld-<arm>.jsonl(.key.json)`; the
+  driver's own scores → `kld-forced-<stamp>.d/kld-forced-<arm>-vs-q8.json` and `kld-diag-<stamp>.d/`. The
+  committed, authoritative scores are under `results/forced-<tag>/`: `kld-forced-final.d/kldf2-<arm>.json`
+  (per arm, fixed scorer) and `kld-diffs.d/diff2-<A>-<B>.json` (paired differences), made with
+  `kld_probe.py score-forced` / `score-forced-diff`. Main batch: `results/forced-20261112-093746/`; round 2:
+  `results/forced-r2-20261112-200238/`.
 
 ## WS7 prologue (sly 1.11.0 first boot)
 

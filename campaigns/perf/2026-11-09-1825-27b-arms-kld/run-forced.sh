@@ -17,6 +17,7 @@
 #      dfh    d0 with a full-precision lm head (sly-redhat/redhat-mxfp4-fullhead), KLD only, ctx 8192
 #      d0f    d0 again (fresh boot), KLD only                     -> vLLM boot noise floor (2026-11-12)
 #      bf     b again (fresh boot), KLD only                      -> radiance boot noise floor (2026-11-12)
+#      d181   d on the OLD sly 1.8.1 image (IMG_SLY_E), KLD only  -> engine effect, de-confounds e vs d (round 2)
 #      a b c c0 q4kxl q6k   as in run-compare.sh                 + depth cells
 #      q4mtp  q4kxl with MTP=1, KLD only: a GREEDY fetch of the first DIAG_N prompts
 #    DIAG_ARMS (d d0 c c0 q4kxl) also get a greedy fetch of the first DIAG_N prompts (kld-<arm>-greedy.jsonl):
@@ -31,8 +32,8 @@ set -uo pipefail
 HERE="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 ARMS="${ARMS:-q8 q8f d d0 dfh a b c c0 q4kxl q4mtp q6k e}"
 for _a in $ARMS; do
-  case "$_a" in q8|q8f|d|d0|d0f|dfh|a|b|bf|c|c0|q4kxl|q4mtp|q6k|e) ;;
-    *) echo "unknown arm '$_a' (only: q8 q8f d d0 d0f dfh a b bf c c0 q4kxl q4mtp q6k e)" >&2; exit 1 ;; esac
+  case "$_a" in q8|q8f|d|d0|d0f|d181|dfh|a|b|bf|c|c0|q4kxl|q4mtp|q6k|e) ;;
+    *) echo "unknown arm '$_a' (only: q8 q8f d d0 d0f d181 dfh a b bf c c0 q4kxl q4mtp q6k e)" >&2; exit 1 ;; esac
 done
 RUN_TAG="${RUN_TAG:-forced-$(date +%Y%m%d-%H%M%S)}"; export RUN_TAG
 export KLD_N="${KLD_N:-128}" REPS="${REPS:-2}" DEPTH=1
@@ -41,7 +42,7 @@ export KLD_CAL="${KLD_CAL:-$HERE/inputs/calibration-v2-prompts.jsonl}"
 if [ -z "${ONLY:-}" ]; then
   _o=""; for _a in $ARMS; do
     case "$_a" in
-      q8f|d0f|dfh|bf|q4mtp|e) ;;                                             # KLD only
+      q8f|d0f|d181|dfh|bf|q4mtp|e) ;;                                             # KLD only
       q8) _o="$_o,q8-10k-tg512-n1,q8-20k-tg512-n1" ;;                        # ctx 32768
       *)  _o="$_o,$_a-10k-tg512-n1,$_a-20k-tg512-n1,$_a-50k-tg512-n1,$_a-100k-tg512-n1" ;;
     esac; done
@@ -114,6 +115,7 @@ for _a in $ARMS; do
     q4kxl) arm_llama q4kxl "$GGUF_Q4KXL" qwen38-27b-ud-q4kxl ;;
     q4mtp) KLD_FORCED_REF='' KLD_N=$DIAG_N KLD_ONLY=1 LLAMA_MTP=1 arm_llama q4mtp "$GGUF_Q4KXL" qwen38-27b-ud-q4kxl-mtp ;;
     q6k)   arm_llama q6k "$GGUF_Q6K" qwen38-27b-ud-q6k ;;
+    d181)  IMAGE="$IMG_SLY_E" arm_sly_kld d181 d-redhat-sly1100 "$D_CTX" 2 qwen38-27b-redhat-mxfp4-dflash ;;  # d @ sly 1.8.1
     e)     arm_e ;;
   esac || echo "  arm $_a did not complete (see $RES/failures.txt) — continuing with the next arm"
 done
