@@ -73,6 +73,78 @@ def test_full_cold_boot():
     assert out["t0"].startswith("16:43:42")
 
 
+# Case 2: sly 1.11.0 dflash boot — real log shape from
+# campaigns/perf/2026-11-09-1825-27b-arms-kld tmp/runs/short-20261110-121812 (2026-11-10):
+#  - vLLM banner/timer lines are process-prefixed: (APIServer pid=1) / (EngineCore pid=339)
+#  - aiter build lines carry a [pid=.. pname=..] tag + ANSI color codes
+#  - uvicorn lines ("Application startup complete.", "GET /health ...") have NO in-message
+#    clock -> the docker ISO prefix (UTC, same instant) must serve as the fallback clock
+#  - the "JIT kernel warmup" line no longer exists in 1.11.0 (null + missing, not a crash)
+V110 = "\n".join([
+    L("2026-11-10T11:52:05.100000000Z",
+      "\x1b[1;38;5;39m┌─[ RADIANCE · GPU TOPOLOGY & BANDWIDTH (rocm-bandwidth-test) ]──\x1b[0m"),
+    L("2026-11-10T11:52:05.300000000Z", "RocmBandwidthTest Version: 2.6.0"),
+    L("2026-11-10T11:52:40.000000000Z",
+      "[aiter] [pid=1 pname=MainProcess] start build [module_aiter_core] under /opt/vllm/lib/python3.12/site-packages/aiter/jit/build/module_aiter_core"),
+    L("2026-11-10T11:53:08.600000000Z",
+      "[aiter] [pid=1 pname=MainProcess] \x1b[32mfinish build [module_aiter_core], cost 28.6s \x1b[0m"),
+    L("2026-11-10T11:53:28.000000000Z",
+      "(APIServer pid=1) INFO 11-10 11:53:28 [api_utils.py:347]  ▄▄ ▄█ version 0.32.0"),
+    L("2026-11-10T11:54:01.000000000Z",
+      "(APIServer pid=1) INFO 11-10 11:54:01 [base.py:280] Multi-modal warmup completed in 18.537s"),
+    L("2026-11-10T11:54:09.000000000Z",
+      "(EngineCore pid=339) INFO 11-10 11:54:09 [core.py:133] Initializing a V1 LLM engine (v0.32.0) with config: model='/model'"),
+    L("2026-11-10T11:55:10.000000000Z",
+      "(EngineCore pid=339) INFO 11-10 11:55:10 [model_runner.py:433] Model loading took 14.83 GiB memory and 59.457149 seconds"),
+    L("2026-11-10T11:55:12.000000000Z",
+      "(EngineCore pid=339) INFO 11-10 11:55:12 [monitor.py:62] [backbone] torch.compile took 0.82 s in total"),
+    L("2026-11-10T11:55:14.000000000Z",
+      "(EngineCore pid=339) INFO 11-10 11:55:14 [monitor.py:91] [backbone] Initial profiling/warmup run took 2.36 s"),
+    L("2026-11-10T11:55:18.000000000Z",
+      "(EngineCore pid=339) INFO 11-10 11:55:18 [model_runner.py:1136] Graph capturing finished in 1 secs, took 0.32 GiB"),
+    L("2026-11-10T11:55:22.000000000Z",
+      "(EngineCore pid=339) INFO 11-10 11:55:22 [core.py:395] init engine (profile, create kv cache, warmup model) took 12.52 s (compilation: 0.97 s)"),
+    # uvicorn lines: no in-message HH:MM:SS -> ISO-prefix fallback clock
+    L("2026-11-10T11:55:52.000000000Z", "INFO:     Application startup complete."),
+    L("2026-11-10T11:55:52.100000000Z",
+      'INFO:     172.17.0.1:39918 - "GET /health HTTP/1.1" 200 OK'),
+])
+
+
+def test_v110_dflash_boot():
+    out = W.parse(V110, 206)
+    sr, ch = out["self_reported_s"], out["chain_s"]
+    assert out["t0"].startswith("11:52:05")          # first ISO line (bandwidth banner)
+    assert sr["aiter_build_s"] == 28.6               # prefix + ANSI-tolerant
+    assert sr["mm_warmup_s"] == 18.54
+    assert sr["weight_gib"] == [14.83]
+    assert sr["weight_load_s"] == 59.46
+    assert sr["torch_compile_modules_s"] == [0.82]
+    assert sr["compilation_s"] == 0.97               # from the init-engine line
+    assert sr["profiling_warmup_s"] == 2.36
+    assert sr["graph_capture_s"] == 1.0
+    assert sr["engine_init_total_s"] == 12.52
+    assert sr["jit_kernel_warmup_s"] is None         # marker gone in 1.11.0
+    assert ch["entrypoint_to_cli_s"] == 83.0         # 11:52:05 -> 11:53:28 (banner)
+    assert ch["cli_to_engine_s"] == 41.0
+    assert ch["engine_to_done_s"] == 73.0
+    assert ch["done_to_health_s"] == 9.0             # 206 - 197
+    assert ch["chain_sum_s"] == 206.0 and ch["unaccounted_s"] == 0.0
+    assert out["cacheable_per_r2_s"] is None         # no JIT marker -> not computable
+    assert out["missing"] == ["jit_kernel_warmup_s"]
+    assert out["jit_monitor_warnings"] == 0 and out["memory_fault"] == 0
+
+
+def test_ansi_stripped_from_paths():
+    # ANSI codes must not leak into extracted values (AOT paths, timers).
+    log = "\n".join([
+        "INFO 11-10 09:00:01 [api_server.py:101] INFO Starting vLLM API server",
+        "INFO 11-10 09:01:00 [aot.py:77] saved AOT compiled function to \x1b[32m/root/.cache/vllm/model\x1b[0m",
+    ])
+    out = W.parse(log, 100)
+    assert out["aot_paths"] == ["/root/.cache/vllm/model"]
+
+
 def test_container_local_only():
     # No docker prefix: parser falls back to the container-local clock.
     log = "\n".join([

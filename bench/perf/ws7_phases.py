@@ -11,7 +11,8 @@ campaigns/perf/2026-11-09-1825-27b-arms-kld/research/ws7-boot-r2.md section 1
 Provenance (iron rule 1):
   - self_reported_s: MEASURED — parsed straight out of the log's own timers.
   - chain_s deltas: INFERRED — differences between MEASURED timestamp anchors
-    (docker-logs ISO prefix, else container-local HH:MM:SS).
+    (container-local HH:MM:SS, else docker-logs ISO prefix for lines with no in-message
+    clock — 1.11.0 uvicorn/banner lines).
   - cacheable_per_r2_s: INFERRED — r2 section 2 mapping (inductor AOT + Triton).
 A missing marker becomes null + a `missing` entry; the parser never crashes on a
 truncated or format-drifted log (run.sh treats a failure as "raw log recorded").
@@ -26,14 +27,21 @@ import sys
 
 # --- line shape ------------------------------------------------------------------
 # docker logs prefix: 2026-10-30T16:43:42.123456789Z stdout=P <message>
-RE_ISO = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?")
+RE_ISO = re.compile(r"^\d{4}-\d{2}-\d{2}T(\d{2}:\d{2}:\d{2})(?:\.\d+)?Z?")
 RE_STREAM = re.compile(r"^\s*(?:stdout|stderr)=[PF]\s+")
 RE_HMS = re.compile(r"\b(\d{2}:\d{2}:\d{2})\b")
-RE_INFO = re.compile(r"^INFO\b")            # vLLM's first banner, anchored to the message
+# vLLM's first banner, anchored to the message. 1.9.1: bare "INFO 10-30 …". 1.11.0:
+# process-prefixed "(APIServer pid=1) INFO 11-10 …" — allow an optional (… pid=…) tag.
+RE_INFO = re.compile(r"^(?:\([^)]*\)\s*)?INFO\b")
+# ANSI escape sequences (color tags) — stripped from every line before matching, so
+# timers and paths come out clean (1.11.0 aiter lines are colorized).
+RE_ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 RE_ENGINE = re.compile(r"Initializing a V1 LLM engine")
 
 # --- self-reported timers (verbatim anchors from ws7-boot-r2.md section 1) -------
-RE_AITER = re.compile(r"\[aiter\] finish build \[module_aiter_core\], cost (\d+(?:\.\d+)?)s")
+# 1.9.1: "[aiter] finish build …". 1.11.0: "[aiter] [pid=1 pname=MainProcess] finish build …"
+# (ANSI already stripped). Allow the optional [..] tags between.
+RE_AITER = re.compile(r"\[aiter\](?:\s*\[[^\]]*\])*\s+finish build \[module_aiter_core\], cost (\d+(?:\.\d+)?)s")
 RE_MM = re.compile(r"Multi-modal warmup completed in (\d+(?:\.\d+)?)s")
 RE_WEIGHT = re.compile(r"Model loading took (\d+(?:\.\d+)?) GiB memory and (\d+(?:\.\d+)?) seconds")
 RE_COMPILE = re.compile(r"torch\.compile took (\d+(?:\.\d+)?) s in total")
@@ -62,17 +70,26 @@ def _line_time(msg):
     m = RE_HMS.search(msg)
     if m:
         return _hms_to_s(m.group(1)), m.group(1)
-    return None, None
+    return None, None  # caller may fall back to the docker-ISO clock
 
 
 def parse(text, up_after_s):
-    """Parse a boot log into the WS7 JSON payload (see module docstring for provenance)."""
-    entries = []  # (t, message)
+    """Parse a boot log into the WS7 JSON payload (see module docstring for provenance).
+
+    Clock: the message's own HH:MM:SS wins (vLLM's clock); lines with no in-message clock
+    (1.11.0 uvicorn lines, the RADIANCE bandwidth banner, aiter tags) fall back to the
+    docker-ISO prefix — the same instant in UTC, so both clocks agree for a UTC container
+    (documented assumption; a non-UTC container TZ would skew fallback lines only)."""
+    text = RE_ANSI.sub("", text)          # one strip: timer/regex matches below stay clean
+    entries = []  # (t, message, tstr)
     for line in text.splitlines():
+        m_iso = RE_ISO.match(line)
         msg = RE_STREAM.sub("", RE_ISO.sub("", line))
-        t, _ = _line_time(msg)
+        t, tstr = _line_time(msg)
+        if t is None and m_iso:
+            t, tstr = _hms_to_s(m_iso.group(1)), m_iso.group(1)
         if t is not None:
-            entries.append((t, msg))
+            entries.append((t, msg, tstr))
 
     out = {
         "up_after_s": up_after_s,
@@ -82,8 +99,8 @@ def parse(text, up_after_s):
         "chain_s": {},
         "self_reported_s": {},
         "cacheable_per_r2_s": None,
-        "jit_monitor_warnings": sum(1 for _, m in entries if RE_JITMON.search(m)),
-        "memory_fault": sum(1 for _, m in entries if RE_FAULT.search(m)),
+        "jit_monitor_warnings": sum(1 for _, m, _ in entries if RE_JITMON.search(m)),
+        "memory_fault": sum(1 for _, m, _ in entries if RE_FAULT.search(m)),
         "aot_paths": sorted(set(RE_AOT.findall(text))),
         "missing": [],
     }
@@ -91,13 +108,11 @@ def parse(text, up_after_s):
         out["missing"] = ["no parseable timestamps in log"]
         return out
 
-    t0 = entries[0][0]
-    m = RE_HMS.search(entries[0][1])
-    out["t0"] = m.group(1) if m else None
+    t0, out["t0"] = entries[0][0], entries[0][2]
 
     def ts_first(regex, pred=None):
         """Seconds-relative-to-t0 of the first entry whose message matches regex, else None."""
-        for t, m in entries:
+        for t, m, _ in entries:
             if regex.search(m) and (pred is None or pred(m)):
                 return t - t0
         return None

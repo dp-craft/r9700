@@ -14,6 +14,7 @@ loop — `run.sh` is plain bash + the repo's deterministic tools, run from **you
 | A | Quark-MXFP4 `.rad` (DFlash2 drafter merged) | radiance **1.11.0** (default) | **baseline** |
 | B | Quark-MXFP4 `.rad` | radiance **1.17.0** | upgrade validation (A vs B = bench-vs-previous) |
 | C | IQ4R-L-V4 `.rad` (DFlash2 drafter merged) | radiance **1.17.0** (image floor) | quality arm (KL 0.00297 vs bf16, +4 % decode — CLAIMED, unsloth) |
+| c0 | IQ4R-L-V4 `.rad` (DFlash2 drafter merged) | radiance **1.17.0** (image floor) | **C spec-off** — same boot as C but `--num-speculative-tokens 0`; isolates the spec-decode contribution (item A) |
 | D | RedHatAI Qwen3.8-27B-MXFP4 (HF) | sly **1.11.0**-rocm10.1 | sly upgrade validation (vs the 1.9.1 MEASURED row) |
 | E (optional, KLD only) | heretic MXFP4 GPTQ + DFlash2 drafter | sly **1.8.1**-rocm10.1, profile `sly-official/heretic-mxfp4` | heretic retest (quality never measured; `run.sh --kld heretic`) |
 
@@ -44,7 +45,7 @@ arm. The plan's earlier "45–70 min" covered cells + boots only (the KLD design
 
 ## KLD (WS3)
 
-`bench/perf/kld_probe.py` (math core TDD: `bench/perf/test_kld_probe.py`, 19/19 OK on synthetic
+`bench/perf/kld_probe.py` (math core TDD: `bench/perf/test_kld_probe.py`, 60/60 OK on synthetic
 fixtures). Method locked by `research/ws3-kld-r1.md` / `r2.md` (every choice sourced there):
 
 - **Mode — paired greedy continuation (r2 §2):** reference and each arm generate N=512 tokens at
@@ -80,9 +81,15 @@ fixtures). Method locked by `research/ws3-kld-r1.md` / `r2.md` (every choice sou
   (token estimate at 4 chars/tok; the manifest pins bytes, not tokens).
 - **Live selftest per engine family (r2 §2, 5 checks):** first radiance boot (arm A) AND first sly
   boot (arm D): (1) `logprobs:20` shape, (2) `prompt_logprobs` availability (informational),
-  (3) `/tokenize` ids ref-vs-arm identical, (4) logprobs identical at temp 0 vs 1 (raw
-  distribution), (5) arm D only — no `RADIANCE_LMHEAD_*` in the recorded cmdline (garbage
-  non-winner logprobs if set). A failed selftest aborts **the KLD pass only**, not the campaign;
+  (3) `/tokenize` ids recorded (`ids` or `tokens` key; `prompt` or `content` body) — the enforced
+  tokenizer guard is at score time: every report carries `tokenizer_check`, the per-prompt
+  `usage.prompt_tokens` of ref vs arm (`ok` | `MISMATCH` with the prompt ids | `unavailable`),
+  (4) logprobs identical at temp 0 vs 1 (raw distribution), (5) every sly fetch (D, E, reference) —
+  no `RADIANCE_LMHEAD_INT2` (other than `=0`) in the live `vllm-8000` container env (`docker inspect`;
+  the two-stage greedy head returns garbage non-winner logprobs) — checked in `kld_fetch`, which
+  refuses the fetch otherwise. `RADIANCE_LMHEAD_FP8`/`INT4` (arm D's profile) are a full-row lm_head
+  quantization and are measured, not refused (verified in the 1.11.0 image source, 2026-11-11).
+  llama.cpp's `content`-style logprobs are normalized to the same rows (`normalize_logprobs`). A failed selftest aborts **the KLD pass only**, not the campaign;
   logprobs-refusing arms fall out of the KLD pass with the reason recorded (r2 §5.2: arm A's
   1.11.0 support is unverified — the selftest covers it at runtime).
 - KLD results land in `results/kld-<arm>.json` (the score compares each arm to the cached
@@ -100,10 +107,64 @@ cold vs warm-first (measured 1.9.1 cold = 400–475 s, 2026-10-30, stands as the
 **no silent wipes** — a cold measurement requires a user-approved cache wipe). Results →
 `results/ws7-boot.json` + `tmp/ws7-boot-*.log`.
 
+## Boot diagnosis + measurables (item B/G/H, 2026-11-11)
+
+Every boot — vllm (`start_server`) and radiance (`start_rad`) — records a bounded diagnosis **and** its
+measurables via `bench/perf/boot_diag.py` (TDD: `bench/perf/test_boot_diag.py`, 18 OK). A failed serve script
+`docker rm -f`'s its container on the way out, so a `docker logs` taken afterwards finds nothing; the diagnosis
+is therefore captured from what the **driver itself saw**: the **start stderr** (the serve script's own
+"container DIED" tail), the **state-dir engine log** (`stack/serve/var/servers/8000.log`, written by the serve
+script's stop/died path), and the serve script's own `logs` mode.
+
+- **Failure → `$RAW/boot-<name>.txt`** (radiance: `$RAW/boot-<arm>.txt`): an appended `=== boot attempt <ts> ===`
+  block holding those three sections (bounded to diagnostic-pattern lines + the last 300) plus `start_rc=` /
+  `waited_s=`. `failures.txt` names it: `SERVER-FAILED … start_rc=N waited_s=S boot tail: …/boot-<name>.txt`.
+  The old `results/server-<name>-boot.log` is **no longer written**.
+- **Measurables → `$RES/boots.jsonl`** (one append-only row per attempt, `kind: "boot"`): start_rc / ok /
+  boot_seconds / image + image_id (docker inspect) / the resolved config (from `serve … print`) /
+  `vram_before_mib` + `vram_ready_mib` (sysfs `mem_info_vram_used`, MEASURED) + `vram_peak_boot_mib`
+  (`vram_sampler.py` CSV peak in the boot window — MEASURED, never calculated, rule 7) + `cache_state`
+  (cold/warm, a bounded walk of the image's host cache dir) + `engine_log` (the engine's own boot numbers — KV
+  tokens, model load, graph capture — parsed from the log; null when a line is absent, never invented). Radiance
+  rows carry `rad_path` / `rad_bytes` and no vllm cache (cache_state null).
+- **WS7 cold/warm (item G):** the prologue labels the boot from the **MEASURED** `cache_state` of the image's
+  host cache dir (`boot_diag cache_probe`), not a dir-existence guess — it prints
+  `cache state = cold (MEASURED …)` / `warm (MEASURED …)`. No silent cache wipes.
+
 ## How to run (your terminal)
 
 **Precondition:** no local-model Claude session running — `run.sh` calls `gpu_exclusive.sh` per arm (inherited
 from `serve_radiance.sh` / `serve_vllm.sh` start modes) and kills any session server on port 8000.
+
+### Compare batch (run-compare.sh) — every existing model, one terminal command (2026-11-11)
+
+```sh
+cd /home/dev/work/dp-craft/amd
+bash campaigns/perf/2026-11-09-1825-27b-arms-kld/run-compare.sh                    # all arms, defaults
+ARMS="c c0 q4kxl" KLD_N=32 bash campaigns/perf/2026-11-09-1825-27b-arms-kld/run-compare.sh   # subset
+RUN_TAG=compare-<stamp> bash campaigns/perf/2026-11-09-1825-27b-arms-kld/run-compare.sh      # resume
+```
+
+- **Arms, in order** (`ARMS`, default `d a b c c0 q4kxl e`): the five campaign arms, plus the
+  llama.cpp GGUF arm `q4kxl` = unsloth UD-Q4_K_XL (`q6k` = UD-Q6_K exists but is opt-in only — user
+  2026-11-11), on `latest-vulkan` (resolved build recorded), **KV q8_0** (llama.cpp has no fp8
+  KV — a documented asymmetry), MTP off — and arm `e` (heretic, KLD only).
+- Per arm: boot gate → boot → residency → KLD selftest → KLD fetch (`KLD_N`, default 16) → cells
+  (`<arm>-10k-tg512-n1`, `<arm>-100k-tg512-n1`, `REPS` default 2) → stop. A failed arm is recorded
+  and the batch continues; a Memory Fault aborts the batch (rule 15 — resume with the same `RUN_TAG`).
+- **Pairwise KLD, no FP8 boot needed:** every ordered pair of complete fetches is scored
+  (`kld_probe.py score --ref-label`) → `results/kld-pair-<arm>-vs-<ref>.json`, and `kld_probe.py matrix`
+  writes `results/kld-matrix.md` (KL(ref‖arm) nats/tok + CI95 + top-1, and each pair's tokenizer check).
+  A cell is the distance **between two quantizations**, not to the truth; `a`-vs-`b` (same checkpoint,
+  engine 1.11.0 vs 1.17.0) and `c`-vs-`c0` (spec on/off) are the noise floors to read the rest against.
+- `KLD_FP8=1` (optional, last): boots the local FP8 reference, scores every arm vs it (`kld-<arm>.json`)
+  and adds it to the matrix as `fp8`.
+- Unique dir per invocation: `tmp/runs/compare-<YYYYmmdd-HHMMSS>/`. Port 8000 must be free.
+- **No-overwrite (user 2026-11-11):** a resume only ADDS. A re-boot of a slug records as `<slug>-boot2…`
+  (server/boot/VRAM files), each pairwise pass gets its own `results/kld-pairs-<stamp>.d/`, an existing
+  score or selftest JSON is never rewritten (`-2` file instead); rows (`results.jsonl`, `boots.jsonl`,
+  `failures.txt`) are append-only. Exception: `bench/core/report.py` regenerates `results/charts/` +
+  `appendix.md` at the end of every pass.
 
 ### Short validation run first (user decision 2026-11-10 — no 3–4 h unattended pass up front)
 
@@ -158,6 +219,8 @@ same KLD machinery) that runs **one** arm — for ad-hoc runs with other models 
 ```sh
 cd campaigns/perf/2026-11-09-1825-27b-arms-kld
 ./run-arm.sh a                 # arm A as pinned (radiance 1.11.0 + MXFP4)
+./run-arm.sh c                 # arm C (radiance 1.17.0 + IQ4R-L-V4, spec-on)
+./run-arm.sh c0                # arm C spec-OFF (same boot, --num-speculative-tokens 0) — item A
 ./run-arm.sh d                 # arm D (sly 1.11.0) — WS7 prologue included
 ./run-arm.sh e                 # arm E: heretic KLD-only pass (sly 1.8.1)
 
@@ -174,6 +237,11 @@ Recovery semantics are identical to `run.sh`: per-cell `tmp/done/` markers, a fa
 leaves no marker and is redone on re-run; KLD ref fetch is cached at `tmp/kld-ref.jsonl` and
 reused by every subsequent arm run (including a different arm). Each standalone run appends to the
 same consolidated `results/results.jsonl` and re-emits charts.
+
+**start && selftest gate:** an arm fetches its KLD set **only after its family's live selftest passes** — the
+`tmp/done/kld-selftest-<family>` marker (item A keys radiance by family *and* spec tokens, so a passed spec-on
+selftest never skips the spec-off one). A failed selftest skips the KLD fetch for that arm (recorded in
+`failures.txt`) but never aborts the run; re-running re-attempts the selftest + fetch.
 
 ## Pins (D6 re-check)
 
@@ -283,6 +351,56 @@ Hand edits (keep the emitted scaffold; replace/add exactly these):
     fetch + score vs the cached reference → stop.
 12. **Summary table** at the end (per-arm decode/prefill at the grid depths + KLD one-liners + WS7
     seconds) so the user's go/no-go for `--round 2` is one screen.
+13. **Gating fixes (2026-11-10/11):** the eight bugs the short run and the 2026-11-11 review exposed,
+    plus the 2026-11-11 TDD pass (items A–H: c0 spec-off arm, boot-failure diagnosis, KLD cache keys,
+    resumable fetch, score extras, measured WS7 cache state, per-boot measurables).
+    Gating tests are in **`tests/test_run_gating.sh`** (91 asserts, no GPU —
+    PATH-stubbed docker/curl, scratch CAMPAIGN_DIR under `tmp/gating-tests/`):
+    - **P1** subset resume re-booted (gates checked the full slug set) → `selected_slugs` gates boots
+      on the ONLY-selected set (supersedes `probes_selected`; T2/T9).
+    - **P3** silent prologue boot failure → failures.txt line `WS7 COLD BOOT NOT MEASURED` (T6).
+    - **P4** foreign-server reuse (item 7's name+image-only check) → reuse now also pins
+      `--max-model-len $D_CTX` from `8000.cmdline` (T4/T5).
+    - **P6** boot failures discarded the container log → now superseded by **item B** (below): the diagnosis
+      is the appended `$RAW/boot-<name>.txt` + the `boots.jsonl` measurables row (T7/T8).
+    - **P9** arm D fetched KLD rows after a *failed* sly selftest (arm_rad was gated, arm_d was not) →
+      arm_d fetches only after the selftest marker (T13/T13b).
+    - **P10** a cached KLD fetch or reference with errored rows was kept as complete (rule 18), and
+      arms or a reference with errored rows were scored → `kld_complete()` gates the fetch cache, the
+      reference cache and every score (`KLD SCORE SKIPPED` in failures.txt) (T10/T10b, T11/T11b, T14/T14b/T14c);
+      T15 runs the real `kld_probe.py fetch` against a canned loopback server.
+    - **P11** selftest JSON recorded no `model`/`url` (rule 2) → both recorded (`bench/perf/test_kld_probe.py`).
+    - **P12** a re-run whose cells were all done skipped the KLD pass entirely (arm D and arm C returned at
+      "skip (done)"), so a failed KLD fetch was never retried and the "re-run to re-fetch" message was a no-op.
+      An arm now skips only when its probes are done **and** its KLD fetch is complete (T16, T16b, T16c);
+      the P1 guards T2/T9 now set up a complete KLD pass.
+    - **2026-11-11 TDD pass (items A–H), added to the same suite** (T17–T25b, plus `bench/perf/test_boot_diag.py`):
+      - **A** spec-off arm **c0**: `start_rad` takes `spec_tokens` (default 7 → byte-identical, T17); c0 passes
+        0; `arm_rad` keys the selftest marker by family *and* spec tokens (`radiance-spec0`); `kld_score_all`
+        scores c0 under its own label; `print_summary` glob `kld-[a-z][0-9]*.json` (T17–T21, T22 end-to-end).
+      - **B** boot-failure diagnosis: on a failed boot the driver appends its own view (start stderr + state-dir
+        engine log + `serve … logs`) to `$RAW/boot-<name>.txt` / `boot-<arm>.txt`, records `start_rc` +
+        `waited_s` in failures.txt, and writes a `boots.jsonl` row; the old `results/server-<name>-boot.log`
+        is gone (T7/T8, T24, T24b).
+      - **C** KLD caches record their **key** (`<file>.key.json`: n / calibration sha256 / max_tokens / top_k /
+        image / model); a mismatch or a legacy keyless file is renamed `*.stale-<stamp>` (never deleted) then
+        re-fetched — a `KLD_N=16` cache is never reused by a `KLD_N=128` run (T23, T23b, T23c).
+      - **D** resumable fetch: `kld_probe.py fetch` keeps the clean key-matching rows and re-requests only the
+        errored/missing prompts (rule 18 — an errored prompt is re-fetched, never cached as data) (T15).
+      - **F** score extras (added, none renamed): `topk_len`, `floor_substitutions` (both directions),
+        `top1_agreement_paired`, `kl_per_position` quantiles — the 19-vs-20 top-k question, quantified
+        (`bench/perf/test_kld_probe.py`).
+      - **G** WS7 cold/warm from the **MEASURED** cache state (`boot_diag cache_probe` of the image's host
+        cache dir), not a dir-existence guess (T25, T25b).
+      - **H** `boots.jsonl` measurables per boot: start_rc / ok / boot_seconds / image_id / resolved config /
+        vram before+ready (sysfs) + peak (sampler CSV) / cache_state / engine_log numbers (T24d).
+    - Each invocation appends `invocation=… repo_commit=… repo_dirty=…` to `results/meta.txt` (T12).
+    New overridables: `SERVER_STATE_DIR`, `SERVE_VLLM`, `SERVE_RAD`, `D_CTX`, plus the boot-diagnosis leaves
+    `BOOT_DIAG` / `BOOT_VRAM_SAMPLER` / `DRM_ROOT` / `VLLM_CACHE_ROOT`. Companion code (same TDD discipline):
+    `ws7_phases.py` 1.11.0 format drift (7 tests), `kld_probe.py` logprobs-shape normalizer + `logprobs_shape()`
+    diagnostics + provenance + cache-key sidecar + resumable fetch + score extras (60 tests), `capture_engine.py`
+    raw SSE tail on "no tokens received" (6 tests), `boot_diag.py` (new) boot diagnosis + measurables (18 tests).
+    Full detail: `tmp/runs/short-20261110-121812/results/analysis.md` §4.
 
 Execution order: preflight → prologue (cold boot) → D (reused boot) → WS7 warm reboot → A → B → C
 (ascending-depth cells per arm; radiance arms after sly so the WS7 numbers precede the grid noise).

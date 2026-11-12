@@ -6,6 +6,8 @@
 #   arms:  D = RedHat-MXFP4 @ sly 1.11.0   (WS7 cold+warm prologue included — first 1.11.0
 #                                          boot IS the WS7 cold measurement)
 #          C = IQ4R-L-V4  @ radiance 1.17.0  (the redhat-vs-iq4 comparison pair)
+#          C0 = arm C spec-OFF (--num-speculative-tokens 0; item A 2026-11-11) — own slugs c0-*,
+#               own KLD fetch (kld-c0.jsonl), own selftest marker (kld-selftest-radiance-spec0)
 #   cells: 10k/100k x tg512 x n1 — 2 per arm, REPS=2 (n=2; if spread/suspicion -> re-run,
 #          the new unique dir doubles the data instead of overwriting)
 #   KLD:   selftest + fetch with KLD_N=16 prompts (short; the full 128 stays for the
@@ -27,7 +29,7 @@ set -uo pipefail
 HERE="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 RUN_TAG="${RUN_TAG:-short-$(date +%Y%m%d-%H%M%S)}"
 export RUN_TAG
-export ONLY="${ONLY:-c-10k-tg512-n1,c-100k-tg512-n1,d-10k-tg512-n1,d-100k-tg512-n1}"
+export ONLY="${ONLY:-c-10k-tg512-n1,c-100k-tg512-n1,c0-10k-tg512-n1,c0-100k-tg512-n1,d-10k-tg512-n1,d-100k-tg512-n1}"
 export REPS="${REPS:-2}"
 export KLD_N="${KLD_N:-16}"
 WS_NO_MAIN=1
@@ -35,12 +37,13 @@ WS_NO_MAIN=1
 source "$HERE/run.sh"   # definitions + preflight (RUN_TAG-aware dirs are set there)
 
 ensure_fixtures 'codereview-10000.txt' 'codereview-100000.txt'
-echo "=== short run: arms c+d, cells [10k,100k]x tg512 x n1, REPS=$REPS, KLD_N=$KLD_N"
+echo "=== short run: arms c+c0+d, cells [10k,100k]x tg512 x n1, REPS=$REPS, KLD_N=$KLD_N"
 echo "    unique dir: $RUN_DIR  (results: $RES/results.jsonl)"
 ws7_prologue
 arm_d
 ws7_warm
 arm_rad c "$IMG_RAD_BC" "$RAD_IQRV4" qwen38-27b-iq4r-l-v4
+arm_rad c0 "$IMG_RAD_BC" "$RAD_IQRV4" qwen38-27b-iq4r-l-v4 0   # spec-off
 kld_ref_ensure || true
 kld_score_all
 print_summary

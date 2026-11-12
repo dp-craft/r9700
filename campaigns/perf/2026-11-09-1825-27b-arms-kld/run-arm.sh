@@ -8,6 +8,7 @@
 #   ./run-arm.sh a                              # arm A as pinned (radiance 1.11.0 + MXFP4)
 #   ./run-arm.sh b                              # arm B (radiance 1.17.0 + MXFP4)
 #   ./run-arm.sh c                              # arm C (radiance 1.17.0 + IQ4R-L-V4)
+#   ./run-arm.sh c0                             # arm C spec-OFF (same boot, --num-speculative-tokens 0)
 #   ./run-arm.sh d                              # arm D (sly 1.11.0) — WS7 prologue included
 #   ./run-arm.sh e                              # arm E: heretic KLD only (sly 1.8.1)
 #
@@ -31,16 +32,17 @@ WS_NO_MAIN=1
 # shellcheck source=run.sh
 source "$HERE/run.sh"
 
-[ $# -eq 1 ] || { echo "usage: run-arm.sh <a|b|c|d|e>   (knobs as env: ROUND=2 IMAGE=... ONLY=...)" >&2; exit 1; }
+[ $# -eq 1 ] || { echo "usage: run-arm.sh <a|b|c|c0|d|e>   (knobs as env: ROUND=2 IMAGE=... ONLY=...)" >&2; exit 1; }
 ARM=$1
 case "$ARM" in
-  a|b|c)
+  a|b|c|c0)
     ensure_fixtures 'codereview-10000.txt' 'codereview-100000.txt'
     [ "$ROUND" -ge 2 ] && ensure_fixtures 'codereview-50000.txt'
     case "$ARM" in
       a) arm_rad a "$IMG_RAD_A"  "$RAD_MXFP4" qwen38-27b-mxfp4 ;;
       b) arm_rad b "$IMG_RAD_BC" "$RAD_MXFP4" qwen38-27b-mxfp4 ;;
       c) arm_rad c "$IMG_RAD_BC" "$RAD_IQRV4" qwen38-27b-iq4r-l-v4 ;;
+      c0) arm_rad c0 "$IMG_RAD_BC" "$RAD_IQRV4" qwen38-27b-iq4r-l-v4 0 ;;   # spec-off (item A, 2026-11-11)
     esac
     kld_ref_ensure || true
     kld_score_all
@@ -60,7 +62,7 @@ case "$ARM" in
     if start_server e-heretic-sly181 8192 fp8 0 1; then
       kld_selftest sly swift-1.5
       if [ -f "$RAW/done/kld-selftest-sly" ]; then
-        kld_fetch swift-1.5 "$RES/kld-e.jsonl"
+        kld_fetch swift-1.5 "$RES/kld-e.jsonl" "$IMG_SLY_E"
       else
         echo "  KLD fetch skipped for arm E (selftest failed)"
       fi
@@ -68,7 +70,7 @@ case "$ARM" in
     fi
     kld_score_all e
     ;;
-  *) echo "unknown arm: $ARM (only: a b c d e)" >&2; exit 1 ;;
+  *) echo "unknown arm: $ARM (only: a b c c0 d e)" >&2; exit 1 ;;
 esac
 print_summary
 make_report

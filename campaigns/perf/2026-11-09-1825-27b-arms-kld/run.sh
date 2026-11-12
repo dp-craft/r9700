@@ -64,8 +64,31 @@ else
   PROBE_CAMPAIGN="$CAMPAIGN_DIR"
 fi
 mkdir -p "$RAW" "$RES"
-EB="$ROOT/bench/perf/engine-bench"
+EB="${EB:-$ROOT/bench/perf/engine-bench}"   # overridable: no-GPU tests (tests/test_run_gating.sh T22)
 GEN="$ROOT/bench/workloads/tmp"
+# serve scripts + state dir + arm-D ctx: overridable via env so the no-GPU gating tests
+# (tests/test_run_gating.sh) can run this script hermetically; defaults = production paths
+SERVER_STATE_DIR="${SERVER_STATE_DIR:-$ROOT/stack/serve/var/servers}"
+SERVE_VLLM="${SERVE_VLLM:-$ROOT/stack/serve/vllm/serve_vllm.sh}"
+SERVE_RAD="${SERVE_RAD:-$ROOT/stack/serve/radiance/serve_radiance.sh}"
+SERVE_LLAMA="${SERVE_LLAMA:-$ROOT/stack/serve/llamacpp/serve_llamacpp.sh}"
+# llama.cpp GGUF arms (compare round 2026-11-11): Vulkan latest-vulkan build (the build is recorded
+# resolved — the symlink moves on promote), same ctx/seqs as every other arm; KV q8_0 because
+# llama.cpp has no fp8 KV cache (nearest 8-bit cache; a documented KV asymmetry vs the fp8 arms).
+LLAMA_BIN="${LLAMA_BIN:-$ROOT/stack/llamacpp/var/builds/latest-vulkan/bin/llama-server}"
+GGUF_Q4KXL="${GGUF_Q4KXL:-/home/dev/models/gguf/unsloth/Qwen3.8-27B-UD-Q4_K_XL.gguf}"
+GGUF_Q6K="${GGUF_Q6K:-/home/dev/models/gguf/unsloth/Qwen3.8-27B-UD-Q6_K.gguf}"
+# Q8_0, unsloth/Qwen3.8-27B-GGUF @ce331efc, sha256 a680f44a06920e5d…e348 (verified 2026-11-11)
+GGUF_Q8="${GGUF_Q8:-/home/dev/models/gguf/unsloth/Qwen3.8-27B-Q8_0.gguf}"
+LLAMA_KV="${LLAMA_KV:-q8_0}"
+D_CTX=260000   # arm D / WS7 prologue+warm ctx — also the reuse-check pin (P4)
+RAD_SPEC_K=7   # radiance --num-speculative-tokens default (27b.conf SPEC_K); arm c0 passes 0 (spec-off)
+# --- boot diagnostics (item B/G/H, 2026-11-11): every boot records a bounded diagnosis + measurables.
+# Overridable via env so tests/test_run_gating.sh can run hermetically; defaults = production paths.
+BOOT_DIAG="${BOOT_DIAG:-$ROOT/bench/perf/boot_diag.py}"                 # THE prober (bench/perf/boot_diag.py)
+BOOT_VRAM_SAMPLER="${BOOT_VRAM_SAMPLER:-python3 $ROOT/stack/gpu/vram_sampler.py}"
+DRM_ROOT="${DRM_ROOT:-/sys/class/drm}"                                  # sysfs VRAM (mem_info_vram_used)
+VLLM_CACHE_ROOT="${VLLM_CACHE_ROOT:-/mnt/Lin1/work/vllm/sly-radiance/cache}"   # mirrors serve_vllm.sh CACHE_DIR
 
 # --- item 1: arg parsing -------------------------------------------------------
 # WS_NO_MAIN=1 makes this file a sourceable library (used by run-arm.sh): arg parsing
@@ -106,8 +129,14 @@ if [ ! -f "$RES/meta.txt" ]; then
   { echo "date=$(date -Iseconds)"; echo "run_tag=${RUN_TAG:-canonical}"; echo "model=$MODEL"; echo "engine=vllm profile=sly-redhat/redhat-mxfp4-dflash served_model=qwen38-27b-redhat-mxfp4-dflash"; echo "image=${IMAGE:-profile default}"; echo "round=$ROUND"; echo "kld_heretic=$KLD_E"; echo 'env[d-redhat-sly1100]=WATCHDOG_MIB=32 GPU_UTIL=0.93 CACTUS_DELTA=0 CHAT_TEMPLATE=/home/dev/work/dp-craft/amd/stack/serve/vllm/templates/dp-sharp-chat_template.jinja'; echo "vram_budget_mib=$VRAM_BUDGET_MIB"; echo "only=${ONLY:-<all>}"; echo "reps_override=${REPS_OVERRIDE:-<default 1>}"; echo "kld_n=${KLD_N:-<full>}"; } > "$RES/meta.txt"
 fi
 
+# one line per invocation (the write-once block above is kept): a resumed run must show every commit it ran
+echo "invocation=$(date -Iseconds) repo_commit=$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown) repo_dirty=$(git -C "$ROOT" status --porcelain 2>/dev/null | wc -l)" >> "$RES/meta.txt"
+
 # probe-cell templates (x- substituted per arm); ascending depth order in arm_cells
 SLUG_R1='x-10k-tg512-n1 x-10k-tg512-n2 x-10k-tg1024-n1 x-10k-tg1024-n2 x-100k-tg512-n1 x-100k-tg512-n2 x-100k-tg1024-n1 x-100k-tg1024-n2'
+# DEPTH=1 (forced batch, rule 16: >=4 depths): + 20k and 50k tg512-n1 (50k already in round 2)
+DEPTH="${DEPTH:-0}"
+if [ "$DEPTH" = 1 ]; then SLUG_R1="$SLUG_R1 x-20k-tg512-n1"; [ "$ROUND" -ge 2 ] || SLUG_R1="$SLUG_R1 x-50k-tg512-n1"; fi
 SLUG_R2='x-10k-tg4096-n1 x-10k-tg4096-n2 x-50k-tg512-n1 x-50k-tg512-n2 x-50k-tg1024-n1 x-50k-tg1024-n2 x-50k-tg4096-n1 x-50k-tg4096-n2 x-100k-tg4096-n1 x-100k-tg4096-n2'
 
 server_needed () {  # any listed probe marker missing?
@@ -118,8 +147,11 @@ want_probe () {  # honor ONLY='glob,glob' filter
   local g; IFS="," read -ra _globs <<<"$ONLY"
   for g in "${_globs[@]}"; do case "$1" in $g) return 0;; esac; done; return 1; }
 
-probes_selected () {  # 0 if ONLY matches >=1 of this server's probes (don't load a model
-  local s; for s in "$@"; do want_probe "$s" && return 0; done; return 1; }  # for filtered-out probes)
+selected_slugs () {  # slug... -> only those selected by ONLY (empty if ONLY matches none;
+  # superseded probes_selected, which only said ">=1 selected" and could not gate "all done")
+  # Gate boots on the SELECTED set, not the full round set (P1: a subset resume never had
+  # "all done" true, so every resume re-booted — see tests/test_run_gating.sh T2/T9).
+  local s out=""; for s in "$@"; do want_probe "$s" && out="$out $s"; done; echo "$out"; }
 
 guard_ok () {  # name predicted_mib -> 0 if within budget (or unknown), else record SKIPPED
   local name=$1 pred=$2
@@ -191,52 +223,309 @@ run_probe_watched () {
   wait "$pid"
 }
 
-stop_server () { CURRENT=""; CURRENT_CONTAINER=""; PORT=8000 "$ROOT/stack/serve/vllm/serve_vllm.sh" stop 2>/dev/null || true; }
+stop_server () { CURRENT=""; CURRENT_CONTAINER=""; PORT=8000 "$SERVE_VLLM" stop 2>/dev/null || true; }
 stop_rad () {  # port-scoped stop + verify the container is really gone
   CURRENT=""; CURRENT_CONTAINER=""
-  PORT=8000 "$ROOT/stack/serve/radiance/serve_radiance.sh" stop 2>/dev/null || true
+  PORT=8000 "$SERVE_RAD" stop 2>/dev/null || true
   local i
   for i in $(seq 1 15); do docker ps --filter name=radiance-8000 -q 2>/dev/null | grep -q . || return 0; sleep 1; done
   echo "WARN: radiance-8000 still present after stop" | tee -a "$RES/failures.txt"; return 1; }
+stop_llama () {  # pidfile stop (serve_llamacpp.sh, rule 14) + verify the gate port is free again
+  CURRENT=""; CURRENT_CONTAINER=""
+  PORT=8000 "$SERVE_LLAMA" stop 2>/dev/null || true
+  local i
+  for i in $(seq 1 15); do gate_port_held "${GATE_PORT:-8000}" || return 0; sleep 1; done
+  echo "WARN: port ${GATE_PORT:-8000} still held after llama.cpp stop" | tee -a "$RES/failures.txt"; return 1; }
 # --- item 3: trap dispatches on the current server kind -------------------------
-stop_current () { if [ "$CURRENT" = radiance ]; then stop_rad; else stop_server; fi; }
+stop_current () {
+  case "$CURRENT" in radiance) stop_rad ;; llamacpp) stop_llama ;; *) stop_server ;; esac; }
 trap stop_current EXIT
 
+# --- item B/G/H helpers (2026-11-11): boot diagnosis + measurables ---------------
+# A failed serve script `docker rm -f`'s its container, so a `docker logs` after the fact finds
+# nothing — the diagnosis must be captured from what the driver itself saw (start stderr + the
+# state-dir engine log + the serve script's own `logs` mode), all appended to $RAW/boot-<name>.txt.
+# VRAM is MEASURED (sysfs before/ready, sampler CSV peak in the boot window), never calculated (rule 7).
+vram_used_mib () {   # sysfs VRAM used (MiB) of the first readable card; empty when none
+  local d
+  for d in "$DRM_ROOT"/card*/device; do
+    [ -r "$d/mem_info_vram_used" ] && { echo $(( $(cat "$d/mem_info_vram_used") / 1048576 )); return; }
+  done
+}
+vllm_cache_dir () {  # image -> host vllm cache dir (mirrors serve_vllm.sh's CACHE_DIR)
+  local tag=${1##*/}; echo "$VLLM_CACHE_ROOT/${tag/:/@}"; }
+image_id_of () { docker image inspect --format '{{.Id}}' "$1" 2>/dev/null || true; }
+state_log_sig () {   # $SERVER_STATE_DIR/8000.log -> inode:size:mtime-ns, or the word absent.
+  # Nanosecond mtime: a same-second rewrite still changes the signature (T28).
+  stat -c '%i:%s:%.9Y' "$SERVER_STATE_DIR/8000.log" 2>/dev/null || echo absent
+}
+_boot_arm () { case "$1" in kld-ref-fp8) echo ref;; d0-*) echo d0;; dfh-*) echo dfh;; d-*) echo d;; e-*) echo e;; *) echo "$1";; esac; }
+record_boot () {   # kind slug arm image served server_txt t0 t1 rc vram_before vram_csv rad cache_json engine_log boot_tail
+  # One append-only row per boot attempt -> $RES/boots.jsonl (boot_diag.py record). Optional args
+  # (vram_csv/rad/cache_json/engine_log/boot_tail) are omitted entirely when empty.
+  local kind=$1 slug=$2 arm=$3 image=$4 served=$5 server_txt=$6 t0=$7 t1=$8 rc=$9
+  local vbefore=${10:-} vcsv=${11:-} rad=${12:-} cjson=${13:-} elog=${14:-} btail=${15:-}
+  local iid vready; iid=$(image_id_of "$image"); vready=$(vram_used_mib)
+  # shellcheck disable=SC2086  # ${...:+...} are intentional word splits (empty => arg omitted)
+  python3 "$BOOT_DIAG" record --out "$RES/boots.jsonl" --name "$slug" --arm "$arm" --kind "$kind" \
+    --served "$served" --image "$image" --image-id "${iid:-}" --server-txt "$server_txt" \
+    --t0 "$t0" --t1 "$t1" --rc "$rc" --vram-before "${vbefore:-}" --vram-ready "${vready:-}" \
+    ${vcsv:+--vram-csv "$vcsv"} ${rad:+--rad "$rad"} ${cjson:+--cache-json "$cjson"} \
+    ${elog:+--log "$elog"} ${btail:+--boot-tail "$btail"} || echo "WARN: boots.jsonl record failed for $slug" >&2
+}
+# --- no-overwrite rule (user 2026-11-11): a resume or retry ADDS records, never overwrites or deletes
+fresh_slug () {  # slug -> the slug itself, or <slug>-boot2, -boot3 … when an earlier boot of it already left
+  # records in this run dir (a resume re-booting arm D for its KLD fetch must not rewrite the first boot's files)
+  local s=$1 c=$1 n=1
+  while [ -e "$RES/server-$c.txt" ] || [ -e "$RAW/boot-$c.txt" ] || [ -e "$RAW/boot-$c-vram.csv" ]; do
+    n=$((n+1)); c="$s-boot$n"; done
+  echo "$c"; }
+fresh_file () {  # path -> the path itself, or <stem>-2.<ext>, -3 … when it already exists
+  local p=$1 n=1 c=$1
+  while [ -e "$c" ]; do n=$((n+1)); c="${p%.*}-$n.${p##*.}"; done
+  echo "$c"; }
+# --- boot gate (2026-11-11): refuse a boot before it spends a GPU second -------------------------
+# Both start paths call boot_gate right after their `>>> starting` echo, before the VRAM sampler and
+# any serve call: it passes only when GATE_PORT (default 8000) has no LISTEN socket AND free VRAM
+# >= FREE_MIB_FLOOR (default 30000) at the same check, polled 1 s apart up to FLOOR_WAIT seconds
+# (the serve scripts' run-mode idiom; seq 0 = one check, no wait). On refusal: one BOOT REFUSED line
+# + the tail facts — no sampler, no serve call, no stop, no boots.jsonl row (no boot attempted).
+gate_port_held () {   # port -> 0 when a LISTEN socket holds it; no pipe, so pipefail-safe
+  local listing; listing=$(ss -ltn 2>/dev/null) || true
+  case "$listing" in *":$1 "*) return 0;; esac; return 1
+}
+gate_free_mib () {   # -> free VRAM in MiB from the first readable card under DRM_ROOT, else unreadable
+  local d
+  for d in "$DRM_ROOT"/card*/device; do
+    [ -r "$d/mem_info_vram_total" ] || continue
+    echo $(( ($(cat "$d/mem_info_vram_total") - $(cat "$d/mem_info_vram_used")) / 1048576 )); return
+  done
+  echo unreadable
+}
+gate_clear () {   # port floor -> 0 when the port is not held AND free VRAM >= floor (unreadable never passes)
+  local free; free=$(gate_free_mib)
+  ! gate_port_held "$1" && [ "$free" != unreadable ] && [ "$free" -ge "$2" ]
+}
+boot_gate_refuse () {   # slug port floor_mib waited_s [note] -> the ONE BOOT REFUSED line per boot:
+  # a failures.txt line + the same facts as lines in the boot tail (no engine-log section, nothing
+  # stale). No sampler, no serve call, no stop, no boots.jsonl row — no boot was attempted.
+  local slug=$1 port=$2 floor=$3 waited=$4 note=${5:-}
+  local free holder port_line line
+  free=$(gate_free_mib)
+  if gate_port_held "$port"; then   # the serve scripts' port check (serve_radiance.sh:142), pipefail-safe
+    holder=$(ss -ltnp 2>/dev/null | grep ":$port " | sed -nE 's/.*users:\(\("([^"]*)",pid=([0-9]+).*/\1 pid=\2/p' | sort -u | head -3 | tr '\n' ' ') || true
+    port_line="port=$port held by ${holder:-unknown — ss -ltnp | grep :$port}"
+  else port_line="port=$port free"; fi
+  line="BOOT REFUSED $slug:"
+  [ -n "$note" ] && line="$line $note;"
+  line="$line $port_line; free_mib=$free; floor_mib=$floor; waited_s=$waited"
+  echo "$line" | tee -a "$RES/failures.txt"
+  { echo "free_mib=$free"; echo "floor_mib=$floor"; echo "$port_line"; echo "waited_s=$waited"; } \
+    > "$RAW/boot-$slug.txt"
+}
+boot_gate () {   # slug -> 0 once the gate port is free AND free VRAM >= floor at the same check
+  # (checked once at t=0, then polled 1 s apart below FLOOR_WAIT); 1 on refusal (boot_gate_refuse).
+  # GATE_PORT/FREE_MIB_FLOOR/FLOOR_WAIT are read at call time (defaults 8000/30000/90); a set
+  # FLOOR_WAIT that is not whole seconds is refused at once, naming FLOOR_WAIT invalid (no wait,
+  # no serve call).
+  local slug=$1 port="${GATE_PORT:-8000}" floor="${FREE_MIB_FLOOR:-30000}" budget
+  local t0 t1 waited
+  if [ -n "${FLOOR_WAIT+x}" ]; then budget=$FLOOR_WAIT; else budget=90; fi
+  t0=$(date +%s.%N)
+  case "$budget" in
+    ''|*[!0-9]*) boot_gate_refuse "$slug" "$port" "$floor" 0 "FLOOR_WAIT=$budget invalid"; return 1;;
+  esac
+  if gate_clear "$port" "$floor"; then
+    return 0; fi
+  # poll, the serve scripts' run-mode idiom (serve_radiance.sh:174): seq 0 runs zero times
+  # (FLOOR_WAIT=0 = one check, no wait); both must hold at the same check
+  for _ in $(seq "$budget"); do
+    sleep 1
+    if gate_clear "$port" "$floor"; then
+      return 0; fi
+  done
+  t1=$(date +%s.%N); waited=$(awk -v a="$t0" -v b="$t1" 'BEGIN{printf "%d", b-a}')
+  boot_gate_refuse "$slug" "$port" "$floor" "$waited"
+  return 1
+}
+
 # --- item 4: native radiance start/stop (the RULE-6 GAP: no gen_campaign kind) --
-start_rad () {  # arm image rad_file served -> 0 up, nonzero (recorded) on failure; CONTINUES
-  local arm=$1 img=$2 rad=$3 served=$4
-  echo ">>> starting radiance arm $arm (image=$img served=$served rad=$rad)"
+start_rad () {  # arm image rad_file served [spec_tokens] -> 0 up, nonzero (recorded) on failure; CONTINUES
+  # spec_tokens defaults to RAD_SPEC_K (7): the spec-on command line is byte-identical to before (T17);
+  # 0 = spec-off (arm c0, item A 2026-11-11). serve_radiance.sh appends EXTRA_ARGS word-split, unchanged.
+  local arm=$1 img=$2 rad=$3 served=$4 spec=${5:-$RAD_SPEC_K}
+  local xa="--gpu-headroom-mib 596 --num-speculative-tokens $spec"
+  local slug; slug=$(fresh_slug "$arm")   # no-overwrite: a re-boot of $arm records as $arm-bootN
+  echo ">>> starting radiance arm $arm (image=$img served=$served rad=$rad spec_tokens=$spec)"
+  # boot gate (2026-11-11): refuse before the sampler starts and any serve call (print or start);
+  # on refusal there is no sampler, no serve call, no stop and no boots.jsonl row
+  boot_gate "$slug" || return 1
+  # item B: a failed boot is diagnosable (start stderr + serve logs, appended to $RAW/boot-$arm.txt)
+  # and every boot records its measurables in $RES/boots.jsonl (item H); VRAM sampled across the boot.
+  local t0 t1 rc sampler_pid csv eng slog start_err waited sig_before sig_after elog state_sec
+  csv="$RAW/boot-$slug-vram.csv"; eng="$RAW/boot-$slug-engine.log"; slog="$RAW/serve-logs-$slug.txt"
+  start_err="$RAW/start-err-$slug.txt"
+  local vbefore; vbefore=$(vram_used_mib)
+  t0=$(date +%s.%N)
+  # shellcheck disable=SC2086  # $BOOT_VRAM_SAMPLER is intentionally word-split (python3 + path)
+  $BOOT_VRAM_SAMPLER --out "$csv" & sampler_pid=$!
+  sig_before=$(state_log_sig)   # before this boot's serve calls (print and start): state-dir log provenance
   RAD_FILE="$rad" IMAGE="$img" PORT=8000 MAXLEN=260000 MAXSEQS=2 KV_DTYPE=fp8 TP=1 \
-  SERVED_NAME="$served" WAIT=900 EXTRA_ARGS="--gpu-headroom-mib 596 --num-speculative-tokens 7" \
-  CONTAINER_NAME=radiance-8000 "$ROOT/stack/serve/radiance/serve_radiance.sh" print > "$RES/server-$arm.txt" 2>&1
+  SERVED_NAME="$served" WAIT=900 EXTRA_ARGS="$xa" \
+  CONTAINER_NAME=radiance-8000 "$SERVE_RAD" print > "$RES/server-$slug.txt" 2>&1
   if RAD_FILE="$rad" IMAGE="$img" PORT=8000 MAXLEN=260000 MAXSEQS=2 KV_DTYPE=fp8 TP=1 \
-     SERVED_NAME="$served" WAIT=900 EXTRA_ARGS="--gpu-headroom-mib 596 --num-speculative-tokens 7" \
-     CONTAINER_NAME=radiance-8000 "$ROOT/stack/serve/radiance/serve_radiance.sh" start; then
-    CURRENT=radiance; CURRENT_CONTAINER=radiance-8000; return 0; fi
-  echo "SERVER-FAILED: radiance arm $arm (image=$img)" | tee -a "$RES/failures.txt"
+     SERVED_NAME="$served" WAIT=900 EXTRA_ARGS="$xa" \
+     CONTAINER_NAME=radiance-8000 "$SERVE_RAD" start 2>"$start_err"; then
+    rc=0
+  else
+    rc=$?
+  fi
+  t1=$(date +%s.%N)
+  kill "$sampler_pid" 2>/dev/null; wait "$sampler_pid" 2>/dev/null
+  if [ "$rc" -eq 0 ]; then
+    docker logs radiance-8000 > "$eng" 2>&1 || true
+    CURRENT=radiance; CURRENT_CONTAINER=radiance-8000
+    record_boot radiance "$slug" "$arm" "$img" "$served" "$RES/server-$slug.txt" "$t0" "$t1" "$rc" "$vbefore" "$csv" "$rad" "" "$eng" ""
+    return 0
+  fi
+  PORT=8000 "$SERVE_RAD" logs > "$slog" 2>&1 || true
+  waited=$(awk -v a="$t0" -v b="$t1" 'BEGIN{printf "%d", b-a}')
+  # the state-dir log is written by the serve script on death/stop and never cleared per boot: the
+  # tail and boots.jsonl get it only when THIS boot changed it (signature before/after the start)
+  sig_after=$(state_log_sig)
+  elog=""; state_sec=""
+  if [ "$sig_before" != "$sig_after" ]; then
+    elog="$SERVER_STATE_DIR/8000.log"; state_sec="state-dir engine log=$SERVER_STATE_DIR/8000.log"
+  fi
+  # shellcheck disable=SC2086  # ${state_sec:+...} is an intentional word split (empty => section omitted)
+  python3 "$BOOT_DIAG" tail --out "$RAW/boot-$slug.txt" \
+    --meta "start_rc=$rc" --meta "waited_s=$waited" \
+    --section "start stderr=$start_err" \
+    ${state_sec:+--section "$state_sec"} \
+    --section "serve logs=$slog" || echo "WARN: boot tail assembly failed for $arm" >&2
+  [ -n "$elog" ] || echo "state-dir engine log: not written by this boot (stale or absent, signature unchanged across the start)" >> "$RAW/boot-$slug.txt"
+  record_boot radiance "$slug" "$arm" "$img" "$served" "$RES/server-$slug.txt" "$t0" "$t1" "$rc" "$vbefore" "$csv" "$rad" "" "$elog" "$RAW/boot-$slug.txt"
+  echo "SERVER-FAILED: radiance arm $arm (image=$img) start_rc=$rc waited_s=$waited boot tail: $RAW/boot-$slug.txt" \
+    | tee -a "$RES/failures.txt"
   stop_rad; return 1; }
 
 # --- item 6/7/10/11: vllm boots (emitted case + kld-ref-fp8 + e-heretic-sly181) --
 start_server () {  # name ctx kv mtp np -> 0 up, nonzero (recorded) on failure; run CONTINUES
   local name=$1 ctx=$2 kv=$3 mtp=$4 np=$5
-  echo ">>> starting $name (ctx=$ctx kv=$kv mtp=$mtp np=$np)"
+  local image served profile
   case "$name" in
-    'd-redhat-sly1100')
-      PROFILE='sly-redhat/redhat-mxfp4-dflash' IMAGE="$IMAGE" MAXLEN="$ctx" MAXSEQS="$np" KV_DTYPE="$kv" WATCHDOG_MIB=32 GPU_UTIL=0.93 CACTUS_DELTA=0 CHAT_TEMPLATE=/home/dev/work/dp-craft/amd/stack/serve/vllm/templates/dp-sharp-chat_template.jinja PORT=8000 "$ROOT/stack/serve/vllm/serve_vllm.sh" print > "$RES/server-$name.txt" 2>&1
-      if PROFILE='sly-redhat/redhat-mxfp4-dflash' IMAGE="$IMAGE" MAXLEN="$ctx" MAXSEQS="$np" KV_DTYPE="$kv" WATCHDOG_MIB=32 GPU_UTIL=0.93 CACTUS_DELTA=0 CHAT_TEMPLATE=/home/dev/work/dp-craft/amd/stack/serve/vllm/templates/dp-sharp-chat_template.jinja PORT=8000 "$ROOT/stack/serve/vllm/serve_vllm.sh" start; then CURRENT=""; CURRENT_CONTAINER=vllm-8000; return 0; fi ;;
+    'd-redhat-sly1100') image=$IMAGE; served=qwen38-27b-redhat-mxfp4-dflash; profile='sly-redhat/redhat-mxfp4-dflash' ;;
+    'd0-redhat-sly1100')   # forced batch: arm D without DFlash (DFlash effect on greedy output + speed)
+      image=$IMAGE; served=qwen38-27b-redhat-mxfp4-sly; profile='sly-redhat/redhat-mxfp4' ;;
+    'dfh-redhat-sly1100')  # forced batch: d0 with the lm head NOT quantized (RADIANCE_LMHEAD_FP8/INT4 dropped)
+      image=$IMAGE; served=qwen38-27b-redhat-mxfp4-fullhead; profile='sly-redhat/redhat-mxfp4-fullhead' ;;
     'kld-ref-fp8')   # KLD reference: local FP8 on sly 1.11.0 (logprob-semantics parity with arm D)
-      PROFILE='sly-radiance/qwen38-fp8' IMAGE="$KLD_REF_IMAGE" MAXLEN="$ctx" MAXSEQS="$np" KV_DTYPE="$kv" PORT=8000 "$ROOT/stack/serve/vllm/serve_vllm.sh" print > "$RES/server-$name.txt" 2>&1
-      if PROFILE='sly-radiance/qwen38-fp8' IMAGE="$KLD_REF_IMAGE" MAXLEN="$ctx" MAXSEQS="$np" KV_DTYPE="$kv" PORT=8000 "$ROOT/stack/serve/vllm/serve_vllm.sh" start; then CURRENT=""; CURRENT_CONTAINER=vllm-8000; return 0; fi ;;
+      image=$KLD_REF_IMAGE; served=qwen38-27b-fp8; profile='sly-radiance/qwen38-fp8' ;;
     'e-heretic-sly181')   # arm E: heretic-MXFP4-GPTQ @ sly 1.8.1 (KLD-only)
-      PROFILE='sly-official/heretic-mxfp4' IMAGE="$IMG_SLY_E" MAXLEN="$ctx" MAXSEQS="$np" KV_DTYPE="$kv" PORT=8000 "$ROOT/stack/serve/vllm/serve_vllm.sh" print > "$RES/server-$name.txt" 2>&1
-      if PROFILE='sly-official/heretic-mxfp4' IMAGE="$IMG_SLY_E" MAXLEN="$ctx" MAXSEQS="$np" KV_DTYPE="$kv" PORT=8000 "$ROOT/stack/serve/vllm/serve_vllm.sh" start; then CURRENT=""; CURRENT_CONTAINER=vllm-8000; return 0; fi ;;
+      image=$IMG_SLY_E; served=swift-1.5; profile='sly-official/heretic-mxfp4' ;;
+    *) echo "start_server: unknown name '$name'" >&2; return 1 ;;
   esac
-  echo "SERVER-FAILED (start OOM/other; expected near the ceiling): $name ctx=$ctx kv=$kv" \
-    | tee -a "$RES/failures.txt"; stop_server; return 1; }
+  local slug; slug=$(fresh_slug "$name")   # no-overwrite: a re-boot of $slug records as $slug-bootN
+  echo ">>> starting $slug (ctx=$ctx kv=$kv mtp=$mtp np=$np)"
+  # boot gate (2026-11-11): refuse before the sampler starts and any serve call (print or start);
+  # on refusal there is no sampler, no serve call, no stop and no boots.jsonl row
+  boot_gate "$slug" || return 1
+  # item B: a failed boot is diagnosable (start stderr + state-dir engine log + serve logs, appended
+  # to $RAW/boot-$slug.txt) and every boot records its measurables in $RES/boots.jsonl (item H).
+  local t0 t1 rc sampler_pid csv eng slog start_err cjson waited sig_before sig_after elog state_sec
+  csv="$RAW/boot-$slug-vram.csv"; eng="$RAW/boot-$slug-engine.log"; slog="$RAW/serve-logs-$slug.txt"
+  start_err="$RAW/start-err-$slug.txt"; cjson="$RAW/boot-$slug-cache.json"
+  local vbefore; vbefore=$(vram_used_mib)
+  t0=$(date +%s.%N)
+  # shellcheck disable=SC2086  # $BOOT_VRAM_SAMPLER is intentionally word-split (python3 + path)
+  $BOOT_VRAM_SAMPLER --out "$csv" & sampler_pid=$!
+  sig_before=$(state_log_sig)   # before this boot's serve calls (print and start): state-dir log provenance
+  # env prefixes must be LITERAL name=value tokens (a word-expanded $extra is run as a command),
+  # so each arm's print/start is spelled out; only arm D carries the starter-exact extras (rule 2).
+  case "$name" in
+    'd-redhat-sly1100'|'d0-redhat-sly1100'|'dfh-redhat-sly1100')   # the sly-redhat family: arm D's starter extras
+      PROFILE=$profile IMAGE="$image" MAXLEN="$ctx" MAXSEQS="$np" KV_DTYPE="$kv" WATCHDOG_MIB=32 GPU_UTIL=0.93 CACTUS_DELTA=0 CHAT_TEMPLATE=/home/dev/work/dp-craft/amd/stack/serve/vllm/templates/dp-sharp-chat_template.jinja PORT=8000 "$SERVE_VLLM" print > "$RES/server-$slug.txt" 2>&1
+      PROFILE=$profile IMAGE="$image" MAXLEN="$ctx" MAXSEQS="$np" KV_DTYPE="$kv" WATCHDOG_MIB=32 GPU_UTIL=0.93 CACTUS_DELTA=0 CHAT_TEMPLATE=/home/dev/work/dp-craft/amd/stack/serve/vllm/templates/dp-sharp-chat_template.jinja PORT=8000 "$SERVE_VLLM" start 2>"$start_err" ;;
+    *)   # kld-ref-fp8 + e-heretic-sly181 share the base shape
+      PROFILE=$profile IMAGE="$image" MAXLEN="$ctx" MAXSEQS="$np" KV_DTYPE="$kv" PORT=8000 "$SERVE_VLLM" print > "$RES/server-$slug.txt" 2>&1
+      PROFILE=$profile IMAGE="$image" MAXLEN="$ctx" MAXSEQS="$np" KV_DTYPE="$kv" PORT=8000 "$SERVE_VLLM" start 2>"$start_err" ;;
+  esac
+  rc=$?   # the start is the last command of its branch
+  t1=$(date +%s.%N)
+  kill "$sampler_pid" 2>/dev/null; wait "$sampler_pid" 2>/dev/null
+  # item G/H: the host cache state of the image (bounded walk, MEASURED) + the boot measurables
+  python3 "$BOOT_DIAG" cache --dir "$(vllm_cache_dir "$image")" > "$cjson" 2>/dev/null || echo '{}' > "$cjson"
+  if [ "$rc" -eq 0 ]; then
+    docker logs vllm-8000 > "$eng" 2>&1 || true
+    CURRENT=""; CURRENT_CONTAINER=vllm-8000
+    record_boot vllm "$slug" "$(_boot_arm "$name")" "$image" "$served" "$RES/server-$slug.txt" "$t0" "$t1" "$rc" "$vbefore" "$csv" "" "$cjson" "$eng" ""
+    return 0
+  fi
+  PORT=8000 "$SERVE_VLLM" logs > "$slog" 2>&1 || true
+  waited=$(awk -v a="$t0" -v b="$t1" 'BEGIN{printf "%d", b-a}')
+  # the state-dir log is written by the serve script on death/stop and never cleared per boot: the
+  # tail and boots.jsonl get it only when THIS boot changed it (signature before/after the start)
+  sig_after=$(state_log_sig)
+  elog=""; state_sec=""
+  if [ "$sig_before" != "$sig_after" ]; then
+    elog="$SERVER_STATE_DIR/8000.log"; state_sec="state-dir engine log=$SERVER_STATE_DIR/8000.log"
+  fi
+  # shellcheck disable=SC2086  # ${state_sec:+...} is an intentional word split (empty => section omitted)
+  python3 "$BOOT_DIAG" tail --out "$RAW/boot-$slug.txt" \
+    --meta "start_rc=$rc" --meta "waited_s=$waited" \
+    --section "start stderr=$start_err" \
+    ${state_sec:+--section "$state_sec"} \
+    --section "serve logs=$slog" || echo "WARN: boot tail assembly failed for $slug" >&2
+  [ -n "$elog" ] || echo "state-dir engine log: not written by this boot (stale or absent, signature unchanged across the start)" >> "$RAW/boot-$slug.txt"
+  record_boot vllm "$slug" "$(_boot_arm "$name")" "$image" "$served" "$RES/server-$slug.txt" "$t0" "$t1" "$rc" "$vbefore" "$csv" "" "$cjson" "$elog" "$RAW/boot-$slug.txt"
+  echo "SERVER-FAILED (start OOM/other; expected near the ceiling): $slug ctx=$ctx kv=$kv start_rc=$rc waited_s=$waited boot tail: $RAW/boot-$slug.txt" \
+    | tee -a "$RES/failures.txt"
+  stop_server; return 1; }
+
+# --- compare round (2026-11-11): llama.cpp GGUF boot (serve_llamacpp.sh, pidfile-owned) --------
+start_llama () {  # arm gguf served -> 0 up, nonzero (recorded) on failure; run CONTINUES
+  local arm=$1 gguf=$2 served=$3 bin
+  bin=$(readlink -f "$LLAMA_BIN")
+  local slug; slug=$(fresh_slug "$arm")   # no-overwrite: a re-boot of $arm records as $arm-bootN
+  echo ">>> starting llama.cpp arm $arm (gguf=$gguf served=$served kv=$LLAMA_KV bin=$bin)"
+  boot_gate "$slug" || return 1
+  local t0 t1 rc sampler_pid csv start_err waited vbefore
+  csv="$RAW/boot-$slug-vram.csv"; start_err="$RAW/start-err-$slug.txt"
+  vbefore=$(vram_used_mib)
+  # provenance (rule 2): the resolved gguf + its size and the resolved build head the server record;
+  # serve_llamacpp.sh's start stdout (cmdline + /props build) is appended below
+  echo "gguf=$(readlink -f "$gguf") bytes=$(stat -L -c %s "$gguf" 2>/dev/null) llama_server=$bin" > "$RES/server-$slug.txt"
+  t0=$(date +%s.%N)
+  # shellcheck disable=SC2086  # $BOOT_VRAM_SAMPLER is intentionally word-split (python3 + path)
+  $BOOT_VRAM_SAMPLER --out "$csv" & sampler_pid=$!
+  # LLAMA_CTX / LLAMA_NP / LLAMA_KV / LLAMA_MTP: per-arm overrides (q8: 27 GiB weights only fit with
+  # ctx 32768, 1 seq; f16 KV for the KLD baseline; q4mtp: MTP=1 → --spec-type draft-mtp)
+  if MODEL="$gguf" LLAMA_SERVER="$bin" BACKEND=vulkan CTX="${LLAMA_CTX:-260000}" NP="${LLAMA_NP:-2}" KV="$LLAMA_KV" MTP="${LLAMA_MTP:-0}" PORT=8000 \
+     WAIT=900 EXTRA_ARGS="--alias $served" "$SERVE_LLAMA" start >> "$RES/server-$slug.txt" 2>"$start_err"; then
+    rc=0
+  else
+    rc=$?
+  fi
+  t1=$(date +%s.%N)
+  kill "$sampler_pid" 2>/dev/null; wait "$sampler_pid" 2>/dev/null
+  if [ "$rc" -eq 0 ]; then
+    CURRENT=llamacpp; CURRENT_CONTAINER=""
+    record_boot llamacpp "$slug" "$arm" "$bin" "$served" "$RES/server-$slug.txt" "$t0" "$t1" "$rc" "$vbefore" "$csv" "" "" "" ""
+    return 0
+  fi
+  waited=$(awk -v a="$t0" -v b="$t1" 'BEGIN{printf "%d", b-a}')
+  python3 "$BOOT_DIAG" tail --out "$RAW/boot-$slug.txt" \
+    --meta "start_rc=$rc" --meta "waited_s=$waited" \
+    --section "start stderr=$start_err" \
+    --section "engine log=$SERVER_STATE_DIR/8000.log" || echo "WARN: boot tail assembly failed for $arm" >&2
+  record_boot llamacpp "$slug" "$arm" "$bin" "$served" "$RES/server-$slug.txt" "$t0" "$t1" "$rc" "$vbefore" "$csv" "" "" "$SERVER_STATE_DIR/8000.log" "$RAW/boot-$slug.txt"
+  echo "SERVER-FAILED: llama.cpp arm $arm (gguf=$gguf) start_rc=$rc waited_s=$waited boot tail: $RAW/boot-$slug.txt" \
+    | tee -a "$RES/failures.txt"
+  stop_llama; return 1; }
 
 # --- item 9: residency check (rule 15b) — warn-only, INFERRED floor -------------
 residency_check () {  # arm
-  local arm=$1 out="$RES/residency-$arm.txt"
+  local arm=$1 out; out=$(fresh_file "$RES/residency-$arm.txt")   # no-overwrite (a re-boot adds residency-<arm>-N.txt)
   { echo "# residency check, arm $arm (iron rule 15b). INFERRED weights-only floor ~16.4 GiB" \
       "# (27B MXFP4/IQ4R on the 32 GB card). A reading BELOW the floor means paging/contention" \
       "# — do not trust this arm's numbers (rule 15). WARNING only, never aborts."
@@ -252,17 +541,25 @@ residency_check () {  # arm
 }
 
 # --- item 10: KLD flow (bench/perf/kld_probe.py) ---------------------------------
-KLD="$ROOT/bench/perf/kld_probe.py"
-KLD_URL="http://localhost:8000/v1"
+KLD="${KLD:-$ROOT/bench/perf/kld_probe.py}"       # overridable: no-GPU tests (T22)
+KLD_URL="${KLD_URL:-http://localhost:8000/v1}"
 KLD_CAL="$CAMPAIGN_DIR/inputs/calibration-prompts.jsonl"
 KLD_N="${KLD_N:-}"   # short pass: first N calibration prompts only (empty = full 128)
+# forced batch (2026-11-12, user: "option B teacher-forced"): KLD_FORCED_REF=<a complete greedy fetch> makes
+# every kld_fetch a TEACHER-FORCED fetch on that reference (kld_probe.py forced, KLD_POSITIONS per prompt)
+KLD_FORCED_REF="${KLD_FORCED_REF:-}"
+KLD_POSITIONS="${KLD_POSITIONS:-32}"
+# the REAL kld_probe.py, for cache checks even when $KLD is a test fake (item C, 2026-11-11)
+KLD_LIB="${KLD_LIB:-$ROOT/bench/perf/kld_probe.py}"
 
-kld_selftest () {  # family (radiance|sly) served — marker-gated once per family
+kld_selftest () {  # family served — marker-gated once per family key (radiance | radiance-spec<N> | sly);
+  # arm_rad passes radiance-spec<N> for a non-default spec_tokens so a passed spec-on selftest never
+  # skips the spec-off one (item A, 2026-11-11)
   local family=$1 served=$2
   local mk="$RAW/done/kld-selftest-$family"
   [ -f "$mk" ] && return 0
   echo "  KLD selftest ($family, served=$served)"
-  if python3 "$KLD" selftest --url "$KLD_URL" --model "$served" --out "$RES/kld-selftest-$family.json"; then
+  if python3 "$KLD" selftest --url "$KLD_URL" --model "$served" --out "$(fresh_file "$RES/kld-selftest-$family.json")"; then
     touch "$mk"; echo "  KLD selftest OK ($family)"
   else
     echo "KLD SELFTEST FAILED: $family ($served) — KLD pass aborted for this family (campaign continues)" \
@@ -270,22 +567,70 @@ kld_selftest () {  # family (radiance|sly) served — marker-gated once per fami
   fi
 }
 
-kld_fetch () {  # served out — cached (resumable), per-arm during its own boot
-  local served=$1 out=$2
-  [ -f "$out" ] && { echo "  KLD fetch cached: $(basename "$out")"; return 0; }
+kld_complete () {  # file [served image] -> 0 only when COMPLETE for THIS run: one clean row per selected
+  # calibration prompt (rule 18: an errored prompt is re-fetched, never cached as data) AND its
+  # <file>.key.json matches (n, calibration sha256, max_tokens, top_k [, served, image]) - item C 2026-11-11:
+  # a KLD_N=16 cache is never reused by a KLD_N=128 run. served/image omitted = not compared (score time).
   local lim=""; [ -n "$KLD_N" ] && lim="--limit $KLD_N"
+  # shellcheck disable=SC2086  # $lim is intentionally word-split (empty or --limit N)
+  python3 "$KLD_LIB" cache-status --out "$1" --calibration "$KLD_CAL" $lim \
+    ${2:+--model "$2"} ${3:+--image "$3"} \
+    ${KLD_FORCED_REF:+--forced-ref "$KLD_FORCED_REF" --positions "$KLD_POSITIONS"} >/dev/null 2>&1
+}
+
+kld_lmhead_clear () {  # served — selftest check 5 (r2 §2): a sly container must not run with the
+  # opt-in RADIANCE_LMHEAD_INT2 knob (two-stage greedy-only lm head: garbage non-winner logprobs —
+  # radiance_lmhead_int2.py:60 in the 1.11.0 image). RADIANCE_LMHEAD_FP8/INT4 are NOT refused: they
+  # emit a full row of approximate logits (radiance_lmhead_int4.py; int2.py:37) — a real lm_head
+  # quantization that belongs in the arm's measured KL (arm D's profile sets both). Read from the
+  # LIVE container env, on every sly fetch (D, E and the reference — not marker-gated); =0 counts as off.
+  [ "$CURRENT_CONTAINER" = vllm-8000 ] || return 0
+  local env hits
+  if ! env=$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' vllm-8000 2>/dev/null); then
+    echo "KLD FETCH REFUSED: $1 — docker inspect vllm-8000 failed (selftest check 5 unverifiable)" | tee -a "$RES/failures.txt"
+    return 1
+  fi
+  hits=$(grep '^RADIANCE_LMHEAD_INT2=' <<<"$env" | grep -v '=0*$' || true)
+  [ -z "$hits" ] && return 0
+  echo "KLD FETCH REFUSED: $1 — container env sets $(tr '\n' ' ' <<<"$hits")(garbage non-winner logprobs; selftest check 5)" \
+    | tee -a "$RES/failures.txt"
+  return 1
+}
+
+kld_fetch () {  # served out [image] - cached only when COMPLETE with a matching key (kld_complete); else
+  # kld_probe.py fetch resumes: keeps the clean rows, re-requests only errored/missing prompts (item D),
+  # and renames a key-mismatched cache to <out>.stale-<stamp> before a full re-fetch (item C)
+  local served=$1 out=$2 image=${3:-}
+  kld_complete "$out" "$served" "$image" && { echo "  KLD fetch cached: $(basename "$out")"; return 0; }
+  kld_lmhead_clear "$served" || return 0
+  [ -f "$out" ] && echo "  KLD fetch incomplete or key mismatch - resuming/re-fetching $(basename "$out")"
+  local lim=""; [ -n "$KLD_N" ] && lim="--limit $KLD_N"
+  if [ -n "$KLD_FORCED_REF" ]; then
+    # rule 18: a partial reference would quarantine (or silently thin) every forced prompt
+    if ! KLD_FORCED_REF='' kld_complete "$KLD_FORCED_REF"; then
+      echo "KLD FORCED REFUSED: $served — reference $(basename "$KLD_FORCED_REF") incomplete (errored/missing rows or key mismatch)" \
+        | tee -a "$RES/failures.txt"; return 0; fi
+    # shellcheck disable=SC2086  # $lim is intentionally word-split (empty or --limit N)
+    python3 "$KLD" forced --url "$KLD_URL" --model "$served" --calibration "$KLD_CAL" \
+      --ref "$KLD_FORCED_REF" --positions "$KLD_POSITIONS" --repo-root "$ROOT" --out "$out" $lim \
+      ${image:+--image "$image"} \
+      || echo "KLD FORCED FETCH FAILED: $served (KLD pass only; campaign continues)" | tee -a "$RES/failures.txt"
+    return 0
+  fi
   # shellcheck disable=SC2086  # $lim is intentionally word-split (empty or --limit N)
   python3 "$KLD" fetch --url "$KLD_URL" --model "$served" \
     --calibration "$KLD_CAL" --repo-root "$ROOT" --out "$out" $lim \
+    ${image:+--image "$image"} --window-out "$RES/kld-fetch-windows.jsonl" \
     || echo "KLD FETCH FAILED: $served (KLD pass only; campaign continues)" | tee -a "$RES/failures.txt"
 }
 
 kld_ref_ensure () {  # one dedicated boot (sly-radiance/qwen38-fp8 @ $KLD_REF_IMAGE); fetch cached in tmp/
   local refout="$RAW/kld-ref.jsonl"
-  if [ -f "$refout" ]; then echo "  KLD reference fetch cached ($(basename "$refout"))"; return 0; fi
+  if kld_complete "$refout" qwen38-27b-fp8 "$KLD_REF_IMAGE"; then echo "  KLD reference fetch cached ($(basename "$refout"))"; return 0; fi
+  [ -f "$refout" ] && echo "  KLD reference cache incomplete or key mismatch — re-booting the reference"
   echo ">>> KLD reference boot (profile sly-radiance/qwen38-fp8 @ $KLD_REF_IMAGE)"
   if start_server kld-ref-fp8 8192 fp8 0 1; then
-    kld_fetch qwen38-27b-fp8 "$refout"
+    kld_fetch qwen38-27b-fp8 "$refout" "$KLD_REF_IMAGE"
     stop_server
   else
     echo "KLD REF BOOT FAILED — KLD pass aborted (campaign continues)" | tee -a "$RES/failures.txt"
@@ -293,14 +638,67 @@ kld_ref_ensure () {  # one dedicated boot (sly-radiance/qwen38-fp8 @ $KLD_REF_IM
   fi
 }
 
-kld_score_all () {  # [extra_arm] — score every fetched arm vs the cached reference
+kld_score_all () {  # [extra_arm...] — score every fetched arm vs the cached reference
   local ref="$RAW/kld-ref.jsonl" arm
   [ -f "$ref" ] || { echo "KLD: no reference fetch — nothing to score" | tee -a "$RES/failures.txt"; return 0; }
-  for arm in a b c d ${1:-}; do
+  # rule 18: a partial reference would silently shift every arm's KL — nothing is scored against it
+  kld_complete "$ref" || { echo "KLD SCORE SKIPPED: reference incomplete (errored/missing rows or key mismatch; re-run to re-boot the reference)" | tee -a "$RES/failures.txt"; return 0; }
+  for arm in a b c c0 d "$@"; do
     [ -f "$RES/kld-$arm.jsonl" ] || continue
+    # rule 18: a fetch with errored or empty rows is an interrupted run, not data — never scored
+    kld_complete "$RES/kld-$arm.jsonl" || { echo "KLD SCORE SKIPPED: $arm (incomplete fetch — errored/missing rows or key mismatch; re-run to re-fetch)" | tee -a "$RES/failures.txt"; continue; }
+    [ -e "$RES/kld-$arm.json" ] && { echo "  KLD score kept: kld-$arm.json exists (no-overwrite)"; continue; }
     python3 "$KLD" score --ref "$ref" --arm "$RES/kld-$arm.jsonl" --label "$arm" --out "$RES/kld-$arm.json" \
       || echo "KLD SCORE FAILED: $arm" | tee -a "$RES/failures.txt"
   done
+}
+
+kld_score_pairs () {  # arm... — every ORDERED pair of complete fetches -> $RES/kld-pairs-<stamp>/kld-pair-<arm>-vs-<ref>.json
+  # + kld-matrix.md in the same NEW dir (no-overwrite, user 2026-11-11: each scoring pass adds its own
+  # stamped dir; earlier passes are never rewritten or deleted). Needs no FP8 boot: a cell is
+  # KL(ref-arm ‖ arm), the distance between two quantizations (not to the truth); KL is asymmetric, so
+  # both directions are scored. The FP8 reference joins as 'fp8' when its fetch is complete. Rule 18: an
+  # incomplete fetch is left out, loudly.
+  local -a names=() files=()
+  local a f i j pd
+  for a in "$@"; do
+    f="$RES/kld-$a.jsonl"
+    [ -f "$f" ] || continue
+    if kld_complete "$f"; then names+=("$a"); files+=("$f")
+    else echo "KLD PAIRS: $a left out (incomplete fetch — errored/missing rows or key mismatch)" | tee -a "$RES/failures.txt"; fi
+  done
+  if [ -f "$RAW/kld-ref.jsonl" ] && kld_complete "$RAW/kld-ref.jsonl"; then names+=(fp8); files+=("$RAW/kld-ref.jsonl"); fi
+  if [ "${#names[@]}" -lt 2 ]; then
+    echo "KLD PAIRS: fewer than 2 complete fetches (${names[*]:-none}) — no matrix" | tee -a "$RES/failures.txt"; return 0; fi
+  pd=$(fresh_file "$RES/kld-pairs-$(date +%Y%m%d-%H%M%S).d"); mkdir -p "$pd"
+  for i in "${!names[@]}"; do
+    for j in "${!names[@]}"; do
+      [ "$i" = "$j" ] && continue
+      python3 "$KLD" score --ref "${files[$j]}" --arm "${files[$i]}" --label "${names[$i]}" \
+        --ref-label "${names[$j]}" --out "$pd/kld-pair-${names[$i]}-vs-${names[$j]}.json" \
+        || echo "KLD PAIR SCORE FAILED: ${names[$i]} vs ${names[$j]}" | tee -a "$RES/failures.txt"
+    done
+  done
+  python3 "$KLD" matrix --dir "$pd" --out "$pd/kld-matrix.md" || echo "KLD MATRIX FAILED" | tee -a "$RES/failures.txt"
+  echo "KLD pairs: ${names[*]} -> $pd/kld-matrix.md"
+}
+
+kld_score_forced () {  # ref_label ref_file arm... — every complete forced fetch vs the reference ->
+  # a NEW $RES/kld-forced-<stamp>.d/kld-forced-<arm>-vs-<ref_label>.json (no-overwrite, like kld_score_pairs).
+  # Rule 18: an incomplete reference scores nothing; an incomplete arm is left out, loudly.
+  local rl=$1 rf=$2 a f pd=""; shift 2
+  if ! KLD_FORCED_REF='' kld_complete "$rf"; then
+    echo "KLD FORCED SCORE SKIPPED: reference $rl incomplete" | tee -a "$RES/failures.txt"; return 0; fi
+  for a in "$@"; do
+    f="$RES/kld-$a.jsonl"
+    [ -f "$f" ] || continue
+    if ! KLD_FORCED_REF="$rf" kld_complete "$f"; then
+      echo "KLD FORCED: $a left out (incomplete forced fetch or key mismatch)" | tee -a "$RES/failures.txt"; continue; fi
+    [ -n "$pd" ] || { pd=$(fresh_file "$RES/kld-forced-$(date +%Y%m%d-%H%M%S).d"); mkdir -p "$pd"; }
+    python3 "$KLD" score-forced --ref "$rf" --arm "$f" --label "$a" --ref-label "$rl" \
+      --out "$pd/kld-forced-$a-vs-$rl.json" || echo "KLD FORCED SCORE FAILED: $a" | tee -a "$RES/failures.txt"
+  done
+  [ -n "$pd" ] && echo "KLD forced scores -> $pd" || echo "KLD forced: nothing to score"
 }
 
 # --- item 6: WS7 prologue — sly 1.11.0 first-boot phase breakdown ----------------
@@ -310,16 +708,26 @@ kld_score_all () {  # [extra_arm] — score every fetched arm vs the cached refe
 D_SLUGS="${SLUG_R1//x-/d-}"; [ "$ROUND" -ge 2 ] && D_SLUGS="$D_SLUGS ${SLUG_R2//x-/d-}"
 
 ws7_prologue () {
-  if ! server_needed $D_SLUGS; then echo "  WS7 prologue: arm D complete — no boot needed"; return 0; fi
-  if ! probes_selected $D_SLUGS; then echo "  WS7 prologue: no arm D probes selected (ONLY filter)"; return 0; fi
-  local cdir="/mnt/Lin1/work/vllm/sly-radiance/cache/vllm-sly-radiance@1.11.0-rocm10.1"
-  local label
-  if [ -d "$cdir" ]; then label="warm-first (1.11.0 cache dir exists; historical 1.9.1 cold MEASURED 400-475 s stands)"
-  else label="cold (no 1.11.0 cache dir — this first boot IS the cold measurement)"; fi
+  local sel; sel=$(selected_slugs $D_SLUGS)
+  if [ -z "$sel" ]; then echo "  WS7 prologue: no arm D probes selected (ONLY filter)"; return 0; fi
+  if ! server_needed $sel; then echo "  WS7 prologue: selected arm D cells complete — no boot needed"; return 0; fi
+  # item G (2026-11-11): cold vs warm from the MEASURED state of the image's host cache dir
+  # (bounded walk by boot_diag.py cache_probe), NOT a dir-existence guess (the 1.9.1 400-475 s
+  # figure was a historical cold; this probe says what THIS boot starts from). No cache wipe.
+  local cdir cstate cjson label
+  cdir=$(vllm_cache_dir "$IMAGE")
+  cjson="$RAW/ws7-cache-probe.json"
+  python3 "$BOOT_DIAG" cache --dir "$cdir" > "$cjson" 2>/dev/null || echo '{"cache_state": "unknown"}' > "$cjson"
+  cstate=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("cache_state") or "unknown")' "$cjson" 2>/dev/null || echo unknown)
+  label="${cstate} (MEASURED via boot_diag cache_probe of $cdir)"
   local first=1; [ -f "$RAW/done/ws7-cold" ] && first=0
   echo ">>> WS7 prologue: sly 1.11.0 cache state = $label"
   local t0=$SECONDS
-  if ! start_server d-redhat-sly1100 260000 fp8 0 2; then return 1; fi
+  if ! start_server d-redhat-sly1100 "$D_CTX" fp8 0 2; then
+    # P3: the WS7 gap must not be silent — a failed prologue boot means no cold number
+    echo "WS7 COLD BOOT NOT MEASURED (prologue start_server failed — see $RAW/boot-d-redhat-sly1100.txt)" \
+      | tee -a "$RES/failures.txt"
+    return 1; fi
   local up_after=$((SECONDS - t0))
   if [ "$first" -eq 1 ]; then
     docker logs vllm-8000 > "$RAW/ws7-boot-cold.log" 2>&1 || true
@@ -337,16 +745,16 @@ ws7_prologue () {
   fi
 }
 
-ws7_warm () {   # timed warm reboot after arm D's cells (item 6/7)
+ws7_warm () {   # timed warm reboot after arm D's cells (item 6/7) — one-time (marker),
+  # and only when the selected arm D cells are complete (the warm number belongs after the arm)
   [ -f "$RAW/done/ws7-warm" ] && { echo "  WS7 warm reboot already recorded"; return 0; }
-  local sel="" s
-  for s in $D_SLUGS; do want_probe "$s" && sel="$sel $s"; done   # gate on SELECTED slugs (ONLY filter)
+  local sel; sel=$(selected_slugs $D_SLUGS)
   if [ -z "$sel" ] || server_needed $sel; then
     echo "  WS7 warm reboot skipped (arm D not complete in this run)"; return 0; fi
   echo ">>> WS7 warm reboot (after arm D cells)"
   stop_server
   local t0=$SECONDS
-  if ! start_server d-redhat-sly1100 260000 fp8 0 2; then
+  if ! start_server d-redhat-sly1100 "$D_CTX" fp8 0 2; then
     echo "WS7 warm reboot FAILED" | tee -a "$RES/failures.txt"; return 0; fi
   local up_after=$((SECONDS - t0))
   docker logs vllm-8000 > "$RAW/ws7-boot-warm.log" 2>&1 || true
@@ -369,6 +777,7 @@ arm_cells () {  # arm
   run_probe_watched "${arm}-10k-tg512-n2"  2 1 512  completions unique codereview-10000.txt
   run_probe_watched "${arm}-10k-tg1024-n1" 1 1 1024 completions unique codereview-10000.txt
   run_probe_watched "${arm}-10k-tg1024-n2" 2 1 1024 completions unique codereview-10000.txt
+  [ "$DEPTH" = 1 ] && run_probe_watched "${arm}-20k-tg512-n1" 1 1 512 completions unique codereview-20000.txt
   [ "$ROUND" -ge 2 ] && {
     run_probe_watched "${arm}-10k-tg4096-n1" 1 1 4096 completions unique codereview-10000.txt
     run_probe_watched "${arm}-10k-tg4096-n2" 2 1 4096 completions unique codereview-10000.txt
@@ -379,6 +788,7 @@ arm_cells () {  # arm
     run_probe_watched "${arm}-50k-tg4096-n1" 1 1 4096 completions unique codereview-50000.txt
     run_probe_watched "${arm}-50k-tg4096-n2" 2 1 4096 completions unique codereview-50000.txt
   }
+  [ "$DEPTH" = 1 ] && [ "$ROUND" -lt 2 ] && run_probe_watched "${arm}-50k-tg512-n1" 1 1 512 completions unique codereview-50000.txt
   WARMUP=0 run_probe_watched "${arm}-100k-tg512-n1"  1 1 512  completions unique codereview-100000.txt
   WARMUP=0 run_probe_watched "${arm}-100k-tg512-n2"  2 1 512  completions unique codereview-100000.txt
   WARMUP=0 run_probe_watched "${arm}-100k-tg1024-n1" 1 1 1024 completions unique codereview-100000.txt
@@ -389,39 +799,80 @@ arm_cells () {  # arm
   }
 }
 
-arm_rad () {  # arm image rad_file served  (items 4/5/9/10)
-  local arm=$1 img=$2 rad=$3 served=$4
+arm_rad () {  # arm image rad_file served [spec_tokens]  (items 4/5/9/10; spec default RAD_SPEC_K, c0 = 0)
+  local arm=$1 img=$2 rad=$3 served=$4 spec=${5:-$RAD_SPEC_K}
+  # selftest marker keyed by family AND spec tokens: the default keeps the historical key 'radiance'
+  local fam=radiance; [ "$spec" = "$RAD_SPEC_K" ] || fam="radiance-spec$spec"
   local all="${SLUG_R1//x-/$arm-}"; [ "$ROUND" -ge 2 ] && all="$all ${SLUG_R2//x-/$arm-}"
-  if ! server_needed $all; then echo "  skip (done): arm $arm — all probes complete"; return 0; fi
-  if ! probes_selected $all; then echo "  skip (ONLY filter): arm $arm"; return 0; fi
-  if ! start_rad "$arm" "$img" "$rad" "$served"; then return 1; fi
+  local sel; sel=$(selected_slugs $all)
+  # KLD_ONLY=1: a KLD-only arm (forced batch q8f/q4mtp) boots for its fetch with no cells selected
+  if [ -z "$sel" ] && [ "${KLD_ONLY:-0}" != 1 ]; then echo "  skip (ONLY filter): arm $arm"; return 0; fi
+  # done probes AND a complete KLD fetch -> nothing to do; else boot, so a re-run retries KLD (P12)
+  if ! server_needed $sel && kld_complete "$RES/kld-$arm.jsonl" "$served" "$img"; then echo "  skip (done): arm $arm — all selected probes and the KLD fetch complete"; return 0; fi
+  if ! start_rad "$arm" "$img" "$rad" "$served" "$spec"; then return 1; fi
   residency_check "$arm"
-  kld_selftest radiance "$served"
-  if [ -f "$RAW/done/kld-selftest-radiance" ]; then
-    kld_fetch "$served" "$RES/kld-$arm.jsonl"
+  kld_selftest "$fam" "$served"
+  if [ -f "$RAW/done/kld-selftest-$fam" ]; then
+    kld_fetch "$served" "$RES/kld-$arm.jsonl" "$img"
   else
     echo "  KLD fetch skipped for arm $arm (selftest failed — logprobs unsupported?)"
   fi
   export ENGINES_LIST="radiance-${arm}|http://localhost:8000/v1|${served}"
-  arm_cells "$arm"
+  [ -n "$sel" ] && arm_cells "$arm"
   stop_rad
 }
 
 # --- item 6/7: arm D block — reuses the prologue boot (or boots fresh) -----------
 arm_d () {
-  if ! server_needed $D_SLUGS; then echo "  skip (done): arm D — all probes complete"; return 0; fi
-  if ! probes_selected $D_SLUGS; then echo "  skip (ONLY filter): arm D"; return 0; fi
-  # serve_vllm.sh start refuses a non-TTY boot on a held port — reuse ours if it matches
-  local cmdfile="$ROOT/stack/serve/var/servers/8000.cmdline"
+  local sel; sel=$(selected_slugs $D_SLUGS)
+  if [ -z "$sel" ]; then echo "  skip (ONLY filter): arm D"; return 0; fi
+  # done probes AND a complete KLD fetch -> nothing to do; else boot, so a re-run retries KLD (P12)
+  if ! server_needed $sel && kld_complete "$RES/kld-d.jsonl" qwen38-27b-redhat-mxfp4-dflash "$IMAGE"; then echo "  skip (done): arm D — all selected probes and the KLD fetch complete"; return 0; fi
+  # serve_vllm.sh start refuses a non-TTY boot on a held port — reuse only OURS: served
+  # name + image + ctx must all match. A foreign server with the same model+image but a
+  # different --max-model-len would taint arm D's rows (P4 — the 2026-11-10 short run
+  # reused the user-session 1.11.0 dflash server and the d-rows' provenance is suspect).
+  local cmdfile="$SERVER_STATE_DIR/8000.cmdline"
   if curl -s http://localhost:8000/v1/models 2>/dev/null | grep -q 'qwen38-27b-redhat-mxfp4-dflash' \
-     && [ -f "$cmdfile" ] && grep -q "$IMAGE" "$cmdfile"; then
-    echo "  reusing booted server (served name + image $IMAGE match)"
+     && [ -f "$cmdfile" ] && grep -q "$IMAGE" "$cmdfile" \
+     && grep -q -- "--max-model-len $D_CTX" "$cmdfile"; then
+    echo "  reusing booted server (served name + image + ctx $D_CTX match)"
     CURRENT=""; CURRENT_CONTAINER=vllm-8000
-  elif ! start_server d-redhat-sly1100 260000 fp8 0 2; then return 1; fi
+  elif ! start_server d-redhat-sly1100 "$D_CTX" fp8 0 2; then return 1; fi
   kld_selftest sly qwen38-27b-redhat-mxfp4-dflash
-  kld_fetch qwen38-27b-redhat-mxfp4-dflash "$RES/kld-d.jsonl"
+  # same contract as arm_rad: fetch only after a PASSED selftest (marker), never after a failed one
+  if [ -f "$RAW/done/kld-selftest-sly" ]; then
+    kld_fetch qwen38-27b-redhat-mxfp4-dflash "$RES/kld-d.jsonl" "$IMAGE"
+  else
+    echo "  KLD fetch skipped for arm D (selftest failed — logprobs unsupported?)"
+  fi
   arm_cells d
   stop_server
+}
+
+# --- compare round (2026-11-11): llama.cpp GGUF arm — same flow as arm_rad ------------------------
+arm_llama () {  # arm gguf served
+  local arm=$1 gguf=$2 served=$3 bin
+  if [ ! -f "$gguf" ] || [ ! -x "$LLAMA_BIN" ]; then
+    echo "PIN-FAIL: llama.cpp arm $arm — gguf '$gguf' or llama-server '$LLAMA_BIN' missing (arm skipped)" \
+      | tee -a "$RES/failures.txt"; return 1; fi
+  bin=$(readlink -f "$LLAMA_BIN")
+  local all="${SLUG_R1//x-/$arm-}"; [ "$ROUND" -ge 2 ] && all="$all ${SLUG_R2//x-/$arm-}"
+  local sel; sel=$(selected_slugs $all)
+  # KLD_ONLY=1: a KLD-only arm (forced batch q8f/q4mtp) boots for its fetch with no cells selected
+  if [ -z "$sel" ] && [ "${KLD_ONLY:-0}" != 1 ]; then echo "  skip (ONLY filter): arm $arm"; return 0; fi
+  if ! server_needed $sel && kld_complete "$RES/kld-$arm.jsonl" "$served" "$bin"; then echo "  skip (done): arm $arm — all selected probes and the KLD fetch complete"; return 0; fi
+  if ! start_llama "$arm" "$gguf" "$served"; then return 1; fi
+  residency_check "$arm"
+  kld_selftest llamacpp "$served"
+  if [ -f "$RAW/done/kld-selftest-llamacpp" ]; then
+    kld_fetch "$served" "$RES/kld-$arm.jsonl" "$bin"   # the build is the cache key's 'image'
+  else
+    echo "  KLD fetch skipped for arm $arm (selftest failed — logprobs unsupported?)"
+  fi
+  export ENGINES_LIST="llamacpp-${arm}|http://localhost:8000/v1|${served}"
+  [ -n "$sel" ] && arm_cells "$arm"
+  stop_llama
 }
 
 # --- item 2: preflight — pins must be exact BEFORE any GPU work (rule 2) ---------
@@ -463,7 +914,7 @@ preflight
 print_summary () {
   [ -f "$RES/results.jsonl" ] || return 0
 python3 - "$RES" <<'PY'
-import glob, json, os, sys
+import glob, json, os, re, sys
 res = sys.argv[1]
 rows = [json.loads(l) for l in open(os.path.join(res, "results.jsonl")) if l.strip()]
 agg = [r for r in rows if r.get("kind") == "aggregate"]
@@ -474,7 +925,8 @@ for arm in sorted({r["label"].split("-")[0] for r in agg}):
         print(f"  {r['label']:24s} n={r['concurrency']} tg={r['max_tokens']:<5}: "
               f"prefill {r.get('prefill_tok_s_p50')} tok/s  decode {r.get('decode_tok_s_per_stream_p50')} tok/s  "
               f"ttft {r.get('ttft_s_p50')} s")
-for f in sorted(glob.glob(os.path.join(res, "kld-?.json"))):
+for f in sorted(g for g in glob.glob(os.path.join(res, "kld-*.json"))
+               if re.fullmatch(r"kld-[a-z0-9]+\.json", os.path.basename(g))):   # a..e, c0, q4kxl (not selftests/pairs)
     try:
         d = json.load(open(f))
         print(f"KLD {d['label']}: {d['kl_nats_per_tok']:.4f} nats/tok  "
@@ -482,6 +934,11 @@ for f in sorted(glob.glob(os.path.join(res, "kld-?.json"))):
               f"top1 {d['top1_agreement']:.1%}  n={d['n_positions']}")
     except Exception as e:
         print(f"KLD {os.path.basename(f)}: unreadable ({e})")
+mxs = sorted(glob.glob(os.path.join(res, "kld-pairs-*.d", "kld-matrix.md")))   # newest scoring pass
+mx = mxs[-1] if mxs else ""
+if mx:
+    print("\n=== KLD pairwise matrix (" + mx + ") ===")
+    print(open(mx).read())
 for f in sorted(glob.glob(os.path.join(res, "ws7-boot*.json"))):
     try: print(f"WS7 {os.path.basename(f)}: {json.load(open(f))}")
     except Exception as e: print(f"WS7 {os.path.basename(f)}: unreadable ({e})")
@@ -502,7 +959,7 @@ if [ "$KLD_E" -eq 1 ]; then
   if start_server e-heretic-sly181 8192 fp8 0 1; then
     kld_selftest sly swift-1.5
     if [ -f "$RAW/done/kld-selftest-sly" ]; then
-      kld_fetch swift-1.5 "$RES/kld-e.jsonl"
+      kld_fetch swift-1.5 "$RES/kld-e.jsonl" "$IMG_SLY_E"
     else
       echo "  KLD fetch skipped for arm E (selftest failed)"
     fi

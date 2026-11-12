@@ -67,8 +67,9 @@ def count_tokens(v1_base, text):
 
 def stream(v1_base, api, payload, timeout=1200.0):
     """One streamed request. Returns a metrics dict (never raises for HTTP/stream errors — those
-    come back as {'error': ...}). Captures both reasoning styles: a separate reasoning_content
-    delta field, or inline <think>…</think> in content."""
+    come back as {'error': ...}; a no-tokens failure carries the raw SSE tail, bounded, so the
+    server's actual reply is readable from the row alone). Captures both reasoning styles: a
+    separate reasoning_content delta field, or inline <think>…</think> in content."""
     prompt = payload.get("_prompt", "")
     body = {k: v for k, v in payload.items() if k != "_prompt"}
     if api == "chat":
@@ -88,6 +89,7 @@ def stream(v1_base, api, payload, timeout=1200.0):
     usage = timings = finish = None
     saw_reasoning = False
     chunk_tokens = 0
+    raw_tail = ""      # bounded raw SSE payload — the "no tokens received" diagnostic
     t0 = time.perf_counter()
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
@@ -98,6 +100,7 @@ def stream(v1_base, api, payload, timeout=1200.0):
                 data = line[5:].strip()
                 if data == "[DONE]":
                     break
+                raw_tail = (raw_tail + data)[-4000:]
                 try:
                     obj = json.loads(data)
                 except json.JSONDecodeError:
@@ -130,7 +133,13 @@ def stream(v1_base, api, payload, timeout=1200.0):
     except (urllib.error.URLError, OSError, TimeoutError, ValueError) as e:
         return {"error": str(e), "total_s": time.perf_counter() - t0}
     if ttft is None:
-        return {"error": "no tokens received", "total_s": time.perf_counter() - t0}
+        # never discard what the server actually said (2026-11-10: 2/4 d-arm reps died
+        # with this and the server reply was gone) — the raw SSE tail makes the next
+        # live occurrence readable from results.jsonl alone
+        return {"error": ("no tokens received"
+                          + (f" (raw sse tail: {raw_tail[-400:]})" if raw_tail
+                             else " (empty sse stream)")),
+                "total_s": time.perf_counter() - t0}
     # a non-thinking model (no <think> ever, no reasoning field) → its first content IS the answer
     if ttfa is None and acc and "<think>" not in acc:
         ttfa = t_first_content
