@@ -1,4 +1,0 @@
-18:44:59 [rep1/r191-sharpsly2-d0] booting: PROFILE=sly-redhat/redhat-mxfp4-dflash SERVED_NAME=qwen38-27b-redhat-mxfp4-dflash MAXLEN=262000 MAXSEQS=1 KV_DTYPE=fp8 GPU_UTIL=0.93 WATCHDOG_MIB=32 FREE_MIB_FLOOR=30000 PORT=8000 IMAGE=ghcr.io/slybase/vllm-sly-radiance:1.9.1-rocm10.1 CACTUS_DELTA=0 CHAT_TEMPLATE=/home/dev/work/dp-craft/amd/campaigns/2026-10-31-redhat191-sharpsly2-w208-blind/sharp-sly2-chat_template.jinja
-18:48:13 [rep1/r191-sharpsly2-d0] claude call 0 (left 3600s)
-19:48:13 [rep1/r191-sharpsly2-d0] call 0 rc=137 session=aee023a5-39f6-4971-9c58-9a2af56c304f
-19:48:13 [rep1/r191-sharpsly2-d0] status=cap wall_s=3601 calls=1 resumes=0 session=aee023a5-39f6-4971-9c58-9a2af56c304f done_line=-

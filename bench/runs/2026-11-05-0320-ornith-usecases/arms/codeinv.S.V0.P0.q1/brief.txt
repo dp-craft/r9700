@@ -1,5 +1,0 @@
-List the top-level functions and classes of the Python files in /tmp/claude-1001/-home-dev-work-dp-craft-amd/bf832afa-1002-41d9-a4b8-4b201a1bc43c/scratchpad/uc/runs/codeinv.S.V0.P0.q1/src.
-Write /tmp/claude-1001/-home-dev-work-dp-craft-amd/bf832afa-1002-41d9-a4b8-4b201a1bc43c/scratchpad/uc/runs/codeinv.S.V0.P0.q1/out/inventory.txt with one line per definition, in this format:
-<file name>|<name>|<line number>|<one-sentence purpose>
-Include only top-level definitions, not methods or nested functions.
-Then reply with only: DONE

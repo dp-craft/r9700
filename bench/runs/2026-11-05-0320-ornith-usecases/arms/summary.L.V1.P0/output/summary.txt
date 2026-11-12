@@ -1,9 +1,0 @@
-GOAL: Benchmark on an AMD Radeon R9700 how the Qwen3.6-27B quantisation ladder, the reasoning budget (4096/16384/unlimited), and the 35B-A3B sampling affect strict-TypeScript task quality at ~132.9k tokens to pick a recommended config.
-RESULT: Of three axes tested, only sampling gives a real, actionable signal — use Qwen's coding recipe whole (temp 0.6 / pp 0) on the 35B-A3B. The quant ladder is a bounded null and the extra reasoning budget is a no-op above ~4k for the dense 27B, though it does genuinely help the MoE 35B; the strict-code wall is about cleanliness (lint/types), not logic.
-KEY: 77.5 TS% | Qwen3.6-35B-A3B at reasoning budget 16384, temp 0.6 / pp 0 (Qwen's coding recipe) — best-quality sampling point
-KEY: -15.4 pts (t=-3.41, significant) | whole Qwen "thinking general" preset vs the coding recipe on the 35B-A3B (within-model); temp 0.3 itself not significant (-7.5)
-KEY: +0.3 pts over +60 s (t=0.37, ns) | Qwen3.6-27B Q4_K_M reasoning budget 4096->16384, a tight null — do not pay for more budget on the dense model
-KEY: -4.3 pts (t=-5.45, significant) | Qwen3.6-35B-A3B reasoning budget 4096->16384 — the MoE benefits where the dense 27B does not
-KEY: 46.1 vs 32.6 decode t/s (+36% wall time) | Qwen3.6-27B Q4_K_M -> Q6_K, the cost side of a quant ladder that is not resolvable (resolution ≳12 pts)
-CAVEAT: The design is underpowered — 5 tasks give only ~≳12-pt resolution, so no quant can be called best or worst and both the quant and model axes are unresolvable; more tasks (not reps) are needed. Separately, GTT spill of 1551-2841 MiB in all 14 cells is unexplained and blocks unattended use on this no-swap box.
-OPEN: What causes the GTT spill present in all 14 cells even where VRAM headroom exists — left unattributed at depth and marked OPEN.

@@ -1,7 +1,0 @@
-Validation passes:
-- **a.** `^=== ITEM` count in items.txt = **40**; `^[0-9]+\|` count in labels.txt = **40** — match. IDs are 1–40, each once (no missing/duplicate).
-- **b.** All 40 lines end with one of the 8 allowed labels ✓.
-- **c.** Re-tested the hesitant cases against definitions: 011/014 report findings on existing code/changes (nav-cache bug; live orchestrator root-causes) → `code-review`; 024 produces merge design decisions → `plan`; 035 is an analytical inventory of existing IRs → `research`. No change needed.
-- File is plain text in exact `<nnn>|<label>` format with no extra lines.
-
-DONE

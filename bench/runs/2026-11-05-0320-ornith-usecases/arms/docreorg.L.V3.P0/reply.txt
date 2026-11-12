@@ -1,9 +1,0 @@
-All three target files are correctly assembled and read logically:
-
-- **topic-a.md** (backend tuning): §1 TL;DR optimum → §2 deltas → §3 sweeps → §4 exact optimum configs → KV-cache research → §5 cross-runtime → §6 status → §7 reproducing.
-- **topic-b.md** (W2-08 blind-review quality benchmark): Summary → Results per Opus finding → Review quality coverage → Methodology → Legend.
-- **topic-c.md** (analysis of why Q4 "thought less" + headroom levers): Summary → Consequences & root causes ×2 → What differs → measured per-step thinking → Levers → Recommended next step → Methodology → Legend.
-
-Both the apply and check steps passed (`0 lines unassigned`; `PASS` — 695 lines, nothing lost/altered/duplicated). The check already passed while ignoring `README.md`, and TOPICS.txt specifies only these three files, so no README is required.
-
-DONE

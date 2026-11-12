@@ -1,5 +1,0 @@
-Q1|2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md
-Q1|2026-10-23-0023-vllm-gpu-fault-solved-hip-kernarg.md
-Q2|none
-CONFLICT|2026-09-15-stew675-buildcmp.analysis.md:103|2026-10-23-0023-vllm-gpu-fault-solved-hip-kernarg.md:24|04 recommends ROCm llama-bench with -fa on for prefill; 03 reports a ROCm -fa on memory fault, fix untested for llama.cpp.
-RECOMMEND|For a local coding agent, the reports favour Qwen3.8-27B-MXFP4 on Sly radiance vLLM with DFlash2 k = 7, the sharp chat template and HIP_FORCE_DEV_KERNARG=0, because it is the only setup here with blind-graded coding quality (11/19 Opus findings) and a memory-fault fix checked over Claude Code turns. Ornith-1.5-35B-A3B on native Radiance with MTP K=3 is the fastest measured option (219.8 t/s decode at 10k), but its coding quality is untested and its default headroom crashed the desktop once. Both quality and speed figures are n = 1 or 3 boots, so repeat runs are needed before treating either as settled.

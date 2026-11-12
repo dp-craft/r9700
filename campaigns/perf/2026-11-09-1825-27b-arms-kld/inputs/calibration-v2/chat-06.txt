@@ -1,0 +1,97 @@
+<|im_start|>system
+You are a coding agent working in a TypeScript and Python repository. Think, then act.
+
+Think first, scaling depth to complexity: solve simple tasks directly; for complex tasks, trace concrete mechanics step-by-step (initial state -> transformations -> final outcome) across boundary and failure cases (empty, extreme, conflicting, aborted), and verify end-to-end continuity (every input, requirement, or claim must be sourced/computed upstream and used/resolved downstream). Avoid circular re-reading, but never stop at surface/structural checks before verifying actual operational behavior.
+
+1. Priority: Accuracy, internal consistency, and completeness override brevity. Keep solutions minimal (no over-engineering), never cutting analytical or verification depth. Evaluate provided context and sources verbatim without silent normalization. Flag flawed premises, contradictions, or dead/unhandled elements first. Never truncate outputs, code, tables, or data with placeholders.
+2. Delivery: Zero filler; use the clearest structure (tables, lists, code, prose). Lead with the answer/artifact, followed only by non-obvious constraints and causal reasoning. Strict format constraints (e.g., JSON/code-only) suppress all prose.
+3. Ambiguity (Minimize Turns): State uncertainties and their root causes.
+   - Minor gaps: State brief assumptions and solve.
+   - Multiple viable paths: Rank top options (effort vs. impact) AND immediately execute the optimal default.
+   - Blocked: Batch all critical clarifying questions at once.<|im_end|>
+<|im_start|>user
+Write unit tests for the public functions in this file. Cover the edge cases, not only the happy path.
+
+File `bench/workloads/corpus/ts-agentic-code-runner/src/core/tools/verifyEdit.test.ts`:
+```
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import { buildAnchorRecoveryHint, verifyEdit } from './verifyEdit';
+
+describe('verifyEdit', () => {
+  let dir: string;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'verify-edit-'));
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('should apply the edit and report ok when anchor matches exactly once', async () => {
+    const file = join(dir, 'a.ts');
+    writeFileSync(file, 'const x = 1;\nconst y = 2;\n');
+
+    const result = await verifyEdit({
+      path: file,
+      anchor: 'const x = 1;',
+      replacement: 'const x = 42;',
+    });
+
+    expect(result.ok).toBe(true);
+    expect(readFileSync(file, 'utf8')).toBe('const x = 42;\nconst y = 2;\n');
+  });
+
+  it('should reject and leave the file unchanged when the anchor is absent', async () => {
+    const file = join(dir, 'b.ts');
+    const original = 'const x = 1;\n';
+    writeFileSync(file, original);
+
+    const result = await verifyEdit({
+      path: file,
+      anchor: 'const z = 9;',
+      replacement: 'const z = 0;',
+    });
+
+    expect(result.ok).toBe(false);
+    expect(readFileSync(file, 'utf8')).toBe(original);
+  });
+
+  it('should reject and leave the file unchanged when the anchor is ambiguous', async () => {
+    const file = join(dir, 'c.ts');
+    const original = 'foo();\nfoo();\n';
+    writeFileSync(file, original);
+
+    const result = await verifyEdit({ path: file, anchor: 'foo();', replacement: 'bar();' });
+
+    expect(result.ok).toBe(false);
+    expect(readFileSync(file, 'utf8')).toBe(original);
+  });
+
+  it('should reject when the path does not point to a readable file', async () => {
+    const missing = join(dir, 'nope.ts');
+
+    const result = await verifyEdit({ path: missing, anchor: 'anything', replacement: 'x' });
+
+    expect(result.ok).toBe(false);
+  });
+
+  it('should reject when the path is a directory', async () => {
+    const sub = join(dir, 'sub');
+    mkdirSync(sub);
+
+    const result = await verifyEdit({ path: sub, anchor: 'anything', replacement: 'x' });
+
+    expect(result.ok).toBe(false);
+  });
+
+  describe('idempotency guard — replacement contains anchor', () => {
+    it('should succeed on first application when replacement contains the anchor', async () => {
+```<|im_end|>
+<|im_start|>assistant
+<think>

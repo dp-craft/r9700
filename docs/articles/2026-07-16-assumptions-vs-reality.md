@@ -41,7 +41,7 @@ produces an answer. Every capped config, across both builds and all three budget
 
 Our first read was that the draft-acceptance parameters were "backfiring" — tuning them to be
 more aggressive was correlated with the runaways, so we called it causal. A follow-up test
-(`bench/runs/2026-07-16-1111-spec-draft-pmin-mtp/`) refuted that story: those draft parameters
+(`campaigns/perf/2026-07-16-0927-mtp-sampler-tax/results/2026-07-16-1111-spec-draft-pmin-mtp/`) refuted that story: those draft parameters
 are live — they measurably change decode behavior — but what they gate is draft *depth and
 speed*, not reasoning *length*. There's no mechanism by which they'd push a model into thinking
 to the token cap. The one variable that actually predicts a runaway is whether the thinking
@@ -87,7 +87,7 @@ Recommended config:
 ```bash
 MODEL=/home/dev/models/gguf/Qwen3.6-27B-MTP-Q4_K_M.gguf BACKEND=vulkan PORT=8081 \
 CTX=32768 NP=1 UB=2048 B=4096 FA=on KV=f16 MTP=1 \
-EXTRA_ARGS="--reasoning-budget 1024" bash bench/engine-bench/serve_llamacpp.sh start
+EXTRA_ARGS="--reasoning-budget 1024" bash stack/serve/llamacpp/serve_llamacpp.sh start
 # client sampling: temperature 0.6, top_p 0.95, top_k 20, min_p 0
 ```
 
@@ -95,7 +95,7 @@ EXTRA_ARGS="--reasoning-budget 1024" bash bench/engine-bench/serve_llamacpp.sh s
 agentic context, use `--reasoning-budget 2048` as the depth-safe default until a depth follow-up
 confirms 1024 holds further out.
 
-![Reasoning-budget sweep: quality flat, cost and latency scale with the cap](../../campaigns/2026-07-13-27b-quality-tuning/charts/reasoning_budget_sweep.svg)
+![Reasoning-budget sweep: quality flat, cost and latency scale with the cap](../../campaigns/quality/2026-07-13-1138-27b-quality-tuning/results/charts/reasoning_budget_sweep.svg)
 <!-- LinkedIn does not render SVG inline; export this chart to PNG before posting. -->
 
 ## What we haven't proven

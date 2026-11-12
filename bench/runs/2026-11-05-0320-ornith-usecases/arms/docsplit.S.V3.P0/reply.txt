@@ -1,9 +1,0 @@
-Done. Split complete and verified:
-
-- **12 files** written to `out/`, named `NN-<slug>.md` (00-intro through 11-external-prior-comparison), each a top-level `## ` section split out by moving raw bytes (no retyping).
-- **manifest.json** with contiguous, gap-free 1-based inclusive ranges covering lines 1–199.
-- `doc_apply.py`: wrote 12 files, 0 unassigned lines.
-- `doc_check.py`: **PASS** — source 166 lines, output 166 lines, 0 lost/altered/duplicated (README ignored as instructed).
-- **README.md** written after the PASS with one linked bullet per file in document order.
-
-DONE

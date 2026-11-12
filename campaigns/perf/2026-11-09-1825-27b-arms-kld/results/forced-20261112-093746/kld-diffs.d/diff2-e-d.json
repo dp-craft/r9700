@@ -1,0 +1,19 @@
+{
+  "kind": "kld_forced_diff",
+  "label_a": "e",
+  "label_b": "d",
+  "reference_label": "q8",
+  "n_prompts_used": 128,
+  "n_prompt_errors": 0,
+  "n_positions": 4096,
+  "kl_a": 0.088703,
+  "kl_b": 0.063786,
+  "diff_nats_per_tok": 0.024918,
+  "ci95_nats": [
+    0.009484,
+    0.042036
+  ],
+  "ci_method": "cluster bootstrap of the per-position difference (block=prompt, B=2000, percentile 95%)",
+  "verdict": "d lower",
+  "frac_prompts_a_lower": 0.17969
+}

@@ -1,0 +1,15 @@
+date=2026-11-11T21:02:35+01:00
+run_tag=compare-20261111-210235
+model=/mnt/Lin1/work/vllm/sly-radiance/models/RedHatAI__Qwen3.8-27B-MXFP4@16a86728
+engine=vllm profile=sly-redhat/redhat-mxfp4-dflash served_model=qwen38-27b-redhat-mxfp4-dflash
+image=ghcr.io/slybase/vllm-sly-radiance:1.11.0-rocm10.1
+round=1
+kld_heretic=0
+env[d-redhat-sly1100]=WATCHDOG_MIB=32 GPU_UTIL=0.93 CACTUS_DELTA=0 CHAT_TEMPLATE=/home/dev/work/dp-craft/amd/stack/serve/vllm/templates/dp-sharp-chat_template.jinja
+vram_budget_mib=32400
+only=d-10k-tg512-n1,d-100k-tg512-n1,a-10k-tg512-n1,a-100k-tg512-n1,b-10k-tg512-n1,b-100k-tg512-n1,c-10k-tg512-n1,c-100k-tg512-n1,c0-10k-tg512-n1,c0-100k-tg512-n1,q4kxl-10k-tg512-n1,q4kxl-100k-tg512-n1,q6k-10k-tg512-n1,q6k-100k-tg512-n1
+reps_override=2
+kld_n=16
+invocation=2026-11-11T21:02:35+01:00 repo_commit=1742be1 repo_dirty=15
+invocation=2026-11-11T21:52:07+01:00 repo_commit=72696b4 repo_dirty=15
+invocation=2026-11-11T23:38:22+01:00 repo_commit=72696b4 repo_dirty=18

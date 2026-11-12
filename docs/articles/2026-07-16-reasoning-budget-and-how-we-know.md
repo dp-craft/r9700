@@ -54,7 +54,7 @@ runaway. Every *capped* config showed 0% runaways, no exceptions. Our first read
 pointed at the MTP draft-acceptance knobs (`--spec-draft-p-min`, `--spec-draft-n-max`) as the
 culprit, since the runaway cells happened to be MTP configs we were also tuning for draft
 acceptance. That inference was wrong, and we know it's wrong because we went back and tested it
-directly: a follow-up run (`bench/runs/2026-07-16-1111-spec-draft-pmin-mtp/`) confirmed those draft
+directly: a follow-up run (`campaigns/perf/2026-07-16-0927-mtp-sampler-tax/results/2026-07-16-1111-spec-draft-pmin-mtp/`) confirmed those draft
 params are live on this build, but they gate draft *depth and speed* — how far ahead the model
 drafts and how eagerly it accepts drafts — not reasoning *length*. There's no mechanism by which
 they could push a model into an 8192-token runaway. The one variable that actually correlates with
@@ -83,7 +83,7 @@ story doesn't survive the check.
 ```bash
 MODEL=/home/dev/models/gguf/Qwen3.6-27B-MTP-Q4_K_M.gguf BACKEND=vulkan PORT=8081 \
 CTX=32768 NP=1 UB=2048 B=4096 FA=on KV=f16 MTP=1 \
-EXTRA_ARGS="--reasoning-budget 1024" bash bench/engine-bench/serve_llamacpp.sh start
+EXTRA_ARGS="--reasoning-budget 1024" bash stack/serve/llamacpp/serve_llamacpp.sh start
 # client sampling: temperature 0.6, top_p 0.95, top_k 20, min_p 0
 ```
 
@@ -101,7 +101,7 @@ sweet spot moves, plus a KV-q8 spot-check now that real VRAM savings are in play
 0% runaway record.
 
 <!-- Hero chart: reasoning_budget_sweep.svg. LinkedIn does not render SVG inline; export to PNG before posting. -->
-![Reasoning budget sweep: quality holds flat while token cost and latency scale with the cap](../../campaigns/2026-07-13-27b-quality-tuning/charts/reasoning_budget_sweep.svg)
+![Reasoning budget sweep: quality holds flat while token cost and latency scale with the cap](../../campaigns/quality/2026-07-13-1138-27b-quality-tuning/results/charts/reasoning_budget_sweep.svg)
 
 ---
 *Provenance: all performance/quality numbers are MEASURED on the R9700 (RDNA4, gfx1201) with

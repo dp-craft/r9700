@@ -1,0 +1,66 @@
+{
+ "slug": "vllm-redhat-sly191-d0-dflash-depth",
+ "date": "2026-10-30-2232",
+ "title": "Sly 1.9.1 · RedHatAI Qwen3.8-27B-MXFP4 · DFlash2 k=7 · CACTUS_DELTA=0 (stock sampling) · fp8 KV · ctx 262000 · depth 10k/50k/100k/150k",
+ "engine": "vllm",
+ "profile": "sly-redhat/redhat-mxfp4-dflash",
+ "served_model": "qwen38-27b-redhat-mxfp4-dflash",
+ "model": "/mnt/Lin1/work/vllm/sly-radiance/models/RedHatAI__Qwen3.8-27B-MXFP4@16a86728",
+ "port": 8000,
+ "servers": [
+  {
+   "name": "redhat-sly191-d0-dflash-fp8kv-ctx262000",
+   "ctx": 262000,
+   "np": 1,
+   "kv": "fp8",
+   "mtp": 0,
+   "probes": [
+    {
+     "slug": "redhat-sly191-d0-dflash-cr10000",
+     "prompts": [
+      "codereview-10000.txt"
+     ],
+     "api": "chat",
+     "reps": 2,
+     "max_tokens": 256,
+     "warmup": 1
+    },
+    {
+     "slug": "redhat-sly191-d0-dflash-cr50000",
+     "prompts": [
+      "codereview-50000.txt"
+     ],
+     "api": "chat",
+     "reps": 2,
+     "max_tokens": 256,
+     "warmup": 0
+    },
+    {
+     "slug": "redhat-sly191-d0-dflash-cr100000",
+     "prompts": [
+      "codereview-100000.txt"
+     ],
+     "api": "chat",
+     "reps": 2,
+     "max_tokens": 256,
+     "warmup": 0
+    },
+    {
+     "slug": "redhat-sly191-d0-dflash-cr150000",
+     "prompts": [
+      "codereview-150000.txt"
+     ],
+     "api": "chat",
+     "reps": 2,
+     "max_tokens": 256,
+     "warmup": 0
+    }
+   ]
+  }
+ ],
+ "image": "ghcr.io/slybase/vllm-sly-radiance:1.9.1-rocm10.1",
+ "env": {
+  "CACTUS_DELTA": "0"
+ },
+ "note": "Stage 1 of the δ0 follow-up to docs/findings/agentic/2026-10-30-1552-dpf-brief-fix-heretic-vs-redhat.md: at δ 0 speculative decoding is distribution-preserving, so DFlash2 k=7 vs MTP k=4 is a pure speed question; this pair decides the spec method for the W2-08 session S1. Differs from campaigns/perf/2026-10-30-1951-vllm-redhat-sly191-dflash-depth (δ 0.5) in: CACTUS_DELTA 0 (fade/cap are inert at δ 0), ctx 262000 (= the session MAXLEN from settings-redhat.json, was 110000) and the extra 150k depth (sessions sit at 90-180k before auto-compaction). Image pinned by tag; the digest is in the run dir's server-<name>.txt."
+}

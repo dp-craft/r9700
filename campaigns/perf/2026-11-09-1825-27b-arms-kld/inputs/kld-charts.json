@@ -1,0 +1,152 @@
+{
+ "reference": "Q8_0",
+ "out": "results/kld-final",
+ "family_slots": {
+  "llama.cpp": 1,
+  "radiance": 2,
+  "sly vLLM": 8
+ },
+ "floor_ref": "q8f",
+ "arms": [
+  {
+   "id": "q8f",
+   "family": "llama.cpp",
+   "label": "q8f · Q8_0 re-run",
+   "score": "results/forced-20261112-093746/kld-forced-final.d/kldf2-q8f.json",
+   "floor": true
+  },
+  {
+   "id": "c",
+   "family": "radiance",
+   "label": "c · IQ4R-L-V4 · Radiance 1.17",
+   "score": "results/forced-20261112-093746/kld-forced-final.d/kldf2-c.json"
+  },
+  {
+   "id": "q4kxl",
+   "family": "llama.cpp",
+   "label": "q4kxl · UD-Q4_K_XL · llama.cpp b11448",
+   "score": "results/forced-20261112-093746/kld-forced-final.d/kldf2-q4kxl.json"
+  },
+  {
+   "id": "dfh",
+   "family": "sly vLLM",
+   "label": "dfh · RedHat MXFP4, full lm head · Sly 1.11",
+   "score": "results/forced-20261112-093746/kld-forced-final.d/kldf2-dfh.json"
+  },
+  {
+   "id": "b",
+   "family": "radiance",
+   "label": "b · Quark MXFP4 · Radiance 1.17",
+   "score": "results/forced-20261112-093746/kld-forced-final.d/kldf2-b.json"
+  },
+  {
+   "id": "bf",
+   "family": "radiance",
+   "label": "bf · re-boot of b",
+   "score": "results/forced-20261112-093746/kld-forced-final.d/kldf2-bf.json",
+   "floor": true
+  },
+  {
+   "id": "a",
+   "family": "radiance",
+   "label": "a · Quark MXFP4 · Radiance 1.11",
+   "score": "results/forced-20261112-093746/kld-forced-final.d/kldf2-a.json"
+  },
+  {
+   "id": "d0",
+   "family": "sly vLLM",
+   "label": "d0 · RedHat MXFP4 · Sly 1.11 · no spec",
+   "score": "results/forced-20261112-093746/kld-forced-final.d/kldf2-d0.json"
+  },
+  {
+   "id": "d0f",
+   "family": "sly vLLM",
+   "label": "d0f · re-boot of d0",
+   "score": "results/forced-20261112-093746/kld-forced-final.d/kldf2-d0f.json",
+   "floor": true
+  },
+  {
+   "id": "d",
+   "family": "sly vLLM",
+   "label": "d · RedHat MXFP4 · Sly 1.11 · DFlash",
+   "score": "results/forced-20261112-093746/kld-forced-final.d/kldf2-d.json"
+  },
+  {
+   "id": "d181",
+   "family": "sly vLLM",
+   "label": "d181 · d on Sly 1.8.1",
+   "score": "results/forced-r2-20261112-200238/kld-forced-final.d/kldf2-d181.json"
+  },
+  {
+   "id": "e",
+   "family": "sly vLLM",
+   "label": "e · heretic MXFP4-GPTQ · Sly 1.8.1",
+   "score": "results/forced-20261112-093746/kld-forced-final.d/kldf2-e.json"
+  }
+ ],
+ "effects": [
+  {
+   "group": "Re-boot noise",
+   "label": "vLLM re-boot (d0f − d0)",
+   "a": "d0f",
+   "b": "d0",
+   "diff": "results/forced-20261112-093746/kld-diffs.d/diff2-d0f-d0.json"
+  },
+  {
+   "group": "Re-boot noise",
+   "label": "Radiance re-boot (bf − b)",
+   "a": "bf",
+   "b": "b",
+   "diff": "results/forced-20261112-093746/kld-diffs.d/diff2-bf-b.json"
+  },
+  {
+   "group": "Speculative decoding",
+   "label": "DFlash on − off (d − d0)",
+   "a": "d",
+   "b": "d0",
+   "diff": "results/forced-20261112-093746/kld-diffs.d/diff2-d-d0.json"
+  },
+  {
+   "group": "Engine version",
+   "label": "Sly 1.8.1 − 1.11 (d181 − d)",
+   "a": "d181",
+   "b": "d",
+   "diff": "results/forced-r2-20261112-200238/kld-diffs.d/diff2-d181-d.json"
+  },
+  {
+   "group": "Engine version",
+   "label": "Radiance 1.11 − 1.17 (a − b)",
+   "a": "a",
+   "b": "b",
+   "diff": "results/forced-20261112-093746/kld-diffs.d/diff2-a-b.json"
+  },
+  {
+   "group": "MXFP4 pack + engine",
+   "label": "Quark/Radiance − RedHat/Sly (b − d0f)",
+   "a": "b",
+   "b": "d0f",
+   "diff": "results/forced-20261112-093746/kld-diffs.d/diff2-b-d0f.json"
+  },
+  {
+   "group": "lm head",
+   "label": "full-precision head (dfh − d0)",
+   "a": "dfh",
+   "b": "d0",
+   "diff": "results/forced-20261112-093746/kld-diffs.d/diff2-dfh-d0.json"
+  },
+  {
+   "group": "Model",
+   "label": "heretic − RedHat, same Sly 1.8.1 (e − d181)",
+   "a": "e",
+   "b": "d181",
+   "diff": "results/forced-r2-20261112-200238/kld-diffs.d/diff2-e-d181.json"
+  },
+  {
+   "group": "Q4-class quant + engine",
+   "label": "IQ4/Radiance − Q4_K_XL/llama.cpp (c − q4kxl)",
+   "a": "c",
+   "b": "q4kxl",
+   "diff": "results/forced-20261112-093746/kld-diffs.d/diff2-c-q4kxl.json"
+  }
+ ]
+}

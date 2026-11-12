@@ -1,6 +1,0 @@
-17:55:38 [redhat191] booting /home/dev/work/dippe/dp-forge/vllm.sh with IMAGE=ghcr.io/slybase/vllm-sly-radiance:1.9.1-rocm10.1
-18:02:28 [redhat191] claude call 0 (left 10800s, W2-08 line 0)
-19:29:16 [redhat191] call 0 rc=0 session=5d87ee3f-d832-4f50-9332-9b714087c592 W2-08 line 1
-19:29:16 [redhat191] W2-08 line recorded
-19:29:22 [redhat191] main checkout untouched
-19:29:22 [redhat191] done: wall_s=5208 claude_calls=1 session=5d87ee3f-d832-4f50-9332-9b714087c592 w208_line=1

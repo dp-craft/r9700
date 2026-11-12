@@ -1,20 +1,21 @@
 #!/usr/bin/env python3
 """Regenerate the report lists in docs/INDEX.md from each report's own metadata.
 
-Every report in docs/analysis/, docs/research/, and each co-located campaign analysis
-(campaigns/<date>-<slug>/analysis.md, indexed under "analysis") must carry an HTML-comment
-meta block at the top (invisible in rendered Markdown):
+Every report under docs/findings/<topic>/ (our write-ups) and docs/research/<topic>/ (external synthesis) must carry
+an HTML-comment meta block at the top (invisible in rendered Markdown):
 
     <!-- meta
     date: 2026-07-11 18:44
     takeaway: One-line summary, **markdown allowed**, `code` fine.
+    campaign: campaigns/perf/2026-07-11-1833-starter-baseline      (findings only, when a campaign produced it;
+                                                                    comma-separated when several did)
     -->
 
-`kind` is inferred from the directory (analysis/ or research/); the link text is the
-filename with the leading date stripped. This script rewrites only the content between
-the `<!-- reindex:analysis:start -->…:end -->` (and research) markers in INDEX.md, sorted
-newest-first. It FAILS LOUDLY if a report has no meta block — that is the enforcement the
-old hand-edited convention lacked.
+The section is the top dir (findings/ or research/); the topic is the path below it (`llamacpp`, `llamacpp/build-checks`);
+the link text is the filename with the leading date stripped. Each `campaign:` entry must name an existing campaign dir
+(repo-relative) holding the data behind the write-up. This script rewrites only the content between the
+`<!-- reindex:findings:start -->…:end -->` (and research) markers in INDEX.md, sorted newest-first. It FAILS LOUDLY on a
+report without a meta block or with a `campaign:` that does not resolve.
 
 Usage:  docs/reindex.py [--check]
   (no args) rewrite INDEX.md in place.
@@ -26,6 +27,7 @@ DOCS = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(DOCS)
 INDEX = os.path.join(DOCS, "INDEX.md")
 META_RE = re.compile(r"<!--\s*meta\b(.*?)-->", re.DOTALL)
+SECTIONS = ("findings", "research")
 
 
 def parse_meta(path):
@@ -59,30 +61,23 @@ def _slug(name):
 
 def build_section(kind):
     lines, errors = [], []
-    # 1) standalone reports in docs/<kind>/*.md
-    for path in glob.glob(os.path.join(DOCS, kind, "*.md")):
-        meta = parse_meta(path)
-        fname = os.path.basename(path)
-        if not meta or "date" not in meta or "takeaway" not in meta:
-            errors.append(f"  MISSING meta (date+takeaway) in {kind}/{fname}")
+    root = os.path.join(DOCS, kind)
+    for path in glob.glob(os.path.join(root, "**", "*.md"), recursive=True):
+        rel = os.path.relpath(path, DOCS)
+        if os.path.basename(path) == "README.md":
             continue
-        link = _slug(fname[:-3])
-        rel = f"{kind}/{fname}"
+        meta = parse_meta(path)
+        if not meta or "date" not in meta or "takeaway" not in meta:
+            errors.append(f"  MISSING meta (date+takeaway) in {rel}")
+            continue
+        for camp in filter(None, (c.strip() for c in meta.get("campaign", "").split(","))):
+            if not os.path.isdir(os.path.join(REPO, camp)):
+                errors.append(f"  campaign: {camp} does not exist ({rel})")
+        topic = os.path.dirname(os.path.relpath(path, root)) or "-"
         lines.append((sort_key(meta["date"]),
-                      f"- {meta['date']} · {kind} · [{link}]({rel}) — {meta['takeaway']}"))
-    # 2) analyses co-located in campaigns/<date>-<slug>/analysis.md (project-root campaigns dir)
-    if kind == "analysis":
-        for path in sorted(glob.glob(os.path.join(REPO, "campaigns", "*", "analysis.md"))):
-            meta = parse_meta(path)
-            cdir = os.path.basename(os.path.dirname(path))
-            if not meta or "date" not in meta or "takeaway" not in meta:
-                errors.append(f"  MISSING meta (date+takeaway) in campaigns/{cdir}/analysis.md")
-                continue
-            rel = f"../campaigns/{cdir}/analysis.md"
-            lines.append((sort_key(meta["date"]),
-                          f"- {meta['date']} · {kind} · [{_slug(cdir)}]({rel}) — {meta['takeaway']}"))
+                      f"- {meta['date']} · {topic} · [{_slug(os.path.basename(path)[:-3])}]({rel}) — {meta['takeaway']}"))
     if errors:
-        sys.exit("reindex: reports without a meta block:\n" + "\n".join(errors))
+        sys.exit("reindex: bad reports:\n" + "\n".join(sorted(errors)))
     lines.sort(key=lambda t: t[0], reverse=True)
     return "\n".join(l for _, l in lines)
 
@@ -92,7 +87,7 @@ def splice(text, kind, body):
     pat = re.compile(re.escape(s) + r".*?" + re.escape(e), re.DOTALL)
     if not pat.search(text):
         sys.exit(f"reindex: markers {s} / {e} not found in INDEX.md")
-    return pat.sub(f"{s}\n{body}\n{e}", text)
+    return pat.sub(lambda _: f"{s}\n{body}\n{e}", text)
 
 
 def main():
@@ -100,7 +95,7 @@ def main():
     with open(INDEX, encoding="utf-8") as fh:
         original = fh.read()
     text = original
-    for kind in ("analysis", "research"):
+    for kind in SECTIONS:
         text = splice(text, kind, build_section(kind))
     if check:
         if text != original:

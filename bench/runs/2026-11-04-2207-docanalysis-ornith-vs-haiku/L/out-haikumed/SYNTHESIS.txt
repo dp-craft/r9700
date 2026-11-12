@@ -1,8 +1,0 @@
-Q1|2026-07-14-hardest-tasks-27b-vs-35b.analysis.md
-Q1|2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md
-Q1|2026-10-23-0023-vllm-gpu-fault-solved-hip-kernarg.md
-Q2|none
-CONFLICT|2026-10-30-0900-vllm-redhat-mxfp4-depth-transposed.md:91|2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md:47|Same RedHat 27B, DFlash2 k=7, Sly 1.9.1 at 10k: 122.72 t/s in one report, 86.9 t/s in the other.
-CONFLICT|2026-07-14-hardest-tasks-27b-vs-35b.analysis.md:466|2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md:138|One says never set presence_penalty above 0 for coding; the other recommends presence_penalty 1.5 (different model, same advice question).
-CONFLICT|2026-10-23-0023-vllm-gpu-fault-solved-hip-kernarg.md:24|2026-09-15-stew675-buildcmp.analysis.md:103|Build report recommends ROCm for prefill; fault report says the same ROCm fault class is probably present in llama.cpp ROCm and untested.
-RECOMMEND|For a local coding agent these reports point to Qwen3.6-35B-A3B on llama.cpp Vulkan with MTP and Qwen's coding sampler (temp 0.6, presence_penalty 0), which is about 2.6x faster to a full answer than the 27B at no resolvable quality difference, though its GTT spill is still unexplained. Ornith 1.5 on native Radiance is faster still but its coding quality is untested, so it needs a quality check before use. Avoid ROCm and presence_penalty above 0 for coding unless re-verified.

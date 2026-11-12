@@ -1,3 +1,0 @@
-All three files are written to `out/`, each reads logically from its summary, and `doc_check` passed (695 source lines → 695 output lines, none lost/altered/duplicated). Every section was moved by the script via byte ranges — no text retyped. Only the three target files were written; no README added (honoring "write only the target files named in TOPICS.txt").
-
-DONE

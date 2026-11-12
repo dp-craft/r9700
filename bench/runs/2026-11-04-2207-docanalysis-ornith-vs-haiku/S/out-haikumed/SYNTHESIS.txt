@@ -1,6 +1,0 @@
-Q1|2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md
-Q1|2026-10-23-0023-vllm-gpu-fault-solved-hip-kernarg.md
-Q2|none
-CONFLICT|2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md:167|2026-10-31-redhat-sharp-w208-blind.analysis.md:240|01 says the 27B arm used production dp-sharp template; 02 keeps v22.5 as default and calls sharp only a candidate.
-CONFLICT|2026-09-15-stew675-buildcmp.analysis.md:97|2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md:16|04 says llama.cpp Vulkan wins decode-heavy work at 21.7 t/s on 27B; 01 measures 86.9-96.0 t/s 27B and 219.8 t/s 35B decode on vLLM-based engines.
-RECOMMEND|For a local coding agent on this R9700, the fastest option in these reports is Ornith 1.5 35B-A3B w4a8 on native Radiance with MTP K=3 (219.8 t/s decode and 13,059 t/s prefill at 10k), but its coding quality is untested. The Qwen3.8-27B on Sly is the alternative with blind-graded quality evidence at 86.9 t/s decode. Any vLLM run on ROCm should set HIP_FORCE_DEV_KERNARG=0 to avoid random memory faults.

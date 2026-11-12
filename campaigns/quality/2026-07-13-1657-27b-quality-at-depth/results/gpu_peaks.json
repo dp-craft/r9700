@@ -1,0 +1,126 @@
+{
+ "generated_by": "bench/quality/make_charts.py",
+ "provenance": "MEASURED: max over the samples of each GPU sample CSV (stack/gpu/vram_sampler.py); csv paths relative to the campaign dir",
+ "runs": [
+  {
+   "run": ".",
+   "csv": "tmp/gpu_jr-d128-f16-rb2048.csv",
+   "peak_vram_mib": 28187,
+   "peak_gtt_mib": 1001,
+   "load_vram_mib": 27364,
+   "vram_total_mib": 32624,
+   "samples": 2127,
+   "quarantined": false,
+   "provenance": "MEASURED",
+   "label": "jr-d128-f16-rb2048"
+  },
+  {
+   "run": ".",
+   "csv": "tmp/gpu_jr-d128-q8-rb2048.csv",
+   "peak_vram_mib": 22779,
+   "peak_gtt_mib": 974,
+   "load_vram_mib": 22611,
+   "vram_total_mib": 32624,
+   "samples": 2032,
+   "quarantined": false,
+   "provenance": "MEASURED",
+   "label": "jr-d128-q8-rb2048"
+  },
+  {
+   "run": ".",
+   "csv": "tmp/gpu_jr-d64-f16-rb2048.csv",
+   "peak_vram_mib": 23361,
+   "peak_gtt_mib": 785,
+   "load_vram_mib": 23028,
+   "vram_total_mib": 32624,
+   "samples": 1572,
+   "quarantined": false,
+   "provenance": "MEASURED",
+   "label": "jr-d64-f16-rb2048"
+  },
+  {
+   "run": ".",
+   "csv": "tmp/gpu_un-d128-f16-rb1024.csv",
+   "peak_vram_mib": 29940,
+   "peak_gtt_mib": 2028,
+   "load_vram_mib": 29896,
+   "vram_total_mib": 32624,
+   "samples": 933,
+   "quarantined": false,
+   "provenance": "MEASURED",
+   "label": "un-d128-f16-rb1024"
+  },
+  {
+   "run": ".",
+   "csv": "tmp/gpu_un-d128-f16-rb2048.csv",
+   "peak_vram_mib": 30301,
+   "peak_gtt_mib": 2017,
+   "load_vram_mib": 30263,
+   "vram_total_mib": 32624,
+   "samples": 751,
+   "quarantined": false,
+   "provenance": "MEASURED",
+   "label": "un-d128-f16-rb2048"
+  },
+  {
+   "run": ".",
+   "csv": "tmp/gpu_un-d128-f16-rb4096.csv",
+   "peak_vram_mib": 30509,
+   "peak_gtt_mib": 2049,
+   "load_vram_mib": 30185,
+   "vram_total_mib": 32624,
+   "samples": 1616,
+   "quarantined": false,
+   "provenance": "MEASURED",
+   "label": "un-d128-f16-rb4096"
+  },
+  {
+   "run": ".",
+   "csv": "tmp/gpu_un-d128-q8-rb2048.csv",
+   "peak_vram_mib": 25880,
+   "peak_gtt_mib": 2035,
+   "load_vram_mib": 25601,
+   "vram_total_mib": 32624,
+   "samples": 1491,
+   "quarantined": false,
+   "provenance": "MEASURED",
+   "label": "un-d128-q8-rb2048"
+  },
+  {
+   "run": ".",
+   "csv": "tmp/gpu_un-d64-f16-rb1024.csv",
+   "peak_vram_mib": 25178,
+   "peak_gtt_mib": 1383,
+   "load_vram_mib": 25075,
+   "vram_total_mib": 32624,
+   "samples": 576,
+   "quarantined": false,
+   "provenance": "MEASURED",
+   "label": "un-d64-f16-rb1024"
+  },
+  {
+   "run": ".",
+   "csv": "tmp/gpu_un-d64-f16-rb2048.csv",
+   "peak_vram_mib": 24988,
+   "peak_gtt_mib": 1369,
+   "load_vram_mib": 24944,
+   "vram_total_mib": 32624,
+   "samples": 777,
+   "quarantined": false,
+   "provenance": "MEASURED",
+   "label": "un-d64-f16-rb2048"
+  },
+  {
+   "run": ".",
+   "csv": "tmp/gpu_un-d64-f16-rb4096.csv",
+   "peak_vram_mib": 25058,
+   "peak_gtt_mib": 1386,
+   "load_vram_mib": 24944,
+   "vram_total_mib": 32624,
+   "samples": 1164,
+   "quarantined": false,
+   "provenance": "MEASURED",
+   "label": "un-d64-f16-rb4096"
+  }
+ ]
+}

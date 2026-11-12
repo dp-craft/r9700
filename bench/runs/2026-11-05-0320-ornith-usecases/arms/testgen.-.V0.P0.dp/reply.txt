@@ -1,3 +1,0 @@
-All 43 tests pass. The test file at `tests/semver.test.ts` covers `parse`, `compare`, `satisfiesCaret`, `bump`, and `maxVersion`, including invalid-input handling, prerelease precedence rules, all three caret-range levels, and numeric (vs lexical) ordering.
-
-DONE

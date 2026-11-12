@@ -1,5 +1,0 @@
-Validation complete:
-- **(a)** Every class's count was confirmed via `count` greps of its distinctive fixed phrase; all match the report (fc.weight_scale=1, mlp.down_proj=5, self_attn.o_proj=5, and each of the others).
-- **(b)** Case-insensitive grep for `abort|fatal|died|timeout|exhausted|evicted|core dumped` returned only lines 64, 173, 227, 282, 337 — all already captured. Nothing missed; no changes needed.
-
-DONE

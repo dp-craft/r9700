@@ -1,0 +1,72 @@
+{
+ "generated_by": "bench/core/report.py",
+ "provenance": "MEASURED: max over the samples of each GPU sample CSV (stack/gpu/vram_sampler.py); csv paths relative to the campaign dir",
+ "runs": [
+  {
+   "run": "invocations",
+   "csv": "tmp/invocations/001-ub1024x2048-b2048-faon-kvf16-d0.gpu.csv",
+   "peak_vram_mib": 16838,
+   "peak_gtt_mib": null,
+   "load_vram_mib": 1082,
+   "vram_total_mib": 32624,
+   "samples": 10,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  },
+  {
+   "run": "invocations",
+   "csv": "tmp/invocations/002-ub4096-b4096-faon-kvf16-d0.gpu.csv",
+   "peak_vram_mib": 16805,
+   "peak_gtt_mib": null,
+   "load_vram_mib": 1082,
+   "vram_total_mib": 32624,
+   "samples": 8,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  },
+  {
+   "run": "invocations",
+   "csv": "tmp/invocations/003-ub2048-b4096-faon-kvf16-d0.gpu.csv",
+   "peak_vram_mib": 16805,
+   "peak_gtt_mib": null,
+   "load_vram_mib": 1082,
+   "vram_total_mib": 32624,
+   "samples": 8,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  },
+  {
+   "run": "invocations",
+   "csv": "tmp/invocations/004-ub2048-b2048-faoff-kvf16-d0.gpu.csv",
+   "peak_vram_mib": 16874,
+   "peak_gtt_mib": null,
+   "load_vram_mib": 1082,
+   "vram_total_mib": 32624,
+   "samples": 9,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  },
+  {
+   "run": "invocations",
+   "csv": "tmp/invocations/005-ub2048-b2048-faon-kvf16-d1024.gpu.csv",
+   "peak_vram_mib": 17905,
+   "peak_gtt_mib": null,
+   "load_vram_mib": 1082,
+   "vram_total_mib": 32624,
+   "samples": 9,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  },
+  {
+   "run": "invocations",
+   "csv": "tmp/invocations/006-ub2048-b2048-faon-kvq8_0-d1024.gpu.csv",
+   "peak_vram_mib": 17861,
+   "peak_gtt_mib": null,
+   "load_vram_mib": 1082,
+   "vram_total_mib": 32624,
+   "samples": 8,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  }
+ ]
+}

@@ -1,8 +1,0 @@
-Validation passes:
-- **a.** Item count in `items.txt` (160) matches valid-line count in `labels.txt` (160). No missing/duplicate items — one line per item, sequential 001–160.
-- **b.** All 160 lines match an allowed label exactly (160/160).
-- **c.** Hesitant items re-tested against definitions: skill-vs-agent-definition split uses the file's `<role>` block presence (`agent-definition`), plain front-matter prose/steps/routing → `skill`; benchmark-report vs research split respects the author's own framing/format (structured benchmark reports with GPU/Host/Data/Summary tables or "Build check"/"Benchmark:" titles → benchmark; research docs, even those containing some self-measurement like #41/#131, and explicit "Research:" headings → research); audit/fix-ready specs carrying findings or ordered remediation mapped by dominant identity.
-
-Writing files are plain text in the required format; no markdown/comments/extra lines.
-
-DONE

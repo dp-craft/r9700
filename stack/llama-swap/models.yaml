@@ -1,0 +1,403 @@
+# llama-swap model definitions
+# Edit this file to add/remove models. Run `python3 generate.py` to regenerate config.yaml
+# Fields:
+#   id: short model identifier (used in llama-swap id; the id carries NO ctx segment anymore --
+#       two rows that differ only in -c share an id and must stay apart via mid/kv/mtp)
+#   path: relative gguf path under MODELS_DIR
+#   kv: f16 or q8_0
+#   mtp: true/false or int (draft depth) -- speculation via an nextn head INSIDE the target gguf
+#   draft: {path, type, n_max?, ngl?} -- speculation via a SEPARATE drafter gguf.
+#          type is the --spec-type suffix (`dflash` -> --spec-type draft-dflash). MUTUALLY
+#          EXCLUSIVE with mtp: both write --spec-type, so generate.py raises if a row sets both.
+#          ngl defaults to `all` (keep the whole drafter on GPU).
+#   cmd: (llama.cpp rows) ALL engine tuning, as VERBATIM llama-server argv tokens appended at
+#          the END of the cmd line: -c, -np, --kv-unified, -a, --spec-draft-p-min, --cache-ram,
+#          ... The old typed keys (ctx, np, kv_unified, spec_p_min, alias, extra_cmd) are
+#          refused on a llama.cpp row -- put them here instead.
+#          EXACTLY ONE `-c <int>` is REQUIRED: it is the context depth the row runs at, and
+#          what opencode advertises as the model's context limit.
+#          -c/-np/--kv-unified semantics (MEASURED, b10375): without --kv-unified llama.cpp
+#          SPLITS -c across the -np slots (each gets -c/-np depth, KV VRAM scales with np x
+#          the per-slot share), so depth D with N slots needs -c D*N; with --kv-unified the -c
+#          IS the shared pool (any single sequence may reach the full -c) and raising -np
+#          costs no extra VRAM. Tune --spec-draft-p-min on tok/s, NOT acceptance rate --
+#          the measured Muse curve is on cmd_for() in generate.py.
+#   family: QWEN27, QWEN35, QWEN38, QWEN38E, QWEN38D, GEM, MUSEP, QWEN35T  (maps to sampler recipes)
+#   backends: list of vulkan/rocm  -- or a SINGLE non-llama.cpp engine: hipfire, vllm, or radiance.
+#             An engine backend cannot share a row with any other; give it its own row.
+#   vllm_model: ABSOLUTE host path to the model DIRECTORY, bind-mounted at /model in the
+#             container. Replaces `path` on a vllm row (generate.py refuses a row with both).
+#             Must be absolute: docker reads a relative -v source as a named VOLUME and would
+#             mount an empty directory instead of failing.
+#   ctx: (hipfire/vllm rows only) the window opencode advertises; on vllm it is --max-model-len.
+#             A llama.cpp row's depth is its `-c` token in `cmd`, not a row key.
+#   np: (vllm rows only) --max-num-seqs. A llama.cpp row's -np is a `cmd` token.
+#   templates: list of fixed chat templates to build entries for: froggeric | sharp.
+#              Each one becomes its OWN llama-swap entry (it is a server launch flag), so it is
+#              selectable in the opencode model menu. Omit the key to use the gguf's embedded
+#              template. Qwen-only — these templates target the Qwen 3.5/3.6/3.8 line.
+#   chat_template_kwargs: mapping -> --chat-template-kwargs, SERVER-WIDE defaults for the chat
+#          template's own variables (Muse: reasoning_strength). A row that pins a key here
+#          advertises NO opencode variant for that key -- a per-request kwarg would override the
+#          server default, so the two surfaces are mutually exclusive by construction.
+#   note: optional comment
+#
+# REMOVED 2026-08-19: `effort_levels`. It generated N extra llama-swap entries per model whose cmd
+# lines were BYTE-IDENTICAL to the base entry (verified against the generated config.yaml: only the
+# id differed — no effort ever reached the server), so each "effort" switch paid a full gguf reload
+# for zero behavior change. Reasoning effort is now a per-REQUEST opencode `variant`
+# (chat_template_kwargs.reasoning_effort + reasoning_budget_tokens) — see generate.py
+# TEMPLATE_VARIANTS / EFFORT_VARIANTS. No reload, and it actually takes effect.
+
+models:
+  - id: qwen35b-a3b-q4km
+    path: unsloth/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf
+    kv: q8_0
+    mtp: true
+    family: QWEN35
+    backends: [vulkan]
+    templates: [froggeric]
+    cmd: ["-c", "250000", "-np", "1"]
+    # REPLACES the Q5_K_M row (2026-10-17, user decision). Source: unsloth/Qwen3.6-35B-A3B-MTP-GGUF,
+    # sha256 0b21525e...7dac58b verified against the repo's LFS oid. gguf metadata: context_length
+    # 262144 (250000 is inside the trained depth), nextn_predict_layers 1 -> MTP head present.
+    # weights 21.11 GiB; only 10 of 40 layers are full-attention (interval 4), 2 kv heads x 256 x K+V
+    # = 10240 elems/tok -> ~10.6 KiB/tok at q8_0 -> ~2.5 GiB KV at 250000.
+
+  - id: muse-glimmer-30b-q5kl-f16
+    path: unsloth/Muse-Glimmer-30B-UD-Q5_K_L.gguf
+    kv: f16
+    mtp: false
+    family: MUSEP
+    backends: [vulkan,rocm]
+    cmd: ["-c", "131072", "-np", "1", "--kv-unified", "-a", "muse-glimmer",
+          "--spec-draft-p-min", "0.40"]
+    draft:
+      path: unsloth/dflash-kquant.gguf
+      type: dflash
+      n_max: 15
+    # REPLACES the Q5_K_XL row (that gguf is deleted from disk, 2026-08-27). Two changes:
+    #   * quant Q5_K_XL (20.29 GiB) -> Q5_K_L (18.41 GiB). The 1.88 GiB it frees is what pays for
+    #     the drafter (1.52 GiB), so this is a budget swap, not a quality whim.
+    #   * DFlash speculative decoding added. The drafter is a BLOCK-DIFFUSION model (5 layers,
+    #     block size 16) shipped in the same unsloth repo; the model card measures 74.9 -> 233.4
+    #     tok/s (3.1x) with it on an RTX 5090. NOT `mtp:` — these ggufs carry no nextn head.
+    #     n_max 15 IS A LOCAL CHOICE, NOT A VENDOR VALUE — corrected 2026-08-28. This comment
+    #     previously called 15 "the vendor tutorial's value"; the official page
+    #     (https://dev.meta.ai/docs/muse-glimmer/llama-cpp § Speculative Decoding) uses
+    #     `--spec-draft-n-max 4` in its only example. 15 was picked here as one below the
+    #     16-token diffusion block. It has NOT been A/B-ed against 4 — measure before trusting
+    #     either. (The p_min 0.40 below IS measured; that sweep held n_max at 15 throughout.)
+    # ctx is PINNED TO THE TRAINED DEPTH, not to a VRAM ceiling: both the target and the drafter
+    # gguf report context_length=131072, and nothing here configures RoPE scaling, so 131072 is the
+    # last position either model was trained to place. A deeper -c would still load and still serve
+    # (MEASURED: 153600 ran at 30.67 of 31.86 GiB), which is exactly why this is a deliberate pin
+    # rather than a limit the hardware enforces — raise it only together with
+    # `--rope-scaling yarn --yarn-orig-ctx 131072`, and re-measure quality up there before trusting
+    # it. Restoring 131072 also returns ~2.8 GiB of headroom the 150k arm had spent.
+    # np 4 split -> np 2 UNIFIED (2026-08-27). This flips what `-c` means: under --kv-unified it
+    # is the SHARED POOL TOTAL, so -c falls 524288 -> 131072 and the KV cost drops with it, while
+    # any single chat may still reach the full 131072 (it is not sliced into 65536 halves). What is
+    # traded away is the GUARANTEE: two concurrent chats now draw from one pool instead of each
+    # owning a reserved full-depth slice, so two simultaneous deep contexts can contend where four
+    # reserved ones could not. Fine for the 1-2 concurrent chats this row actually sees, and the
+    # freed VRAM is real rather than theoretical.
+    # Native reasoning-effort levels -> opencode EFFORT_VARIANTS (MUSE_VARIANTS).
+
+
+  - id: qwen38-27b-q4kxl-f16-mtp
+    path: unsloth/Qwen3.8-27B-UD-Q4_K_XL.gguf
+    kv: f16
+    mtp: true
+    family: QWEN38
+    backends: [vulkan]
+    templates: [froggeric]
+    cmd: ["-c", "150000", "-np", "1", "--kv-unified"]
+    # weights 16.69 GiB + 133120 tok x 64 KiB/tok = 8320 MiB KV -> ~27.4 GiB. The old np=1 vs "-np2"
+    # row split is gone: under unified KV this row IS np=2 at unchanged VRAM.
+
+  - id: qwen38-27b-q4kxl-q8-mtp
+    path: unsloth/Qwen3.8-27B-UD-Q4_K_XL.gguf
+    kv: q8_0
+    mtp: true
+    family: QWEN38
+    backends: [vulkan]
+    templates: [froggeric, sharp]
+    # T2 RAM prompt-cache budget (llama.cpp --cache-ram, MiB) -- the tier that carries
+    # orchestrator<->subagent state across slot switches (see AiChatney docs/analysis/
+    # 2026-10-01-1230-052-reprefill-cache-research.md). 2026-10-01: 8192 -> 12288 ("no swap
+    # change", user decision). The earlier note assumed dropping --load-mode mlock would free
+    # ~16 GiB; it did not -- mlock was a measured no-op (VmLck 0, RLIMIT_MEMLOCK 0). 12288 is
+    # +4 GiB worst-case resident anon over 8192 on a box where the server already holds ~22.4 GiB
+    # anon with swap 100% used, so a deep both-branches-resident state may now swap -- accepted.
+    # 16384 (the design target) stays deferred until real swap exists. One-token fallback: 12288 -> 8192.
+    cmd: ["-c", "260000", "-np", "1", "--kv-unified", "--cache-ram", "12288"]
+
+    # SPECULATION TUNING -- MEASURED 2026-08-27, DO NOT re-tune without new evidence.
+    # The Muse row's big win (--spec-draft-p-min 0.40, +47%) does NOT transfer to this MTP line.
+    # Greedy, mean tok/s over the same 3 real project workloads used for Muse:
+    #   Q4_K_XL: default(n_max 3) 52.6 | p_min .40 52.0 | n_max 6 49.6 | n_max 16 + p_min .80 46.0
+    #            | n_max 8 + p_min .60 44.7 | n_max 10 35.0
+    #   Q6_K   : default          45.9 | p_min .40 45.2
+    # The ENGINE DEFAULT WINS on both quants, so these rows pass no spec flags at all.
+    # (Those numbers are the UD2 file; see the re-quant note below -- they were re-measured.)
+    #
+    # UNSLOTH DYNAMIC 3.0 RE-QUANT -- gguf replaced in place 2026-08-27 (same path, same id).
+    # HF re-uploaded Q4_K_XL on 08-20 under the Dynamic 3.0 recipe; our copy was the 08-14 UD2
+    # build. The new file is 347 MiB SMALLER (17.56 vs 17.92 GiB) off a 27.8x larger imatrix
+    # (1251 vs 45 chunks). 306 tensors changed type: SSM projections PROMOTED to Q8_0 (96x
+    # ssm_alpha/ssm_out Q4_K->Q8_0 -- recurrent state, where quant error compounds along the
+    # sequence), paid for by demoting FFN to IQ4_XS/IQ4_NL/Q3_K/IQ3_S. MTP head byte-identical.
+    # b10375 VERIFIED, not assumed: all 9 tensor types have Vulkan shaders compiled in, and the
+    # full file loads and serves clean. Dynamic 3.0 adds no new tensor FORMAT, only a new mix.
+    # COST: -3.4% decode. Greedy, same 3 workloads (w1 investigate | w2 generate | w3 plan):
+    #   UD2  59.9(83%) | 54.4(74%) | 45.0(51%)  -> mean 53.1
+    #   UD3  60.0(84%) | 48.4(61%) | 45.4(53%)  -> mean 51.3   (reproduced twice, acc identical)
+    # The loss is entirely w2, where MTP acceptance fell 74->61%: the nextn head is byte-identical
+    # but the base model's logits moved, so head and body agree less often. Accepted deliberately
+    # -- Unsloth measures +10% top-1% and better Divergence-300@32 at this size, and the SSM->Q8_0
+    # promotion targets exactly the long-context error accumulation this hybrid is prone to.
+    # RE-TUNED ON UD3 (the quant mix changed, so the UD2 sweep was re-run rather than inherited):
+    #   default(n_max 3) 51.3 | n_max 4 50.6 | p_min .40 40.3
+    # Default still wins. n_max 4 is faster on the two long-context arms (+4.7% w1, +4.1% w2) but
+    # -14.8% on short w3 (acceptance 53->36%), and one row cannot vary per workload.
+    # p_min .40 collapses here -- on w3 it suppressed drafting entirely (draft_n 0).
+    # DFlash2 EVALUATED AND REJECTED 2026-08-27 (incoai/Qwen3.8-27B-DFlash2-GGUF).
+    # It needs a build newer than b10375 (b10375 refuses it outright: "expected 81, got 58" -- the
+    # DFlash1 graph has 58 tensors, DFlash2 has 81). The master 6fdd0ac build loads it correctly
+    # (reports block_size=8, n_extract=5, sample_from_anchor=true), so this is a real measurement,
+    # not a compatibility failure. Mean decode tok/s vs the built-in MTP head:
+    #   MTP (in use)        51.3   <-- winner
+    #   DFlash2 Q8_0        50.8 | DFlash2 Q4_K_M 50.7 | + p_min .40 50.5
+    #   n_max 7 + p_min .40 48.9 | n_max 7 46.5   (the README's own n_max 7 rec is the worst arm)
+    # DFlash2 also costs ~23% PREFILL (614 vs 792 tok/s on w1) because the drafter must process the
+    # prompt too. Keep MTP: it is free, already in the target gguf, and faster on both axes.
+    # WHY it differs from Muse: MTP reuses a single nextn head trained to predict ONE token ahead,
+    # so draft quality decays fast with depth and the default n_max 3 already sits at 74-83%
+    # acceptance -- there is no low-confidence tail for p_min to trim. DFlash is block-diffusion,
+    # trained on 16-token blocks, so it drafts long and NEEDS p_min to cut the bad tail.
+    # Community rec `n_max 16 + p_min 0.8` (llama.cpp Discussion #25198) was tested and is 12%
+    # SLOWER here than doing nothing -- it did not reproduce on this model/hardware.
+    note: >-
+      Deliberate q8_0-KV twin of the row above — SAME id on purpose, full_id() appends the `kvq8`
+      tag so the generated ids stay distinct. Kept because q8_0 KV is MEASURED to still yield 54.3%
+      MTP draft acceptance on Qwen3.8 (unlike the Qwen3.6 line, where q8_0 collapses it to ~0.7%),
+      so it is a real quality/VRAM A/B arm at ~4.4 GiB KV instead of 8.3 GiB. Renamed from
+      `qwen38-27b-q4kxl-np2`: that suffix described an np difference that no longer exists.
+
+  # --- MRCR v2 long-context EVAL rows (eval_hub/mrcr_v2), added 2026-09-02 -----------------------
+  # Purpose: run Google DeepMind's MRCR v2 ("multi-round coreference resolution") long-context
+  # benchmark locally. The task hands the model a long synthetic user/assistant transcript and asks
+  # it to reproduce the i-th assistant answer to one of the queries VERBATIM, prefixed by a 12-char
+  # random hash. Scoring is difflib SequenceMatcher ratio vs. the reference (run_evaluation.py).
+  # These are BENCHMARK rows, not chat rows, and they differ from the qwen38-27b-q6k A/B row above
+  # in four deliberate ways:
+  #   * family QWEN38E, not QWEN38 -> ONE entry per row instead of a coding/planning pair. The
+  #     "coding" arm could not be used here anyway: it carries --presence-penalty 1.5, which
+  #     directly penalises the verbatim token reuse the metric rewards. See Q38_MRCR in generate.py.
+  #   * templates: [froggeric] ONLY -- "sharp" is the SAME v22.1 file plus an appended TERSENESS
+  #     directive, and terseness is the one instruction that cannot coexist with "reproduce this
+  #     ~1000-token writing sample exactly". Including it would generate an entry that is
+  #     guaranteed to score badly for a reason unrelated to long-context ability.
+  #     froggeric over the gguf's embedded template because it fixes the blank-<think> injection
+  #     that invalidates the prefix KV cache -- and MRCR v2 is EXPLICITLY prefix-cache-friendly
+  #     (README "FEATURES": consecutive samples in one csv share a long prefix), so that fix is
+  #     worth real wall-clock across a sweep, not just cleanliness.
+  #   * reasoning_effort PINNED to 'medium' server-side via chat_template_kwargs. This is the
+  #     froggeric template's own default already (template line 18: undefined -> 'medium', and
+  #     MEASURED to match -- an omitted-kwarg request returned thinking byte-identical to the
+  #     explicit 'medium' one), so it changes no behaviour today. It is pinned anyway because a
+  #     benchmark's effort level must not be inherited from a default that a template bump could
+  #     move underneath a published score. It does NOT lock the harness out: --chat-template-kwargs
+  #     sets a SERVER-WIDE DEFAULT, and a per-request kwarg still overrides it, so sweeping effort
+  #     from the eval client remains possible -- what the pin buys is a known starting point.
+  #     Note the pin carries the EFFORT only, not TEMPLATE_VARIANTS' paired
+  #     reasoning_budget_tokens: 4096 cap -- that is a body-level opencode field, not a template
+  #     variable, so no server flag can set it. Harmless here, because that cap is documented as
+  #     effectively non-binding at medium (natural thinking length 3058-3746 tokens).
+  #     These are the FIRST rows in this file to use chat_template_kwargs; the machinery existed
+  #     but was unexercised, hence the matching `eff-<level>` id tag added to full_id().
+  #   * ctx is the variable under test, so the two rows are a clean KV-precision pair at the two
+  #     depths requested: f16 at ~130k, or q8_0 at 200k. Same id on purpose -- full_id() appends the
+  #     `kvq8` tag, so the generated ids stay distinct (same trick as the q4kxl pair above).
+  #
+  # VRAM, from bench/core/gguf_kv.py on THIS gguf (not hand-math, and not an online calculator: the arch
+  # is HYBRID -- 65 blocks but only 16 full-attention KV layers, 48 SSM/linear + 1 nextn, so KV is
+  # 64 KiB/tok f16 / 34 KiB/tok q8_0, roughly a quarter of what block_count would suggest):
+  #   weights 20.47 GiB = 20961 MiB;  card total 32624 MiB (31.86 GiB);  guard budget 32400 MiB
+  #   f16  @ 133120 : 20961 + 8320 KV + 2000 overhead = 31281 MiB   (~1.1 GiB under the guard)
+  #   q8_0 @ 204800 : 20961 + 6800 KV + 2000 overhead = 29761 MiB   (~2.6 GiB under the guard)
+  # gguf_kv.py puts the f16 ceiling at ~150,955 tok and the q8_0 ceiling at the 262,144 RoPE cap, so
+  # both rows sit inside the budget -- but the f16 one is the TIGHT one and is the first thing to
+  # suspect on an OOM. Fall back to `ctx: 122880` there (-1280 MiB) before touching anything else.
+  # The old README warning "do not raise the q8_0 row to 200k" does NOT apply: that ceiling was
+  # measured with np=2 on SPLIT KV, where -c is multiplied by the slot count. These rows are np=1
+  # unified, which is also why the live q4kxl q8 row already runs 220000 without trouble.
+  #
+  # MEASURED 2026-09-02, first load of the q8_0/204800 row: 29.54 GiB of the 31.86 GiB card, vs the
+  # 29761 MiB (29.06 GiB) predicted just above -- the arithmetic held to within 0.5 GiB, and ~2.3
+  # GiB of headroom is real. Load took ~70 s: the gguf lives on /mnt/LinBackup (SATA), and 22.5 GB
+  # is read into host RAM before any VRAM is touched, so `mem_info_vram_used` sits at idle for the
+  # first minute of a cold start. That is NOT a stall -- check /proc/<pid>/io read_bytes, not VRAM.
+  # CARRY-OVER FOR THE f16 ROW, still unmeasured: it is predicted at 31281 MiB (30.55 GiB). If it
+  # runs the same ~0.5 GiB over prediction as this row did, it lands near 31.0 GiB of 31.86 -- only
+  # ~0.85 GiB spare. Treat 133120/f16 as the tight arm and drop to ctx 122880 at the first OOM.
+
+  - id: qwen35-9b-q4km
+    path: unsloth/Qwen3.5-9B-Q4_K_M.gguf
+    kv: f16
+    mtp: false
+    family: QWEN35T
+    backends: [vulkan]
+    cmd: ["-c", "131072", "-np", "4", "--kv-unified"]
+    # weights 5.29 GiB + 4096 MiB KV -> ~11.3 GiB incl. 2 GiB overhead.
+
+  - id: qwen38-9b-distill-q4km
+    path: empero-ai/Qwen3.8-9B-Q4_K_M.gguf
+    kv: q8_0
+    mtp: true
+    family: QWEN38D
+    backends: [vulkan]
+    cmd: ["-c", "250000", "-np", "1"]
+    # gguf metadata (read 2026-10-17): context_length 262144, so 250000 sits inside the trained
+    # depth; nextn_predict_layers 1 + blk.32.nextn.* tensors -> MTP head present, mtp: true is real.
+    # Hybrid: full_attention_interval 4 -> only 8 of 32 layers hold KV; 4 kv heads x 256 dim x K+V
+    # = 16384 elems/tok -> ~17 KiB/tok at q8_0 -> ~4.1 GiB KV at 250000. weights 5.38 GiB.
+    # sha256 df13d660...44de589d8dda verified against the repo's SHA256SUMS.
+
+  # qwen35-9b-q8 REMOVED 2026-08-27 together with the commented DISABLED block above (user
+  # decision): its gguf unsloth/Qwen3.5-9B-Q8_0.gguf is not on disk, so the row generated a
+  # llama-swap entry that could never load. qwen35-9b-q4km above is the surviving 9B arm.
+
+  - id: qwen35-4b-q4km
+    path: unsloth/Qwen3.5-4B-Q4_K_M.gguf
+    kv: f16
+    mtp: false
+    family: QWEN35T
+    backends: [vulkan]
+    cmd: ["-c", "131072", "-np", "4", "--kv-unified"]
+    # weights 2.55 GiB + 4096 MiB KV -> ~8.6 GiB incl. overhead.
+
+  - id: qwen35-4b-q8
+    path: unsloth/Qwen3.5-4B-Q8_0.gguf
+    kv: f16
+    mtp: false
+    family: QWEN35T
+    backends: [vulkan]
+    cmd: ["-c", "131072", "-np", "4", "--kv-unified"]
+    # weights 4.17 GiB + 4096 MiB KV -> ~10.2 GiB incl. overhead.
+
+
+# Rerankers - separate list, kept in generate.py for now (could be moved to yaml later)
+
+  # --- hipfire rows -----------------------------------------------------------------------------
+  # A DIFFERENT ENGINE, not a llama.cpp backend. `hipfire_tag` replaces `path`; ctx/kv are
+  # DESCRIPTIVE ONLY (they shape the id and the opencode context limit) because hipfire takes
+  # context depth, KV mode, sampling and speculation from ~/.hipfire/config.toml and the request
+  # body -- there is no argv to put them in. generate.py refuses the llama.cpp-only keys on these
+  # rows rather than dropping them silently.
+  #
+  # Engine config these rows ASSUME (set globally in ~/.hipfire/config.toml):
+  #   speculation.dflash = on    -> the 27B uses its DFlash draft (tau ~9.6 on code)
+  #   speculation.mtp    = off   -> MEASURED 2026-09-10: MTP costs the 35B 6.4x
+  #                                 (177.2 vs 27.9 tok/s, n=5, +/-0.4%)
+  #   memory.prompt_cache_capacity = 512 -> prefix KV reuse survives a long agentic session
+
+#  - id: qwen38-27b-hipfire
+#    hipfire_tag: /home/dev/models/hipfire/qwen3.8-27b.mq4-pro
+#    ctx: 200000
+#    kv: q8_0
+#    family: QWEN38
+#    backends: [hipfire]
+#    hipfire_env:
+#      # This row is the ONLY one that may see the DFlash draft. MEASURED via llama-swap
+#      # 2026-09-10: decode 176.7 tok/s, tau 10.88 on a coding turn.
+#      HIPFIRE_DFLASH_MODE: "on"
+#      HIPFIRE_MTP_MODE: "off"
+#    # Addressed by ABSOLUTE PATH, not by tag: the registry knows `qwen3.8:27b-mq4-pro` and the local
+#    # file matches its name and byte size exactly, but the artifact was never adopted locally, so
+#    # `hipfire list` and /v1/models do not offer the tag. Swap this for the tag if it ever is.
+#    # ctx 82944 is MEASURED from the load log (physical_cap=max_seq=82944), not a guess -- it is
+#    # generation.max_tokens (81920, from the qwen3.x registry tag policy) + 1024, NOT memory.max_seq.
+
+  - id: ornith35b-a3b-hipfire
+    hipfire_tag: ornith-1.5:35b-a3b-mq4r
+    ctx: 200000
+    kv: q8_0
+    family: QWEN35
+    backends: [hipfire]
+    hipfire_env:
+      # The 27B DFlash draft must be invisible here: loading it against the MoE hard-fails with
+      # `draft target_layer_ids contains 47 >= num_target_layers`. An EMPTY HIPFIRE_DFLASH_DRAFT
+      # is the documented opt-out, and MODE=off is belt-and-braces.
+      HIPFIRE_DFLASH_MODE: "off"
+      HIPFIRE_DFLASH_DRAFT: ""
+      # MEASURED 2026-09-10 (n=5, +/-0.4%): MTP costs this model 6.4x -- 177.2 tok/s off
+      # vs 27.9 on. It is a drafter, so turning it off is lossless.
+      HIPFIRE_MTP_MODE: "off"
+    # Registered tag, so no path needed. 65536 because the default physical_cap of 32768 rejects a
+    # 55K prompt outright (HTTP 400); memory.max_seq must already be >= this when the daemon starts.
+
+  # --- vllm rows ---------------------------------------------------------------------------------
+  # 2026-10-22: the two stilldeadcode/vllm-radiance:0.9.3 rows (qwen38-27b-int4-*) were REMOVED (user
+  # decision) -- that image was deleted, so they could not start. Their MEASURED window/MTP notes are
+  # in git history and in dp-craft docs/findings/vllm/2026-09-12-1535-vllm-window-budgets-and-rocm-knobs.md.
+  #
+  # PROFILE-backed row: `vllm_profile` names a dp-craft serve_vllm.sh profile (image + model + drafter
+  # + engine args, exactly what the benchmarks measured) and llama-swap runs `serve_vllm.sh run`.
+  # Row keys: ctx -> MAXLEN, np -> MAXSEQS, kv -> KV_DTYPE, templates -> CHAT_TEMPLATE (mounted),
+  # kv_ram_gib -> Sly's KVCACHE=ram GPU->RAM prefix-cache tier. The id MUST equal the profile's
+  # served model name (useModelName rewrites `model` to it).
+  #
+  # MEASURED (dp-craft docs/findings/vllm/2026-10-22-{1406-vllm-sly-mxfp4-dflash,1506-vllm-sly-mxfp4-dflash-170k}.md), Sly radiance
+  # 1.6.0 + amd/Qwen3.8-27B-Quark-AWQ-MXFP4 + DFlash2 k=7, fp8 KV, util 0.90: prefill 2,800 -> 1,500
+  # tok/s (8k -> 136k), decode 87-137 tok/s cold / ~65 on fresh 1k thinking at 150k; device VRAM
+  # peak 30,259 MiB, flat over time (no creep); KV pool 332,822 tok at ctx 170000 (51 % used by one
+  # 170k sequence). Boot 236-408 s (healthCheckTimeout 600 covers it).
+  # NOT MEASURED: ctx 180000 (one 180k sequence = ~54 % of the pool, INFERRED), the RAM tier on this
+  # profile (Sly measured it on vLLM 0.31 / image 1.1.1), and the sharp template on vLLM.
+  # KNOWN RISK: intermittent GPU memory fault in the MXFP4 W4A8 GEMMs (atiled AND folded kernels) ->
+  # engine hangs then dies. 3 of 3 interactive Claude Code boots WITH the RAM KV tier faulted on the first
+  # request (campaigns without it: 2 in 84, never first). RAM tier removed 2026-10-22 as the A/B; A-tiled
+  # back on (turning it off did not help). See dp-craft
+  # docs/findings/vllm/2026-10-22-1643-vllm-mxfp4-atiled-fault-and-llama-swap-serving.md
+  # kv_ram_gib 8: user cap "max 10 GB RAM". Power of two on purpose: the pinned host buffer is rounded up
+  # to the next power of two (MEASURED 2026-10-22: 4 GiB -> 4.28 GiB pinned, 9 GiB -> 16.28 GiB). ~37 KiB/token -> ~225k tokens
+  # (INFERRED from the GPU pool's bytes/token).
+  # 2026-10-23: kv_ram_gib 8 RESTORED (user: "i want 8GB prompt cache"). It was removed 2026-10-22 as the A/B
+  # for the GPU memory fault; that fault is now attributed to device kernargs and fixed by
+  # HIP_FORCE_DEV_KERNARG=0 in the profile, so the reason for removal is gone. Still UNMEASURED on this
+  # profile with the kernarg fix -- first boot is a smoke check (PLAN.md Task 1b). Pinned host buffer
+  # MEASURED 8 -> 8.28 GiB. The sampler (EXTRA_ARGS --override-generation-config) comes from the QWEN38
+  # planning recipe in generate.py, presence_penalty pinned 0.1 (2026-10-23 anti-loop, was 0).
+  - id: qwen38-27b-mxfp4-dflash
+    vllm_profile: sly-radiance/qwen38-mxfp4-dflash
+    ctx: 190000
+    kv: fp8
+    family: QWEN38
+    backends: [vllm]
+    np: 1
+    kv_ram_gib: 8
+  # Same model, the target's own MTP head instead of the DFlash2 drafter (2026-10-23). UNTESTED. Whether Sly's
+  # Cactus acceptance (#164 repetition lock) also applies to MTP is unverified -- see the profile header.
+  - id: qwen38-27b-mxfp4-mtp
+    vllm_profile: sly-radiance/qwen38-mxfp4-mtp
+    ctx: 190000
+    kv: fp8
+    family: QWEN38
+    backends: [vllm]
+    np: 1
+    kv_ram_gib: 8
+  # --- NATIVE radiance row (2026-10-23): the `radiance` runtime (docker stilldeadcode/radiance:1.11.0), NOT vLLM.
+  # Serves one `.rad` container (weights + tokenizer + chat template + the built-in DFlash2 drafter; depth
+  # auto-picked, so `mtp`/`draft` are refused). Launched by serve_radiance.sh with the HF card's flags
+  # (StillDeadcode/qwen3.8-27b-mxfp4 @ 60bd4139, CLAIMED): --tp 1 --max-model-len 200000 --kv-cache-dtype fp8
+  # --max-num-seqs 8 (tested there on an R9700 gfx1201 at depth 7). Needs radiance >= 1.2.3. Sampling comes from
+  # the request body. UNMEASURED on this box until the first boot.
+  - id: qwen38-27b-mxfp4
+    radiance_model: /mnt/Lin1/work/radiance/models/StillDeadcode__qwen3.8-27b-mxfp4@60bd4139/qwen3.8-27b-mxfp4.rad
+    ctx: 200000
+    kv: fp8
+    family: QWEN38
+    backends: [radiance]
+    np: 8

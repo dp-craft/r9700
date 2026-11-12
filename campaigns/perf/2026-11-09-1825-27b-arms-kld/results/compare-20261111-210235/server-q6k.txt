@@ -1,0 +1,2 @@
+gguf=/mnt/LinBackup/models/gguf/unsloth/Qwen3.8-27B-UD-Q6_K.gguf bytes=21983677344 llama_server=/home/dev/work/dp-craft/amd/stack/llamacpp/var/builds/b11448-vulkan-1.4.363.0/bin/llama-server
+starting on :8000 (pid 503332) — log: /home/dev/work/dp-craft/amd/stack/serve/var/servers/8000.log

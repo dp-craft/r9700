@@ -1,9 +1,0 @@
-GOAL: Test and settle the Hungarian-language retrieval strategy, adapter architecture, and testing approach for a Knowledge Port project — refuting four prior design claims.
-RESULT: Four prior claims were overturned, chiefly that the corpus is bilingual (English primary, Hungarian secondary), which no search can handle structurally when only bare BM25 is used on Hungarian text (20% recall). The viable plan stems index and query in JS with a Snowball stemmer (recall 20% to 100%), adds a dense multilingual-e5-small leg for English queries against Hungarian documents, and fuses via RRF; trigram is rejected.
-KEY: 20% | BM25 recall on the Hungarian corpus with the bare unicode61 tokenizer, no stemming — from the head-to-head measure
-KEY: 35% | recall of the trigram tokenizer in the same measured head-to-head (Hungarian)
-KEY: 100% | recall when index and query are both Snowball-stemmed (unicode61 + multilingual-stemmer, Hungarian) — the viable fix
-KEY: 75,0 | Recall@100 for EN→hu on MKQA with the bge-m3 embedding model (dense leg), measured
-KEY: ~400–600 sor | realistic own-implementation size including tests, correcting the earlier ~150 sor estimate
-CAVEAT: None of the reviewed embedding models has a public Hungarian per-language score, so the dense-leg choice is unverified and only a local HunSum2AbstractiveRetrieval run could supply real evidence.
-OPEN: Which embedding model actually fits this small off-domain corpus — multilingual-e5-small (recommended but score UNVERIFIED) or bge-m3 — and can only be settled by a local HunSum2 test that has not been run, or none

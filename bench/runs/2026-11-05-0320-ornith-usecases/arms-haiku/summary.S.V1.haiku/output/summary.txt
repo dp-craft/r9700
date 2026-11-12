@@ -1,9 +1,0 @@
-GOAL: Push Qwen3.6-35B-A3B on Vulkan to its native 262144-token context and measure how prefill, decode, MTP, q8_0 KV and parallel streams behave as prompt depth grows to 200K.
-RESULT: Vulkan with f16 KV is the winning config up to 200K tokens: f16 runs with no OOM, while the q8_0 KV penalty grows with depth and is catastrophic at 200K. MTP should be on only when generation dominates prefill, because at 200K it is a net loss for deep-prefill, short-decode requests.
-KEY: −39.8% | change in prefill, q8_0 KV vs f16 KV at 200K with MTP=1 (Qwen3.6-35B-A3B, deep-mtp1q8-cr200000 vs deep-mtp1-cr200000)
-KEY: −21.7% | change in decode, q8_0 KV vs f16 KV at 200K with MTP=1 (Qwen3.6-35B-A3B, deep-mtp1q8-cr200000 vs deep-mtp1-cr200000)
-KEY: +16.7 s | change in wall time, MTP on vs off at 200K with f16 KV and 256 generated tokens (Qwen3.6-35B-A3B, deep-mtp1-cr200000 vs deep-mtp0-cr200000)
-KEY: −1.5 s | change in wall time, MTP on vs off on the thinking fixture (~0 prompt, 1024 generated tokens) (Qwen3.6-35B-A3B, deep-mtp1-think vs deep-mtp0-think)
-KEY: 49.4 s | TTFT p95 with 4×32K parallel streams, MTP off (Qwen3.6-35B-A3B, deep-par-np4; deep-par-np2 was 24.3 s)
-CAVEAT: Parallel prompts hit EOS early (16–256 gen tok), and the report says this under-measures aggregate decode scaling at depth, so the parallel verdict is untested for long generations.
-OPEN: Does a future Mesa/llama.cpp build narrow the Vulkan q8_0 KV penalty?

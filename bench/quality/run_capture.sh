@@ -1,0 +1,402 @@
+#!/usr/bin/env bash
+# run_capture.sh — the ONE TS-TDD quality driver: capture -> grade (tsc/eslint/vitest) -> blind LLM
+# judge -> charts -> aggregate -> per-task charts -> auto-write the write-up via the
+# benchmark-results skill.
+#
+#   bench/quality/run_capture.sh <campaign_dir>      # or CAMPAIGN_DIR=<dir>
+#
+# <campaign_dir> is a campaigns/quality/<stamp>-<slug>/ dir holding:
+#   configs.jsonl       one JSON line per cell (label/model/mtp/kv/depth/tokens/ctx/budget/sampling)
+#   campaign.env        campaign identity + every default this campaign's old driver copy patched in
+#                       (TITLE, JUDGE_ENGINE, SUMMARY, REPS, CALIB, MODELS_DIR, ...)
+#   inputs/tasks.jsonl  the task manifest (+ calibration*.jsonl reference fixtures)
+# Raw goes to <dir>/tmp/ (gitignored: replies, GPU samples, props, done/ markers), results to
+# <dir>/results/ (scores, summary, charts, appendices). New campaign = a dir with configs.jsonl +
+# campaign.env + inputs/tasks.jsonl, run this script on it.
+#
+# For each cell in configs.jsonl (model/quant, fixed depth×KV×reasoning-budget), at the cell's
+# sampling (Qwen3.6-thinking default temp 0.6 / top_p 0.95 / top_k 20 / min_p 0 unless the cell
+# says otherwise): start ONE llama-server, sample VRAM across the whole probe, send every TS-TDD
+# task via capture.py (the corpus is a shared cached prefix → only the first task per server pays
+# the deep prefill), stop the server. Resumable at TWO levels: per-cell done markers here, AND
+# row-level in capture.py ((config,task,rep) rows already in outputs.jsonl are never re-captured or
+# duplicated — so deleting a done marker after a partial/lower-REPS run only captures what's
+# missing). Continues past a failed cell. Then batch-grade (real tsc/eslint/vitest) + make charts.
+#
+# ONE script, no human interaction: capture -> grade -> blind LLM judge -> charts ->
+# auto-write the write-up via the benchmark-results skill. The judge + summary run `claude` THROUGH
+# tmux (headless/background claude is restricted), so a tmux session must exist first:
+#     tmux new-session -d -s claude-run       # do this ONCE, then:
+#     bench/quality/run_capture.sh <dir>      # automatic
+#   ONLY='q6-*' REPS=1 bench/quality/run_capture.sh <dir>   # subset / quick
+#   SMOKE=1 bench/quality/run_capture.sh <dir>              # also include matrix:false smoke tasks
+#   CONFIGS=<dir>/configs_sampling.jsonl bench/quality/run_capture.sh <dir>   # an add-on sweep
+#   JUDGE_ENGINE=http JUDGE_BASE_URL=https://host/v1 bench/quality/run_capture.sh <dir>
+#   JUDGE_ENGINE=none SUMMARY=0 bench/quality/run_capture.sh <dir>   # capture+grade+charts only
+#   MODELS_DIR=/home/dev/models/gguf bench/quality/run_capture.sh <dir>
+set -uo pipefail
+Q="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"           # bench/quality — the shared tools
+D="${1:-${CAMPAIGN_DIR:-}}"
+[ -n "$D" ] || { echo "usage: run_capture.sh <campaign_dir>  (or CAMPAIGN_DIR=<dir>)" >&2; exit 2; }
+D="$(cd "$D" 2>/dev/null && pwd)" || { echo "run_capture: campaign dir not found: ${1:-${CAMPAIGN_DIR:-}}" >&2; exit 2; }
+REPO="$(git -C "$D" rev-parse --show-toplevel 2>/dev/null)"
+[ -n "$REPO" ] || REPO="$(cd "$Q/../.." && pwd)"
+SERVE="$REPO/stack/serve/llamacpp/serve_llamacpp.sh"
+
+ENV_FILE="$D/campaign.env"
+[ -f "$ENV_FILE" ] || { echo "run_capture: missing $ENV_FILE — campaign identity + defaults (one KEY=value per line; see an existing campaign)" >&2; exit 2; }
+
+# --- campaign.env: this campaign's defaults (the values its old driver copy patched in). A
+#     variable already set in the environment (a caller override) always wins, so only
+#     currently-UNSET keys are assigned. Lines are plain KEY=value (a whole-line comment, or a
+#     trailing "  # comment" on a value line, is stripped); no command substitution is ever run. ---
+while IFS= read -r _line; do
+  case "$_line" in ''|'#'*) continue;; esac
+  [[ "$_line" == *=* ]] || { echo "run_capture: bad line in $ENV_FILE (want KEY=value): $_line" >&2; exit 2; }
+  _key=${_line%%=*}; _val=${_line#*=}
+  [[ "$_key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || { echo "run_capture: bad key in $ENV_FILE: $_line" >&2; exit 2; }
+  if [[ "$_val" =~ ^(.*[^[:space:]])[[:space:]]+#.*$ ]]; then _val="${BASH_REMATCH[1]}"; fi   # strip trailing comment
+  while [[ "$_val" =~ [[:space:]]$ ]]; do _val="${_val%[[:space:]]}"; done                     # rstrip
+  [ -n "${!_key+x}" ] || printf -v "$_key" '%s' "$_val"
+done < "$ENV_FILE"
+
+: "${TITLE:=$(basename "$D")}"
+: "${MODELS_DIR:=/home/dev/models/gguf}"
+: "${CONFIGS:=$D/configs.jsonl}"    # override to run a sweep, e.g. CONFIGS=<dir>/configs_sampling.jsonl
+# CALIB: calibration file(s) relative to <dir>/inputs/, comma-separated (e.g. calibration-reps.jsonl
+# or calibration.jsonl,calibration-hard.jsonl). Empty = the tools' default (inputs/calibration.jsonl
+# + inputs/calibration-hard.jsonl, missing skipped). Reference ladder (haiku/sonnet/opus), collected
+# by run_refs.sh: rows carry `rep` → aggregate reports mean±sd and hard_pass as k/n.
+# ONE variable feeds BOTH consumers on purpose: aggregate.py builds summary.md's reference rows and
+# make_charts.py draws the reference BANDS on the SVGs from their own separate reads. They were
+# wired to different sources (make_charts hardcoded the legacy calibration{,-hard}.jsonl; aggregate
+# had no flag at all and silently defaulted to them) — which would print a 3-rep table beside an
+# n=1 dashed line and call them the same reference.
+# Do NOT merge the legacy files in: they hold n=1 rows for these same (model, task) pairs, so a pair
+# would silently gain a fourth rep of different provenance. Legacy rows cover OTHER tasks and stay
+# where they are.
+: "${CALIB:=}"
+: "${PORT:=8081}" ; : "${REPS:=3}" ; : "${BACKEND:=vulkan}" ; : "${UB:=2048}" ; : "${B:=4096}"
+: "${WAIT:=600}"                       # 128k cold load can take ~3 min
+# claude-driven steps run THROUGH tmux (headless/background claude is restricted). Defaults keep a
+# bare run deterministic (no claude); campaign.env sets each campaign's own values.
+: "${JUDGE_ENGINE:=none}"             # claude-tmux | http | none
+: "${JUDGE_MODEL:=opus}"              # claude-tmux: ORCHESTRATOR model (http: the judge model)
+: "${JUDGE_SUBAGENT_MODEL:=opus}"     # claude-tmux: model of the blind judging subagents. STRONG single
+                                       # judge (opus) — it reviews opus-tier design/robustness, and one
+                                       # model keeps the 0-5 scale consistent. 'sonnet' = cheaper; not haiku.
+: "${SUMMARY:=0}"                     # 1 = auto-write the write-up via the benchmark-results skill
+: "${SUMMARY_MODEL:=opus}"
+: "${CLAUDE_TMUX_SESSION:=claude-run}"
+export CLAUDE_TMUX_SESSION
+[ -f "$CONFIGS" ] || { echo "run_capture: missing configs file: $CONFIGS" >&2; exit 2; }
+TASKS="$D/inputs/tasks.jsonl"
+[ -f "$TASKS" ] || { echo "run_capture: missing $TASKS" >&2; exit 2; }
+RAW="$D/tmp" ; RES="$D/results" ; mkdir -p "$RAW/done" "$RES"
+OUT="$RAW/outputs.jsonl" ; VRAM="$RES/vram.jsonl"   # one summary row per config: a RESULT, so results/ (readers search results/ then tmp/)
+
+# --- 0. FAIL FAST: the judge/summary run claude through tmux; require the session BEFORE the long
+#        capture so we never burn hours only to fail at the judge. ---
+need_claude=0
+[ "$JUDGE_ENGINE" = "claude-tmux" ] && need_claude=1
+[ "$SUMMARY" = "1" ] && need_claude=1
+if [ "$need_claude" = 1 ] && ! tmux has-session -t "$CLAUDE_TMUX_SESSION" 2>/dev/null; then
+  {
+    echo "ERROR: the judge and final-summary run 'claude' THROUGH tmux (headless/background is"
+    echo "       restricted), but tmux session '$CLAUDE_TMUX_SESSION' does not exist."
+    echo "       Start it once, then re-run this script:"
+    echo
+    echo "         tmux new-session -d -s $CLAUDE_TMUX_SESSION"
+    echo
+    echo "       Or disable the claude steps entirely:"
+    echo "         JUDGE_ENGINE=none SUMMARY=0 bench/quality/run_capture.sh $D"
+  } >&2
+  exit 3
+fi
+
+# --- 1. build the per-depth task prompts once (shared corpus prefix + per-task rules/spec suffix) ---
+build_depth_tasks() {   # $1 = depth label (64k|120k|128k), $2 = target tokens
+  local depth="$1" toks="$2" f="$RAW/tasks-$depth.jsonl"
+  # Cache is valid ONLY if it holds exactly the task ids the manifest expects. The old check was a
+  # bare `[ -s "$f" ]`, so ADDING a task to tasks.jsonl silently reused the stale prompt file and the
+  # new task was never captured at all.
+  if [ -s "$f" ] && SMOKE="${SMOKE:-0}" python3 - "$D" "$f" 2>/dev/null <<'PY'
+import sys, json, os
+d, cache = sys.argv[1], sys.argv[2]
+smoke = os.environ.get("SMOKE") == "1"
+manifest = [json.loads(l) for l in open(os.path.join(d, "inputs", "tasks.jsonl")) if l.strip()]
+want = {t["id"] for t in manifest if smoke or t.get("matrix", True)}
+have = {json.loads(l)["id"] for l in open(cache) if l.strip()}
+sys.exit(0 if want == have else 1)
+PY
+  then echo "$f"; return; fi
+  SMOKE="${SMOKE:-0}" python3 - "$D" "$Q" "$toks" "$f" >&2 <<'PY'
+import sys, json, os
+d, q, toks, out = sys.argv[1], sys.argv[2], int(sys.argv[3]), sys.argv[4]
+smoke = os.environ.get("SMOKE") == "1"
+sys.path.insert(0, q); import build_context
+manifest = [json.loads(l) for l in open(os.path.join(d, "inputs", "tasks.jsonl")) if l.strip()]
+tasks = [t for t in manifest if smoke or t.get("matrix", True)]   # easy tasks (matrix:false) are smoke-only
+with open(out, "w") as fo:
+    for t in tasks:
+        # A task may pin its OWN prompt size via `"tokens": N` in tasks.jsonl (pricing-deferred needs
+        # ~85k so that prompt + up to 32,768 thinking + answer still fits ctx 163840). Without this
+        # every task was forced to the cell's depth, which would have made unlimited reasoning
+        # truncate. Depth differing per task is not a confound: Δ is paired BY TASK, and every cell
+        # runs a given task identically.
+        tt = int(t.get("tokens", toks))
+        prompt = build_context.build(os.path.join(q, "ts-harness", "tasks", t["id"]), tt)
+        fo.write(json.dumps({"id": t["id"], "type": "ts-tdd", "category": t["tier"],
+                             "prompt": prompt}) + "\n")
+        if tt != toks:
+            print(f"  {t['id']}: pinned to ~{tt} tok (cell depth is ~{toks})")
+print(f"built {out} ({len(tasks)}/{len(manifest)} tasks @ ~{toks} tok; smoke={smoke})")
+PY
+  echo "$f"
+}
+
+vram_used_mib() { rocm-smi --showmeminfo vram 2>/dev/null \
+  | awk -F: '/VRAM Total Used/ {gsub(/ /,"",$NF); printf "%d", $NF/1048576}'; }
+
+# --- 2. per-cell probe loop (configs.jsonl → pipe-delimited fields) ---
+python3 -c '
+import json,sys
+for l in open(sys.argv[1]):
+    if not l.strip(): continue
+    c=json.loads(l)
+    # presence_penalty before role/optin: Qwen ties pp to the temperature PRESET, so a vendor preset
+    # cell (temp 1.0 + pp 1.5) is NOT reproducible without it — without this column those cells would
+    # silently collapse into the plain temp-1.0 cell and fake a "preset ≈ temp" finding.
+    print("|".join(str(c.get(k,"")) for k in
+      ["label","model","mtp","kv","depth","tokens","ctx","budget","temp","top_p","top_k","min_p","presence_penalty","role","optin"]))
+' "$CONFIGS" | while IFS='|' read -r label model mtp kv depth tokens ctx budget temp top_p top_k min_p presence_penalty role optin; do
+  [ -n "${ONLY:-}" ] && [[ "$label" != ${ONLY} ]] && { echo "skip (ONLY): $label"; continue; }
+  [ "$optin" = "True" ] && [ "${RUN_OPTIN:-0}" != "1" ] && { echo "skip (opt-in, set RUN_OPTIN=1): $label"; continue; }
+  mfile="$MODELS_DIR/$model"
+  [ -f "$mfile" ] || { echo "MISSING MODEL, skipping: $mfile" | tee -a "$RAW/failures.txt"; continue; }
+  tasks_file=$(build_depth_tasks "$depth" "$tokens")
+
+  # A cell is done only when every (task, rep) it owes is already captured — derived from the DATA,
+  # not from a marker. capture.py has row-level resume, so an INCOMPLETE cell (a task added to
+  # tasks.jsonl after this cell ran) only pays for the MISSING replies. The old marker-only check
+  # short-circuited before capture.py ever ran, so a newly added task could never be backfilled and
+  # the grid stayed ragged (old cells 4 tasks, new cells 5).
+  need=$(( $(grep -c . "$tasks_file") * REPS ))
+  have=$(python3 - "$OUT" "$label" <<'PY'
+import sys, json, os
+out, label = sys.argv[1], sys.argv[2]
+n = 0
+if os.path.exists(out):
+    for l in open(out):
+        if not l.strip():
+            continue
+        r = json.loads(l)
+        if r.get("config") == label and not r.get("error") and r.get("response"):
+            n += 1
+print(n)
+PY
+)
+  [ "$have" -ge "$need" ] && { echo "skip (complete: $label — $have/$need replies)"; continue; }
+  [ "$have" -gt 0 ] && echo "resume: $label — $have/$need already captured, running the rest"
+  # --reasoning-budget semantics, MEASURED from our own b9950 `--help` (docs/research/2026-07-15-1000-*):
+  #   -1 = unrestricted · 0 = IMMEDIATE END (not "uncapped": the old comment here was wrong) · N>0 = budget.
+  # For -1 the cap must be generous or "unlimited" is not unlimited (it used to fall to 16384, which
+  # would have silently capped the whole point of the cell). 40960 covers Qwen's 32768 recommendation
+  # plus an answer; where ctx has less headroom the server stops at the wall and the truncation IS the
+  # measurement.
+  if [ "$budget" -gt 0 ]; then max_tokens=$(( budget + 8192 ))
+  elif [ "$budget" -lt 0 ]; then max_tokens=40960
+  else max_tokens=8192; fi
+
+  echo "=== $label  ($role: ${model%%.gguf} mtp=$mtp kv=$kv depth=$depth budget=$budget) ==="
+  t0=$(date +%s)
+  if MODEL="$mfile" BACKEND="$BACKEND" PORT="$PORT" CTX="$ctx" NP=1 UB="$UB" B="$B" FA=on \
+       KV="$kv" MTP="$mtp" WAIT="$WAIT" EXTRA_ARGS="--reasoning-budget $budget" bash "$SERVE" start; then
+    load_s=$(( $(date +%s) - t0 )); used=$(vram_used_mib)
+    echo "  VRAM at load: ${used} MiB  (load ${load_s}s)"
+    curl -s -m 10 "http://127.0.0.1:$PORT/props" > "$RAW/props_${label}.json" 2>/dev/null || true
+    msize=$(stat -c%s "$mfile" 2>/dev/null || echo 0)
+    csv="$RAW/gpu_${label}.csv"; SPID=""
+    if command -v rocm-smi >/dev/null 2>&1; then
+      python3 "$REPO/stack/gpu/vram_sampler.py" --out "$csv" --interval 1 & SPID=$!
+      for _ in 1 2 3 4; do [ -s "$csv" ] && [ "$(wc -l <"$csv")" -ge 2 ] && break
+        kill -0 "$SPID" 2>/dev/null || break; sleep 0.5; done
+    fi
+    python3 "$Q/capture.py" --config "$label" \
+      --tasks "$tasks_file" --out "$OUT" --base-url "http://127.0.0.1:$PORT" \
+      --reps "$REPS" --max-tokens "$max_tokens" \
+      --temp "$temp" --top-p "$top_p" --top-k "$top_k" --min-p "$min_p" \
+      ${presence_penalty:+--presence-penalty "$presence_penalty"} \
+      && touch "$RAW/done/$label"
+    [ -n "$SPID" ] && { kill "$SPID" 2>/dev/null; wait "$SPID" 2>/dev/null || true; }
+    python3 - "$label" "$model" "$mtp" "$ctx" "$kv" "$budget" "$depth" "$used" "$csv" "$load_s" "$msize" >> "$VRAM" <<'PY'
+import sys, json, re
+label, model, mtp, ctx, kv, budget, depth, used, csv, load_s, msize = sys.argv[1:12]
+row = {"config": label, "model": model, "mtp": int(mtp), "ctx": int(ctx), "kv": kv,
+       "budget": int(budget), "depth": depth, "vram_used_mib_at_load": int(used),
+       "load_time_s": int(load_s), "model_size_bytes": int(msize),
+       "weights_gib": round(int(msize) / 2**30, 2)}
+try:
+    summ = [l for l in open(csv) if l.startswith("#")][-1]
+    for k, v in re.findall(r"(\w+)=([\d.]+)", summ):
+        row[k] = float(v) if "." in v else int(v)
+except Exception as e:
+    row["sampler_note"] = str(e)
+print(json.dumps(row))
+PY
+  else
+    echo "SERVER FAILED to start: $label" | tee -a "$RAW/failures.txt"
+  fi
+  PORT="$PORT" bash "$SERVE" stop || true
+  sleep 2
+done
+
+# --- 3. grade every captured reply with the real toolchain ---
+# GRADER SELF-CHECK (the fix): PROVE vitest actually runs in this environment before trusting any
+# grade. selftest runs tsc+eslint+vitest on reference fixtures and asserts good>mediocre>bad. If it
+# fails (e.g. vitest can't spawn under memory pressure — the bug that voided the previous run), ABORT
+# loudly instead of recording silent zeros.
+echo; echo "=== grader self-check (vitest must run) ==="
+if ! python3 "$Q/score_typescript.py" selftest; then
+  echo "GRADER SELF-CHECK FAILED — vitest is not running correctly here; refusing to grade" >&2
+  echo "(would silently zero tests+edge). Free host memory / reboot the box, then re-run grading:" >&2
+  echo "  python3 $Q/score_typescript.py batch --campaign $D" >&2
+  exit 4
+fi
+echo; echo "=== grading (tsc + eslint + vitest, per reply) ==="
+# --resume: reuse rows already graded (keyed config/task_id/rep) so an INCREMENTAL run (new cells
+# appended to configs.jsonl) only pays tsc+eslint+vitest for the NEW replies. Output is rewritten in
+# outputs.jsonl order and is byte-identical to a full re-grade; grade_error rows are always retried.
+# Set REGRADE=1 to force a full re-grade (e.g. after changing the grader itself).
+python3 "$Q/score_typescript.py" batch --campaign "$D" $([ "${REGRADE:-0}" = "1" ] || echo --resume) || true
+
+# --- 4. blind LLM judge (subjective design/clarity/robustness the toolchain can't grade) ---
+# 27B is the strongest LOCAL model, so it can't judge itself — the judge is Claude via the tmux gateway
+# (JUDGE_ENGINE=claude-tmux), or any stronger OpenAI-compatible endpoint (JUDGE_ENGINE=http +
+# JUDGE_BASE_URL). Both save the full prompt+raw reply (judge_raw.jsonl) AND parsed scores. Rubric: JUDGE.md.
+case "$JUDGE_ENGINE" in
+  claude-tmux)
+    echo; echo "=== blind judge: ONE claude session fans out $JUDGE_SUBAGENT_MODEL subagents (orchestrator=$JUDGE_MODEL) ==="
+    python3 "$Q/judge.py" --campaign "$D" --engine claude-tmux \
+      --model "$JUDGE_MODEL" --subagent-model "$JUDGE_SUBAGENT_MODEL" \
+      || echo "judge step failed (see above / JUDGE.md)" ;;
+  http)
+    echo; echo "=== blind judge via HTTP (${JUDGE_BASE_URL:-UNSET}) ==="
+    python3 "$Q/judge.py" --campaign "$D" --engine http \
+      --base-url "${JUDGE_BASE_URL:-}" --model "${JUDGE_MODEL:-}" \
+      || echo "judge step failed" ;;
+  *) echo; echo "=== judge SKIPPED (JUDGE_ENGINE=$JUDGE_ENGINE) — see JUDGE.md ===" ;;
+esac
+
+# --- charts (reused by the benchmark-results skill): results/charts/ + results/appendix.md +
+#     results/gpu_peaks.json (measured peak VRAM/GTT per config from tmp/gpu_<label>.csv) ---
+echo; echo "=== charts (reused by the benchmark-results skill) ==="
+ORDER="$(python3 -c 'import json,sys;print(",".join(json.loads(l)["label"] for l in open(sys.argv[1]) if l.strip()))' "$CONFIGS")"
+calib_abs() {  # map each relative file of the comma list onto <dir>/inputs/ (absolute ones pass through)
+  local out="" p
+  IFS=',' read -ra _parts <<< "$CALIB"
+  for p in "${_parts[@]}"; do
+    [ -z "$p" ] && continue
+    case "$p" in /*) out+="$p" ;; *) out+="$D/inputs/$p" ;; esac
+    out+=","
+  done
+  printf '%s' "${out%,}"
+}
+if [ -n "$CALIB" ]; then
+  python3 "$Q/make_charts.py" --campaign "$D" --order "$ORDER" --calibration "$(calib_abs)" \
+    || echo "make_charts failed (see above)"
+else
+  python3 "$Q/make_charts.py" --campaign "$D" --order "$ORDER" \
+    || echo "make_charts failed (see above)"
+fi
+
+# --- 5. deterministic digest: aggregate.py crunches ALL the numbers in Python (per-cell table +
+#        the campaign questions answered numerically) so the analysis LLM never touches bulk JSON. ---
+echo; echo "=== aggregate (deterministic digest → results/summary.md) ==="
+# --by-task also emits results/summary_by_task.json, which the per-task charts below consume. It was
+# missing here once, so summary_by_task.json was only ever written by hand — that is exactly how
+# charts/detailed/ ended up built from a pre-correction aggregate (2026-07-15). Data first, charts after.
+if [ -n "$CALIB" ]; then
+  python3 "$Q/aggregate.py" --campaign "$D" --by-task --calib-files "$CALIB" || echo "aggregate failed (see above)"
+else
+  python3 "$Q/aggregate.py" --campaign "$D" --by-task || echo "aggregate failed (see above)"
+fi
+
+# Per-task charts LAST: they read results/summary_by_task.json, so they MUST run after aggregate --by-task.
+# Wired in deliberately — running them by hand is what let charts/detailed/ drift behind the data.
+echo; echo "=== per-task charts (results/charts/detailed/) ==="
+python3 "$Q/make_charts_detailed.py" --campaign "$D" --scores scores_typescript.jsonl --orig scores_typescript.jsonl \
+  || echo "make_charts_detailed failed (see above)"
+
+# --- 6. auto-write the write-up via the benchmark-results skill (interactive claude, through tmux) ---
+# claude_ask.sh opens an interactive claude in tmux and TYPES the request (no headless -p); claude runs
+# the skill, writes the write-up, then writes a short confirmation to the result file to signal it's done.
+# The prompt points ONLY at the deterministic digest + charts — NOT the per-reply jsonl (outputs.jsonl
+# holds full replies incl. thinking). The model's job is prose synthesis, not aggregation.
+if [ "$SUMMARY" = "1" ]; then
+  echo; echo "=== final analysis (benchmark-results skill via interactive claude/tmux, model=$SUMMARY_MODEL) ==="
+  sp="$RAW/summary_prompt.txt"
+  CREL="${D#$REPO/}"
+  if [ -f "$D/summary-prompt.md" ]; then   # the campaign's own questions (recipe file beside campaign.env)
+    cp "$D/summary-prompt.md" "$sp"
+  else
+  cat > "$sp" <<EOF
+You are finishing the "$TITLE" benchmark in this repo. Follow the
+repo's benchmark-results skill (read .claude/skills/benchmark-results/SKILL.md) and write the analysis to
+docs/findings/quality/$(basename "$D").md.
+
+ALL the numbers are ALREADY aggregated deterministically — read ONLY:
+  - $CREL/results/summary.md        (per-cell table + PER-REP detail + findings)
+  - $CREL/results/appendix.md    (cell-level charts + data table)
+  - $CREL/results/appendix-detailed.md  (per-task charts, if present)
+DO NOT read outputs.jsonl / scores_*.jsonl / judge_scores.jsonl — large per-reply logs; everything you
+need is in summary.md. For design context/glossary you may skim $CREL/README.md and $CREL/eval-design.md.
+
+Write it to the skill's contract: TL;DR + results TABLE FIRST (a memory column is MANDATORY),
+then detail. Every number comes from summary.md/appendix.md — tag MEASURED, mark reasoning INFERRED,
+invent nothing. Cover the campaign's questions exactly as summary.md's "Findings" lists them.
+NOTE the grader FIX: this run used single-process vitest + a fail-loud grader + a pre-grade self-check,
+so tests/edge are trustworthy (the previous run's tests/edge=0 was a harness bug). If summary.md's Health
+line flags grade_error/HARNESS rows, runaways, or GTT spill, surface them prominently.
+
+UNCERTAINTY (MANDATORY — do not present noise as shape): summary.md has an
+"Uncertainty" section with per-cell sd/SE/95% CI, the rep noise, and a PAIRED-by-task t-test.
+READ EVERY NUMBER FROM THAT SECTION. Do NOT copy a Δ, t, sd, CI, resolution or task-count out of this
+prompt: they go stale the moment the matrix grows, and they HAVE. Rules, not numbers:
+(1) do NOT rank the cells or call any cell "best"/"worst" unless its paired Δ clears the significance
+threshold PRINTED in the table; (2) state a bounded null result where the table says so — "no detectable
+effect; any effect is smaller than our resolution" (quote the resolution from the Power line) — and note
+that a non-monotonic ordering is exactly what noise looks like; (3) report EVERY comparison whose verdict
+is SIGNIFICANT, and say plainly which are not — do not inherit an older draft's "only signal" from this
+prompt; (4) quote every Δ with its verdict; (5) name underpowering as the top limitation and recommend
+MORE TASKS (per the Power line), not more reps (task-to-task variance dominates).
+
+PER-REP DETAIL (MANDATORY — the user wants to see all reps, not just means): summary.md ends with a
+"Per-rep detail" section — one table per task listing EVERY local rep (full objective vector), a mean
+row, and the haiku/sonnet/opus references in the same columns. INLINE these per-task tables VERBATIM in
+the write-up under a "Per-rep results" section — do NOT collapse them to means. Call out rep-to-rep
+spread where reps disagree, and note any reference gaps.
+
+JUDGE DETAIL (if a judge ran): appendix.md ends with the full blind-judge verdict table + "Judge mean by
+task". Add a "Judge verdicts" section: (1) per-cell judge d.c.r means from summary.md, (2) quote 3-5 most
+informative notes VERBATIM (worst + best), (3) the "Judge mean by task" line, (4) link to the appendix
+for the full table.
+
+Include a <!-- meta --> block so docs/reindex.py can register it. This task is complete once the
+write-up is written; your final answer is a one-line confirmation, e.g. "write-up written (N cells)".
+EOF
+  fi
+  bash "$Q/claude_ask.sh" --prompt "$sp" --result "$RAW/summary_result.txt" \
+    --cwd "$REPO" --model "$SUMMARY_MODEL" --permission-mode bypassPermissions \
+    && echo "  write-up written by claude" \
+    || echo "  summary step failed (see $RAW/summary_result.txt.err)"
+  # reindex is deterministic — do it here, not via the model
+  python3 "$REPO/docs/reindex.py" 2>/dev/null && echo "  docs/INDEX.md reindexed" || echo "  (reindex skipped)"
+fi
+
+echo; echo "Run complete."
+echo "  replies:  $OUT"
+echo "  scores:   $RES/scores_typescript.jsonl   judge: $RES/judge_scores.jsonl"
+echo "  VRAM:     $VRAM   (gpu samples: $RAW/gpu_*.csv)"
+echo "  charts:   $RES/charts/"
+echo "  write-up: $REPO/docs/findings/quality/$(basename "$D").md   (auto-written; review before committing run data)"

@@ -1,0 +1,40 @@
+{
+  "slug": "vllm-sly-mxfp4-dflash-170k",
+  "date": "2026-10-22-1506",
+  "title": "Sly radiance 1.6.0 · Qwen3.8-27B MXFP4 · fp8 KV · DFlash2 k=7 — 170k window: fill 150k, then think until full (memory over time)",
+  "notes": [
+    "question: is VRAM/GTT flat or creeping while a 170k window fills to the edge? find a safe max setting",
+    "user experience: <= 30.8 GB total VRAM use is stable on this box; MTP on llama.cpp creeps slowly",
+    "turn 0 = 150k tokens of codereview-200000.txt; later turns = thinking-hard.prompt.txt only (step 0), 1024 max tokens, reasoning_effort high",
+    "kv_usage_peak per turn = vLLM kv_cache_usage_perc polled during the turn; VRAM/GTT sampled at 1 s for the whole probe",
+    "same profile as campaigns/perf/2026-10-22-1406-vllm-sly-mxfp4-dflash except MAXLEN 170000"
+  ],
+  "engine": "vllm",
+  "profile": "sly-radiance/qwen38-mxfp4-dflash",
+  "served_model": "qwen38-27b-mxfp4-dflash",
+  "model": "/mnt/Lin1/work/vllm/sly-radiance/models/amd__Qwen3.8-27B-Quark-AWQ-MXFP4@5233554c",
+  "port": 8000,
+  "servers": [
+    {
+      "name": "mxfp4-dflash7-fp8kv-ctx170000",
+      "ctx": 170000,
+      "np": 1,
+      "kv": "fp8",
+      "mtp": 0,
+      "probes": [
+        {
+          "slug": "fill170k",
+          "mode": "conversation",
+          "prompts": ["codereview-200000.txt"],
+          "start_tokens": 150000,
+          "step_tokens": 0,
+          "max_depth": 170000,
+          "max_tokens": 1024,
+          "reps": 2,
+          "turn_prompt": "thinking-hard.prompt.txt",
+          "chat_template_kwargs": {"reasoning_effort": "high"}
+        }
+      ]
+    }
+  ]
+}

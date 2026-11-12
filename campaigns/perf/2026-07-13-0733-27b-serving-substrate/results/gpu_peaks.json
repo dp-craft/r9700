@@ -1,0 +1,160 @@
+{
+ "generated_by": "bench/core/report.py",
+ "provenance": "MEASURED: max over the samples of each GPU sample CSV (stack/gpu/vram_sampler.py); csv paths relative to the campaign dir",
+ "runs": [
+  {
+   "run": "2026-07-13-0734-engine-pf-cr8000",
+   "csv": "tmp/2026-07-13-0734-engine-pf-cr8000/gpu_samples.csv",
+   "peak_vram_mib": 21414,
+   "peak_gtt_mib": 424,
+   "load_vram_mib": 21277,
+   "vram_total_mib": 32624,
+   "samples": 60,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  },
+  {
+   "run": "2026-07-13-0735-engine-pf-cr32000",
+   "csv": "tmp/2026-07-13-0735-engine-pf-cr32000/gpu_samples.csv",
+   "peak_vram_mib": 21484,
+   "peak_gtt_mib": 469,
+   "load_vram_mib": 21319,
+   "vram_total_mib": 32624,
+   "samples": 182,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  },
+  {
+   "run": "2026-07-13-0738-engine-pf-cr64000",
+   "csv": "tmp/2026-07-13-0738-engine-pf-cr64000/gpu_samples.csv",
+   "peak_vram_mib": 21536,
+   "peak_gtt_mib": 538,
+   "load_vram_mib": 21321,
+   "vram_total_mib": 32624,
+   "samples": 371,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  },
+  {
+   "run": "2026-07-13-0745-engine-warm-cr32000",
+   "csv": "tmp/2026-07-13-0745-engine-warm-cr32000/gpu_samples.csv",
+   "peak_vram_mib": 21336,
+   "peak_gtt_mib": 531,
+   "load_vram_mib": 21272,
+   "vram_total_mib": 32624,
+   "samples": 87,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  },
+  {
+   "run": "2026-07-13-0746-engine-dec-think",
+   "csv": "tmp/2026-07-13-0746-engine-dec-think/gpu_samples.csv",
+   "peak_vram_mib": 21320,
+   "peak_gtt_mib": 531,
+   "load_vram_mib": 21304,
+   "vram_total_mib": 32624,
+   "samples": 51,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  },
+  {
+   "run": "2026-07-13-0747-engine-pf-cr32000-q8",
+   "csv": "tmp/2026-07-13-0747-engine-pf-cr32000-q8/gpu_samples.csv",
+   "peak_vram_mib": 19423,
+   "peak_gtt_mib": 445,
+   "load_vram_mib": 19348,
+   "vram_total_mib": 32624,
+   "samples": 203,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  },
+  {
+   "run": "2026-07-13-0751-engine-pf-cr64000-q8",
+   "csv": "tmp/2026-07-13-0751-engine-pf-cr64000-q8/gpu_samples.csv",
+   "peak_vram_mib": 19765,
+   "peak_gtt_mib": 500,
+   "load_vram_mib": 19344,
+   "vram_total_mib": 32624,
+   "samples": 451,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  },
+  {
+   "run": "2026-07-13-0759-engine-dec-think-q8",
+   "csv": "tmp/2026-07-13-0759-engine-dec-think-q8/gpu_samples.csv",
+   "peak_vram_mib": 19753,
+   "peak_gtt_mib": 487,
+   "load_vram_mib": 19737,
+   "vram_total_mib": 32624,
+   "samples": 52,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  },
+  {
+   "run": "2026-07-13-0800-engine-pf-cr32000-mtp1",
+   "csv": "tmp/2026-07-13-0800-engine-pf-cr32000-mtp1/gpu_samples.csv",
+   "peak_vram_mib": 22949,
+   "peak_gtt_mib": 911,
+   "load_vram_mib": 22877,
+   "vram_total_mib": 32624,
+   "samples": 178,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  },
+  {
+   "run": "2026-07-13-0804-engine-dec-think-mtp1",
+   "csv": "tmp/2026-07-13-0804-engine-dec-think-mtp1/gpu_samples.csv",
+   "peak_vram_mib": 22602,
+   "peak_gtt_mib": 884,
+   "load_vram_mib": 22591,
+   "vram_total_mib": 32624,
+   "samples": 28,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  },
+  {
+   "run": "2026-07-13-0830-engine-pf-cr32000",
+   "csv": "tmp/2026-07-13-0830-engine-pf-cr32000/gpu_samples.csv",
+   "peak_vram_mib": 21769,
+   "peak_gtt_mib": 531,
+   "load_vram_mib": 21484,
+   "vram_total_mib": 32624,
+   "samples": 181,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  },
+  {
+   "run": "2026-07-13-0833-engine-warm-cr32000",
+   "csv": "tmp/2026-07-13-0833-engine-warm-cr32000/gpu_samples.csv",
+   "peak_vram_mib": 21615,
+   "peak_gtt_mib": 485,
+   "load_vram_mib": 21611,
+   "vram_total_mib": 32624,
+   "samples": 85,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  },
+  {
+   "run": "2026-07-13-0836-engine-hip-pf-cr32000",
+   "csv": "tmp/2026-07-13-0836-engine-hip-pf-cr32000/gpu_samples.csv",
+   "peak_vram_mib": 1066,
+   "peak_gtt_mib": 108,
+   "load_vram_mib": 845,
+   "vram_total_mib": 32624,
+   "samples": 1824,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  },
+  {
+   "run": "2026-07-13-0910-engine-hip-dec-think",
+   "csv": "tmp/2026-07-13-0910-engine-hip-dec-think/gpu_samples.csv",
+   "peak_vram_mib": 615,
+   "peak_gtt_mib": 82,
+   "load_vram_mib": 604,
+   "vram_total_mib": 32624,
+   "samples": 37,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  }
+ ]
+}

@@ -1,0 +1,94 @@
+<|im_start|>system
+You are a coding agent working in a TypeScript and Python repository. Think, then act.
+
+Think first, scaling depth to complexity: solve simple tasks directly; for complex tasks, trace concrete mechanics step-by-step (initial state -> transformations -> final outcome) across boundary and failure cases (empty, extreme, conflicting, aborted), and verify end-to-end continuity (every input, requirement, or claim must be sourced/computed upstream and used/resolved downstream). Avoid circular re-reading, but never stop at surface/structural checks before verifying actual operational behavior.
+
+1. Priority: Accuracy, internal consistency, and completeness override brevity. Keep solutions minimal (no over-engineering), never cutting analytical or verification depth. Evaluate provided context and sources verbatim without silent normalization. Flag flawed premises, contradictions, or dead/unhandled elements first. Never truncate outputs, code, tables, or data with placeholders.
+2. Delivery: Zero filler; use the clearest structure (tables, lists, code, prose). Lead with the answer/artifact, followed only by non-obvious constraints and causal reasoning. Strict format constraints (e.g., JSON/code-only) suppress all prose.
+3. Ambiguity (Minimize Turns): State uncertainties and their root causes.
+   - Minor gaps: State brief assumptions and solve.
+   - Multiple viable paths: Rank top options (effort vs. impact) AND immediately execute the optimal default.
+   - Blocked: Batch all critical clarifying questions at once.<|im_end|>
+<|im_start|>user
+Write unit tests for the public functions in this file. Cover the edge cases, not only the happy path.
+
+File `bench/workloads/corpus/py-rich/rich/scope.py`:
+```
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any, Optional, Tuple
+
+from .highlighter import ReprHighlighter
+from .panel import Panel
+from .pretty import Pretty
+from .table import Table
+from .text import Text, TextType
+
+if TYPE_CHECKING:
+    from .console import ConsoleRenderable
+
+
+def render_scope(
+    scope: "Mapping[str, Any]",
+    *,
+    title: Optional[TextType] = None,
+    sort_keys: bool = True,
+    indent_guides: bool = False,
+    max_length: Optional[int] = None,
+    max_string: Optional[int] = None,
+) -> "ConsoleRenderable":
+    """Render python variables in a given scope.
+
+    Args:
+        scope (Mapping): A mapping containing variable names and values.
+        title (str, optional): Optional title. Defaults to None.
+        sort_keys (bool, optional): Enable sorting of items. Defaults to True.
+        indent_guides (bool, optional): Enable indentation guides. Defaults to False.
+        max_length (int, optional): Maximum length of containers before abbreviating, or None for no abbreviation.
+            Defaults to None.
+        max_string (int, optional): Maximum length of string before truncating, or None to disable. Defaults to None.
+
+    Returns:
+        ConsoleRenderable: A renderable object.
+    """
+    highlighter = ReprHighlighter()
+    items_table = Table.grid(padding=(0, 1), expand=False)
+    items_table.add_column(justify="right")
+
+    def sort_items(item: Tuple[str, Any]) -> Tuple[bool, str]:
+        """Sort special variables first, then alphabetically."""
+        key, _ = item
+        return (not key.startswith("__"), key.lower())
+
+    items = sorted(scope.items(), key=sort_items) if sort_keys else scope.items()
+    for key, value in items:
+        key_text = Text.assemble(
+            (key, "scope.key.special" if key.startswith("__") else "scope.key"),
+            (" =", "scope.equals"),
+        )
+        items_table.add_row(
+            key_text,
+            Pretty(
+                value,
+                highlighter=highlighter,
+                indent_guides=indent_guides,
+                max_length=max_length,
+                max_string=max_string,
+            ),
+        )
+    return Panel.fit(
+        items_table,
+        title=title,
+        border_style="scope.border",
+        padding=(0, 1),
+    )
+
+
+if __name__ == "__main__":  # pragma: no cover
+    from rich import print
+
+    print()
+
+    def test(foo: float, bar: float) -> None:
+```<|im_end|>
+<|im_start|>assistant
+<think>

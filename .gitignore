@@ -1,20 +1,24 @@
-# compat symlinks into builds/ (bench/ → ../build/ symlink → llamacpp/builds/)
-bench/llamacpp-vulkan-b10375
-bench/llamacpp-b10375
-bench/llamacpp-vulkan-6fdd0ac
-llama.cpp-src
-# llama.cpp builds: symlink `build/` → llamacpp/builds/
-# (build/ itself is a symlink — git tracks symlink target, not contents)
-llamacpp/vulkansdk/
-llamacpp/builds/
-# IDE state + local skill backups
-.idea/
-.claude/skills/tmp/
-llama-swap/llama-swap/
-/llama-swap/.go-toolchain/
-# monitor.py live-output artifact (README example writes it to the repo root)
-/session.jsonl
-# Python cache artifacts (e.g. bench/engine-bench/vllm/overlays/__pycache__)
+# Two ignored dir names, anywhere in the tree (docs/guides/GUIDE.md § Layout):
+#   tmp/  reproducible internals + scratch (raw replies, server logs, GPU samples, markers); deleting costs a rerun
+#   var/  machine state running services need (llama.cpp builds, Vulkan SDK, venvs, model caches, pidfiles, logs)
+tmp/
+var/
+node_modules
 __pycache__/
-# dp-fan-out-subagents result files (one run dir per session)
-docs/tmp/
+*.pyc
+.pytest_cache/
+.idea/
+.venv/
+
+# Private companion repo ../amd-private, linked in by its link.sh (notes, archive payload). The launcher home
+# (clients/claude) lives in THIS repo since 2026-11-09 (D1); amd-private/clients/claude links back — the dp_
+# link set is managed by stack/serve/install.sh.
+/notes
+/archive
+/.claude/skills/brainstorming
+/.claude/skills/consider
+/.claude/skills/research
+/.claude/skills/llama-swap-add-model
+/.claude/commands/
+/.claude/worktrees/
+/.claude/scheduled_tasks.lock

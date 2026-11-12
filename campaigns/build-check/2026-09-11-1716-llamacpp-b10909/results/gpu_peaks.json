@@ -1,0 +1,50 @@
+{
+ "generated_by": "bench/core/report.py",
+ "provenance": "MEASURED: max over the samples of each GPU sample CSV (stack/gpu/vram_sampler.py); csv paths relative to the campaign dir",
+ "runs": [
+  {
+   "run": "2026-09-11-1716-model-buildcmp-b10655-4-g6fdd0ac-vulkan",
+   "csv": "tmp/2026-09-11-1716-model-buildcmp-b10655-4-g6fdd0ac-vulkan/gpu_samples.csv",
+   "peak_vram_mib": 20740,
+   "peak_gtt_mib": 302,
+   "load_vram_mib": 836,
+   "vram_total_mib": 32624,
+   "samples": 231,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  },
+  {
+   "run": "2026-09-11-1720-model-buildcmp-b10909-vulkan",
+   "csv": "tmp/2026-09-11-1720-model-buildcmp-b10909-vulkan/gpu_samples.csv",
+   "peak_vram_mib": 20627,
+   "peak_gtt_mib": 298,
+   "load_vram_mib": 735,
+   "vram_total_mib": 32624,
+   "samples": 219,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  },
+  {
+   "run": "2026-09-11-1724-model-buildcmp-b10375-rocm",
+   "csv": "tmp/2026-09-11-1724-model-buildcmp-b10375-rocm/gpu_samples.csv",
+   "peak_vram_mib": 20348,
+   "peak_gtt_mib": 104,
+   "load_vram_mib": 729,
+   "vram_total_mib": 32624,
+   "samples": 258,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  },
+  {
+   "run": "2026-09-11-1729-model-buildcmp-b10909-rocm",
+   "csv": "tmp/2026-09-11-1729-model-buildcmp-b10909-rocm/gpu_samples.csv",
+   "peak_vram_mib": 20517,
+   "peak_gtt_mib": 112,
+   "load_vram_mib": 789,
+   "vram_total_mib": 32624,
+   "samples": 223,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  }
+ ]
+}

@@ -1,4 +1,0 @@
-DONE
-
-Answers computed from results.jsonl:
-- Q1 67.25, Q2 40, Q3 31, Q4 redhat-sly-dflash-cr10000, Q5 330.3, Q6 3, Q7 30.68, Q8 24332, Q9 5, Q10 8

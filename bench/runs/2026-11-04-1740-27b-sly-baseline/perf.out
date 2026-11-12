@@ -1,5 +1,0 @@
-boot_rc=0
-10000 probe_rc=0 rows=4
-50000 probe_rc=0 rows=8
-100000 probe_rc=0 rows=12
-DONE

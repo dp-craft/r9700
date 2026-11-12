@@ -1,9 +1,0 @@
-Q1|2026-07-14-hardest-tasks-27b-vs-35b.analysis.md
-Q1|2026-10-23-0023-vllm-gpu-fault-solved-hip-kernarg.md
-Q1|2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md
-Q2|none
-CONFLICT|2026-07-14-hardest-tasks-27b-vs-35b.analysis.md:466|2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md:138|07-14 says never set presence_penalty above 0 for coding; 11-04 recommends presence-penalty 1.5 for Ornith on Radiance.
-CONFLICT|2026-07-14-hardest-tasks-27b-vs-35b.analysis.md:11|2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md:111|07-14 states the host has no swap; 11-04 measured 4.7 GiB swap and calls the CLAUDE.md no-swap line out of date.
-CONFLICT|2026-07-14-hardest-tasks-27b-vs-35b.analysis.md:439|2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md:3|07-14 recommends Qwen3.6-35B-A3B on llama.cpp Vulkan (about 120 t/s decode); 11-04 calls Ornith 1.5 on Radiance the best 35B (about 220 t/s), quality untested.
-CONFLICT|2026-09-15-stew675-buildcmp.analysis.md:103|2026-10-23-0023-vllm-gpu-fault-solved-hip-kernarg.md:87|09-15 recommends the ROCm build for prefill-heavy work with no kernarg setting; 10-23 says ROCm engines need HIP_FORCE_DEV_KERNARG=0 to avoid memory faults.
-RECOMMEND|Ornith 1.5 w4a8 on native Radiance with MTP K=3 is the fastest 35B-class configuration measured on one R9700 (219.8 t/s decode at 10k, about 2.5x the 27B on Sly), but its coding quality has not been tested. The only local model here with graded coding quality is Qwen3.6-35B-A3B on llama.cpp Vulkan at temp 0.6, top_p 0.95, top_k 20, min_p 0 and presence_penalty 0 (73 to 78 TS %, about 120 t/s decode), so grade Ornith on the same harness before adopting it for coding. Keep presence_penalty at 0 for coding as the 07-14 report advises, and expect possible desktop crashes at Radiance's default 96 MiB headroom.

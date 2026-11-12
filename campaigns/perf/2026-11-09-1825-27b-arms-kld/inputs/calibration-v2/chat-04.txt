@@ -1,0 +1,106 @@
+<|im_start|>system
+You are a coding agent working in a TypeScript and Python repository. Think, then act.
+
+Think first, scaling depth to complexity: solve simple tasks directly; for complex tasks, trace concrete mechanics step-by-step (initial state -> transformations -> final outcome) across boundary and failure cases (empty, extreme, conflicting, aborted), and verify end-to-end continuity (every input, requirement, or claim must be sourced/computed upstream and used/resolved downstream). Avoid circular re-reading, but never stop at surface/structural checks before verifying actual operational behavior.
+
+1. Priority: Accuracy, internal consistency, and completeness override brevity. Keep solutions minimal (no over-engineering), never cutting analytical or verification depth. Evaluate provided context and sources verbatim without silent normalization. Flag flawed premises, contradictions, or dead/unhandled elements first. Never truncate outputs, code, tables, or data with placeholders.
+2. Delivery: Zero filler; use the clearest structure (tables, lists, code, prose). Lead with the answer/artifact, followed only by non-obvious constraints and causal reasoning. Strict format constraints (e.g., JSON/code-only) suppress all prose.
+3. Ambiguity (Minimize Turns): State uncertainties and their root causes.
+   - Minor gaps: State brief assumptions and solve.
+   - Multiple viable paths: Rank top options (effort vs. impact) AND immediately execute the optimal default.
+   - Blocked: Batch all critical clarifying questions at once.<|im_end|>
+<|im_start|>user
+Explain what this module does, how its parts connect, and where it would break first under load.
+
+File `bench/workloads/corpus/ts-agentic-code-runner/src/core/runner/escalationLoop.ts`:
+```
+import { resolve } from 'node:path';
+
+import {
+  buildRunSummary,
+  captureAttempt,
+  evalCaptureEnabled,
+  preserveFailedOutputs,
+  resolveEvalRunDir,
+  writeRunSummary
+} from '../capture';
+import { createRegionStore } from '../execution';
+import { type TaskSpec } from '../execution';
+import {
+  appendConclusion,
+  buildDriveMessages,
+  extractConclusion,
+  failureSignature,
+  type FeedbackFileContext,
+  isNoProgress,
+  type Ledger,
+  localizeOutput } from '../gates';
+import {
+  decompositionGate,
+  defaultRunTests,
+  functionalStyleGate,
+  type GateContext,
+  type GateFailure,
+  gateRun,
+  noopGate,
+  scopedLintGate,
+  scopedTestGate,
+  toGate,
+  tscGate
+} from '../gates';
+import type { ConnectorDeps } from '../llm';
+import {
+  type AttemptSignal,
+  type ClassifierConfig,
+  classifyAttempt,
+  CONTEXT_OVERFLOW_MARKER,
+  isConnectivityError,
+  isContextOverflowError,
+  isGenerationTimeoutError,
+  isNearMiss
+} from '../llm';
+import { forceEscalate, initLadder, type LadderState, recordFailure, startRungForBackend, TERMINAL_RUNG } from '../orchestration';
+import {
+  decompositionStage,
+  functionalStyleStage,
+  greenStage,
+  lintStage,
+  type PipelineResult,
+  planRetry,
+  redStage,
+  repeatUntilExhausted,
+  runPipeline,
+  type Stage,
+  type StageContext,
+  testStage,
+  tscStage
+} from '../orchestration';
+import { type ModelProfile, profileForRung } from '../profiles';
+import {
+  buildImplPreloadWithSliceContract,
+  buildKickoff,
+  buildTestKickoff,
+  selectCodeKickoff
+} from '../prompt';
+import { createProgress, type Progress } from '../reporting';
+import type { AttemptCarry, EscalationOutcome, UsageAccumulator } from '../result';
+import {
+  buildAttemptRecord,
+  computeUsageDelta
+} from '../result';
+import type { AttemptRecord } from '../shared';
+import { ENV } from '../shared';
+import { buildSdkTools, createMutationTracker, createToolRegistry, type NavBundleLookup } from '../tools';
+import type { RunnerDeps } from './runner';
+
+const DEFAULT_MAX_STEPS = 32;
+const MAX_STEPS_ENV = ENV.MAX_STEPS;
+
+// Per-drive cap on the AI-SDK tool-loop steps. Each step is one upstream request;
+// the cap bounds the request COUNT (compaction bounds each request's SIZE). A 16-step
+// cap truncated weak models mid-edit on large files (read test + read store + multiple
+// edit/re-read cycles exhausts 16 before the file is left parseable), so the cap is 32
+// (matching the documented default in capabilities.ts). NaN / sub-1 overrides fall back.
+```<|im_end|>
+<|im_start|>assistant
+<think>

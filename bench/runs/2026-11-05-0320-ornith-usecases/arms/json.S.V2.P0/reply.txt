@@ -1,3 +1,0 @@
-The output file is complete and correctly formatted — 10 lines in `Q<n>|<answer>` form with no extra content or units. All answers were validated by independent methods (Grep counts, full-file scan, reverse-order re-addition, and row-level confirmation of the highest/lowest values). Nothing changed after writing.
-
-DONE

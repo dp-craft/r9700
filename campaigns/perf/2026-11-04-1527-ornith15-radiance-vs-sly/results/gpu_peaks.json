@@ -1,0 +1,226 @@
+{
+ "generated_by": "bench/core/report.py",
+ "provenance": "MEASURED: max over the samples of each GPU sample CSV (stack/gpu/vram_sampler.py); csv paths relative to the campaign dir",
+ "runs": [
+  {
+   "run": "2026-11-04-1527-35b-kv-fit/gs1-k7",
+   "csv": "tmp/2026-11-04-1527-35b-kv-fit/gs1-k7/gpu_samples.csv",
+   "peak_vram_mib": 31934,
+   "peak_gtt_mib": 82,
+   "load_vram_mib": 634,
+   "vram_total_mib": 32624,
+   "samples": 241,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  },
+  {
+   "run": "2026-11-04-1527-35b-kv-fit/gs1",
+   "csv": "tmp/2026-11-04-1527-35b-kv-fit/gs1/gpu_samples.csv",
+   "peak_vram_mib": 26218,
+   "peak_gtt_mib": 68,
+   "load_vram_mib": 595,
+   "vram_total_mib": 32624,
+   "samples": 197,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  },
+  {
+   "run": "2026-11-04-1527-35b-kv-fit/gs2-k7",
+   "csv": "tmp/2026-11-04-1527-35b-kv-fit/gs2-k7/gpu_samples.csv",
+   "peak_vram_mib": 30762,
+   "peak_gtt_mib": 168,
+   "load_vram_mib": 575,
+   "vram_total_mib": 32624,
+   "samples": 233,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  },
+  {
+   "run": "2026-11-04-1527-35b-kv-fit/gs5-k7",
+   "csv": "tmp/2026-11-04-1527-35b-kv-fit/gs5-k7/gpu_samples.csv",
+   "peak_vram_mib": 29244,
+   "peak_gtt_mib": 90,
+   "load_vram_mib": 578,
+   "vram_total_mib": 32624,
+   "samples": 344,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  },
+  {
+   "run": "2026-11-04-1527-35b-kv-fit/gs5-triton",
+   "csv": "tmp/2026-11-04-1527-35b-kv-fit/gs5-triton/gpu_samples.csv",
+   "peak_vram_mib": 1896,
+   "peak_gtt_mib": 62,
+   "load_vram_mib": 640,
+   "vram_total_mib": 32624,
+   "samples": 105,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  },
+  {
+   "run": "2026-11-04-1527-35b-kv-fit/gs5",
+   "csv": "tmp/2026-11-04-1527-35b-kv-fit/gs5/gpu_samples.csv",
+   "peak_vram_mib": 26236,
+   "peak_gtt_mib": 68,
+   "load_vram_mib": 599,
+   "vram_total_mib": 32624,
+   "samples": 179,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  },
+  {
+   "run": "2026-11-04-1557-35b-perf-10k-50k-100k/dflash-k7",
+   "csv": "tmp/2026-11-04-1557-35b-perf-10k-50k-100k/dflash-k7/gpu_samples.csv",
+   "peak_vram_mib": 31597,
+   "peak_gtt_mib": 279,
+   "load_vram_mib": 456,
+   "vram_total_mib": 32624,
+   "samples": 395,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  },
+  {
+   "run": "2026-11-04-1557-35b-perf-10k-50k-100k/dflash-unfused",
+   "csv": "tmp/2026-11-04-1557-35b-perf-10k-50k-100k/dflash-unfused/gpu_samples.csv",
+   "peak_vram_mib": 31327,
+   "peak_gtt_mib": 180,
+   "load_vram_mib": 252,
+   "vram_total_mib": 32624,
+   "samples": 524,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  },
+  {
+   "run": "2026-11-04-1557-35b-perf-10k-50k-100k/mtp-k4-r4d-bootfail",
+   "csv": "tmp/2026-11-04-1557-35b-perf-10k-50k-100k/mtp-k4-r4d-bootfail/gpu_samples.csv",
+   "peak_vram_mib": 26177,
+   "peak_gtt_mib": 180,
+   "load_vram_mib": 536,
+   "vram_total_mib": 32624,
+   "samples": 227,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  },
+  {
+   "run": "2026-11-04-1557-35b-perf-10k-50k-100k/mtp-k4",
+   "csv": "tmp/2026-11-04-1557-35b-perf-10k-50k-100k/mtp-k4/gpu_samples.csv",
+   "peak_vram_mib": 31900,
+   "peak_gtt_mib": 213,
+   "load_vram_mib": 600,
+   "vram_total_mib": 32624,
+   "samples": 705,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  },
+  {
+   "run": "2026-11-04-1557-35b-perf-10k-50k-100k/nospec-unfused",
+   "csv": "tmp/2026-11-04-1557-35b-perf-10k-50k-100k/nospec-unfused/gpu_samples.csv",
+   "peak_vram_mib": 31122,
+   "peak_gtt_mib": 200,
+   "load_vram_mib": 554,
+   "vram_total_mib": 32624,
+   "samples": 765,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  },
+  {
+   "run": "2026-11-04-1557-35b-perf-10k-50k-100k/nospec",
+   "csv": "tmp/2026-11-04-1557-35b-perf-10k-50k-100k/nospec/gpu_samples.csv",
+   "peak_vram_mib": 31617,
+   "peak_gtt_mib": 202,
+   "load_vram_mib": 566,
+   "vram_total_mib": 32624,
+   "samples": 792,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  },
+  {
+   "run": "2026-11-04-1730-ornith15-w4a8-radiance/ornith15-w4a8",
+   "csv": "tmp/2026-11-04-1730-ornith15-w4a8-radiance/ornith15-w4a8/gpu_samples.csv",
+   "peak_vram_mib": 32511,
+   "peak_gtt_mib": 339,
+   "load_vram_mib": 722,
+   "vram_total_mib": 32624,
+   "samples": 122,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  },
+  {
+   "run": "2026-11-04-1740-27b-sly-baseline/sly-27b-dflash",
+   "csv": "tmp/2026-11-04-1740-27b-sly-baseline/sly-27b-dflash/gpu_samples.csv",
+   "peak_vram_mib": 31197,
+   "peak_gtt_mib": 48,
+   "load_vram_mib": 334,
+   "vram_total_mib": 32624,
+   "samples": 359,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  },
+  {
+   "run": "2026-11-04-1802-ornith15-sly-dflash/ornith-k3-s8",
+   "csv": "tmp/2026-11-04-1802-ornith15-sly-dflash/ornith-k3-s8/gpu_samples.csv",
+   "peak_vram_mib": 31510,
+   "peak_gtt_mib": 78,
+   "load_vram_mib": 807,
+   "vram_total_mib": 32624,
+   "samples": 730,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  },
+  {
+   "run": "2026-11-04-1802-ornith15-sly-dflash/ornith-k7-s8-INTERRUPTED",
+   "csv": "tmp/2026-11-04-1802-ornith15-sly-dflash/ornith-k7-s8-INTERRUPTED/gpu_samples.csv",
+   "peak_vram_mib": 30719,
+   "peak_gtt_mib": 100,
+   "load_vram_mib": 561,
+   "vram_total_mib": 32624,
+   "samples": 359,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  },
+  {
+   "run": "2026-11-04-1802-ornith15-sly-dflash/ornith-mtp-k3-FAILED-aiter",
+   "csv": "tmp/2026-11-04-1802-ornith15-sly-dflash/ornith-mtp-k3-FAILED-aiter/gpu_samples.csv",
+   "peak_vram_mib": 1872,
+   "peak_gtt_mib": 81,
+   "load_vram_mib": 647,
+   "vram_total_mib": 32624,
+   "samples": 103,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  },
+  {
+   "run": "2026-11-04-1802-ornith15-sly-dflash/ornith-mtp-k3-FAILED-triton",
+   "csv": "tmp/2026-11-04-1802-ornith15-sly-dflash/ornith-mtp-k3-FAILED-triton/gpu_samples.csv",
+   "peak_vram_mib": 1877,
+   "peak_gtt_mib": 77,
+   "load_vram_mib": 658,
+   "vram_total_mib": 32624,
+   "samples": 102,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  },
+  {
+   "run": "2026-11-04-1802-ornith15-sly-dflash/ornith-mtp-k3-s1",
+   "csv": "tmp/2026-11-04-1802-ornith15-sly-dflash/ornith-mtp-k3-s1/gpu_samples.csv",
+   "peak_vram_mib": 1003,
+   "peak_gtt_mib": 79,
+   "load_vram_mib": 942,
+   "vram_total_mib": 32624,
+   "samples": 14,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  },
+  {
+   "run": "2026-11-04-1802-ornith15-sly-dflash/ornith-mtp-k3-s8-FAILED-unfused",
+   "csv": "tmp/2026-11-04-1802-ornith15-sly-dflash/ornith-mtp-k3-s8-FAILED-unfused/gpu_samples.csv",
+   "peak_vram_mib": 21912,
+   "peak_gtt_mib": 122,
+   "load_vram_mib": 902,
+   "vram_total_mib": 32624,
+   "samples": 258,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  }
+ ]
+}

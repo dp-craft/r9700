@@ -1,1 +1,0 @@
-Write tests for src/semver.ts in tests/semver.test.ts, using vitest. Then reply with only: DONE

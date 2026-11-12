@@ -1,4 +1,0 @@
-date=2026-10-22T13:35:32+02:00
-workload=/home/dev/work/dp-craft/amd/bench/workloads/generated/codereview-150000.txt
-max_tokens=256 concurrency=1 reps=2 warmup=1 prefix_mode=none
-mode=conversation start_tokens=10000 step_tokens=15000 max_depth=145000 chat_kwargs={"reasoning_effort": "low"}

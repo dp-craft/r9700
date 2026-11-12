@@ -1,3 +1,0 @@
-All 34 tests pass. 
-
-DONE

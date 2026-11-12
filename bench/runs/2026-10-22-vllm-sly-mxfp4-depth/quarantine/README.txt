@@ -1,1 +1,0 @@
-reason: vLLM 0.31 streams delta.reasoning; capture_engine read only reasoning_content -> every request 'no tokens received' (all 256 tokens were reasoning). Fixed in capture_engine stream(). 2026-10-22

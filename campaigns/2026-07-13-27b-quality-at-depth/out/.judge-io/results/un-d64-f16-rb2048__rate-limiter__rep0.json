@@ -1,1 +1,0 @@
-{"design":5,"clarity":5,"robustness":4,"notes":"Concise in-place token-bucket with lazy refill and clean lazy bucket creation; straightforward and easy to follow."}

@@ -1,0 +1,29 @@
+{
+  "kind": "kld_forced",
+  "label": "a",
+  "reference_label": "q8",
+  "mode": "teacher-forced on the reference's greedy continuation (temp 0, top-20, \u226432 evenly spaced positions per prompt, max_tokens 1)",
+  "n_prompts": 128,
+  "n_prompt_errors": 0,
+  "n_positions": 4096,
+  "kl_nats_per_tok": 0.059821,
+  "ci95_nats": [
+    0.043015,
+    0.079124
+  ],
+  "ci_method": "cluster bootstrap (block=prompt, B=2000, percentile 95%)",
+  "kl_per_position": {
+    "median": 0.000404,
+    "p90": 0.084176,
+    "max": 7.417505
+  },
+  "top1_agreement": 0.9563,
+  "dnll_nats_per_tok": 0.056442,
+  "arm_topk_short": {
+    "n_short": 379,
+    "frac_short": 0.09253,
+    "top_k": 20
+  },
+  "ref_missing_frac": 0.190445,
+  "lower_bound_note": "KL is a lower bound: reference top-20 support, floor for tokens missing from the arm top-20, lumped tail bucket, clamped \u2265 0 (sly kv4/kl_compare.py)"
+}

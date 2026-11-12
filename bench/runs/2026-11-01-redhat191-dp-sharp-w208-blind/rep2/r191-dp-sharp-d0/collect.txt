@@ -1,3 +1,0 @@
-collect: docs/plans/2026-10-28-2239-dpf-tui-f0-f1/briefs/W2-08.md
-collect: docs/plans/2026-10-28-2239-dpf-tui-f0-f1/review/27b-fix/progress.md
-collect: docs/plans/2026-10-28-2239-dpf-tui-f0-f1/review/W2-08.refine-27b.md

@@ -1,9 +1,0 @@
-Done. The bug in `BUG.md` is fixed — the test suite passes 2/2 and `rolling_max` is untouched.
-
-The report described two symptoms; the root causes were:
-
-1. **Wrong median for even-length windows** (`_median` returned a single middle element instead of averaging the two middles → `[1,2]` gave `2` not `1.5`).
-2. **Stale cross-series results** — `_cache={}` was keyed on `window` alone, so any later call with the same window but different series returned the first series' numbers. Removed the faulty cache entirely.
-3. **Off-by-one** that dropped the last window (`range(len(values) - window)` vs. `rolling_max`'s `+ 1`).
-
-`rolling_median` now computes true medians, emits one value per full window, stays fresh across calls, and keeps the `(values, window)` signature.

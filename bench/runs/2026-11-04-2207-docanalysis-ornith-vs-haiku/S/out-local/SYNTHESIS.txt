@@ -1,5 +1,0 @@
-Q1|2026-11-04-1746-ornith15-radiance-vs-sly-35b-27b.md
-Q1|2026-10-23-0023-vllm-gpu-fault-solved-hip-kernarg.md
-Q2|none
-CONFLICT|none
-RECOMMEND|For a local coding agent on the R9700, prefer Ornith-1.5-35B-A3B on native Radiance with MTP K=3, which has the highest decode (~220 t/s) and prefill (>13k t/s) throughput of any arm here. If you run Sly (vLLM) instead, set HIP_FORCE_DEV_KERNARG=0 to clear the recurring memory fault and use the sharp chat template, which cuts a RedHat Qwen3.8-27B review's work about a third with no measurable quality loss. For pure batch builds prefer llama.cpp ROCm plus stew675 for prefill-heavy tasks and Vulkan for decode-heavy ones, but remember Ornith's coding quality is untested here.

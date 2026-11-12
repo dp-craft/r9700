@@ -1,9 +1,0 @@
-GOAL: Benchmark the 35B-A3B model (Qwen3.6-35B-A3B-UD-Q4_K_M) on an AMD R9700 under Vulkan/RoMm up to its native 262144-token ceiling, sweeping the depth curve, MTP vs. depth, a q8_0 KV confirmation, and parallel throughput at the ceiling.
-RESULT: f16 KV is the only sane choice — it runs to 200K with no OOM (VRAM is not the limit; the RoPE cap is) — and q8_0 KV is rejected as catastrophic (-40% prefill, +66% TTFT). MTP helps decode (+35% at 200K) but is a net loss whenever prefill dominates, so it should be ON only for generation-heavy turns.
-KEY: 1254 tok/s | peak prefill throughput of Qwen3.6-35B-A3B on Vulkan at 200K context (f16 KV, MTP off), down from 3077 tok/s at 8K
-KEY: +35.1% | MTP decode gain at 200K (61 → 82.4 tok/s) for Qwen3.6-35B-A3B, a net -16.7 s wall because ~18 s prefill tax outweighs ~1 s saved
-KEY: -39.8% | q8_0 KV prefill penalty at 200K (vs f16) on Qwen3.6-35B-A3B/Vulkan — -21.7% decode, +66% TTFT, REJECTED
-KEY: 5.5 → 6.0 tok/s | aggregate throughput change raising np2 to np4 at 32K prompts on Qwen3.6-35B-A3B (prefill-bound), while TTFT p95 doubles from 24 s to 49 s
-KEY: 171.7 s | median time-to-first-token for a ~193K-token prompt at 200K context on Qwen3.6-35B-A3B/Vulkan f16 (MTP=1), dominated by prefill
-CAVEAT: VRAM was not re-sampled this run (no gpu_samples), so the headline "f16 runs to 200K with no OOM" rests on served-path evidence rather than direct memory measurement, and the parallel results use early-EOS prompts that under-measure true decode-batch scaling at depth.
-OPEN: Whether a future Mesa/llama.cpp build narrows the unoptimized Vulkan q8_0 KV kernel penalty (the ROCm path's smaller -7.5% decode penalty hints it is the specific weak point).
