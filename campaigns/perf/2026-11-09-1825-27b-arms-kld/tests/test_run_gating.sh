@@ -1518,8 +1518,33 @@ body_t60c () {
   assert_contains "T60c dfh served" "$RES/boots.jsonl" '"served": "qwen38-27b-redhat-mxfp4-fullhead"'
 }
 
-# T62: run-forced.sh end to end, hermetic — ARMS="q8 q8f c q4mtp", DEPTH cells, q8 greedy reference first,
-# then forced fetches vs it, the q4mtp greedy diagnostic paired with a BASE_RUN greedy q4kxl fetch.
+# t63 (+): DIAG_ARMS: an arm in the list gets a second, GREEDY fetch of DIAG_N prompts -> kld-<arm>-greedy.jsonl,
+# and a finished arm whose diag fetch is missing is NOT skipped (a resume re-boots for it).
+body_t63 () {
+  export CURL_MODELS=
+  export ONLY='c-10k-tg512-n1'
+  touch "$RAW/done/kld-selftest-radiance" "$RAW/done/c-10k-tg512-n1"
+  mk_kld_ok "$RES/kld-c.jsonl" qwen38-27b-iq4r-l-v4 "$IMG_RAD_BC"
+  DIAG_ARMS='c'; DIAG_N=1
+  real_kld_fetch () { :; }
+  kld_fetch () { echo "kld_fetch $* forced=${KLD_FORCED_REF:-none} n=$KLD_N" >> "$CALLS"; }
+  arm_rad c "$IMG_RAD_BC" "$RAD_IQRV4" qwen38-27b-iq4r-l-v4
+  assert_count "$CALLS" '^start_rad c ' 1 "T63 missing diag fetch -> boot"
+  assert_count "$CALLS" "^kld_fetch qwen38-27b-iq4r-l-v4 $RES/kld-c-greedy.jsonl $IMG_RAD_BC forced=none n=1\$" 1 "T63 greedy diag fetch"
+  : > "$CALLS"; DIAG_ARMS=''
+  arm_rad c "$IMG_RAD_BC" "$RAD_IQRV4" qwen38-27b-iq4r-l-v4
+  assert_count "$CALLS" '^start_rad' 0 "T63 no diag wanted + all done -> skip"
+}
+# t63b (-): preflight checks EVERY calibration*.sha256: a changed v2 prompt file fails the pins.
+body_t63b () {
+  export CURL_MODELS=
+  echo '{"id": "tampered"}' >> "$CAMPAIGN_DIR/inputs/calibration-v2-prompts.jsonl"
+  if ( preflight ) > "$scratch/pf.txt" 2>&1; then abad "T63b preflight fails" "passed"; else aok "T63b preflight fails"; fi
+  assert_contains "T63b names the v2 pin" "$scratch/pf.txt" 'PIN-FAIL: calibration-v2.sha256 mismatch'
+}
+
+# T62: run-forced.sh end to end, hermetic — ARMS="q8 q8f c q4kxl q4mtp", DIAG_ARMS="c q4kxl", DEPTH cells, calibration
+# v2, q8 greedy reference first, then forced fetches vs it, greedy diag fetches, the q4mtp-vs-q4kxl diag pair.
 runforced () {
   if [ -n "${GATING_ONLY:-}" ] && ! [[ " $GATING_ONLY " == *" t62 "* ]]; then return 0; fi
   local scratch; scratch=$(mktemp -d "$TMP_BASE/t62.XXXXXX"); SCRATCHES+=("$scratch")
@@ -1548,9 +1573,11 @@ with open(os.environ["CALLS"], "a") as f:
     f.write("kld-" + a[0] + " " + " ".join(a[1:]) + "\n")
 def opt(k):
     return a[a.index(k) + 1] if k in a else None
-if "--out" in a:
+if "--out" in a:   # one clean row for the FIRST prompt of the calibration in use (v1 cal-001, v2 cal2-001)
+    import json
+    pid = json.loads(open(opt("--calibration")).readline())["id"] if opt("--calibration") else "cal-001"
     with open(opt("--out"), "w") as f:
-        f.write('{"id": "cal-001", "toks": ["x"], "pos": [], "error": null}\n')
+        f.write(json.dumps({"id": pid, "toks": ["x"], "pos": [], "error": None}) + "\n")
 if a[0] in ("fetch", "forced"):
     cmd = [sys.executable, os.environ["REAL_KLD"], "cache-key", "--calibration", opt("--calibration"), "--model", opt("--model")]
     for k in ("--limit", "--image"):
@@ -1561,16 +1588,11 @@ if a[0] in ("fetch", "forced"):
     with open(opt("--out") + ".key.json", "w") as f:
         f.write(subprocess.run(cmd, check=True, capture_output=True, text=True).stdout)
 PY3
-  # BASE_RUN: the earlier greedy batch — a complete N=1 greedy q4kxl fetch keyed to the fake build
-  local base="$scratch/tmp/runs/base-t62/results"; mkdir -p "$base"
-  echo '{"id": "cal-001", "toks": ["x"], "pos": [], "error": null}' > "$base/kld-q4kxl.jsonl"
-  python3 "$real_kld" cache-key --calibration "$scratch/inputs/calibration-prompts.jsonl" --limit 1 \
-    --model qwen38-27b-ud-q4kxl --image "$scratch/fake/llama-server" > "$base/kld-q4kxl.jsonl.key.json"
   echo 1073741824 > "$scratch/drm/card0/device/mem_info_vram_used"
   echo 34359738368 > "$scratch/drm/card0/device/mem_info_vram_total"
   chmod +x "$scratch/stubbin/"* "$scratch/fake/"*.sh "$scratch/fake/llama-server"
   ( cd "$scratch" && env PATH="$scratch/stubbin:$PATH" CALLS="$scratch/calls.log" CAMPAIGN_DIR="$scratch" \
-      RUN_TAG=gate-t62 BASE_RUN=base-t62 ARMS='q8 q8f c q4mtp' KLD_N=1 DIAG_N=1 SERVER_STATE_DIR="$scratch/state" \
+      RUN_TAG=gate-t62 ARMS='q8 q8f c q4kxl q4mtp' DIAG_ARMS='c q4kxl' KLD_N=1 DIAG_N=1 SERVER_STATE_DIR="$scratch/state" \
       SERVE_RAD="$scratch/fake/serve-rad.sh" SERVE_VLLM="$scratch/fake/serve-vllm.sh" SERVE_LLAMA="$scratch/fake/serve-llama.sh" \
       LLAMA_BIN="$scratch/fake/llama-server" GGUF_Q4KXL="$scratch/fake.gguf" GGUF_Q8="$scratch/fake.gguf" EB="$scratch/fake" \
       KLD="$scratch/fake/kld.py" REAL_KLD="$real_kld" KLD_URL="http://127.0.0.1:9/v1" \
@@ -1580,16 +1602,18 @@ PY3
   _t62 () { if [ "$2" = "$3" ]; then echo "ok T62 $1"; PASS=$((PASS+1)); else echo "FAIL T62 $1 :: got '$2' want '$3'"; FAIL=$((FAIL+1)); fi; }
   _t62 "run-forced.sh exits 0" "$rc" 0
   [ "$rc" -eq 0 ] || tail -8 "$scratch/out.log" | sed 's/^/  /'
-  _t62 "boot order q8, q8f, c, q4mtp" "$(grep -oE '^serve-(rad|llama) start|--alias [a-z0-9-]+' "$calls" | tr '\n' ',')" \
-    "serve-llama start,--alias qwen38-27b-q8,serve-llama start,--alias qwen38-27b-q8,serve-rad start,serve-llama start,--alias qwen38-27b-ud-q4kxl-mtp,"
+  _t62 "boot order q8, q8f, c, q4kxl, q4mtp" "$(grep -oE '^serve-(rad|llama) start|--alias [a-z0-9-]+' "$calls" | tr '\n' ',')" \
+    "serve-llama start,--alias qwen38-27b-q8,serve-llama start,--alias qwen38-27b-q8,serve-rad start,serve-llama start,--alias qwen38-27b-ud-q4kxl,serve-llama start,--alias qwen38-27b-ud-q4kxl-mtp,"
   _t62 "q8 + q8f: f16 KV, ctx 32768, 1 seq" "$(grep -c '^serve-llama start .*KV=f16 CTX=32768 NP=1 MTP=0 EXTRA_ARGS=--alias qwen38-27b-q8$' "$calls")" 2
   _t62 "q4mtp: MTP=1, q8_0 KV, the q4kxl shape" "$(grep -c '^serve-llama start .*KV=q8_0 CTX=260000 NP=2 MTP=1 ' "$calls")" 1
   _t62 "depth cells in order" "$(grep -oE '^eb-run .*' "$calls" | cut -d' ' -f2 | tr '\n' ',')" \
-    "q8-10k-tg512-n1,q8-20k-tg512-n1,c-10k-tg512-n1,c-20k-tg512-n1,c-50k-tg512-n1,c-100k-tg512-n1,"
-  _t62 "greedy fetches: q8 (reference) + q4mtp" "$(grep -oE '^kld-fetch .*--out [^ ]+' "$calls" | grep -oE 'kld-[a-z0-9]+\.jsonl' | tr '\n' ',')" "kld-q8.jsonl,kld-q4mtp.jsonl,"
-  _t62 "forced fetches vs q8: q8f, c" "$(grep -c "^kld-forced .*--ref $res/kld-q8.jsonl " "$calls")" 2
-  _t62 "forced scores: q8f, c" "$(grep -c "^kld-score-forced --ref $res/kld-q8.jsonl " "$calls")" 2
-  _t62 "q4mtp paired with the BASE_RUN q4kxl" "$(grep -c "^kld-score --ref $base/kld-q4kxl.jsonl --arm $res/kld-q4mtp.jsonl " "$calls")" 1
+    "q8-10k-tg512-n1,q8-20k-tg512-n1,c-10k-tg512-n1,c-20k-tg512-n1,c-50k-tg512-n1,c-100k-tg512-n1,q4kxl-10k-tg512-n1,q4kxl-20k-tg512-n1,q4kxl-50k-tg512-n1,q4kxl-100k-tg512-n1,"
+  _t62 "greedy fetches: q8, c diag, q4kxl diag, q4mtp" "$(grep -oE '^kld-fetch .*--out [^ ]+' "$calls" | grep -oE 'kld-[a-z0-9-]+\.jsonl' | tr '\n' ',')" "kld-q8.jsonl,kld-c-greedy.jsonl,kld-q4kxl-greedy.jsonl,kld-q4mtp.jsonl,"
+  _t62 "every KLD call on calibration v2" "$(grep -E '^kld-(fetch|forced) ' "$calls" | grep -vc 'calibration-v2-prompts.jsonl')" 0
+  _t62 "forced fetches vs q8: q8f, c, q4kxl" "$(grep -c "^kld-forced .*--ref $res/kld-q8.jsonl " "$calls")" 3
+  _t62 "forced scores: q8f, c, q4kxl" "$(grep -c "^kld-score-forced --ref $res/kld-q8.jsonl " "$calls")" 3
+  _t62 "diag pair q4mtp vs q4kxl greedy" "$(grep -c "^kld-score --ref $res/kld-q4kxl-greedy.jsonl --arm $res/kld-q4mtp.jsonl " "$calls")" 1
+  _t62 "absent diag pairs are not failures" "$(grep -c 'KLD DIAG SKIPPED' "$res/failures.txt" 2>/dev/null || true)" 0
   _t62 "no arm-vs-arm greedy matrix" "$(grep -c '^kld-matrix ' "$calls")" 0
 }
 
@@ -1678,6 +1702,8 @@ scenario t59c
 scenario t60
 scenario t60b
 scenario t60c
+scenario t63
+scenario t63b
 runarm_c0
 runcompare
 runforced

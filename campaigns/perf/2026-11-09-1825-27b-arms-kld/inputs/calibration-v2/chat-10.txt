@@ -1,0 +1,116 @@
+<|im_start|>system
+You are a coding agent working in a TypeScript and Python repository. Think, then act.
+
+Think first, scaling depth to complexity: solve simple tasks directly; for complex tasks, trace concrete mechanics step-by-step (initial state -> transformations -> final outcome) across boundary and failure cases (empty, extreme, conflicting, aborted), and verify end-to-end continuity (every input, requirement, or claim must be sourced/computed upstream and used/resolved downstream). Avoid circular re-reading, but never stop at surface/structural checks before verifying actual operational behavior.
+
+1. Priority: Accuracy, internal consistency, and completeness override brevity. Keep solutions minimal (no over-engineering), never cutting analytical or verification depth. Evaluate provided context and sources verbatim without silent normalization. Flag flawed premises, contradictions, or dead/unhandled elements first. Never truncate outputs, code, tables, or data with placeholders.
+2. Delivery: Zero filler; use the clearest structure (tables, lists, code, prose). Lead with the answer/artifact, followed only by non-obvious constraints and causal reasoning. Strict format constraints (e.g., JSON/code-only) suppress all prose.
+3. Ambiguity (Minimize Turns): State uncertainties and their root causes.
+   - Minor gaps: State brief assumptions and solve.
+   - Multiple viable paths: Rank top options (effort vs. impact) AND immediately execute the optimal default.
+   - Blocked: Batch all critical clarifying questions at once.<|im_end|>
+<|im_start|>user
+Write unit tests for the public functions in this file. Cover the edge cases, not only the happy path.
+
+File `bench/workloads/corpus/py-rich/rich/text.py`:
+```
+import re
+from functools import partial, reduce
+from math import gcd
+from operator import itemgetter
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    NamedTuple,
+    Optional,
+    Pattern,
+    Tuple,
+    Union,
+)
+
+from ._loop import loop_last
+from ._pick import pick_bool
+from ._wrap import divide_line
+from .align import AlignMethod
+from .cells import cell_len, set_cell_size
+from .containers import Lines
+from .control import strip_control_codes
+from .emoji import EmojiVariant
+from .jupyter import JupyterMixin
+from .measure import Measurement
+from .segment import Segment
+from .style import Style, StyleType
+
+if TYPE_CHECKING:  # pragma: no cover
+    from .console import Console, ConsoleOptions, JustifyMethod, OverflowMethod
+
+DEFAULT_JUSTIFY: "JustifyMethod" = "default"
+DEFAULT_OVERFLOW: "OverflowMethod" = "fold"
+
+
+_re_whitespace = re.compile(r"\s+$")
+
+TextType = Union[str, "Text"]
+"""A plain string or a :class:`Text` instance."""
+
+GetStyleCallable = Callable[[str], Optional[StyleType]]
+
+
+class Span(NamedTuple):
+    """A marked up region in some text."""
+
+    start: int
+    """Span start index."""
+    end: int
+    """Span end index."""
+    style: Union[str, Style]
+    """Style associated with the span."""
+
+    def __repr__(self) -> str:
+        return f"Span({self.start}, {self.end}, {self.style!r})"
+
+    def __bool__(self) -> bool:
+        return self.end > self.start
+
+    def split(self, offset: int) -> Tuple["Span", Optional["Span"]]:
+        """Split a span in to 2 from a given offset."""
+
+        if offset < self.start:
+            return self, None
+        if offset >= self.end:
+            return self, None
+
+        start, end, style = self
+        span1 = Span(start, min(end, offset), style)
+        span2 = Span(span1.end, end, style)
+        return span1, span2
+
+    def move(self, offset: int) -> "Span":
+        """Move start and end by a given offset.
+
+        Args:
+            offset (int): Number of characters to add to start and end.
+
+        Returns:
+            TextSpan: A new TextSpan with adjusted position.
+        """
+        start, end, style = self
+        return Span(start + offset, end + offset, style)
+
+    def right_crop(self, offset: int) -> "Span":
+        """Crop the span at the given offset.
+
+        Args:
+            offset (int): A value between start and end.
+
+        Returns:
+            Span: A new (possibly smaller) span.
+        """
+        start, end, style = self
+```<|im_end|>
+<|im_start|>assistant
+<think>

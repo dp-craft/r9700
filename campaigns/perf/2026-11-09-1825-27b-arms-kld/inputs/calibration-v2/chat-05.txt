@@ -1,0 +1,90 @@
+<|im_start|>system
+You are a coding agent working in a TypeScript and Python repository. Think, then act.
+
+Think first, scaling depth to complexity: solve simple tasks directly; for complex tasks, trace concrete mechanics step-by-step (initial state -> transformations -> final outcome) across boundary and failure cases (empty, extreme, conflicting, aborted), and verify end-to-end continuity (every input, requirement, or claim must be sourced/computed upstream and used/resolved downstream). Avoid circular re-reading, but never stop at surface/structural checks before verifying actual operational behavior.
+
+1. Priority: Accuracy, internal consistency, and completeness override brevity. Keep solutions minimal (no over-engineering), never cutting analytical or verification depth. Evaluate provided context and sources verbatim without silent normalization. Flag flawed premises, contradictions, or dead/unhandled elements first. Never truncate outputs, code, tables, or data with placeholders.
+2. Delivery: Zero filler; use the clearest structure (tables, lists, code, prose). Lead with the answer/artifact, followed only by non-obvious constraints and causal reasoning. Strict format constraints (e.g., JSON/code-only) suppress all prose.
+3. Ambiguity (Minimize Turns): State uncertainties and their root causes.
+   - Minor gaps: State brief assumptions and solve.
+   - Multiple viable paths: Rank top options (effort vs. impact) AND immediately execute the optimal default.
+   - Blocked: Batch all critical clarifying questions at once.<|im_end|>
+<|im_start|>user
+Review this file for bugs and risky edge cases. List each issue with the line and a concrete fix.
+
+File `bench/workloads/corpus/ts-agentic-code-runner/src/core/execution/__tests__/editRegion.test.ts`:
+```
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import {
+  buildEditRegionDirective,
+  type FileReader,
+  resolveLargeFileLines
+} from '../editRegion';
+import type { TaskSpec } from '../executor';
+
+// ─── helpers ─────────────────────────────────────────────────────────────────
+
+const makeSpec = (overrides: Partial<TaskSpec> = {}): TaskSpec => ({
+  agentType: 'code-logic-writer',
+  navBundlePath: 'nav.json',
+  targetFiles: ['src/foo.ts'],
+  ...overrides,
+});
+
+const makeReader =
+  (files: Record<string, string>): FileReader =>
+    async (path: string): Promise<string | null> =>
+      files[path] ?? null;
+
+const lines = (n: number): string => Array.from({ length: n }, (_, i) => `line ${i}`).join('\n');
+
+// ─── resolveLargeFileLines ───────────────────────────────────────────────────
+
+describe('resolveLargeFileLines', () => {
+  afterEach(() => {
+    delete process.env.RUNNER_LARGE_FILE_LINES;
+  });
+
+  it('should return 300 when env var is not set', () => {
+    delete process.env.RUNNER_LARGE_FILE_LINES;
+    expect(resolveLargeFileLines()).toBe(300);
+  });
+
+  it('should return the parsed value when env var is a valid number', () => {
+    process.env.RUNNER_LARGE_FILE_LINES = '500';
+    expect(resolveLargeFileLines()).toBe(500);
+  });
+
+  it('should return default 300 when env var is NaN', () => {
+    process.env.RUNNER_LARGE_FILE_LINES = 'not-a-number';
+    expect(resolveLargeFileLines()).toBe(300);
+  });
+
+  it('should return default 300 when env var is an empty string (Number("") === 0 must not win)', () => {
+    delete process.env.RUNNER_MAX_WHOLE_WRITE_LINES;
+    process.env.RUNNER_LARGE_FILE_LINES = '';
+    expect(resolveLargeFileLines()).toBe(300);
+  });
+});
+
+// ─── buildEditRegionDirective — no large files ───────────────────────────────
+
+describe('buildEditRegionDirective — small files', () => {
+  it('should return empty string when target file is below threshold', async () => {
+    const reader = makeReader({ 'src/foo.ts': lines(10) });
+    const result = await buildEditRegionDirective(makeSpec(), reader);
+    expect(result).toBe('');
+  });
+
+  it('should return empty string when target file is missing (new file path)', async () => {
+    const reader = makeReader({});
+    const result = await buildEditRegionDirective(makeSpec(), reader);
+    expect(result).toBe('');
+  });
+
+  it('should return empty string when all files are exactly one line below threshold', async () => {
+    process.env.RUNNER_LARGE_FILE_LINES = '10';
+```<|im_end|>
+<|im_start|>assistant
+<think>

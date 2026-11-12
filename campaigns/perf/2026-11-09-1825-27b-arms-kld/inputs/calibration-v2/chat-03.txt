@@ -1,0 +1,77 @@
+<|im_start|>system
+You are a coding agent working in a TypeScript and Python repository. Think, then act.
+
+Think first, scaling depth to complexity: solve simple tasks directly; for complex tasks, trace concrete mechanics step-by-step (initial state -> transformations -> final outcome) across boundary and failure cases (empty, extreme, conflicting, aborted), and verify end-to-end continuity (every input, requirement, or claim must be sourced/computed upstream and used/resolved downstream). Avoid circular re-reading, but never stop at surface/structural checks before verifying actual operational behavior.
+
+1. Priority: Accuracy, internal consistency, and completeness override brevity. Keep solutions minimal (no over-engineering), never cutting analytical or verification depth. Evaluate provided context and sources verbatim without silent normalization. Flag flawed premises, contradictions, or dead/unhandled elements first. Never truncate outputs, code, tables, or data with placeholders.
+2. Delivery: Zero filler; use the clearest structure (tables, lists, code, prose). Lead with the answer/artifact, followed only by non-obvious constraints and causal reasoning. Strict format constraints (e.g., JSON/code-only) suppress all prose.
+3. Ambiguity (Minimize Turns): State uncertainties and their root causes.
+   - Minor gaps: State brief assumptions and solve.
+   - Multiple viable paths: Rank top options (effort vs. impact) AND immediately execute the optimal default.
+   - Blocked: Batch all critical clarifying questions at once.<|im_end|>
+<|im_start|>user
+Refactor the longest function in this file into smaller ones without changing behaviour. Show the new code.
+
+File `bench/workloads/corpus/ts-agentic-code-runner/src/core/tools/submitRegionHandler.ts`:
+```
+import { readFile, writeFile } from 'node:fs/promises';
+
+import type { Region, RegionStore } from '../execution';
+import type { ToolResult } from '../shared';
+import { type MutationTracker, snapshotOriginal } from './mutationTracker';
+import { isAllowedTarget, resolveWithinCwd } from './pathPolicy';
+import type { ToolHandler } from './toolRegistry';
+
+const fail = (output: string): ToolResult => ({ ok: false, output });
+
+const requireString = (args: Readonly<Record<string, unknown>>, key: string): string | null => {
+  const value = args[key];
+  return typeof value === 'string' ? value : null;
+};
+
+// Replace lines startLine..endLine (1-based, inclusive) with the content lines.
+const spliceLines = (source: string, region: Region, content: string): string => {
+  const lines = source.split('\n');
+  const before = lines.slice(0, region.startLine - 1);
+  const after = lines.slice(region.endLine);
+  return [...before, ...content.split('\n'), ...after].join('\n');
+};
+
+const resolveTarget = (
+  cwd: string,
+  allowedTargets: readonly string[] | undefined,
+  path: string
+): { readonly resolved: string } | ToolResult => {
+  const resolved = resolveWithinCwd(cwd, path);
+  if (resolved === null) return fail(`submit_region: path escapes working dir: ${path}`);
+  if (!isAllowedTarget(cwd, allowedTargets, resolved)) {
+    return fail(`submit_region: path not in declared targets: ${path}`);
+  }
+  return { resolved };
+};
+
+interface SpliceArgs {
+  readonly resolved: string;
+  readonly path: string;
+  readonly content: string;
+  readonly region: Region;
+  readonly regionStore: RegionStore | undefined;
+  readonly tracker: MutationTracker | undefined;
+}
+
+const applySplice = async (args: SpliceArgs): Promise<ToolResult> => {
+  const { resolved, path, content, region, regionStore, tracker } = args;
+  const original = tracker === undefined ? null : await snapshotOriginal(resolved);
+  const current = await readFile(resolved, 'utf8').catch((): null => null);
+  if (current === null) return fail(`submit_region: unable to read file: ${path}`);
+  const written = await writeFile(resolved, spliceLines(current, region, content), 'utf8').then(
+    (): boolean => true,
+    (): boolean => false
+  );
+  if (!written) return fail(`submit_region: failed to write ${path}`);
+  tracker?.record(resolved, original);
+  const endLine = region.startLine + content.split('\n').length - 1;
+  regionStore?.record(resolved, { startLine: region.startLine, endLine });
+```<|im_end|>
+<|im_start|>assistant
+<think>

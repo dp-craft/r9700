@@ -543,7 +543,8 @@ residency_check () {  # arm
 # --- item 10: KLD flow (bench/perf/kld_probe.py) ---------------------------------
 KLD="${KLD:-$ROOT/bench/perf/kld_probe.py}"       # overridable: no-GPU tests (T22)
 KLD_URL="${KLD_URL:-http://localhost:8000/v1}"
-KLD_CAL="$CAMPAIGN_DIR/inputs/calibration-prompts.jsonl"
+# KLD_CAL: overridable (forced batch 2026-11-12: inputs/calibration-v2-prompts.jsonl, mid-text cuts + topic mix)
+KLD_CAL="${KLD_CAL:-$CAMPAIGN_DIR/inputs/calibration-prompts.jsonl}"
 KLD_N="${KLD_N:-}"   # short pass: first N calibration prompts only (empty = full 128)
 # forced batch (2026-11-12, user: "option B teacher-forced"): KLD_FORCED_REF=<a complete greedy fetch> makes
 # every kld_fetch a TEACHER-FORCED fetch on that reference (kld_probe.py forced, KLD_POSITIONS per prompt)
@@ -623,6 +624,17 @@ kld_fetch () {  # served out [image] - cached only when COMPLETE with a matching
     ${image:+--image "$image"} --window-out "$RES/kld-fetch-windows.jsonl" \
     || echo "KLD FETCH FAILED: $served (KLD pass only; campaign continues)" | tee -a "$RES/failures.txt"
 }
+
+# DIAG_ARMS (forced batch): arms that ALSO get a greedy fetch of the first DIAG_N prompts -> kld-<arm>-greedy.jsonl,
+# paired spec-on vs spec-off (d/d0, c/c0, q4kxl/q4mtp): forced fetches cannot see DFlash/MTP (max_tokens 1)
+DIAG_ARMS="${DIAG_ARMS:-}"; DIAG_N="${DIAG_N:-16}"
+kld_diag_wanted () { [[ " $DIAG_ARMS " == *" $1 "* ]]; }
+kld_diag_complete () {  # arm served image -> 0 when no diag fetch is wanted for arm, or it is complete
+  kld_diag_wanted "$1" || return 0
+  KLD_FORCED_REF='' KLD_N=$DIAG_N kld_complete "$RES/kld-$1-greedy.jsonl" "$2" "$3"; }
+kld_diag_fetch () {  # arm served image
+  kld_diag_wanted "$1" || return 0
+  KLD_FORCED_REF='' KLD_N=$DIAG_N kld_fetch "$2" "$RES/kld-$1-greedy.jsonl" "$3"; }
 
 kld_ref_ensure () {  # one dedicated boot (sly-radiance/qwen38-fp8 @ $KLD_REF_IMAGE); fetch cached in tmp/
   local refout="$RAW/kld-ref.jsonl"
@@ -808,12 +820,13 @@ arm_rad () {  # arm image rad_file served [spec_tokens]  (items 4/5/9/10; spec d
   # KLD_ONLY=1: a KLD-only arm (forced batch q8f/q4mtp) boots for its fetch with no cells selected
   if [ -z "$sel" ] && [ "${KLD_ONLY:-0}" != 1 ]; then echo "  skip (ONLY filter): arm $arm"; return 0; fi
   # done probes AND a complete KLD fetch -> nothing to do; else boot, so a re-run retries KLD (P12)
-  if ! server_needed $sel && kld_complete "$RES/kld-$arm.jsonl" "$served" "$img"; then echo "  skip (done): arm $arm — all selected probes and the KLD fetch complete"; return 0; fi
+  if ! server_needed $sel && kld_complete "$RES/kld-$arm.jsonl" "$served" "$img" && kld_diag_complete "$arm" "$served" "$img"; then echo "  skip (done): arm $arm — all selected probes and the KLD fetch complete"; return 0; fi
   if ! start_rad "$arm" "$img" "$rad" "$served" "$spec"; then return 1; fi
   residency_check "$arm"
   kld_selftest "$fam" "$served"
   if [ -f "$RAW/done/kld-selftest-$fam" ]; then
     kld_fetch "$served" "$RES/kld-$arm.jsonl" "$img"
+    kld_diag_fetch "$arm" "$served" "$img"
   else
     echo "  KLD fetch skipped for arm $arm (selftest failed — logprobs unsupported?)"
   fi
@@ -827,7 +840,8 @@ arm_d () {
   local sel; sel=$(selected_slugs $D_SLUGS)
   if [ -z "$sel" ]; then echo "  skip (ONLY filter): arm D"; return 0; fi
   # done probes AND a complete KLD fetch -> nothing to do; else boot, so a re-run retries KLD (P12)
-  if ! server_needed $sel && kld_complete "$RES/kld-d.jsonl" qwen38-27b-redhat-mxfp4-dflash "$IMAGE"; then echo "  skip (done): arm D — all selected probes and the KLD fetch complete"; return 0; fi
+  if ! server_needed $sel && kld_complete "$RES/kld-d.jsonl" qwen38-27b-redhat-mxfp4-dflash "$IMAGE" \
+     && kld_diag_complete d qwen38-27b-redhat-mxfp4-dflash "$IMAGE"; then echo "  skip (done): arm D — all selected probes and the KLD fetch complete"; return 0; fi
   # serve_vllm.sh start refuses a non-TTY boot on a held port — reuse only OURS: served
   # name + image + ctx must all match. A foreign server with the same model+image but a
   # different --max-model-len would taint arm D's rows (P4 — the 2026-11-10 short run
@@ -843,6 +857,7 @@ arm_d () {
   # same contract as arm_rad: fetch only after a PASSED selftest (marker), never after a failed one
   if [ -f "$RAW/done/kld-selftest-sly" ]; then
     kld_fetch qwen38-27b-redhat-mxfp4-dflash "$RES/kld-d.jsonl" "$IMAGE"
+    kld_diag_fetch d qwen38-27b-redhat-mxfp4-dflash "$IMAGE"
   else
     echo "  KLD fetch skipped for arm D (selftest failed — logprobs unsupported?)"
   fi
@@ -861,12 +876,13 @@ arm_llama () {  # arm gguf served
   local sel; sel=$(selected_slugs $all)
   # KLD_ONLY=1: a KLD-only arm (forced batch q8f/q4mtp) boots for its fetch with no cells selected
   if [ -z "$sel" ] && [ "${KLD_ONLY:-0}" != 1 ]; then echo "  skip (ONLY filter): arm $arm"; return 0; fi
-  if ! server_needed $sel && kld_complete "$RES/kld-$arm.jsonl" "$served" "$bin"; then echo "  skip (done): arm $arm — all selected probes and the KLD fetch complete"; return 0; fi
+  if ! server_needed $sel && kld_complete "$RES/kld-$arm.jsonl" "$served" "$bin" && kld_diag_complete "$arm" "$served" "$bin"; then echo "  skip (done): arm $arm — all selected probes and the KLD fetch complete"; return 0; fi
   if ! start_llama "$arm" "$gguf" "$served"; then return 1; fi
   residency_check "$arm"
   kld_selftest llamacpp "$served"
   if [ -f "$RAW/done/kld-selftest-llamacpp" ]; then
     kld_fetch "$served" "$RES/kld-$arm.jsonl" "$bin"   # the build is the cache key's 'image'
+    kld_diag_fetch "$arm" "$served" "$bin"
   else
     echo "  KLD fetch skipped for arm $arm (selftest failed — logprobs unsupported?)"
   fi
@@ -898,8 +914,10 @@ preflight () {
   for t in "$IMG_RAD_A" "$IMG_RAD_BC" "$IMAGE" "$KLD_REF_IMAGE" "$IMG_SLY_E"; do
     grep -q "^${t}\$" <<<"$imgs" || { echo "PIN-FAIL: image $t not present" >&2; fail=1; }
   done
-  ( cd "$CAMPAIGN_DIR/inputs" && sha256sum -c --quiet calibration.sha256 ) \
-    || { echo "PIN-FAIL: calibration.sha256 mismatch (calibration set changed)" >&2; fail=1; }
+  for c in "$CAMPAIGN_DIR"/inputs/calibration*.sha256; do   # every pinned calibration set (v1, v2, ...)
+    ( cd "$CAMPAIGN_DIR/inputs" && sha256sum -c --quiet "$(basename "$c")" ) \
+      || { echo "PIN-FAIL: $(basename "$c") mismatch (calibration set changed)" >&2; fail=1; }
+  done
   [ "$fail" -eq 0 ] || { echo "PREFLIGHT FAILED — fix the pins above, no GPU work started" >&2; exit 1; }
   echo "preflight OK (pins exact: 2 .rad @ pinned revisions, 4 model dirs, 4 images, calibration sha256)"
 }

@@ -1,0 +1,91 @@
+{
+  "kind": "kld",
+  "label": "c",
+  "reference": "c0",
+  "mode": "paired greedy continuation (temp 0, top-20, shared-prefix pairing, first-divergent position included)",
+  "n_prompts": 16,
+  "n_prompt_errors": 0,
+  "n_positions": 1486,
+  "n_positions_dropped": 1611,
+  "kl_nats_per_tok": 0.000824,
+  "ci95_nats": [
+    0.000331,
+    0.002107
+  ],
+  "ci_method": "cluster bootstrap (block=prompt, B=2000, percentile 95%)",
+  "pooled_ci_nats": [
+    0.000567,
+    0.00108
+  ],
+  "pooled_note": "pooled 1.96\u00b7SD/\u221an (sly convention) \u2014 cross-check, mildly optimistic (\u00d7~1.46)",
+  "lower_bound_note": "KL is a lower bound: reference top-20 support, floor for tokens missing from arm top-20, lumped tail bucket, clamped \u2265 0 (sly kv4/kl_compare.py, \u03b5=1e-9)",
+  "dnll_nats_per_tok": 0.001089,
+  "top1_agreement": 0.63287,
+  "first_divergent_pos": {
+    "mean": 69.0,
+    "median": 46,
+    "n_diverged": 5,
+    "n_prompts": 16
+  },
+  "coverage_ref_mean": 0.99794,
+  "coverage_arm_mean": 0.99791,
+  "segments_per_1k": [
+    {
+      "start": 0,
+      "n": 1000,
+      "nats_per_tok": 0.000738
+    },
+    {
+      "start": 1000,
+      "n": 486,
+      "nats_per_tok": 0.000999
+    }
+  ],
+  "noise_floors": [
+    "A-vs-B pair = engine-version floor (same checkpoint, radiance 1.11.0 vs 1.17.0)",
+    "reference self-run bounds boot noise"
+  ],
+  "tokenizer_check": {
+    "n_compared": 16,
+    "n_mismatch": 0,
+    "mismatches": [],
+    "verdict": "ok",
+    "note": "per-prompt usage.prompt_tokens, ref vs arm (rows without it are skipped)"
+  },
+  "top1_agreement_paired": 0.99664,
+  "kl_per_position": {
+    "median": 3e-06,
+    "p90": 0.000388,
+    "max": 0.08048,
+    "note": "over paired positions; p90 = nearest rank"
+  },
+  "topk_len": {
+    "ref": {
+      "n_positions": 1486,
+      "n_short": 135,
+      "frac_short": 0.09085,
+      "min_len": 1,
+      "top_k": 20
+    },
+    "arm": {
+      "n_positions": 1486,
+      "n_short": 135,
+      "frac_short": 0.09085,
+      "min_len": 1,
+      "top_k": 20
+    },
+    "note": "paired positions whose top-k row had fewer than TOP_K entries"
+  },
+  "floor_substitutions": {
+    "ref_tokens_missing_from_arm": 789,
+    "ref_entries": 29024,
+    "ref_missing_frac": 0.027184,
+    "positions_with_floor": 592,
+    "ref_mass_floored_mean": 2.8e-05,
+    "arm_tokens_missing_from_ref": 789,
+    "arm_entries": 29024,
+    "arm_missing_frac": 0.027184,
+    "note": "ref tokens absent from the arm top-k are scored at the arm floor (lower-bound KL); arm tokens absent from the ref top-k do not enter KL(ref||arm)"
+  },
+  "reference_label": "c0"
+}

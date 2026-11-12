@@ -1,0 +1,85 @@
+<|im_start|>system
+You are a coding agent working in a TypeScript and Python repository. Think, then act.
+
+Think first, scaling depth to complexity: solve simple tasks directly; for complex tasks, trace concrete mechanics step-by-step (initial state -> transformations -> final outcome) across boundary and failure cases (empty, extreme, conflicting, aborted), and verify end-to-end continuity (every input, requirement, or claim must be sourced/computed upstream and used/resolved downstream). Avoid circular re-reading, but never stop at surface/structural checks before verifying actual operational behavior.
+
+1. Priority: Accuracy, internal consistency, and completeness override brevity. Keep solutions minimal (no over-engineering), never cutting analytical or verification depth. Evaluate provided context and sources verbatim without silent normalization. Flag flawed premises, contradictions, or dead/unhandled elements first. Never truncate outputs, code, tables, or data with placeholders.
+2. Delivery: Zero filler; use the clearest structure (tables, lists, code, prose). Lead with the answer/artifact, followed only by non-obvious constraints and causal reasoning. Strict format constraints (e.g., JSON/code-only) suppress all prose.
+3. Ambiguity (Minimize Turns): State uncertainties and their root causes.
+   - Minor gaps: State brief assumptions and solve.
+   - Multiple viable paths: Rank top options (effort vs. impact) AND immediately execute the optimal default.
+   - Blocked: Batch all critical clarifying questions at once.<|im_end|>
+<|im_start|>user
+Refactor the longest function in this file into smaller ones without changing behaviour. Show the new code.
+
+File `bench/workloads/corpus/py-rich/rich/default_styles.py`:
+```
+from typing import Dict
+
+from .style import Style
+
+DEFAULT_STYLES: Dict[str, Style] = {
+    "none": Style.null(),
+    "reset": Style(
+        color="default",
+        bgcolor="default",
+        dim=False,
+        bold=False,
+        italic=False,
+        underline=False,
+        blink=False,
+        blink2=False,
+        reverse=False,
+        conceal=False,
+        strike=False,
+    ),
+    "dim": Style(dim=True),
+    "bright": Style(dim=False),
+    "bold": Style(bold=True),
+    "strong": Style(bold=True),
+    "code": Style(reverse=True, bold=True),
+    "italic": Style(italic=True),
+    "emphasize": Style(italic=True),
+    "underline": Style(underline=True),
+    "blink": Style(blink=True),
+    "blink2": Style(blink2=True),
+    "reverse": Style(reverse=True),
+    "strike": Style(strike=True),
+    "black": Style(color="black"),
+    "red": Style(color="red"),
+    "green": Style(color="green"),
+    "yellow": Style(color="yellow"),
+    "magenta": Style(color="magenta"),
+    "cyan": Style(color="cyan"),
+    "white": Style(color="white"),
+    "inspect.attr": Style(color="yellow", italic=True),
+    "inspect.attr.dunder": Style(color="yellow", italic=True, dim=True),
+    "inspect.callable": Style(bold=True, color="red"),
+    "inspect.async_def": Style(italic=True, color="bright_cyan"),
+    "inspect.def": Style(italic=True, color="bright_cyan"),
+    "inspect.class": Style(italic=True, color="bright_cyan"),
+    "inspect.error": Style(bold=True, color="red"),
+    "inspect.equals": Style(),
+    "inspect.help": Style(color="cyan"),
+    "inspect.doc": Style(dim=True),
+    "inspect.value.border": Style(color="green"),
+    "live.ellipsis": Style(bold=True, color="red"),
+    "layout.tree.row": Style(dim=False, color="red"),
+    "layout.tree.column": Style(dim=False, color="blue"),
+    "logging.keyword": Style(bold=True, color="yellow"),
+    "logging.level.notset": Style(dim=True),
+    "logging.level.debug": Style(color="green"),
+    "logging.level.info": Style(color="blue"),
+    "logging.level.warning": Style(color="yellow"),
+    "logging.level.error": Style(color="red", bold=True),
+    "logging.level.critical": Style(color="red", bold=True, reverse=True),
+    "log.level": Style.null(),
+    "log.time": Style(color="cyan", dim=True),
+    "log.message": Style.null(),
+    "log.path": Style(dim=True),
+    "repr.ellipsis": Style(color="yellow"),
+    "repr.indent": Style(color="green", dim=True),
+    "repr.error": Style(color="red", bold=True),
+```<|im_end|>
+<|im_start|>assistant
+<think>

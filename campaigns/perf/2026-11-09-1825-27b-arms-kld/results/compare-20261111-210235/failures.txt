@@ -1,2 +1,3 @@
 KLD FETCH REFUSED: qwen38-27b-redhat-mxfp4-dflash — container env sets RADIANCE_LMHEAD_FP8=1 RADIANCE_LMHEAD_INT4=1 (garbage non-winner logprobs; selftest check 5)
   WARN (rule 15b): arm q4kxl residency 0.00 GiB < INFERRED floor 16.4 GiB — see /home/dev/work/dp-craft/amd/campaigns/perf/2026-11-09-1825-27b-arms-kld/tmp/runs/compare-20261111-210235/results/residency-q4kxl.txt
+  WARN (rule 15b): arm q6k residency 0.00 GiB < INFERRED floor 16.4 GiB — see /home/dev/work/dp-craft/amd/campaigns/perf/2026-11-09-1825-27b-arms-kld/tmp/runs/compare-20261111-210235/results/residency-q6k.txt

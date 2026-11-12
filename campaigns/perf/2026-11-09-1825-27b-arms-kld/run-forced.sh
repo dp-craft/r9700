@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # Forced batch for campaigns/perf/2026-11-09-1825-27b-arms-kld (2026-11-12, user decisions: "q8 should be the
 # baseline", "2 ok f16", "3 option B teacher-forced", "4 KLD_N=128", 32 evenly spaced positions, "e depth curve
-# yes", "Dflash/MTP: if cheap then measure"). Hand-written driver like run-compare.sh (no gen_campaign kind
+# yes", "Dflash/MTP: if cheap then measure", calibration v2 "Stop, fix, restart"). Hand-written driver like run-compare.sh (no gen_campaign kind
 # covers a multi-engine KLD batch); all machinery comes from run.sh (sourced, WS_NO_MAIN=1).
 #
+# Prompts: inputs/calibration-v2-prompts.jsonl (bench/perf/kld_calibration.py: mid-text cuts — v1's whole files made
+#    the model stop at once on 78/128 prompts — 90 code / 14 prose / 24 chat turns in the production template).
 # 1. q8   unsloth Q8_0 @ llama.cpp latest-vulkan, f16 KV, ctx 32768, 1 seq: GREEDY fetch (KLD_N prompts x 512
 #         tokens) = the reference, + depth cells 10k/20k.
 # 2. every later arm: TEACHER-FORCED fetch on q8's greedy continuation (kld_probe.py forced: prompt + the first i
@@ -11,16 +13,17 @@
 #    SAME positions, so the KL means are comparable across arms. Spec decoding is invisible here (max_tokens 1).
 #      q8f    q8 again, KLD only                                  -> engine/boot floor of the method
 #      d      RedHat-MXFP4 @ sly 1.11.0, DFlash k=7 (arm D)        + depth cells 10k/20k/50k/100k
-#      d0     d without DFlash (profile sly-redhat/redhat-mxfp4)   + depth cells; + a GREEDY fetch (DIAG_N) paired
-#             with BASE_RUN's greedy d fetch -> the DFlash effect on greedy output
+#      d0     d without DFlash (profile sly-redhat/redhat-mxfp4)   + depth cells
 #      dfh    d0 with a full-precision lm head (sly-redhat/redhat-mxfp4-fullhead), KLD only, ctx 8192
 #      a b c c0 q4kxl q6k   as in run-compare.sh                 + depth cells
-#      q4mtp  q4kxl with MTP=1, GREEDY fetch (DIAG_N) paired with BASE_RUN's greedy q4kxl -> the MTP effect
+#      q4mtp  q4kxl with MTP=1, KLD only: a GREEDY fetch of the first DIAG_N prompts
+#    DIAG_ARMS (d d0 c c0 q4kxl) also get a greedy fetch of the first DIAG_N prompts (kld-<arm>-greedy.jsonl):
+#    spec on vs off on free-running output -> the DFlash (d/d0, c/c0) and MTP (q4mtp/q4kxl) effect on quality.
 #      e      heretic @ sly 1.8.1, KLD only
-# 3. scores: kld-forced-<stamp>.d/kld-forced-<arm>-vs-q8.json (+ kld-diag-<stamp>.d/ greedy diagnostic pairs).
+# 3. scores: kld-forced-<stamp>.d/kld-forced-<arm>-vs-q8.json + kld-diag-<stamp>.d/kld-diag-<on>-vs-<off>.json.
 #
-# Knobs: ARMS (default all above, q8 first)  KLD_N (128)  KLD_POSITIONS (32)  DIAG_N (16 = BASE_RUN's KLD_N)
-#   BASE_RUN (compare-20261111-210235)  REPS (2)  RUN_TAG (forced-<stamp>; pin it to RESUME)  + every run.sh pin.
+# Knobs: ARMS (default all above, q8 first)  KLD_N (128)  KLD_POSITIONS (32)  DIAG_N (16)  DIAG_ARMS  KLD_CAL
+#   REPS (2)  RUN_TAG (forced-<stamp>; pin it to RESUME)  + every run.sh pin.
 # Requires a plain terminal, port 8000 free, GPU idle (the boot gate refuses otherwise).
 set -uo pipefail
 HERE="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
@@ -31,8 +34,8 @@ for _a in $ARMS; do
 done
 RUN_TAG="${RUN_TAG:-forced-$(date +%Y%m%d-%H%M%S)}"; export RUN_TAG
 export KLD_N="${KLD_N:-128}" REPS="${REPS:-2}" DEPTH=1
-DIAG_N="${DIAG_N:-16}"
-BASE_RUN="${BASE_RUN:-compare-20261111-210235}"
+export DIAG_N="${DIAG_N:-16}" DIAG_ARMS="${DIAG_ARMS:-d d0 c c0 q4kxl}"
+export KLD_CAL="${KLD_CAL:-$HERE/inputs/calibration-v2-prompts.jsonl}"
 if [ -z "${ONLY:-}" ]; then
   _o=""; for _a in $ARMS; do
     case "$_a" in
@@ -47,20 +50,19 @@ WS_NO_MAIN=1
 # shellcheck source=run.sh
 source "$HERE/run.sh"
 REF="$RES/kld-q8.jsonl"
-BASE_RES="$CAMPAIGN_DIR/tmp/runs/$BASE_RUN/results"
 
-arm_sly_kld () {  # arm boot_name ctx np served [cells: 1|0] [greedy_out] — a sly arm outside arm_d
-  local arm=$1 name=$2 ctx=$3 np=$4 served=$5 cells=${6:-0} gout=${7:-}
+arm_sly_kld () {  # arm boot_name ctx np served [cells: 1|0] — a sly arm outside arm_d
+  local arm=$1 name=$2 ctx=$3 np=$4 served=$5 cells=${6:-0}
   local all="${SLUG_R1//x-/$arm-}" sel=""
   [ "$cells" = 1 ] && sel=$(selected_slugs $all)
   if { [ -z "$sel" ] || ! server_needed $sel; } && kld_complete "$RES/kld-$arm.jsonl" "$served" "$IMAGE" \
-     && { [ -z "$gout" ] || KLD_FORCED_REF='' KLD_N=$DIAG_N kld_complete "$gout" "$served" "$IMAGE"; }; then
+     && kld_diag_complete "$arm" "$served" "$IMAGE"; then
     echo "  skip (done): arm $arm"; return 0; fi
   start_server "$name" "$ctx" fp8 0 "$np" || return 1
   kld_selftest sly "$served"
   if [ -f "$RAW/done/kld-selftest-sly" ]; then
     kld_fetch "$served" "$RES/kld-$arm.jsonl" "$IMAGE"
-    [ -n "$gout" ] && KLD_FORCED_REF='' KLD_N=$DIAG_N kld_fetch "$served" "$gout" "$IMAGE"
+    kld_diag_fetch "$arm" "$served" "$IMAGE"
   else
     echo "  KLD fetch skipped for arm $arm (selftest failed)"
   fi
@@ -77,17 +79,19 @@ arm_e () {  # heretic: KLD only
   stop_server
 }
 
-score_diag () {  # label base_file arm_file — one greedy diagnostic pair (both DIAG_N, complete) -> $DIAG_DIR
+score_diag () {  # label off_file on_file — KL(spec off ‖ spec on), both greedy DIAG_N and complete -> $DIAG_DIR
   local label=$1 bf=$2 af=$3
+  if [ ! -f "$bf" ] || [ ! -f "$af" ]; then echo "  KLD diag $label: not in this batch (fetch absent)"; return 0; fi
   if ! KLD_FORCED_REF='' KLD_N=$DIAG_N kld_complete "$bf" || ! KLD_FORCED_REF='' KLD_N=$DIAG_N kld_complete "$af"; then
     echo "KLD DIAG SKIPPED: $label (base or arm greedy fetch incomplete/absent)" | tee -a "$RES/failures.txt"; return 0; fi
   [ -n "${DIAG_DIR:-}" ] || { DIAG_DIR=$(fresh_file "$RES/kld-diag-$(date +%Y%m%d-%H%M%S).d"); mkdir -p "$DIAG_DIR"; }
-  python3 "$KLD" score --ref "$bf" --arm "$af" --label "$label" --ref-label "$(basename "$bf" .jsonl)@$BASE_RUN" \
+  python3 "$KLD" score --ref "$bf" --arm "$af" --label "$label" --ref-label "$(basename "$bf" .jsonl)" \
     --out "$DIAG_DIR/kld-diag-$label.json" || echo "KLD DIAG SCORE FAILED: $label" | tee -a "$RES/failures.txt"
 }
 
 ensure_fixtures 'codereview-10000.txt' 'codereview-20000.txt' 'codereview-50000.txt' 'codereview-100000.txt'
-echo "=== forced batch: arms [$ARMS], KLD_N=$KLD_N x $KLD_POSITIONS forced positions, DIAG_N=$DIAG_N (base $BASE_RUN), REPS=$REPS"
+echo "=== forced batch: arms [$ARMS], KLD_N=$KLD_N x $KLD_POSITIONS forced positions, DIAG_N=$DIAG_N [$DIAG_ARMS q4mtp], REPS=$REPS"
+echo "    calibration: $KLD_CAL"
 echo "    unique dir: $RUN_DIR  (results: $RES)"
 for _a in $ARMS; do
   echo; echo "=================== arm $_a ($(date +%H:%M:%S)) ==================="
@@ -97,7 +101,7 @@ for _a in $ARMS; do
     q8)    LLAMA_KV=f16 LLAMA_CTX=32768 LLAMA_NP=1 arm_llama q8 "$GGUF_Q8" qwen38-27b-q8 ;;
     q8f)   KLD_ONLY=1 LLAMA_KV=f16 LLAMA_CTX=32768 LLAMA_NP=1 arm_llama q8f "$GGUF_Q8" qwen38-27b-q8 ;;
     d)     arm_d ;;
-    d0)    arm_sly_kld d0 d0-redhat-sly1100 110000 2 qwen38-27b-redhat-mxfp4-sly 1 "$RES/kld-d0-greedy.jsonl" ;;
+    d0)    arm_sly_kld d0 d0-redhat-sly1100 110000 2 qwen38-27b-redhat-mxfp4-sly 1 ;;
     dfh)   arm_sly_kld dfh dfh-redhat-sly1100 8192 1 qwen38-27b-redhat-mxfp4-fullhead ;;
     a)     arm_rad a  "$IMG_RAD_A"  "$RAD_MXFP4" qwen38-27b-mxfp4 ;;
     b)     arm_rad b  "$IMG_RAD_BC" "$RAD_MXFP4" qwen38-27b-mxfp4 ;;
@@ -116,8 +120,9 @@ _f=""; for _a in $ARMS; do case "$_a" in q8|q4mtp) ;; *) _f="$_f $_a" ;; esac; d
 # shellcheck disable=SC2086  # $_f is the arm list
 kld_score_forced q8 "$REF" $_f
 DIAG_DIR=""
-case " $ARMS " in *" d0 "*) score_diag d0-vs-d "$BASE_RES/kld-d.jsonl" "$RES/kld-d0-greedy.jsonl" ;; esac
-case " $ARMS " in *" q4mtp "*) score_diag q4mtp-vs-q4kxl "$BASE_RES/kld-q4kxl.jsonl" "$RES/kld-q4mtp.jsonl" ;; esac
+score_diag d-vs-d0       "$RES/kld-d0-greedy.jsonl"    "$RES/kld-d-greedy.jsonl"     # DFlash on sly
+score_diag c-vs-c0       "$RES/kld-c0-greedy.jsonl"    "$RES/kld-c-greedy.jsonl"     # DFlash2 on radiance
+score_diag q4mtp-vs-q4kxl "$RES/kld-q4kxl-greedy.jsonl" "$RES/kld-q4mtp.jsonl"       # MTP on llama.cpp
 print_summary
 make_report
 echo "forced batch done. dir: $RUN_DIR   failures: $RES/failures.txt"

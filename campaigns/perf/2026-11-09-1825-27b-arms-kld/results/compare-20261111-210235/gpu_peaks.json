@@ -133,6 +133,28 @@
    "samples": 291,
    "quarantined": false,
    "provenance": "MEASURED"
+  },
+  {
+   "run": "2026-11-11-2342-engine-q6k-10k-tg512-n1",
+   "csv": "tmp/2026-11-11-2342-engine-q6k-10k-tg512-n1/gpu_samples.csv",
+   "peak_vram_mib": 30636,
+   "peak_gtt_mib": 1040,
+   "load_vram_mib": 30622,
+   "vram_total_mib": 32624,
+   "samples": 34,
+   "quarantined": false,
+   "provenance": "MEASURED"
+  },
+  {
+   "run": "2026-11-11-2343-engine-q6k-100k-tg512-n1",
+   "csv": "tmp/2026-11-11-2343-engine-q6k-100k-tg512-n1/gpu_samples.csv",
+   "peak_vram_mib": 30976,
+   "peak_gtt_mib": 1132,
+   "load_vram_mib": 30633,
+   "vram_total_mib": 32624,
+   "samples": 315,
+   "quarantined": false,
+   "provenance": "MEASURED"
   }
  ]
 }
