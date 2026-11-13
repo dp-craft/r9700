@@ -32,8 +32,9 @@ selftest/fetch against a canned loopback HTTP server — the live logprobs shape
 shape-tolerant (_topk_entries) and the observed shape is always reported (logprobs_shape)
 in the selftest JSON and fetch errors, after the 2026-11-10 short run returned 0 logprob
 rows on every live fetch). HTTP is stdlib urllib only (sly convention). All arms share the
-Qwen3.8 tokenizer, so decoded token STRINGS key the support (selftest asserts identical
-/tokenize ids ref-vs-arm first).
+Qwen3.8 tokenizer. Top-k entries are joined by TOKEN ID when both sides carry ids for every
+entry (llama.cpp/radiance `id`, vLLM "token_id:N" via return_tokens_as_token_ids, 2026-11-13);
+otherwise by canonical STRING (canon_tok/canon_top — rows fetched before ids were kept).
 
   python3 kld_probe.py selftest --url http://127.0.0.1:8000/v1 --model <served> [--out FILE]
   python3 kld_probe.py fetch    --url ... --model <served> --calibration prompts.jsonl --out FILE
@@ -79,7 +80,7 @@ def canon_tok(tok):
     the q8 self-floor read 0.11 nats/tok (several '' in one top-20 collided in a dict) and charged ~20 nats at
     every end-of-turn position across engines. Non-special added tokens (<think>, <tool_call>) keep their text."""
     if not isinstance(tok, str):
-        return tok                        # token ids (synthetic fixtures) are already unambiguous
+        return tok                        # token ids (id join, synthetic fixtures) are already unambiguous
     return SPECIAL_BUCKET if tok == "" or _SPECIAL_RE.fullmatch(tok) else tok
 
 
@@ -117,6 +118,57 @@ def kl_position(ref_top, arm_top):
         s += math.exp(r) * (r - a)
     s += rt * math.log(rt / at)           # lumped tail bucket
     return max(0.0, s), ref_mass, arm_mass
+
+
+ID_PREFIX = "token_id:"   # vLLM return_tokens_as_token_ids renders every token as "token_id:N"
+
+
+def _ids_ok(top, ids):
+    return (isinstance(ids, list) and len(ids) == len(top)
+            and all(isinstance(i, int) and not isinstance(i, bool) for i in ids))
+
+
+def join_keys(rtok, rtop, rid, rids, atok, atop, aid, aids, placeholder=False):
+    """Key one position of ref and arm for scoring → (rtok, rtop, atok, atop, join).
+
+    join "id": both sides carry an id for EVERY top-k entry and for the chosen token → every token is replaced by
+    its id (ints pass canon_tok untouched, duplicate ids still merge by logsumexp in canon_top, the tail bucket is
+    the same code). Server-side string collisions ('' for specials / partial UTF-8) cannot merge distinct tokens.
+    join "string": anything else (rows fetched before ids were kept) — today's path, the very same objects.
+    placeholder: either block is a vLLM placeholder block (_placeholder_block) — its "token_id:N" strings have no
+    text to match, so the string path raises. A real text token that merely starts with "token_id:" does not
+    (fix round 2: the guard is block-scoped, not per string)."""
+    if rid is not None and aid is not None and _ids_ok(rtop, rids) and _ids_ok(atop, aids):
+        return (rid, [(i, lp) for i, (_t, lp) in zip(rids, rtop)],
+                aid, [(i, lp) for i, (_t, lp) in zip(aids, atop)], "id")
+    if placeholder:
+        t = next((t for t, _ in (*rtop, *atop) if isinstance(t, str) and t.startswith(ID_PREFIX)), None)
+        if t is None:                                   # a mixed block: this row is text, another was placeholders
+            raise ValueError("string-joined position in a block that also holds vLLM token-id placeholder rows: "
+                             "the block mixes id and text rows (re-fetch it)")
+        raise ValueError(f"token {t!r} is a vLLM token-id placeholder on a string-joined position: the other "
+                         "side has no token ids (re-fetch it with ids, e.g. the reference with this probe version)")
+    return rtok, rtop, atok, atop, "string"
+
+
+def _placeholder_block(blk):
+    """True when the block came back as vLLM placeholders: some top-k row whose every entry is a "token_id:…"
+    string (a malformed one included), with at least 2 entries: a one-entry text row could be a real
+    "token_id:…" text token, so it is not evidence."""
+    for _tok, top in blk.get("pos") or []:
+        if len(top or ()) >= 2 and all(isinstance(t, str) and t.startswith(ID_PREFIX) for t, _ in top):
+            return True
+    return False
+
+
+def _at(seq, i):
+    """seq[i] for a per-position id list stored in a block (None when absent or short)."""
+    return seq[i] if isinstance(seq, list) and 0 <= i < len(seq) else None
+
+
+def join_summary(counts):
+    """{"id": n, "string": m} → "id" | "string" | "mixed" (which path scored an arm's number)."""
+    return "mixed" if counts["id"] and counts["string"] else ("id" if counts["id"] else "string")
 
 
 def pair_positions(ref_toks, arm_toks):
@@ -189,6 +241,67 @@ def _post_json(url, path, payload, timeout=1800):
         return json.loads(r.read().decode())
 
 
+def detect_engine(url, timeout=10):
+    """GET /v1/models → data[0].owned_by ("vllm", "llamacpp", …); None when the card has no owned_by. Only "vllm"
+    changes a request (_lp_body). A /v1/models that fails (HTTP error, timeout, unreachable) or does not parse
+    RAISES (fix round 1): a silent None would drop vLLM's token ids and quietly fall back to the string join."""
+    base = url[:-3] if url.rstrip("/").endswith("/v1") else url
+    try:
+        with urllib.request.urlopen(base.rstrip("/") + "/v1/models", timeout=timeout) as r:
+            d = json.loads(r.read().decode())
+        data = d.get("data") if isinstance(d, dict) else None
+        if not isinstance(data, list) or not data or not isinstance(data[0], dict):
+            raise ValueError(f"no model card in the answer: {str(d)[:120]}")
+    except Exception as e:      # noqa: BLE001 — every failure is reported, never mapped to "no engine"
+        raise RuntimeError(f"engine detection failed (GET /v1/models: {type(e).__name__}: {e}); "
+                           "pass --engine vllm|llamacpp|radiance") from e
+    return data[0].get("owned_by") or None
+
+
+def _lp_body(body, engine):
+    """A /v1/completions body; vLLM also gets return_tokens_as_token_ids (top_logprobs keyed "token_id:N", so
+    its string dict cannot collapse distinct tokens). llama.cpp and radiance bodies are left as they were."""
+    if engine == "vllm":
+        body["return_tokens_as_token_ids"] = True
+    return body
+
+
+def _tok_id(tok):
+    """vLLM "token_id:N" → N; anything else (a malformed placeholder, leading zeros included) → None."""
+    n = tok[len(ID_PREFIX):] if isinstance(tok, str) and tok.startswith(ID_PREFIX) else ""
+    if n.isascii() and n.isdigit() and (n == "0" or not n.startswith("0")):
+        return int(n)
+    return None
+
+
+def _topk_parse(entries):
+    """One top_logprobs row → ((token, lp) × ≤20, ids): ids aligned with the kept entries (an entry's `id`, else
+    a "token_id:N" token), or None unless EVERY kept entry has one (the position then joins by string)."""
+    if isinstance(entries, dict):
+        items = [(t, v, _tok_id(t)) for t, v in entries.items()]
+    else:
+        items = []
+        for e in entries or []:
+            if not isinstance(e, dict) or "logprob" not in e or e.get("token") is None:
+                continue
+            i = e.get("id")
+            ok = isinstance(i, int) and not isinstance(i, bool) and i >= 0
+            items.append((e["token"], e["logprob"], i if ok else _tok_id(e["token"])))
+    top, ids = [], []
+    for tok, lp, i in items:
+        try:
+            lp = float(lp)
+        except (TypeError, ValueError):
+            continue
+        if not math.isfinite(lp):
+            continue
+        top.append((tok, lp))
+        ids.append(i)
+        if len(top) >= TOP_K:
+            break
+    return top, (ids if top and all(i is not None for i in ids) else None)
+
+
 def _topk_entries(entries):
     """One top_logprobs row → ((token, lp) × ≤20, mass).
 
@@ -197,26 +310,15 @@ def _topk_entries(entries):
     to 0 entries): canonical list of {token, logprob} dicts, a dict-map row
     (token → logprob), token values as str or int. Rows that parse to nothing leave the
     diagnosis to logprobs_shape() — the caller surfaces it in the error/selftest."""
-    if isinstance(entries, dict):
-        items = list(entries.items())
-    else:
-        items = []
-        for e in entries or []:
-            if not isinstance(e, dict) or "logprob" not in e or e.get("token") is None:
-                continue
-            items.append((e["token"], e["logprob"]))
-    top = []
-    for tok, lp in items:
-        try:
-            lp = float(lp)
-        except (TypeError, ValueError):
-            continue
-        if not math.isfinite(lp):
-            continue
-        top.append((tok, lp))
-        if len(top) >= TOP_K:
-            break
+    top, _ids = _topk_parse(entries)
     return top, _mass(top)
+
+
+def _use_content(lp):
+    """The `content` array carries token ids (llama.cpp sends only it; radiance sends it beside the legacy
+    `tokens`/`top_logprobs`, whose dict collapses equal texts), so a non-empty one wins; an empty one does not."""
+    c = lp.get("content")
+    return isinstance(c, list) and (bool(c) or "tokens" not in lp)
 
 
 def normalize_logprobs(lp):
@@ -224,10 +326,11 @@ def normalize_logprobs(lp):
 
     vLLM/radiance answer /v1/completions in the OpenAI completions shape (`tokens` +
     `top_logprobs`); llama.cpp answers in the chat-style shape (`content`: one dict per token
-    with its own `top_logprobs` list). Each returned row is fed to _topk_entries as-is."""
+    with its own `top_logprobs` list). Radiance sends both: `content` is preferred (ids, no
+    collisions; _use_content). Each returned row is fed to _topk_entries as-is."""
     if not isinstance(lp, dict):
         return [], []
-    if "tokens" not in lp and isinstance(lp.get("content"), list):
+    if _use_content(lp):
         toks, tops = [], []
         for e in lp["content"]:
             if not isinstance(e, dict) or e.get("token") is None:
@@ -248,7 +351,7 @@ def logprobs_shape(lp):
     """
     if not isinstance(lp, dict):
         return "logprobs missing"
-    if "tokens" not in lp and isinstance(lp.get("content"), list):
+    if _use_content(lp):
         c = lp["content"]
         if not c or not isinstance(c[0], dict):
             return f"content=list[{len(c)}]"
@@ -298,14 +401,17 @@ def _row_measurables(choice, usage, pos, latency_s):
 
 
 def fetch(url, model, prompts, max_tokens=N_MAX, timeout=1800, reuse=None, on_block=None,
-          kv_samples=None):
+          kv_samples=None, engine=None, prompt_ids=False):
     """Greedy capture per prompt: POST /v1/completions {prompt, max_tokens, temperature 0,
     logprobs TOP_K}. prompts = list of (id, text). Returns one block per prompt:
     {"id", "toks": [generated token str...], "pos": [ (tok, [(token, lp) ≤20]) ... ],
      "error": str|None, + per-row measurables (_row_measurables)}.
     reuse: {id: OK block} — those prompts are NOT re-requested (item D: a resumed fetch re-asks only
     errored/missing prompts). on_block(blk) is called after each NEW request (incremental persistence).
-    kv_samples: list to append a /metrics KV-usage gauge sample to after each new request."""
+    kv_samples: list to append a /metrics KV-usage gauge sample to after each new request.
+    engine: "vllm" adds return_tokens_as_token_ids (_lp_body). Rows that carry token ids get "top_ids" (one id
+    list per pos row, None where a row has none). prompt_ids: also store this server's /tokenize ids of the
+    prompt ("prompt_ids", must match usage.prompt_tokens) — a forced reference then sends them to every arm."""
     blocks = []
     for pid, text in prompts:
         if reuse and pid in reuse:
@@ -314,26 +420,35 @@ def fetch(url, model, prompts, max_tokens=N_MAX, timeout=1800, reuse=None, on_bl
         blk = {"id": pid, "toks": [], "pos": [], "error": None}
         t0 = time.monotonic()
         try:
+            if prompt_ids:
+                blk["prompt_ids"] = _tokenize(url, model, text)
             out = _post_json(url, "/v1/completions",
-                             {"model": model, "prompt": text, "max_tokens": max_tokens,
-                              "temperature": 0, "logprobs": TOP_K}, timeout)
+                             _lp_body({"model": model, "prompt": text, "max_tokens": max_tokens,
+                                       "temperature": 0, "logprobs": TOP_K}, engine), timeout)
             choice = (out.get("choices") or [{}])[0]
             lp = choice.get("logprobs") or {}
             toks, tops = normalize_logprobs(lp)
             blk["toks"] = list(toks)
             ids = _content_ids(lp)
             if ids is not None and len(ids) == len(toks):
-                blk["ids"] = ids   # llama.cpp: generated token ids -> this fetch can be a forced reference
+                blk["ids"] = ids   # generated token ids -> this fetch can be a forced reference
             if not toks:
                 blk["error"] = f"no generated tokens in response (shape: {logprobs_shape(lp)})"
+            tids = []
             for tok, entries in zip(toks, tops):
-                top, _m = _topk_entries(entries)
+                top, row_ids = _topk_parse(entries)
                 if top:
                     blk["pos"].append((tok, top))
+                    tids.append(row_ids)
+            if any(t is not None for t in tids):
+                blk["top_ids"] = tids
             if len(blk["pos"]) != len(toks):
                 blk["error"] = (f"logprobs rows {len(blk['pos'])} != tokens {len(toks)} "
                                 f"(shape: {logprobs_shape(lp)})")
             blk.update(_row_measurables(choice, out.get("usage"), blk["pos"], time.monotonic() - t0))
+            if prompt_ids and blk.get("prompt_tokens") not in (None, len(blk["prompt_ids"])):
+                blk["error"] = (f"/tokenize gave {len(blk['prompt_ids'])} prompt ids, the completion read "
+                                f"{blk['prompt_tokens']} prompt tokens")
         except Exception as e:      # noqa: BLE001 — quarantined per prompt (rule 18)
             blk["error"] = f"{type(e).__name__}: {e}"
             blk["latency_s"] = round(time.monotonic() - t0, 3)
@@ -358,10 +473,14 @@ FORCED_K = 32   # scored positions per prompt (user 2026-11-12: 32 evenly spaced
 
 
 def _content_ids(lp):
-    """Generated token ids from a llama.cpp `content` logprobs object, else None."""
-    if not isinstance(lp, dict) or "tokens" in lp or not isinstance(lp.get("content"), list):
+    """Generated token ids: the `content` entries' ids (llama.cpp, radiance), or vLLM's "token_id:N" tokens;
+    None when any is missing."""
+    if not isinstance(lp, dict):
         return None
-    ids = [e.get("id") for e in lp["content"] if isinstance(e, dict) and e.get("token") is not None]
+    if _use_content(lp):
+        ids = [e.get("id") for e in lp["content"] if isinstance(e, dict) and e.get("token") is not None]
+    else:
+        ids = [_tok_id(t) for t in lp.get("tokens") or []]
     return ids if ids and all(isinstance(i, int) for i in ids) else None
 
 
@@ -405,13 +524,17 @@ def _tokenize(url, model, text):
     raise RuntimeError("tokenize failed: " + "; ".join(errs))
 
 
-def fetch_forced(url, model, prompts, refs, k=FORCED_K, timeout=1800, reuse=None, on_block=None):
+def fetch_forced(url, model, prompts, refs, k=FORCED_K, timeout=1800, reuse=None, on_block=None, engine=None):
     """Teacher-forced capture. prompts = [(id, text)], refs = {id: reference fetch block with "ids"}.
     Per prompt: prompt ids from this server's /tokenize (must equal the reference's prompt_tokens), then
     for each i in forced_positions: POST {prompt: prompt_ids + ref_ids[:i], max_tokens 1, temp 0,
     logprobs TOP_K}; the answer's usage.prompt_tokens must equal the sent length (proves the list was read
     as token ids). Block: {"id", "mode": "forced", "positions", "pos": [(ref token, top)], "error", ...};
-    any failure quarantines the WHOLE prompt (rule 18)."""
+    any failure quarantines the WHOLE prompt (rule 18).
+    2026-11-13: when the reference stored its own "prompt_ids" (fetch --prompt-ids), THOSE ids are sent and this
+    server's /tokenize ids must equal them id for id (not just in length); the arm's ids are kept as
+    "prompt_ids" for tokenizer_check. All three engines take an int-list prompt (llama.cpp, vLLM, radiance:
+    usage.prompt_tokens check, MEASURED 0 errors in forced-20261112-093746). Rows with ids get "top_ids"."""
     blocks = []
     for pid, text in prompts:
         if reuse and pid in reuse:
@@ -425,30 +548,48 @@ def fetch_forced(url, model, prompts, refs, k=FORCED_K, timeout=1800, reuse=None
                 raise RuntimeError("reference prompt missing or errored")
             rids = ref.get("ids")
             if not isinstance(rids, list) or len(rids) != len(ref.get("pos") or []):
-                raise RuntimeError("reference has no token ids (fetch it from a llama.cpp server)")
+                raise RuntimeError("reference has no token ids (fetch it with this probe from llama.cpp or radiance "
+                                   "(content[] ids); a vLLM reference is not supported)")
+            if any(isinstance(t, str) and t.startswith(ID_PREFIX) for t, _ in ref["pos"]):
+                # partial_utf8_positions reads TEXT: a vLLM placeholder reference would skip nothing, so the
+                # position set would depend on the reference's engine. Fix round 1: refuse it.
+                raise RuntimeError("reference tokens are vLLM token_id placeholders: the partial-UTF-8 skip rule "
+                                   "needs text (use a llama.cpp or radiance reference)")
             pids = _tokenize(url, model, text)
             blk["prompt_tokens"] = len(pids)
-            if ref.get("prompt_tokens") is not None and ref["prompt_tokens"] != len(pids):
+            blk["prompt_ids"] = pids
+            rp = ref.get("prompt_ids")
+            if isinstance(rp, list):
+                if rp != pids:
+                    j = next((j for j, (x, y) in enumerate(zip(rp, pids)) if x != y), min(len(rp), len(pids)))
+                    raise RuntimeError(f"tokenizer mismatch: prompt ids differ from the reference's at index {j} "
+                                       f"({len(pids)} ids here vs {len(rp)})")
+                pids = list(rp)    # the reference's own prompt ids (equal by the check above)
+            elif ref.get("prompt_tokens") is not None and ref["prompt_tokens"] != len(pids):
                 raise RuntimeError(f"tokenizer mismatch: {len(pids)} prompt ids here vs "
                                    f"{ref['prompt_tokens']} in the reference")
             positions = forced_positions(len(rids), k, skip=partial_utf8_positions(ref["pos"]))
-            rows = []
+            rows, tids = [], []
             for i in positions:
                 sent = pids + rids[:i]
                 out = _post_json(url, "/v1/completions",
-                                 {"model": model, "prompt": sent, "max_tokens": 1,
-                                  "temperature": 0, "logprobs": TOP_K}, timeout)
+                                 _lp_body({"model": model, "prompt": sent, "max_tokens": 1,
+                                           "temperature": 0, "logprobs": TOP_K}, engine), timeout)
                 got = (out.get("usage") or {}).get("prompt_tokens")
                 if got is not None and got != len(sent):
                     raise RuntimeError(f"prompt_tokens {got} != {len(sent)} sent ids at position {i} "
                                        "(int-list prompt not read as token ids?)")
                 lp = ((out.get("choices") or [{}])[0]).get("logprobs") or {}
                 _toks, tops = normalize_logprobs(lp)
-                top, _m = _topk_entries(tops[0]) if tops else ([], 0.0)
+                top, row_ids = _topk_parse(tops[0]) if tops else ([], None)
                 if not top:
                     raise RuntimeError(f"no logprobs row at position {i} (shape: {logprobs_shape(lp)})")
                 rows.append((ref["pos"][i][0], top))
+                tids.append(row_ids)
             blk["positions"], blk["pos"] = positions, rows
+            blk["forced_ids"] = [rids[i] for i in positions]   # the reference ids forced on (score-time guard)
+            if any(t is not None for t in tids):
+                blk["top_ids"] = tids
             lens = [len(t) for _, t in rows]
             blk["topk_len_min"] = min(lens) if lens else None
         except Exception as e:      # noqa: BLE001 — quarantined per prompt (rule 18)
@@ -608,9 +749,27 @@ def _read_rows_tolerant(path):
     return rows
 
 
-def cache_status(out, calibration, limit, max_tokens, model=None, image=None, forced_ref=None, positions=None):
+def missing_prompt_ids(rows):
+    """Clean rows without "prompt_ids": fetched before this probe kept ids."""
+    return [r.get("id") for r in rows if not r.get("error") and not isinstance(r.get("prompt_ids"), list)]
+
+
+def ref_has_prompt_ids(path):
+    """True when a forced reference file carries prompt ids (its arms must then carry them too)."""
+    return any(isinstance(r.get("prompt_ids"), list) for r in _read_rows_tolerant(path))
+
+
+# prompt_ids is the marker of a row fetched by an id-keeping probe (fix round 2: the check is prompt_ids ONLY —
+# top_ids legitimately stays absent for an engine that returns no ids, so it cannot mark an old row)
+IDS_REFUSAL = ("{n} cached row(s) lack prompt_ids (fetched before this probe kept ids, e.g. {ids}); "
+               "this file is left untouched — fetch to a new --out path")
+
+
+def cache_status(out, calibration, limit, max_tokens, model=None, image=None, forced_ref=None, positions=None,
+                 prompt_ids=False):
     """(code, reason): 0 complete + key match · 1 incomplete (errored/missing/duplicate/torn rows) ·
-    2 key missing or mismatched · 3 file absent. model/image are compared only when given."""
+    2 key missing or mismatched, or ids required but missing · 3 file absent. model/image are compared only
+    when given. Ids are required with prompt_ids (fetch --prompt-ids) or a forced_ref that carries prompt_ids."""
     if not os.path.exists(out):
         return 3, "absent"
     exp = cache_key(calibration, limit, max_tokens, model, image, forced_ref, positions)
@@ -633,39 +792,44 @@ def cache_status(out, calibration, limit, max_tokens, model=None, image=None, fo
     errs = [r.get("id") for r in rows if r.get("error")]
     if errs:
         return 1, f"{len(errs)} errored rows: {errs[:5]}"
+    miss = missing_prompt_ids(rows) if (prompt_ids or (forced_ref and ref_has_prompt_ids(forced_ref))) else []
+    if miss:
+        return 2, IDS_REFUSAL.format(n=len(miss), ids=miss[:3])
     return 0, "complete"
 
 
 # ------------------------------------------------------------------ live selftest (r2 §2)
-def selftest(url, model):
+def selftest(url, model, engine=None):
     """First-boot gate per engine family (5 checks, r2 §2). Returns (ok, checks-dict).
     ok = check 1 (logprobs supported) — a refusal takes the arm OUT of the KLD pass,
     recorded with the reason (r2 §2.1). Check 3's tokenize ids are recorded for the eye only;
     the enforced tokenizer guard is score()'s per-prompt prompt_tokens comparison."""
-    checks = {"url": url, "model": model}   # provenance: which endpoint and served model were tested (rule 2)
+    checks = {"url": url, "model": model, "engine": engine}   # provenance: endpoint, served model (rule 2)
     # 1. completions logprobs:20 — own logprob + ≤20 alternatives per token. The gate is
     #    "the rows PARSE to 1..20 entries" (shape-tolerant — see _topk_entries), and the
     #    observed shape is ALWAYS recorded (logprobs_shape) so a drifted server is
     #    diagnosable from the selftest JSON, not just "unsupported".
     try:
         r1 = _post_json(url, "/v1/completions",
-                        {"model": model, "prompt": PROBE_TEXT, "max_tokens": 4,
-                         "temperature": 0, "logprobs": TOP_K})
+                        _lp_body({"model": model, "prompt": PROBE_TEXT, "max_tokens": 4,
+                                  "temperature": 0, "logprobs": TOP_K}, engine))
         lp = (r1.get("choices") or [{}])[0].get("logprobs") or {}
         toks, tops = normalize_logprobs(lp)
         checks["logprobs20"] = bool(
             toks and tops
             and all(1 <= len(_topk_entries(r)[0]) <= TOP_K for r in tops[:4]))
         checks["logprobs_shape"] = logprobs_shape(lp)
+        checks["topk_ids"] = bool(tops) and all(_topk_parse(r)[1] is not None for r in tops[:4])
     except Exception as e:      # noqa: BLE001
         checks["logprobs20"] = False
+        checks["topk_ids"] = False
         checks["logprobs20_error"] = f"{type(e).__name__}: {e}"
         checks["logprobs_shape"] = f"request failed ({type(e).__name__})"
     # 2. prompt_logprobs availability (INFORMATIONAL — the bonus pass, not the headline)
     try:
         r2 = _post_json(url, "/v1/completions",
-                        {"model": model, "prompt": PROBE_TEXT, "max_tokens": 1,
-                         "temperature": 0, "prompt_logprobs": 1})
+                        _lp_body({"model": model, "prompt": PROBE_TEXT, "max_tokens": 1,
+                                  "temperature": 0, "prompt_logprobs": 1}, engine))
         checks["prompt_logprobs"] = bool((r2.get("choices") or [{}])[0].get("prompt_logprobs"))
     except Exception:           # noqa: BLE001 — refused (radiance) or unsupported
         checks["prompt_logprobs"] = False
@@ -691,11 +855,11 @@ def selftest(url, model):
     # 4. raw-distribution semantics: identical logprobs at temp 0 vs temp 1 (max_tokens 1)
     try:
         ra = _post_json(url, "/v1/completions",
-                        {"model": model, "prompt": PROBE_TEXT, "max_tokens": 1,
-                         "temperature": 0, "logprobs": TOP_K})
+                        _lp_body({"model": model, "prompt": PROBE_TEXT, "max_tokens": 1,
+                                  "temperature": 0, "logprobs": TOP_K}, engine))
         rb = _post_json(url, "/v1/completions",
-                        {"model": model, "prompt": PROBE_TEXT, "max_tokens": 1,
-                         "temperature": 1.0, "logprobs": TOP_K})
+                        _lp_body({"model": model, "prompt": PROBE_TEXT, "max_tokens": 1,
+                                  "temperature": 1.0, "logprobs": TOP_K}, engine))
         la = (ra.get("choices") or [{}])[0].get("logprobs") or {}
         lb = (rb.get("choices") or [{}])[0].get("logprobs") or {}
         checks["raw_logprobs"] = normalize_logprobs(la)[1] == normalize_logprobs(lb)[1]
@@ -725,12 +889,23 @@ def score(ref_blocks, arm_blocks, label, reference_note):
     # item F (2026-11-11) diagnostics over PAIRED positions — counted only, the KL math is untouched
     ref_lens, arm_lens, p1_num = [], [], 0
     fl_ref_missing, fl_ref_entries, fl_pos, fl_mass, fl_arm_missing, fl_arm_entries = 0, 0, 0, [], 0, 0
+    joins = {"id": 0, "string": 0}
+
+    def _keyed(i):   # one position, joined by id when both sides carry ids (join_keys)
+        (rtok, rtop), (atok, atop) = rb["pos"][i], ab["pos"][i]
+        return join_keys(rtok, rtop, _at(rb.get("ids"), i), _at(rb.get("top_ids"), i),
+                         atok, atop, _at(ab.get("ids"), i), _at(ab.get("top_ids"), i), ph)
     for rb, ab in zip(ref_blocks, arm_blocks):
         if rb.get("error") or ab.get("error"):
             n_err += 1
             continue
-        ref_toks = [t for t, _ in rb["pos"]]
-        arm_toks = [t for t, _ in ab["pos"]]
+        ph = _placeholder_block(rb) or _placeholder_block(ab)
+        # pair on generated ids only when both blocks carry top ids too (files fetched before 2026-11-13 have
+        # llama.cpp `ids` but no `top_ids`: they keep pairing on strings, bit-identical)
+        by_id = all(isinstance(b.get("top_ids"), list) and isinstance(b.get("ids"), list)
+                    and len(b["ids"]) == len(b["pos"]) for b in (rb, ab))
+        ref_toks = rb["ids"] if by_id else [t for t, _ in rb["pos"]]
+        arm_toks = ab["ids"] if by_id else [t for t, _ in ab["pos"]]
         n_paired_pos, div = pair_positions(ref_toks, arm_toks)
         if div is not None:
             div_idx.append(div)
@@ -738,8 +913,8 @@ def score(ref_blocks, arm_blocks, label, reference_note):
         n_dropped += max(0, min(len(ref_toks), len(arm_toks)) - n_paired_pos)
         block_kls = []
         for i in range(n_paired_pos):
-            rtok, rtop = rb["pos"][i]
-            atok, atop = ab["pos"][i]
+            rtok, rtop, atok, atop, join = _keyed(i)
+            joins[join] += 1
             kl, rm, am = kl_position(rtop, atop)
             ref_lens.append(len(rtop))
             arm_lens.append(len(atop))
@@ -753,24 +928,30 @@ def score(ref_blocks, arm_blocks, label, reference_note):
             fl_mass.append(sum(math.exp(r) for _, r in miss))
             fl_arm_missing += sum(1 for t, _ in atop if t not in rmap_keys)
             fl_arm_entries += len(atop)
-            if max(rtop, key=lambda kv: kv[1])[0] == max(atop, key=lambda kv: kv[1])[0]:
+            # top-1: the id path compares the logsumexp-merged tops the KL uses (duplicate ids cannot split an
+            # argmax); the string path keeps the raw rows, so existing string-only data scores exactly as before
+            r1, a1 = (canon_top(rtop), canon_top(atop)) if join == "id" else (rtop, atop)
+            if max(r1, key=lambda kv: kv[1])[0] == max(a1, key=lambda kv: kv[1])[0]:
                 p1_num += 1
             block_kls.append(kl)
             cov_ref.append(rm)
             cov_arm.append(am)
             pooled_kls.append(kl)
             # dNLL: the generated token's logprob on each side (floor if absent, lower bound)
-            rmap = dict(rtop)
-            amap = dict(atop)
-            rfloor = min(lp for _, lp in rtop)
-            afloor = min(lp for _, lp in atop)
+            # (id path: the merged tops, like the KL — fix round 2; string path: the raw rows, as before)
+            rmap = dict(r1)
+            amap = dict(a1)
+            rfloor = min(lp for _, lp in r1)
+            afloor = min(lp for _, lp in a1)
             dnll_terms.append(rmap.get(rtok, rfloor) - amap.get(atok, afloor))
         if block_kls:
             kl_blocks.append(block_kls)
         # top-1 over all generated positions (argmax of each side's top-20)
         for i in range(min(len(ref_toks), len(arm_toks))):
-            rtop_i = dict(rb["pos"][i][1])
-            atop_i = dict(ab["pos"][i][1])
+            _rt, rtop_i, _a, atop_i, j_i = _keyed(i)
+            if j_i == "id":
+                rtop_i, atop_i = canon_top(rtop_i), canon_top(atop_i)
+            rtop_i, atop_i = dict(rtop_i), dict(atop_i)
             rmax = max(rtop_i.items(), key=lambda kv: kv[1])[0]
             amax = max(atop_i.items(), key=lambda kv: kv[1])[0]
             top1_den += 1
@@ -838,6 +1019,7 @@ def score(ref_blocks, arm_blocks, label, reference_note):
                          "vs 1.17.0)", "reference self-run bounds boot noise"],
         "tokenizer_check": tok_check,
         **extras,
+        "join": join_summary(joins), "join_counts": joins,
     }
 
 
@@ -846,7 +1028,13 @@ def score_forced(ref_blocks, arm_blocks, label, ref_label):
     greedy fetch). At every scored position both sides saw the SAME context (prompt + the reference's
     first i tokens), so every arm is scored at the same positions and the means are comparable across
     arms. KL(ref‖arm) per kl_position (lower bound), top-1 agreement, dNLL of the reference token,
-    cluster bootstrap by prompt. An errored arm prompt is excluded and counted (rule 18)."""
+    cluster bootstrap by prompt. An errored arm prompt is excluded and counted (rule 18).
+    Each position joins by token id when the reference and the arm row both carry ids (join_keys; the
+    chosen token is the reference's on both sides), else by canonical string; "join" says which.
+    Fix round 1: an arm row forced on a token other than the reference's at that position (a re-fetched
+    reference) quarantines the prompt (_ref_mismatch): counted in n_prompt_errors, listed, never scored.
+    Known limit: only SCORED positions are checked; a reference change at an unscored position is not seen
+    here (the forced cache's ref_sha256 guards it at fetch time)."""
     if len(ref_blocks) < len(arm_blocks):
         raise ValueError(f"arm has {len(arm_blocks)} prompts, reference only {len(ref_blocks)}")
     order = [(rb.get("id"), ab.get("id")) for rb, ab in zip(ref_blocks, arm_blocks)
@@ -855,15 +1043,23 @@ def score_forced(ref_blocks, arm_blocks, label, ref_label):
         raise ValueError(f"prompt id order mismatch (ref, arm): {order[:3]}")
     kl_blocks, pooled, dnll, n_err, top1 = [], [], [], 0, 0
     arm_lens, ref_missing, ref_entries = [], 0, 0
+    joins, ref_mism = {"id": 0, "string": 0}, []
     for rb, ab in zip(ref_blocks, arm_blocks):
         if rb.get("error") or ab.get("error"):
             n_err += 1
             continue
-        block = []
-        for i, (rtok_arm, atop) in zip(ab["positions"], ab["pos"]):
+        bad = _ref_mismatch(rb, ab)
+        if bad:
+            n_err += 1
+            ref_mism.append(bad)
+            continue
+        block, ph = [], _placeholder_block(rb) or _placeholder_block(ab)
+        for j, (i, (_forced_on, atop)) in enumerate(zip(ab["positions"], ab["pos"])):
             if not 0 <= i < len(rb["pos"]):
                 raise ValueError(f"{ab['id']}: position {i} outside the reference ({len(rb['pos'])} tokens)")
             rtok, rtop = rb["pos"][i]
+            rtok, rtop, _t, atop, join = _forced_keyed(rb, i, rtop, atop, _at(ab.get("top_ids"), j), ph)
+            joins[join] += 1
             kl, _rm, _am = kl_position(rtop, atop)
             block.append(kl)
             pooled.append(kl)
@@ -900,37 +1096,82 @@ def score_forced(ref_blocks, arm_blocks, label, ref_label):
         "ref_missing_frac": round(ref_missing / ref_entries, 6) if ref_entries else None,
         "lower_bound_note": "KL is a lower bound: reference top-20 support, floor for tokens missing "
                             "from the arm top-20, lumped tail bucket, clamped ≥ 0 (sly kv4/kl_compare.py)",
+        "tokenizer_check": tokenizer_check(ref_blocks, arm_blocks),
+        "join": join_summary(joins), "join_counts": joins,
+        "n_ref_token_mismatch": len(ref_mism), "ref_token_mismatches": ref_mism[:10],
     }
+
+
+def _ref_mismatch(rb, ab):
+    """First scored position where the arm row was forced on another token than the reference's (its recorded
+    token string; and its forced id vs the reference id, where both exist) → {"id", "position", "arm", "ref"},
+    else None. Out-of-range positions are left to the caller's ValueError. Unscored positions are not checked."""
+    for j, (i, (t, _top)) in enumerate(zip(ab["positions"], ab["pos"])):
+        if not 0 <= i < len(rb["pos"]):
+            continue
+        rt = rb["pos"][i][0]
+        fid, rid = _at(ab.get("forced_ids"), j), _at(rb.get("ids"), i)
+        if t != rt:
+            return {"id": ab.get("id"), "position": i, "arm": t, "ref": rt}
+        if fid is not None and rid is not None and fid != rid:
+            return {"id": ab.get("id"), "position": i, "arm": fid, "ref": rid}
+    return None
+
+
+def _forced_keyed(rb, i, rtop, atop, aids, placeholder=False):
+    """join_keys for a forced position: the scored token is the reference's own (id rb["ids"][i]) on both sides."""
+    rtok, rid = rb["pos"][i][0], _at(rb.get("ids"), i)
+    return join_keys(rtok, rtop, rid, _at(rb.get("top_ids"), i), rtok, atop, rid, aids, placeholder)
 
 
 def score_forced_diff(ref_blocks, a_blocks, b_blocks, label_a, label_b, ref_label):
     """Paired difference KL(ref‖a) − KL(ref‖b) of two teacher-forced arms, position by position (both arms saw the
     SAME contexts), cluster bootstrap by prompt. Cancels the "this prompt is hard for everyone" variance that two
     separate CIs carry, so it resolves close pairs that overlapping per-arm CIs cannot. A prompt errored in either
-    arm (or the reference) is excluded and counted (rule 18)."""
+    arm (or the reference) is excluded and counted (rule 18), and so is a prompt either arm was forced on other
+    tokens (_ref_mismatch). Fix round 1: both arms must be scored by the same join ("id" or "string", never
+    "mixed") — an id-joined KL minus a string-joined KL is not a difference of the arms, so it is refused."""
     if not (len(ref_blocks) >= len(a_blocks) == len(b_blocks)):
         raise ValueError(f"prompt counts: ref {len(ref_blocks)}, a {len(a_blocks)}, b {len(b_blocks)}")
     blocks, ka, kb, n_err, a_lower, used = [], [], [], 0, 0, 0
+    joins, ref_mism = {"a": {"id": 0, "string": 0}, "b": {"id": 0, "string": 0}}, []
     for rb, ab, bb in zip(ref_blocks, a_blocks, b_blocks):
         if not (rb.get("id") == ab.get("id") == bb.get("id")):
             raise ValueError(f"prompt id order mismatch: {rb.get('id')} / {ab.get('id')} / {bb.get('id')}")
         if rb.get("error") or ab.get("error") or bb.get("error"):
             n_err += 1
             continue
+        bad = [{"arm_label": lab, **m} for lab, m in ((label_a, _ref_mismatch(rb, ab)),
+                                                       (label_b, _ref_mismatch(rb, bb))) if m]
+        if bad:
+            n_err += 1
+            ref_mism += [{"id": m["id"], "arm_label": m["arm_label"], "position": m["position"], "arm": m["arm"],
+                          "ref": m["ref"]} for m in bad]
+            continue
         if list(ab["positions"]) != list(bb["positions"]):
             raise ValueError(f"{ab['id']}: the two arms were forced at different positions")
         d, sa, sb = [], 0.0, 0.0
-        for i, (_ta, atop), (_tb, btop) in zip(ab["positions"], ab["pos"], bb["pos"]):
+        ph_r = _placeholder_block(rb)
+        ph_a, ph_b = ph_r or _placeholder_block(ab), ph_r or _placeholder_block(bb)
+        for j, (i, (_ta, atop), (_tb, btop)) in enumerate(zip(ab["positions"], ab["pos"], bb["pos"])):
             if not 0 <= i < len(rb["pos"]):
                 raise ValueError(f"{ab['id']}: position {i} outside the reference ({len(rb['pos'])} tokens)")
             rtop = rb["pos"][i][1]
-            x, y = kl_position(rtop, atop)[0], kl_position(rtop, btop)[0]
+            _r, rta, _t, atop, ja = _forced_keyed(rb, i, rtop, atop, _at(ab.get("top_ids"), j), ph_a)
+            _r, rtb, _t, btop, jb = _forced_keyed(rb, i, rtop, btop, _at(bb.get("top_ids"), j), ph_b)
+            joins["a"][ja] += 1
+            joins["b"][jb] += 1
+            x, y = kl_position(rta, atop)[0], kl_position(rtb, btop)[0]
             d.append(x - y); ka.append(x); kb.append(y); sa += x; sb += y
         if d:
             blocks.append(d); used += 1
             a_lower += sa < sb
     if not blocks:
         raise ValueError("no scored positions (all prompts failed or empty)")
+    ja, jb = join_summary(joins["a"]), join_summary(joins["b"])
+    if ja != jb or ja == "mixed":
+        raise ValueError(f"join mismatch, not comparable: {label_a} scored by {ja} {joins['a']}, {label_b} by "
+                         f"{jb} {joins['b']} (re-fetch the string-joined arm against a reference with top_ids)")
     mean, lo, hi = cluster_bootstrap_ci(blocks)
     verdict = f"{label_a} lower" if hi < 0 else f"{label_b} lower" if lo > 0 else "not resolved"
     return {
@@ -940,24 +1181,45 @@ def score_forced_diff(ref_blocks, a_blocks, b_blocks, label_a, label_b, ref_labe
         "diff_nats_per_tok": round(mean, 6), "ci95_nats": [round(lo, 6), round(hi, 6)],
         "ci_method": "cluster bootstrap of the per-position difference (block=prompt, B=2000, percentile 95%)",
         "verdict": verdict, "frac_prompts_a_lower": round(a_lower / used, 5),
+        "join_a": ja, "join_b": jb,
+        "n_ref_token_mismatch": len(ref_mism), "ref_token_mismatches": ref_mism[:10],
     }
 
 
 def tokenizer_check(ref_blocks, arm_blocks):
     """Tokenizer drift guard: the same prompt text must tokenize to the same length on both sides
     (usage.prompt_tokens per prompt). A drift breaks the string-keyed top-k support silently, so
-    it is reported beside the KL, never folded into it. verdict: ok | MISMATCH | unavailable."""
-    mism, n = [], 0
+    it is reported beside the KL, never folded into it. verdict: ok | MISMATCH | unavailable.
+    2026-11-13: where both rows carry "prompt_ids" (/tokenize ids), they must be equal id for id
+    (a same-length, different-id tokenization would pass the length check); "ids_equal" marks it."""
+    mism, n, n_ids, n_ids_mism = [], 0, 0, 0
     for rb, ab in zip(ref_blocks, arm_blocks):
         r, a = rb.get("prompt_tokens"), ab.get("prompt_tokens")
+        ri, ai = rb.get("prompt_ids"), ab.get("prompt_ids")
+        ids_eq = (ri == ai) if isinstance(ri, list) and isinstance(ai, list) else None
+        if ids_eq is not None:
+            n_ids += 1
+            n_ids_mism += not ids_eq
         if r is None or a is None:
+            if ids_eq is False:
+                mism.append({"id": rb.get("id"), "ref": r, "arm": a, "ids_equal": False})
             continue
         n += 1
-        if r != a:
-            mism.append({"id": rb.get("id"), "ref": r, "arm": a})
+        if r != a or ids_eq is False:
+            m = {"id": rb.get("id"), "ref": r, "arm": a}
+            if ids_eq is not None:
+                m["ids_equal"] = ids_eq
+            mism.append(m)
     return {"n_compared": n, "n_mismatch": len(mism), "mismatches": mism[:10],
-            "verdict": "unavailable" if n == 0 else ("MISMATCH" if mism else "ok"),
-            "note": "per-prompt usage.prompt_tokens, ref vs arm (rows without it are skipped)"}
+            "verdict": "unavailable" if n == 0 and n_ids == 0 else ("MISMATCH" if mism else "ok"),
+            "note": "per-prompt usage.prompt_tokens, ref vs arm (rows without it are skipped); prompt ids "
+                    "compared id for id where both rows carry them",
+            "n_ids_compared": n_ids, "n_ids_mismatch": n_ids_mism,
+            # fix round 1: `verdict` stays the length check (unchanged for existing data); the id check is reported
+            # separately and never reads "ok" when no ids were compared
+            "ids_verdict": ("MISMATCH" if n_ids_mism else "ok") if n_ids else (
+                "not checked (arm has no prompt_ids)" if any(isinstance(b.get("prompt_ids"), list) for b in ref_blocks)
+                else "not checked (reference has no prompt_ids)")}
 
 
 def load_pair_results(d):
@@ -1031,6 +1293,9 @@ def main():
     sp.add_argument("--url", required=True)
     sp.add_argument("--model", required=True)
     sp.add_argument("--out", help="write the checks JSON here (default: stdout)")
+    ENGINE_HELP = ("engine family; 'auto' reads /v1/models owned_by. Only vllm changes the requests "
+                   "(return_tokens_as_token_ids, so its top-k is keyed by id)")
+    sp.add_argument("--engine", default="auto", choices=("auto", "vllm", "llamacpp", "radiance"), help=ENGINE_HELP)
 
     fp = sub.add_parser("fetch", help="greedy capture per calibration prompt")
     fp.add_argument("--url", required=True)
@@ -1044,6 +1309,9 @@ def main():
     fp.add_argument("--image", default=None, help="engine image, recorded in the cache key (<out>.key.json)")
     fp.add_argument("--window-out", default=None,
                     help="append one JSON line per fetch: /metrics deltas + counts (item H)")
+    fp.add_argument("--engine", default="auto", choices=("auto", "vllm", "llamacpp", "radiance"), help=ENGINE_HELP)
+    fp.add_argument("--prompt-ids", action="store_true",
+                    help="also store this server's /tokenize prompt ids (the forced reference sends them to every arm)")
 
     fo = sub.add_parser("forced", help="teacher-forced capture on a reference's greedy continuation")
     fo.add_argument("--url", required=True)
@@ -1055,6 +1323,7 @@ def main():
     fo.add_argument("--repo-root", default=os.getcwd())
     fo.add_argument("--out", required=True)
     fo.add_argument("--image", default=None)
+    fo.add_argument("--engine", default="auto", choices=("auto", "vllm", "llamacpp", "radiance"), help=ENGINE_HELP)
 
     cs = sub.add_parser("cache-status", help="exit 0 complete+key match, 1 incomplete, 2 key mismatch/missing, 3 absent")
     ck = sub.add_parser("cache-key", help="print the expected cache key JSON")
@@ -1067,6 +1336,7 @@ def main():
         x.add_argument("--forced-ref", default=None, help="a forced fetch's reference file (forced key)")
         x.add_argument("--positions", type=int, default=None)
     cs.add_argument("--out", required=True)
+    cs.add_argument("--prompt-ids", action="store_true", help="the cached rows must carry prompt_ids (exit 2 if not)")
 
     sc = sub.add_parser("score", help="paired greedy KL: reference vs arm")
     sc.add_argument("--ref", required=True)
@@ -1097,8 +1367,16 @@ def main():
     mx.add_argument("--out", required=True)
 
     a = ap.parse_args()
+    try:
+        eng = (detect_engine(a.url) if a.engine == "auto" else a.engine) if hasattr(a, "engine") else None
+    except RuntimeError as e:   # fix round 1: --engine auto never degrades silently to "no engine"
+        print(f"REFUSED: {e}", file=sys.stderr)
+        sys.exit(2)
+    if getattr(a, "engine", None) == "auto" and eng is None:   # fix round 2: a card without owned_by, said aloud
+        print(f"WARNING {a.url}: /v1/models has no owned_by — engine undetected: string join, no vLLM id flag "
+              "(pin --engine to change that)", file=sys.stderr)
     if a.cmd == "selftest":
-        ok, checks = selftest(a.url, a.model)
+        ok, checks = selftest(a.url, a.model, engine=eng)
         out = json.dumps(checks, indent=2) + "\n"
         if a.out:
             open(a.out, "w").write(out)
@@ -1114,7 +1392,7 @@ def main():
     elif a.cmd == "cache-status":
         mt = 1 if a.forced_ref else a.max_tokens   # a forced fetch asks max_tokens 1
         code, reason = cache_status(a.out, a.calibration, a.limit, mt, a.model, a.image,
-                                    a.forced_ref, a.positions)
+                                    a.forced_ref, a.positions, a.prompt_ids)
         print(f"{os.path.basename(a.out)}: {reason}")
         sys.exit(code)
     elif a.cmd == "forced":
@@ -1138,6 +1416,11 @@ def main():
                 for r in _read_rows_tolerant(a.out):
                     if r.get("id") in want and not r.get("error") and r["id"] not in reuse:
                         reuse[r["id"]] = r
+        miss = missing_prompt_ids(reuse.values()) if any(isinstance(r.get("prompt_ids"), list)
+                                                         for r in refs.values()) else []
+        if miss:   # fix round 1: never mix pre-id rows into an id-checked forced fetch, never rename the file
+            print("REFUSED: " + IDS_REFUSAL.format(n=len(miss), ids=miss[:3]), file=sys.stderr)
+            sys.exit(2)
         _write_atomic(key_path(a.out), json.dumps(key) + "\n")
         _write_atomic(a.out, "".join(json.dumps(reuse[p]) + "\n" for p, _ in prompts if p in reuse))
 
@@ -1146,33 +1429,44 @@ def main():
                 f.write(json.dumps(blk) + "\n")
         t0 = time.time()
         n_new = sum(1 for p, _ in prompts if p not in reuse)
-        blocks = fetch_forced(a.url, a.model, prompts, refs, k=a.positions, reuse=reuse, on_block=_append_f)
+        blocks = fetch_forced(a.url, a.model, prompts, refs, k=a.positions, reuse=reuse, on_block=_append_f,
+                              engine=eng)
         _write_atomic(a.out, "".join(json.dumps(b) + "\n" for b in blocks))
         errs = [b["id"] for b in blocks if b.get("error")]
         npos = sum(len(b.get("positions") or []) for b in blocks)
         print(f"forced {len(blocks)} prompts, {npos} positions ({n_new} requested, {len(reuse)} reused; "
-              f"{len(errs)} errored: {errs[:5]}) in {time.time() - t0:.0f} s -> {a.out}")
+              f"{len(errs)} errored: {errs[:5]}) in {time.time() - t0:.0f} s, engine {eng} -> {a.out}")
         if errs:
             first = next(b for b in blocks if b.get("error"))
             print(f"  first error ({first['id']}): {first['error']}")
         if len(errs) == len(blocks):
             sys.exit(1)
     elif a.cmd == "score-forced-diff":
-        res = score_forced_diff(_read_jsonl(a.ref), _read_jsonl(a.arm_a), _read_jsonl(a.arm_b),
-                                a.label_a, a.label_b, a.ref_label)
+        try:
+            res = score_forced_diff(_read_jsonl(a.ref), _read_jsonl(a.arm_a), _read_jsonl(a.arm_b),
+                                    a.label_a, a.label_b, a.ref_label)
+        except ValueError as e:     # join mismatch / order / count: refused, no output file
+            print(f"REFUSED {a.label_a} − {a.label_b}: {e}", file=sys.stderr)
+            sys.exit(2)
         with open(a.out, "w") as f:
             json.dump(res, f, indent=2)
             f.write("\n")
         print(f"{a.label_a} − {a.label_b} (forced, vs {a.ref_label}): {res['diff_nats_per_tok']} "
-              f"[{res['ci95_nats'][0]}, {res['ci95_nats'][1]}] -> {res['verdict']} -> {a.out}")
+              f"[{res['ci95_nats'][0]}, {res['ci95_nats'][1]}] -> {res['verdict']} "
+              f"(join {res['join_a']}/{res['join_b']}) -> {a.out}")
     elif a.cmd == "score-forced":
-        res = score_forced(_read_jsonl(a.ref), _read_jsonl(a.arm), a.label, a.ref_label)
+        try:
+            res = score_forced(_read_jsonl(a.ref), _read_jsonl(a.arm), a.label, a.ref_label)
+        except ValueError as e:     # nothing scorable (all quarantined) / order / count: refused, no output file
+            print(f"REFUSED {a.label} vs {a.ref_label}: {e}", file=sys.stderr)
+            sys.exit(2)
         with open(a.out, "w") as f:
             json.dump(res, f, indent=2)
             f.write("\n")
         print(f"{a.label} vs {a.ref_label} (forced): KL {res['kl_nats_per_tok']} "
               f"[{res['ci95_nats'][0]}, {res['ci95_nats'][1]}] median {res['kl_per_position']['median']} "
-              f"top1 {res['top1_agreement']} n={res['n_positions']} errors={res['n_prompt_errors']} -> {a.out}")
+              f"top1 {res['top1_agreement']} n={res['n_positions']} errors={res['n_prompt_errors']} "
+              f"join {res['join']} -> {a.out}")
     elif a.cmd == "fetch":
         prompts = load_prompts(a.calibration, a.repo_root)
         if a.limit is not None:
@@ -1195,6 +1489,10 @@ def main():
                 for r in _read_rows_tolerant(a.out):
                     if r.get("id") in want and not r.get("error") and r["id"] not in reuse:
                         reuse[r["id"]] = r
+        miss = missing_prompt_ids(reuse.values()) if a.prompt_ids else []
+        if miss:   # fix round 1: --prompt-ids on a pre-id cache would silently add nothing; the file is left as is
+            print("REFUSED: " + IDS_REFUSAL.format(n=len(miss), ids=miss[:3]), file=sys.stderr)
+            sys.exit(2)
         _write_atomic(key_path(a.out), json.dumps(key) + "\n")
         # persistence: the reused rows first, then each new block appended as it lands (a kill keeps
         # progress); the final rewrite below leaves exactly one row per prompt id, in calibration order
@@ -1207,14 +1505,14 @@ def main():
         kv_samples = []
         n_new = sum(1 for p, _ in prompts if p not in reuse)
         blocks = fetch(a.url, a.model, prompts, max_tokens=a.max_tokens, reuse=reuse, on_block=_append,
-                       kv_samples=kv_samples if w0 is not None else None)
+                       kv_samples=kv_samples if w0 is not None else None, engine=eng, prompt_ids=a.prompt_ids)
         w1 = metrics_snapshot(a.url) if w0 is not None else None
         _write_atomic(a.out, "".join(json.dumps(b) + "\n" for b in blocks))
         errs = [b["id"] for b in blocks if b.get("error")]
         print(f"fetched {len(blocks)} prompts ({n_new} requested, {len(reuse)} reused; "
-              f"{len(errs)} errored: {errs}) in {time.time() - t0:.0f} s -> {a.out}")
+              f"{len(errs)} errored: {errs}) in {time.time() - t0:.0f} s, engine {eng} -> {a.out}")
         if a.window_out:
-            win = {"kind": "kld_fetch_window", "out": a.out, "model": a.model, "image": a.image,
+            win = {"kind": "kld_fetch_window", "out": a.out, "model": a.model, "image": a.image, "engine": eng,
                    "url": a.url, "n": key["n"], "n_requested": n_new, "n_reused": len(reuse),
                    "n_errors": len(errs), "t_start": round(t0, 3), "t_end": round(time.time(), 3),
                    **window_summary(w0, w1, kv_samples)}
@@ -1239,7 +1537,7 @@ def main():
               f"[{res['ci95_nats'][0]}, {res['ci95_nats'][1]}] "
               f"(pooled {res['pooled_ci_nats'][0]}–{res['pooled_ci_nats'][1]}) "
               f"dNLL {res['dnll_nats_per_tok']} top1 {res['top1_agreement']} "
-              f"n={res['n_positions']} tokenizer {res['tokenizer_check']['verdict']} -> {a.out}")
+              f"n={res['n_positions']} tokenizer {res['tokenizer_check']['verdict']} join {res['join']} -> {a.out}")
     elif a.cmd == "matrix":
         rows = load_pair_results(a.dir)
         if not rows:

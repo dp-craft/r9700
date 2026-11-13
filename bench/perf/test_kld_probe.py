@@ -451,6 +451,13 @@ class _CountingServer:
 
         class H(http.server.BaseHTTPRequestHandler):
             def do_GET(self):
+                if self.path == "/v1/models":
+                    body = b'{"object": "list", "data": [{"id": "m", "owned_by": "llamacpp"}]}'
+                    self.send_response(200)
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+                    return
                 if self.path == "/metrics" and outer.metrics:
                     body = outer.metrics[min(outer.metrics_gets, len(outer.metrics) - 1)].encode()
                     outer.metrics_gets += 1
@@ -986,7 +993,8 @@ class _ForcedServer:
     identified by its forced prefix length. Records every request body. Knobs: usage_delta (a server
     that miscounts the prompt — e.g. one that stringified the list), fail_at (prompt length -> 500)."""
 
-    def __init__(self, prompt_ids=(1, 2, 3), usage_delta=0, fail_at=None, llama_shape=False):
+    def __init__(self, prompt_ids=(1, 2, 3), usage_delta=0, fail_at=None, llama_shape=False, owned_by=None,
+                 radiance_shape=False, models="ok"):
         import http.server
         import json as _json
         import threading
@@ -994,6 +1002,21 @@ class _ForcedServer:
         self.bodies = []
 
         class H(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                # /v1/models owned_by: how the probe tells vLLM from the other engines (detect_engine);
+                # models: "ok" | "500" (a server still loading) | "garbage" (not JSON)
+                if self.path == "/v1/models" and models != "500":
+                    card = {"id": "m", **({"owned_by": owned_by} if owned_by else {})}
+                    raw = (b"<html>not json" if models == "garbage"
+                           else _json.dumps({"object": "list", "data": [card]}).encode())
+                    self.send_response(200)
+                    self.send_header("Content-Length", str(len(raw)))
+                    self.end_headers()
+                    self.wfile.write(raw)
+                    return
+                self.send_response(500 if self.path == "/v1/models" else 404)
+                self.end_headers()
+
             def do_POST(self):
                 body = _json.loads(self.rfile.read(int(self.headers["Content-Length"])))
                 outer.bodies.append((self.path, body))
@@ -1001,16 +1024,26 @@ class _ForcedServer:
                     data = {"tokens": list(prompt_ids)}
                 else:
                     p = body.get("prompt")
-                    n = len(p) if isinstance(p, list) else 999
+                    n = len(p) if isinstance(p, list) else len(prompt_ids)   # a text prompt = the tokenized ids
                     if fail_at is not None and n == fail_at:
                         self.send_response(500)
                         self.end_headers()
                         return
                     row = {f"t{n}": -0.1, "z": -2.5}
-                    if llama_shape:
+                    if body.get("return_tokens_as_token_ids"):
+                        # vLLM: every token string becomes "token_id:N" (z = id 9999)
+                        lpo = {"tokens": [f"token_id:{n}"],
+                               "top_logprobs": [{f"token_id:{n}": -0.1, "token_id:9999": -2.5}]}
+                    elif llama_shape:
                         lpo = {"content": [{"id": 7, "token": f"t{n}", "logprob": -0.1,
                                             "top_logprobs": [{"id": 7, "token": t, "logprob": v}
                                                              for t, v in row.items()]}]}
+                    elif radiance_shape:
+                        # radiance: the legacy dict AND the content array (ids + bytes) side by side
+                        lpo = {"tokens": [f"t{n}"], "top_logprobs": [row],
+                               "content": [{"id": n, "token": f"t{n}", "logprob": -0.1, "bytes": [],
+                                            "top_logprobs": [{"id": n, "token": f"t{n}", "logprob": -0.1, "bytes": []},
+                                                             {"id": 9999, "token": "z", "logprob": -2.5, "bytes": []}]}]}
                     else:
                         lpo = {"tokens": [f"t{n}"], "top_logprobs": [row]}
                     data = {"choices": [{"text": f"t{n}", "finish_reason": "length", "logprobs": lpo}],
@@ -1315,6 +1348,766 @@ class TestScoreForcedDiff(unittest.TestCase):
         _run_main(["score-forced-diff", "--ref", files["ref"], "--arm-a", files["a"], "--arm-b", files["b"],
                    "--label-a", "a", "--label-b", "b", "--ref-label", "q8", "--out", out])
         self.assertEqual(json.load(open(out))["verdict"], "b lower")
+
+
+# ------------------------------------------------------------------ token-id keying (2026-11-13, §10 item 1)
+class TestTokenIdParsing(unittest.TestCase):
+    """Each top-k entry keeps its token id when the engine sends one: llama.cpp/radiance `id`, vLLM "token_id:N"
+    (return_tokens_as_token_ids). A row's ids are kept only when EVERY kept entry has one."""
+
+    def test_tok_id_vllm_placeholder(self):
+        self.assertEqual(K._tok_id("token_id:123"), 123)
+        self.assertEqual(K._tok_id("token_id:0"), 0)
+
+    def test_tok_id_malformed_is_none(self):
+        for s in ("token_id:", "token_id:x", "token_id:1.5", "token_id:-3", "token_id: 4", "token_id:5 ",
+                  "xtoken_id:5", "token_id", "abc", "", None, 5, "token_id:007", "token_id:00", "token_id:٣"):
+            self.assertIsNone(K._tok_id(s), s)
+
+    def test_llamacpp_entries_keep_ids(self):
+        top, ids = K._topk_parse([{"id": 5, "token": "a", "logprob": lp(0.6), "bytes": [97]},
+                                  {"id": 6, "token": "", "logprob": lp(0.3), "bytes": []}])
+        self.assertEqual(top, [("a", lp(0.6)), ("", lp(0.3))])
+        self.assertEqual(ids, [5, 6])
+
+    def test_vllm_dict_map_ids(self):
+        top, ids = K._topk_parse({"token_id:5": lp(0.6), "token_id:6": lp(0.3)})
+        self.assertEqual(ids, [5, 6])
+        self.assertEqual([t for t, _ in top], ["token_id:5", "token_id:6"])
+
+    def test_one_entry_without_id_drops_the_row_ids(self):
+        _top, ids = K._topk_parse([{"id": 5, "token": "a", "logprob": -0.1}, {"token": "b", "logprob": -2.0}])
+        self.assertIsNone(ids)
+
+    def test_malformed_placeholder_drops_the_row_ids(self):
+        top, ids = K._topk_parse({"token_id:5": -0.1, "token_id:x": -2.0})
+        self.assertIsNone(ids)
+        self.assertEqual(len(top), 2)
+
+    def test_bool_or_negative_id_is_not_an_id(self):
+        self.assertIsNone(K._topk_parse([{"id": True, "token": "a", "logprob": -0.1}])[1])
+        self.assertIsNone(K._topk_parse([{"id": -1, "token": "a", "logprob": -0.1}])[1])
+
+    def test_legacy_rows_have_no_ids(self):
+        self.assertIsNone(K._topk_parse({"a": -0.1, "b": -2.0})[1])
+        self.assertIsNone(K._topk_parse([_entry("a", 0.5)])[1])
+        self.assertEqual(K._topk_parse(None), ([], None))
+
+    def test_ids_stay_aligned_when_entries_are_skipped(self):
+        top, ids = K._topk_parse([{"id": 1, "token": "a", "logprob": float("nan")},
+                                  {"id": 2, "token": "b", "logprob": -0.1}])
+        self.assertEqual((top, ids), ([("b", -0.1)], [2]))
+        top, ids = K._topk_parse([{"id": i, "token": str(i), "logprob": -0.1} for i in range(30)])
+        self.assertEqual(ids, list(range(K.TOP_K)))
+
+    def test_topk_entries_signature_unchanged(self):
+        top, mass = K._topk_entries([{"id": 5, "token": "a", "logprob": lp(0.5)}])
+        self.assertEqual(top, [("a", lp(0.5))])
+        self.assertAlmostEqual(mass, 0.5, delta=1e-12)
+
+
+def _rad_lp():
+    """radiance /v1/completions: the legacy dict (collapsed: two '' tokens -> one key) AND the content array."""
+    return {"tokens": ["a"], "top_logprobs": [{"a": lp(0.6), "": lp(0.2)}],
+            "content": [{"id": 5, "token": "a", "logprob": lp(0.6), "bytes": [97],
+                         "top_logprobs": [{"id": 5, "token": "a", "logprob": lp(0.6), "bytes": [97]},
+                                          {"id": 6, "token": "", "logprob": lp(0.2), "bytes": [226]},
+                                          {"id": 7, "token": "", "logprob": lp(0.1), "bytes": []}]}]}
+
+
+class TestNormalizePrefersContent(unittest.TestCase):
+    def test_radiance_both_shapes_prefers_content(self):
+        toks, tops = K.normalize_logprobs(_rad_lp())
+        self.assertEqual(toks, ["a"])
+        top, ids = K._topk_parse(tops[0])
+        self.assertEqual(ids, [5, 6, 7])            # the legacy dict had only 2 keys (server-side collision)
+        self.assertEqual(len(top), 3)
+        self.assertEqual(K._content_ids(_rad_lp()), [5])
+        self.assertIn("content=list[1]", K.logprobs_shape(_rad_lp()))
+
+    def test_empty_content_falls_back_to_legacy(self):
+        lpo = {"tokens": ["a"], "top_logprobs": [{"a": -0.1}], "content": []}
+        self.assertEqual(K.normalize_logprobs(lpo), (["a"], [{"a": -0.1}]))
+        self.assertIsNone(K._content_ids(lpo))
+        self.assertEqual(K.logprobs_shape(lpo), "tokens=1, top_logprobs=list[1] row=dict-map[1]")
+
+    def test_empty_content_alone(self):
+        self.assertEqual(K.normalize_logprobs({"content": []}), ([], []))
+        self.assertIsNone(K._content_ids({"content": []}))
+
+    def test_legacy_only_unchanged(self):
+        lpo = {"tokens": ["a", "b"], "top_logprobs": [{"a": -0.1}, {"b": -0.2}]}
+        self.assertEqual(K.normalize_logprobs(lpo), (["a", "b"], [{"a": -0.1}, {"b": -0.2}]))
+        self.assertIsNone(K._content_ids(lpo))
+
+    def test_vllm_placeholder_tokens_give_generated_ids(self):
+        lpo = {"tokens": ["token_id:5", "token_id:9"], "top_logprobs": [{"token_id:5": -0.1}, {"token_id:9": -0.1}]}
+        self.assertEqual(K._content_ids(lpo), [5, 9])
+        self.assertIsNone(K._content_ids({"tokens": ["token_id:5", "token_id:x"], "top_logprobs": [{}, {}]}))
+
+
+class TestEngineScopedRequests(unittest.TestCase):
+    """vLLM gets return_tokens_as_token_ids; llama.cpp and radiance requests stay byte-for-byte as before."""
+
+    def test_detect_engine(self):
+        for owned, want in (("vllm", "vllm"), ("llamacpp", "llamacpp"), (None, None)):
+            srv = _ForcedServer(owned_by=owned)
+            try:
+                self.assertEqual(K.detect_engine(srv.url), want)
+            finally:
+                srv.close()
+
+    def test_forced_flag_only_for_vllm(self):
+        for engine, flagged in (("vllm", True), ("llamacpp", False), ("radiance", False), (None, False)):
+            srv = _ForcedServer()
+            try:
+                blk = K.fetch_forced(srv.url, "m", [("p1", "hello")], {"p1": _ref_block()}, engine=engine)[0]
+            finally:
+                srv.close()
+            self.assertIsNone(blk["error"], engine)
+            for b in srv.completions():
+                self.assertEqual("return_tokens_as_token_ids" in b, flagged, engine)
+                if flagged:
+                    self.assertIs(b["return_tokens_as_token_ids"], True)
+            self.assertTrue(all("return_tokens_as_token_ids" not in b for p, b in srv.bodies if p == "/tokenize"))
+
+    def test_greedy_fetch_and_selftest_flag_for_vllm(self):
+        srv = _ForcedServer()
+        try:
+            blk = K.fetch(srv.url, "m", [("p1", "hello")], max_tokens=1, engine="vllm")[0]
+            ok, checks = K.selftest(srv.url, "m", engine="vllm")
+            bodies = srv.completions()
+        finally:
+            srv.close()
+        self.assertTrue(bodies and all(b.get("return_tokens_as_token_ids") is True for b in bodies))
+        self.assertIsNone(blk["error"])
+        self.assertEqual(blk["ids"], [3])                  # "token_id:3" -> 3
+        self.assertEqual(blk["top_ids"], [[3, 9999]])
+        self.assertTrue(ok)
+        self.assertEqual(checks["engine"], "vllm")
+        self.assertTrue(checks["topk_ids"])
+
+    def test_selftest_without_engine_unchanged_requests(self):
+        srv = _ForcedServer()
+        try:
+            _ok, checks = K.selftest(srv.url, "m")
+            bodies = srv.completions()
+        finally:
+            srv.close()
+        self.assertTrue(all("return_tokens_as_token_ids" not in b for b in bodies))
+        self.assertIsNone(checks["engine"])
+        self.assertFalse(checks["topk_ids"])
+
+    def test_forced_rows_store_ids_per_engine_shape(self):
+        for kw, engine, want in (({"llama_shape": True}, None, [7, 7]), ({"radiance_shape": True}, None, None),
+                                 ({}, "vllm", None), ({}, None, "absent")):
+            srv = _ForcedServer(**kw)
+            try:
+                blk = K.fetch_forced(srv.url, "m", [("p1", "hello")], {"p1": _ref_block()}, engine=engine)[0]
+            finally:
+                srv.close()
+            self.assertIsNone(blk["error"], kw)
+            if want == "absent":
+                self.assertNotIn("top_ids", blk)           # a legacy-shape engine: the row is as before
+            elif want is None:                              # radiance / vLLM: the ids follow the prefix length
+                self.assertEqual(blk["top_ids"], [[n, 9999] for n in (3, 4, 5, 6)], kw)
+            else:
+                self.assertEqual(blk["top_ids"], [want] * 4)
+
+    def test_forced_cli_auto_detects_vllm(self):
+        d = _scratch("forced-engine-cli")
+        cal, ref = os.path.join(d, "cal.jsonl"), os.path.join(d, "kld-q8.jsonl")
+        src = os.path.join(d, "p.txt")
+        open(src, "w").write("hello world")
+        with open(cal, "w") as f:
+            f.write(json.dumps({"id": "p1", "src": src, "char_cut": 5}) + "\n")
+        with open(ref, "w") as f:
+            f.write(json.dumps(_ref_block("p1")) + "\n")
+        for owned, flagged in (("vllm", True), ("llamacpp", False), (None, False)):
+            srv = _ForcedServer(owned_by=owned)
+            out = os.path.join(d, f"kld-{owned}.jsonl")
+            try:
+                self.assertEqual(_run_main(["forced", "--url", srv.url, "--model", "m", "--calibration", cal,
+                                            "--ref", ref, "--out", out]), 0)
+                bodies = srv.completions()
+            finally:
+                srv.close()
+            self.assertTrue(bodies)
+            self.assertTrue(all(("return_tokens_as_token_ids" in b) == flagged for b in bodies), owned)
+        srv = _ForcedServer(owned_by="llamacpp")     # an explicit --engine wins over the detection
+        try:
+            _run_main(["forced", "--url", srv.url, "--model", "m", "--calibration", cal, "--ref", ref,
+                       "--out", os.path.join(d, "kld-pin.jsonl"), "--engine", "vllm"])
+            self.assertTrue(all(b.get("return_tokens_as_token_ids") for b in srv.completions()))
+        finally:
+            srv.close()
+
+
+def _fref(top, ids=None, chosen=("", 2), pid="p1"):
+    """A one-position forced reference block; ids = the row's top ids (None = an old, string-only row)."""
+    b = {"id": pid, "toks": [chosen[0]], "ids": [chosen[1]], "prompt_tokens": 3, "error": None,
+         "pos": [(chosen[0], top)]}
+    if ids is not None:
+        b["top_ids"] = [ids]
+    return b
+
+
+def _farm(tops, ids=None, pid="p1", tok=""):
+    b = _forced_block(pid, [(tok, t) for t in tops])
+    if ids is not None:
+        b["top_ids"] = ids
+    return b
+
+
+class TestIdJoin(unittest.TestCase):
+    """Scoring joins by id when BOTH sides carry ids for every entry of the position; otherwise the string path
+    runs exactly as before. The id path reuses kl_position: ints pass canon_tok untouched, duplicate ids merge by
+    logsumexp in canon_top, and the tail bucket is the same code."""
+
+    # two distinct tokens that both render '' (control specials, partial UTF-8): the string bucket merges them
+    REF = [("", lp(0.5)), ("", lp(0.3)), ("a", lp(0.1))]
+    ARM = [("", lp(0.3)), ("", lp(0.5)), ("a", lp(0.1))]      # ids 1 and 2 swapped their mass
+
+    def test_id_join_sees_what_the_string_bucket_hides(self):
+        ref = [_fref(self.REF, [1, 2, 3])]
+        r = K.score_forced(ref, [_farm([self.ARM], [[1, 2, 3]])], "x", "q8")
+        want = 0.5 * math.log(0.5 / 0.3) + 0.3 * math.log(0.3 / 0.5)      # tail: 0.1·ln(0.1/0.1) = 0
+        self.assertAlmostEqual(r["kl_nats_per_tok"], round(want, 6), places=6)
+        self.assertAlmostEqual(r["dnll_nats_per_tok"], round(math.log(0.3 / 0.5), 6), places=6)   # chosen id 2
+        self.assertEqual(r["top1_agreement"], 0.0)
+        self.assertEqual((r["join"], r["join_counts"]), ("id", {"id": 1, "string": 0}))
+        s = K.score_forced([_fref(self.REF)], [_farm([self.ARM])], "x", "q8")       # same rows, no ids
+        self.assertEqual((s["kl_nats_per_tok"], s["join"]), (0.0, "string"))
+
+    def test_vllm_placeholder_arm_joins_a_llamacpp_reference(self):
+        arm = [("token_id:1", lp(0.3)), ("token_id:2", lp(0.5)), ("token_id:3", lp(0.1))]
+        r = K.score_forced([_fref(self.REF, [1, 2, 3])], [_farm([arm], [[1, 2, 3]], tok="")], "x", "q8")
+        self.assertAlmostEqual(r["kl_nats_per_tok"], round(0.2 * math.log(5 / 3), 6), places=6)
+        self.assertEqual(r["join"], "id")
+
+    def test_mixed_one_side_lacks_ids_is_the_string_path(self):
+        base = K.score_forced([_fref(self.REF)], [_farm([self.ARM])], "x", "q8")
+        for ref_ids, arm_ids in (([1, 2, 3], None), (None, [[1, 2, 3]]), ([1, 2, None], [[1, 2, 3]])):
+            r = K.score_forced([_fref(self.REF, ref_ids)], [_farm([self.ARM], arm_ids)], "x", "q8")
+            self.assertEqual(r["join"], "string", (ref_ids, arm_ids))
+            self.assertEqual({k: r[k] for k in base}, base)
+
+    def test_mixed_rows_within_an_arm(self):
+        ref = _fref(self.REF, [1, 2, 3])
+        ref["toks"], ref["ids"] = ["", ""], [2, 2]
+        ref["pos"], ref["top_ids"] = ref["pos"] * 2, ref["top_ids"] * 2
+        r = K.score_forced([ref], [_farm([self.ARM, self.ARM], [[1, 2, 3], None])], "x", "q8")
+        self.assertEqual((r["join"], r["join_counts"]), ("mixed", {"id": 1, "string": 1}))
+
+    def test_duplicate_ids_merge_by_logsumexp(self):
+        ref = [("x", lp(0.4)), ("x", lp(0.2)), ("y", lp(0.3))]
+        arm = [("x", lp(0.3)), ("y", lp(0.6))]
+        r = K.score_forced([_fref(ref, [5, 5, 6], chosen=("x", 5))], [_farm([arm], [[5, 6]], tok="x")], "x", "q8")
+        # merged ref {5: 0.6, 6: 0.3} vs arm {5: 0.3, 6: 0.6}; unmerged entries would clamp to 0
+        self.assertAlmostEqual(r["kl_nats_per_tok"], round(0.3 * math.log(2), 6), places=6)
+        self.assertEqual(r["join"], "id")
+
+    def test_tail_bucket_math_identical_on_both_paths(self):
+        ref = [("a", lp(0.5)), ("b", lp(0.2))]
+        arm = [("a", lp(0.4)), ("c", lp(0.3))]
+        s = K.score_forced([_fref(ref, chosen=("a", 1))], [_farm([arm], tok="a")], "x", "q8")
+        i = K.score_forced([_fref(ref, [1, 2], chosen=("a", 1))], [_farm([arm], [[1, 3]], tok="a")], "x", "q8")
+        self.assertEqual(i["join"], "id")
+        for k in ("kl_nats_per_tok", "kl_per_position", "dnll_nats_per_tok", "top1_agreement", "ref_missing_frac"):
+            self.assertEqual(i[k], s[k], k)
+
+    def test_placeholders_on_the_string_path_raise(self):
+        arm = [("token_id:1", lp(0.3)), ("token_id:2", lp(0.5))]
+        with self.assertRaisesRegex(ValueError, "token_id"):
+            K.score_forced([_fref(self.REF)], [_farm([arm], [[1, 2]])], "x", "q8")
+        # a vLLM row with one malformed placeholder has no ids, but its block is still a placeholder block
+        with self.assertRaisesRegex(ValueError, "token_id"):
+            K.score_forced([_fref(self.REF)], [_farm([[("token_id:1", lp(0.3)), ("token_id:x", lp(0.5))]])],
+                           "x", "q8")
+
+    def test_real_text_token_starting_with_token_id_is_scored_by_string(self):
+        # fix round 2: a genuine text token "token_id:5" (old llama.cpp data, no ids) must not raise
+        ref = [("token_id:5", lp(0.5)), ("a", lp(0.3))]
+        arm = [("token_id:5", lp(0.4)), ("a", lp(0.4))]
+        r = K.score_forced([_fref(ref, chosen=("token_id:5", 2))], [_farm([arm], tok="token_id:5")], "x", "q8")
+        self.assertEqual(r["join"], "string")
+        self.assertAlmostEqual(r["kl_nats_per_tok"], round(0.5 * math.log(0.5 / 0.4) + 0.3 * math.log(0.3 / 0.4)
+                                                           + 0.2 * math.log(0.2 / 0.2), 6), places=6)
+        g = K.score([_blk("p1", [("token_id:5", ref)])], [_blk("p1", [("token_id:5", arm)])], "x", "note")
+        self.assertEqual(g["join"], "string")
+
+    def test_one_entry_real_text_row_is_not_a_placeholder_block(self):
+        # a single "token_id:5" text entry is not evidence of a vLLM block (<2 entries)
+        self.assertFalse(K._placeholder_block({"pos": [("token_id:5", [("token_id:5", lp(0.9))])]}))
+        self.assertTrue(K._placeholder_block({"pos": [("x", [("token_id:1", lp(0.5)), ("token_id:2", lp(0.4))])]}))
+        r = K.score_forced([_fref([("token_id:5", lp(0.9))], chosen=("token_id:5", 2))],
+                           [_farm([[("token_id:5", lp(0.8))]], tok="token_id:5")], "x", "q8")
+        self.assertEqual(r["join"], "string")
+
+    def test_mixed_placeholder_block_raises_valueerror_not_stopiteration(self):
+        # placeholder block, but this position's rows are plain text: a ValueError naming the mix
+        with self.assertRaisesRegex(ValueError, "mixes id and text rows"):
+            K.join_keys("a", [("a", lp(0.5))], None, None, "a", [("a", lp(0.5))], None, None, placeholder=True)
+
+    def test_greedy_dnll_uses_the_merged_top_on_the_id_path(self):
+        # fix round 2: id 5 twice (0.3 + 0.3): the merged ref logprob of the chosen id is ln 0.6, not ln 0.3
+        rtop = [("x", lp(0.3)), ("x", lp(0.3)), ("y", lp(0.35))]
+        atop = [("x", lp(0.6)), ("y", lp(0.3))]
+        ref, arm = _blk("p1", [("x", rtop)]), _blk("p1", [("x", atop)])
+        ref["ids"], ref["top_ids"], arm["ids"], arm["top_ids"] = [5], [[5, 5, 6]], [5], [[5, 6]]
+        r = K.score([ref], [arm], "x", "note")
+        self.assertEqual(r["join"], "id")
+        self.assertAlmostEqual(r["dnll_nats_per_tok"], 0.0, places=6)
+
+    def test_greedy_score_pairs_on_ids(self):
+        top = [("", lp(0.5)), ("a", lp(0.3))]
+        ref = _blk("p1", [("", top), ("a", top)])
+        arm = _blk("p1", [("", top), ("a", top)])
+        ref["ids"], arm["ids"] = [7, 1], [8, 1]       # same string, different token at position 0
+        r = K.score([dict(ref)], [dict(arm)], "x", "note")
+        self.assertEqual((r["n_positions"], r["first_divergent_pos"]["n_diverged"], r["join"]), (2, 0, "string"))
+        ref["top_ids"], arm["top_ids"] = [[7, 1], [7, 1]], [[8, 1], [8, 1]]
+        r = K.score([ref], [arm], "x", "note")
+        self.assertEqual((r["n_positions"], r["n_positions_dropped"], r["first_divergent_pos"]["n_diverged"]),
+                         (1, 1, 1))
+        self.assertEqual(r["join"], "id")
+
+    def test_forced_diff_refuses_different_joins(self):
+        # one arm id-joined, the other string-joined: the same distribution reads 0.102 vs 0.0 -> not comparable
+        ref = [_fref(self.REF, [1, 2, 3])]
+        with self.assertRaisesRegex(ValueError, "join"):
+            K.score_forced_diff(ref, [_farm([self.ARM], [[1, 2, 3]])], [_farm([self.ARM])], "a", "b", "q8")
+        ref2 = _fref(self.REF, [1, 2, 3])                        # both arms "mixed" -> refused too
+        ref2["toks"], ref2["ids"], ref2["pos"], ref2["top_ids"] = ["", ""], [2, 2], ref2["pos"] * 2, ref2["top_ids"] * 2
+        mixed = _farm([self.ARM, self.ARM], [[1, 2, 3], None])
+        with self.assertRaisesRegex(ValueError, "mixed"):
+            K.score_forced_diff([ref2], [mixed], [dict(mixed)], "a", "b", "q8")
+        r = K.score_forced_diff(ref, [_farm([self.ARM], [[1, 2, 3]])], [_farm([self.REF], [[1, 2, 3]])], "a", "b", "q8")
+        self.assertEqual((r["join_a"], r["join_b"]), ("id", "id"))
+        self.assertAlmostEqual(r["kl_a"], round(0.2 * math.log(5 / 3), 6), places=6)
+
+    def test_forced_diff_cli_refuses_with_nonzero_exit(self):
+        d = _scratch("forced-diff-join-cli")
+        files = {}
+        for name, blocks in (("ref", [_fref(self.REF, [1, 2, 3])]), ("a", [_farm([self.ARM], [[1, 2, 3]])]),
+                             ("b", [_farm([self.ARM])])):
+            files[name] = os.path.join(d, f"{name}.jsonl")
+            with open(files[name], "w") as f:
+                f.writelines(json.dumps(x) + "\n" for x in blocks)
+        out = os.path.join(d, "diff.json")
+        code = _run_main(["score-forced-diff", "--ref", files["ref"], "--arm-a", files["a"], "--arm-b", files["b"],
+                          "--label-a", "a", "--label-b", "b", "--ref-label", "q8", "--out", out])
+        self.assertNotEqual(code, 0)
+        self.assertFalse(os.path.exists(out))
+
+    def test_greedy_top1_uses_the_merged_top(self):
+        # id 5 appears twice (0.3 + 0.3 = 0.6 > id 6's 0.35): merged argmax is 5, last-wins/raw argmax would be 6
+        rtop = [("x", lp(0.3)), ("x", lp(0.3)), ("y", lp(0.35))]
+        atop = [("x", lp(0.6)), ("y", lp(0.3))]
+        ref, arm = _blk("p1", [("x", rtop)]), _blk("p1", [("x", atop)])
+        ref["ids"], ref["top_ids"], arm["ids"], arm["top_ids"] = [5], [[5, 5, 6]], [5], [[5, 6]]
+        r = K.score([ref], [arm], "x", "note")
+        self.assertEqual((r["join"], r["top1_agreement"], r["top1_agreement_paired"]), ("id", 1.0, 1.0))
+
+
+class TestOldDataBitIdentical(unittest.TestCase):
+    """Rows already on disk carry no top ids, so re-scoring them must reproduce the pre-change numbers exactly.
+    Golden values captured from kld_probe.py BEFORE the token-id change, on this file's existing fixtures."""
+
+    def setUp(self):
+        self.ref = [_ref_block(f"p{i}", ids=(10, 11)) for i in range(6)]
+        self.same = [_forced_block(b["id"], list(b["pos"])) for b in self.ref]
+        off = ("r10", [("z", -0.05), ("r10", -3.0)])
+        self.worse = [_forced_block(b["id"], [off, b["pos"][1]]) for b in self.ref]
+
+    def _assert_golden(self, r, golden):
+        self.assertEqual({k: r[k] for k in golden}, golden)
+        self.assertIn(r.get("join", r.get("join_a")), ("string",))
+
+    def test_forced(self):
+        self._assert_golden(K.score_forced(self.ref, self.worse, "worse", "q8"), {
+            "n_prompts": 6, "n_prompt_errors": 0, "n_positions": 12, "kl_nats_per_tok": 1.329627,
+            "ci95_nats": [1.329627, 1.329627],
+            "kl_per_position": {"median": 1.329627, "p90": 2.659255, "max": 2.659255},
+            "top1_agreement": 0.5, "dnll_nats_per_tok": 1.475,
+            "arm_topk_short": {"n_short": 12, "frac_short": 1.0, "top_k": 20}, "ref_missing_frac": 0.0})
+
+    def test_forced_diff(self):
+        r = K.score_forced_diff(self.ref, self.worse, self.same, "worse", "same", "q8")
+        self._assert_golden(r, {"n_prompts_used": 6, "n_prompt_errors": 0, "n_positions": 12, "kl_a": 1.329627,
+                                "kl_b": 0.0, "diff_nats_per_tok": 1.329627, "ci95_nats": [1.329627, 1.329627],
+                                "verdict": "same lower", "frac_prompts_a_lower": 0.0})
+        self.assertEqual(r["join_b"], "string")
+
+    def test_forced_canonical_specials(self):
+        ref = [{"id": "p1", "toks": [""], "ids": [5], "prompt_tokens": 3, "error": None,
+                "pos": [("", [("", -0.001), ("\n", -7.0), ("", -9.0)])]}]
+        arm = [{"id": "p1", "mode": "forced", "positions": [0], "error": None,
+                "pos": [("", [("<|im_end|>", -0.002), ("\n", -6.5), ("x", -8.0)])]}]
+        self._assert_golden(K.score_forced(ref, arm, "x", "q8"), {
+            "n_positions": 1, "kl_nats_per_tok": 0.000667, "ci95_nats": [0.000667, 0.000667],
+            "kl_per_position": {"median": 0.000667, "p90": 0.000667, "max": 0.000667},
+            "top1_agreement": 1.0, "dnll_nats_per_tok": 0.001124, "ref_missing_frac": 0.0})
+
+    def test_greedy_with_generated_ids_but_no_top_ids_pairs_on_strings(self):
+        # llama.cpp greedy files on disk carry generated `ids` (ref and arm) but no top ids: pairing must stay on
+        # the strings (p1 position 2 is '' on both sides with ids 7 vs 8 — the old code paired it)
+        top_a = [("a", lp(0.7)), ("b", lp(0.2))]
+        top_b = [("b", lp(0.6)), ("a", lp(0.3))]
+        top_e = [("", lp(0.5)), ("a", lp(0.3)), ("", lp(0.1))]
+        ref = [_blk("p1", [("a", top_a), ("a", top_a), ("", top_e), ("a", top_a)]),
+               _blk("p2", [("b", top_b), ("a", top_a)])]
+        arm = [_blk("p1", [("a", top_a), ("a", top_b), ("", top_a), ("b", top_b)]),
+               _blk("p2", [("b", top_a), ("b", top_b)])]
+        ref[0]["ids"], arm[0]["ids"], ref[1]["ids"], arm[1]["ids"] = [1, 1, 7, 1], [1, 1, 8, 2], [2, 1], [2, 2]
+        self._assert_golden(K.score(ref, arm, "x", "note"), {
+            "n_positions": 6, "n_positions_dropped": 0, "kl_nats_per_tok": 0.321686,
+            "ci95_nats": [0.287938, 0.389182], "pooled_ci_nats": [0.194978, 0.448393],
+            "dnll_nats_per_tok": 0.260177, "top1_agreement": 0.33333,
+            "first_divergent_pos": {"mean": 2.0, "median": 3, "n_diverged": 2, "n_prompts": 2},
+            "coverage_ref_mean": 0.9, "coverage_arm_mean": 0.9, "top1_agreement_paired": 0.16667,
+            "kl_per_position": {"median": 0.373386, "p90": 0.404978, "max": 0.404978,
+                                "note": "over paired positions; p90 = nearest rank"},
+            "floor_substitutions": {
+                "ref_tokens_missing_from_arm": 2, "ref_entries": 13, "ref_missing_frac": 0.153846,
+                "positions_with_floor": 1, "ref_mass_floored_mean": 0.1, "arm_tokens_missing_from_ref": 1,
+                "arm_entries": 12, "arm_missing_frac": 0.083333,
+                "note": "ref tokens absent from the arm top-k are scored at the arm floor (lower-bound KL); "
+                        "arm tokens absent from the ref top-k do not enter KL(ref||arm)"}})
+
+
+class TestPromptIds(unittest.TestCase):
+    """The reference stores its own /tokenize prompt ids (fetch --prompt-ids); every forced arm is sent THOSE ids
+    and its own /tokenize must equal them id for id, not just in length."""
+
+    def test_fetch_prompt_ids_stored(self):
+        srv = _ForcedServer(prompt_ids=(4, 5, 6))
+        try:
+            blk = K.fetch(srv.url, "m", [("p1", "hello")], max_tokens=1, prompt_ids=True)[0]
+            tok = [b for p, b in srv.bodies if p == "/tokenize"]
+        finally:
+            srv.close()
+        self.assertIsNone(blk["error"])
+        self.assertEqual(blk["prompt_ids"], [4, 5, 6])
+        self.assertEqual(len(tok), 1)
+
+    def test_fetch_prompt_ids_length_disagreement_quarantines(self):
+        srv = _ForcedServer(usage_delta=1)
+        try:
+            blk = K.fetch(srv.url, "m", [("p1", "hello")], max_tokens=1, prompt_ids=True)[0]
+        finally:
+            srv.close()
+        self.assertIn("prompt ids", blk["error"])
+
+    def test_fetch_default_sends_no_tokenize(self):
+        srv = _ForcedServer()
+        try:
+            blk = K.fetch(srv.url, "m", [("p1", "hello")], max_tokens=1)[0]
+            paths = [p for p, _ in srv.bodies]
+        finally:
+            srv.close()
+        self.assertNotIn("prompt_ids", blk)
+        self.assertEqual(paths, ["/v1/completions"])
+
+    def test_forced_sends_the_reference_prompt_ids(self):
+        ref = _ref_block()
+        ref["prompt_ids"] = [1, 2, 3]
+        srv = _ForcedServer(prompt_ids=(1, 2, 3))
+        try:
+            blk = K.fetch_forced(srv.url, "m", [("p1", "hello")], {"p1": ref})[0]
+        finally:
+            srv.close()
+        self.assertIsNone(blk["error"])
+        self.assertEqual(blk["prompt_ids"], [1, 2, 3])
+        self.assertEqual([b["prompt"][:3] for b in srv.completions()], [[1, 2, 3]] * 4)
+
+    def test_forced_same_length_different_ids_quarantines(self):
+        ref = _ref_block()
+        ref["prompt_ids"] = [1, 2, 3]
+        srv = _ForcedServer(prompt_ids=(1, 2, 4))         # same length: the old length check passed this
+        try:
+            blk = K.fetch_forced(srv.url, "m", [("p1", "hello")], {"p1": ref})[0]
+        finally:
+            srv.close()
+        self.assertIn("prompt ids differ", blk["error"])
+        self.assertIn("index 2", blk["error"])
+        self.assertEqual(srv.completions(), [])
+        self.assertEqual(blk["prompt_ids"], [1, 2, 4])
+
+    def test_tokenizer_check_reports_id_equality(self):
+        top = [("a", lp(0.9))]
+        ref, arm = _blk_pt("p1", [("a", top)], 3), _blk_pt("p1", [("a", top)], 3)
+        ref["prompt_ids"], arm["prompt_ids"] = [1, 2, 3], [1, 2, 4]
+        g = K.tokenizer_check([ref], [arm])
+        self.assertEqual(g["verdict"], "MISMATCH")
+        self.assertEqual(g["mismatches"], [{"id": "p1", "ref": 3, "arm": 3, "ids_equal": False}])
+        self.assertEqual((g["n_ids_compared"], g["n_ids_mismatch"]), (1, 1))
+        arm["prompt_ids"] = [1, 2, 3]
+        g = K.tokenizer_check([ref], [arm])
+        self.assertEqual((g["verdict"], g["n_ids_compared"], g["n_ids_mismatch"]), ("ok", 1, 0))
+
+    def test_score_forced_carries_the_tokenizer_check(self):
+        ref = _fref([("a", lp(0.9))], chosen=("a", 1))
+        ref["prompt_ids"] = [1, 2, 3]
+        arm = _farm([[("a", lp(0.9))]], tok="a")
+        arm["prompt_tokens"], arm["prompt_ids"] = 3, [1, 2, 3]
+        g = K.score_forced([ref], [arm], "x", "q8")["tokenizer_check"]
+        self.assertEqual((g["verdict"], g["n_compared"], g["n_ids_compared"]), ("ok", 1, 1))
+
+
+class TestPromptIdsReuse(unittest.TestCase):
+    """Fix round 1, MAJOR 2: a cached file fetched before ids were kept is never silently reused when ids are
+    required, and never renamed or moved: fetch/forced/cache-status refuse loudly and name a new --out path."""
+
+    def setUp(self):
+        self.d = _scratch("pids-" + self._testMethodName)
+        self.cal = os.path.join(self.d, "cal.jsonl")
+        src = os.path.join(self.d, "p.txt")
+        open(src, "w").write("hello world")
+        with open(self.cal, "w") as f:
+            f.write(json.dumps({"id": "p1", "src": src, "char_cut": 5}) + "\n")
+        self.out = os.path.join(self.d, "kld-q8.jsonl")
+
+    def _fetch(self, srv, *extra):
+        return _run_main(["fetch", "--url", srv.url, "--model", "m", "--calibration", self.cal, "--out", self.out,
+                          "--max-tokens", "1", *extra])
+
+    def _status(self, *extra):
+        return _run_main(["cache-status", "--calibration", self.cal, "--out", self.out, "--max-tokens", "1", *extra])
+
+    def _snapshot(self):
+        return sorted(os.listdir(self.d)), open(self.out, "rb").read()
+
+    def test_fetch_prompt_ids_refuses_a_cache_without_them(self):
+        srv = _ForcedServer(llama_shape=True)
+        try:
+            self.assertEqual(self._fetch(srv), 0)                    # an old-style fetch: no prompt_ids
+            before, n = self._snapshot(), len(srv.bodies)
+            self.assertEqual(self._status(), 0)
+            self.assertEqual(self._status("--prompt-ids"), 2)       # cached, but not with prompt ids
+            self.assertNotEqual(self._fetch(srv, "--prompt-ids"), 0)
+            self.assertEqual(len(srv.bodies), n)                     # nothing requested
+        finally:
+            srv.close()
+        self.assertEqual(self._snapshot(), before)                   # nothing renamed, moved or rewritten
+
+    def test_fetch_prompt_ids_cache_with_them_is_reused(self):
+        srv = _ForcedServer(llama_shape=True)
+        try:
+            self.assertEqual(self._fetch(srv, "--prompt-ids"), 0)
+            n = len(srv.bodies)
+            self.assertEqual(self._status("--prompt-ids"), 0)
+            self.assertEqual(self._fetch(srv, "--prompt-ids"), 0)
+            self.assertEqual(len(srv.bodies), n)
+        finally:
+            srv.close()
+        row = _rows(self.out)[0]
+        self.assertEqual((row["prompt_ids"], row["top_ids"]), ([1, 2, 3], [[7, 7]]))
+
+    def test_forced_cache_without_prompt_ids_refused_when_the_reference_has_them(self):
+        ref = os.path.join(self.d, "ref.jsonl")
+        rb = _ref_block("p1")
+        rb["prompt_ids"] = [1, 2, 3]
+        with open(ref, "w") as f:
+            f.write(json.dumps(rb) + "\n")
+        argv = ["forced", "--url", None, "--model", "m", "--calibration", self.cal, "--ref", ref, "--out", self.out]
+        st = ["cache-status", "--calibration", self.cal, "--out", self.out, "--forced-ref", ref]
+        srv = _ForcedServer()
+        try:
+            argv[2] = srv.url
+            self.assertEqual(_run_main(argv), 0)
+            self.assertEqual(_run_main(st), 0)
+            rows = _rows(self.out)
+            del rows[0]["prompt_ids"]                                # a row fetched before prompt ids were sent
+            with open(self.out, "w") as f:
+                f.write(json.dumps(rows[0]) + "\n")
+            before, n = self._snapshot(), len(srv.bodies)
+            self.assertEqual(_run_main(st), 2)
+            self.assertNotEqual(_run_main(argv), 0)
+            self.assertEqual(len(srv.bodies), n)
+        finally:
+            srv.close()
+        self.assertEqual(self._snapshot(), before)
+
+    def test_tokenizer_check_ids_not_checked_without_reference_prompt_ids(self):
+        top = [("a", lp(0.9))]
+        ref, arm = _blk_pt("p1", [("a", top)], 3), _blk_pt("p1", [("a", top)], 3)
+        arm["prompt_ids"] = [1, 2, 3]
+        g = K.tokenizer_check([ref], [arm])
+        self.assertEqual(g["verdict"], "ok")                         # the length check, as before
+        self.assertEqual(g["ids_verdict"], "not checked (reference has no prompt_ids)")
+        ref["prompt_ids"] = [1, 2, 3]
+        self.assertEqual(K.tokenizer_check([ref], [arm])["ids_verdict"], "ok")
+        arm["prompt_ids"] = [1, 2, 4]
+        self.assertEqual(K.tokenizer_check([ref], [arm])["ids_verdict"], "MISMATCH")
+
+
+class TestRefTokenGuard(unittest.TestCase):
+    """Fix round 1, MAJOR 3: each forced arm row records the reference token it was forced on; at score time it
+    must equal the reference's token (and id, where both carry one), else the prompt is quarantined."""
+
+    def setUp(self):
+        self.ref = [_ref_block("p1", ids=(10, 11)), _ref_block("p2", ids=(20,))]
+        self.same = [_forced_block(b["id"], list(b["pos"])) for b in self.ref]
+
+    def test_fetch_forced_records_forced_ids(self):
+        srv = _ForcedServer()
+        try:
+            blk = K.fetch_forced(srv.url, "m", [("p1", "hello")], {"p1": _ref_block()})[0]
+        finally:
+            srv.close()
+        self.assertEqual(blk["forced_ids"], [10, 11, 12, 13])
+
+    def test_token_mismatch_quarantines_the_prompt(self):
+        arm = [dict(b) for b in self.same]
+        arm[0]["pos"] = [("r99", arm[0]["pos"][0][1]), arm[0]["pos"][1]]   # forced on another token
+        r = K.score_forced(self.ref, arm, "x", "q8")
+        self.assertEqual((r["n_prompt_errors"], r["n_positions"]), (1, 1))
+        self.assertEqual(r["ref_token_mismatches"], [{"id": "p1", "position": 0, "arm": "r99", "ref": "r10"}])
+
+    def test_id_mismatch_quarantines_the_prompt(self):
+        arm = [dict(b) for b in self.same]
+        arm[0]["forced_ids"], arm[1]["forced_ids"] = [10, 12], [20]
+        r = K.score_forced(self.ref, arm, "x", "q8")
+        self.assertEqual((r["n_prompt_errors"], r["n_positions"]), (1, 1))
+        self.assertEqual(r["ref_token_mismatches"][0]["position"], 1)
+        self.assertEqual(K.score_forced(self.ref, self.same, "x", "q8")["ref_token_mismatches"], [])
+
+    def test_diff_quarantines_a_mismatch_in_either_arm(self):
+        b = [dict(x) for x in self.same]
+        b[1]["pos"] = [("r21", b[1]["pos"][0][1])]
+        r = K.score_forced_diff(self.ref, self.same, b, "a", "b", "q8")
+        self.assertEqual((r["n_prompts_used"], r["n_prompt_errors"]), (1, 1))
+        self.assertEqual(r["ref_token_mismatches"], [{"id": "p2", "arm_label": "b", "position": 0,
+                                                     "arm": "r21", "ref": "r20"}])
+
+
+class TestEngineDetectionLoud(unittest.TestCase):
+    """Fix round 1, MINOR 4: under --engine auto, a /v1/models that errors or does not parse is a loud failure,
+    not a silent engine None (which would silently drop vLLM's token ids)."""
+
+    def test_detect_engine_raises(self):
+        for models in ("500", "garbage"):
+            srv = _ForcedServer(models=models)
+            try:
+                with self.assertRaises(RuntimeError):
+                    K.detect_engine(srv.url)
+            finally:
+                srv.close()
+
+    def test_no_owned_by_is_none(self):
+        srv = _ForcedServer(owned_by=None)
+        try:
+            self.assertIsNone(K.detect_engine(srv.url))
+        finally:
+            srv.close()
+
+    def test_auto_undetected_engine_is_said_on_stderr(self):
+        import contextlib
+        import io
+        d = _scratch("engine-undetected")
+        cal, ref = os.path.join(d, "cal.jsonl"), os.path.join(d, "ref.jsonl")
+        src = os.path.join(d, "p.txt")
+        open(src, "w").write("hello world")
+        with open(cal, "w") as f:
+            f.write(json.dumps({"id": "p1", "src": src, "char_cut": 5}) + "\n")
+        with open(ref, "w") as f:
+            f.write(json.dumps(_ref_block("p1")) + "\n")
+        for owned, warned in ((None, True), ("llamacpp", False)):
+            srv = _ForcedServer(owned_by=owned)
+            err = io.StringIO()
+            try:
+                with contextlib.redirect_stderr(err):
+                    code = _run_main(["forced", "--url", srv.url, "--model", "m", "--calibration", cal, "--ref", ref,
+                                      "--out", os.path.join(d, f"kld-{owned}.jsonl")])
+            finally:
+                srv.close()
+            self.assertEqual(code, 0)
+            self.assertEqual("engine undetected: string join, no vLLM id flag" in err.getvalue(), warned, owned)
+
+    def test_forced_cli_auto_refuses_and_pinned_engine_runs(self):
+        d = _scratch("engine-loud")
+        cal, ref = os.path.join(d, "cal.jsonl"), os.path.join(d, "ref.jsonl")
+        src = os.path.join(d, "p.txt")
+        open(src, "w").write("hello world")
+        with open(cal, "w") as f:
+            f.write(json.dumps({"id": "p1", "src": src, "char_cut": 5}) + "\n")
+        with open(ref, "w") as f:
+            f.write(json.dumps(_ref_block("p1")) + "\n")
+        srv = _ForcedServer(models="500")
+        try:
+            argv = ["forced", "--url", srv.url, "--model", "m", "--calibration", cal, "--ref", ref,
+                    "--out", os.path.join(d, "kld-x.jsonl")]
+            self.assertNotEqual(_run_main(argv), 0)
+            self.assertEqual(srv.completions(), [])
+            self.assertEqual(_run_main(argv + ["--engine", "llamacpp"]), 0)
+        finally:
+            srv.close()
+
+
+class TestPlaceholderReference(unittest.TestCase):
+    """Fix round 1, MINOR 10: a reference whose tokens are vLLM placeholders cannot run the partial-UTF-8 skip
+    rule (no text), so forcing on it is refused instead of silently using a different position set."""
+
+    def test_placeholder_reference_refused(self):
+        ref = _ref_block()
+        ref["pos"] = [(f"token_id:{i}", top) for i, (_t, top) in zip(ref["ids"], ref["pos"])]
+        srv = _ForcedServer()
+        try:
+            blk = K.fetch_forced(srv.url, "m", [("p1", "hello")], {"p1": ref})[0]
+        finally:
+            srv.close()
+        self.assertIn("placeholder", blk["error"])
+        self.assertEqual(srv.completions(), [])
+
+    def test_no_ids_message_names_the_engines(self):
+        ref = _ref_block()
+        del ref["ids"]
+        srv = _ForcedServer()
+        try:
+            blk = K.fetch_forced(srv.url, "m", [("p1", "hello")], {"p1": ref})[0]
+        finally:
+            srv.close()
+        self.assertIn("no token ids", blk["error"])
+        self.assertNotIn("fetch it from a llama.cpp server)", blk["error"])
+        # fix round 2: the sources it recommends are the ones fetch_forced accepts (a vLLM reference
+        # is refused, so vLLM is named only as NOT usable)
+        self.assertIn("llama.cpp", blk["error"])
+        self.assertIn("radiance", blk["error"])
+        self.assertNotIn("vLLM with --engine vllm", blk["error"])
+        self.assertIn("vLLM reference is not supported", blk["error"])
+
+
+
+class TestFixRound2Cli(unittest.TestCase):
+    """Fix round 2: the ids refusal names what it checks (prompt_ids); score-forced refuses like score-forced-diff."""
+
+    def test_ids_refusal_names_prompt_ids_only(self):
+        d = _scratch("ids-refusal-text")
+        cal = _calibration(d, 1)
+        out = os.path.join(d, "kld-x.jsonl")
+        with open(out, "w") as f:
+            f.write(json.dumps({"id": "cal-001", "toks": ["a"], "pos": [["a", [["a", -0.1]]]], "error": None}) + "\n")
+        json.dump(K.cache_key(cal, None, K.N_MAX, None, None), open(K.key_path(out), "w"))
+        code, reason = K.cache_status(out, cal, None, K.N_MAX, prompt_ids=True)
+        self.assertEqual(code, 2)
+        self.assertIn("prompt_ids", reason)
+        self.assertNotIn("top_ids", reason)
+
+    def test_score_forced_cli_refuses_when_nothing_is_scorable(self):
+        d = _scratch("score-forced-refused")
+        ref = [_ref_block("p1", ids=(10, 11))]
+        arm = [_forced_block("p1", [("r99", ref[0]["pos"][0][1]), ref[0]["pos"][1]])]   # every prompt quarantined
+        files = {}
+        for name, blocks in (("ref", ref), ("arm", arm)):
+            files[name] = os.path.join(d, f"{name}.jsonl")
+            with open(files[name], "w") as f:
+                f.writelines(json.dumps(x) + "\n" for x in blocks)
+        out = os.path.join(d, "kldf.json")
+        code = _run_main(["score-forced", "--ref", files["ref"], "--arm", files["arm"], "--label", "x",
+                          "--ref-label", "q8", "--out", out])
+        self.assertEqual(code, 2)
+        self.assertFalse(os.path.exists(out))
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
