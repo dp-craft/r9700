@@ -1,0 +1,67 @@
+{
+  "slug": "27b-iq5r-s-v4-speed-gate",
+  "date": "2026-11-13-1347",
+  "type": "perf",
+  "title": "Qwen3.8-27B IQ5R-S-V4 on radiance 1.17.0: 100k speed gate, paired to c-100k-tg512-n1",
+  "port": 8001,
+  "notes": [
+    "Plan: notes/plans/2026-11-13-1220-27b-kld-next-tests-plan.md \u00a75 step 1, \u00a74 test 5b, \u00a76 answers 6-7 (go/no-go gate, user decides)",
+    "Paired to c's MEASURED row c-100k-tg512-n1 (campaigns/perf/2026-11-09-1825-27b-arms-kld/results/compare-20261111-210235): same fixture codereview-100000.txt (sha256 8c2c99c0...), completions, max_tokens 512, prefix unique, warmup 0, temperature 0.2 only (capture_engine default at 72696b4), no seed, no repetition penalty",
+    "Same server flags as c: radiance 1.17.0, ctx 260000, 2 seqs, fp8 KV, --gpu-headroom-mib 596, spec 7; only the .rad file differs",
+    "Port 8001: port 8000 is the user's own vLLM server and is never touched",
+    "One depth is a go/no-go gate against c at the same depth, not an engine comparison (rule 16)",
+    "The gate runs ONLY=iq5rs-d64000-n1,iq5rs-d80000-n1,iq5rs-d100000-n1, 1 rep each (user 2026-11-13: IQ5R only, 1 rep); 8k/32k/200k exist only because gen_campaign requires >=4 depths. Only the 100k row pairs with c (c has no 64k/80k row)"
+  ],
+  "sampling": {
+    "temperature": 0.2
+  },
+  "workload": {
+    "api": "completions",
+    "max_tokens": 512,
+    "min_gen": 0,
+    "prefix_mode": "unique",
+    "fixture": "codereview-{depth}.txt",
+    "first_warmup": 0,
+    "ladder": {
+      "depths": [
+        8000,
+        32000,
+        64000,
+        80000,
+        100000,
+        200000
+      ],
+      "reps": 1,
+      "spec_reps": 1,
+      "spec_depths": [
+        64000,
+        80000,
+        100000
+      ]
+    }
+  },
+  "pins": {
+    "files": {
+      "/mnt/Lin1/work/radiance/models/StillDeadcode__qwen3.8-27b-iqr-v4@e5f1b3ef/qwen3.8-27b-iq5r-s-v4.rad": "fa19567007e666d968c072432dcc8ef74a923b9d69c9f9ef384c3cc7b149e2e7"
+    },
+    "images": {
+      "stilldeadcode/radiance:1.17.0": "sha256:c2acbaa373c89272ec47a22befa1cf04d2ddf1de51c2baf534f5273e517f7100"
+    }
+  },
+  "servers": [
+    {
+      "name": "iq5rs",
+      "engine": "radiance",
+      "served_model": "qwen38-27b-iq5r-s-v4",
+      "rad_file": "/mnt/Lin1/work/radiance/models/StillDeadcode__qwen3.8-27b-iqr-v4@e5f1b3ef/qwen3.8-27b-iq5r-s-v4.rad",
+      "image": "stilldeadcode/radiance:1.17.0",
+      "spec_tokens": 7,
+      "ctx": 260000,
+      "np": 2,
+      "kv": "fp8",
+      "extra_args": "--gpu-headroom-mib 596",
+      "working_set_mib": 18728,
+      "free_mib_floor": 30000
+    }
+  ]
+}

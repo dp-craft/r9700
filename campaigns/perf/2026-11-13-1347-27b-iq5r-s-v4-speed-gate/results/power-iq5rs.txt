@@ -1,0 +1,113 @@
+## before 2026-11-13T13:47:53+01:00
+card=/sys/class/drm/card1/device
+### power_dpm_force_performance_level
+manual
+### pp_power_profile_mode
+PROFILE_INDEX(NAME) CLOCK_TYPE(NAME) FPS MinActiveFreqType MinActiveFreq BoosterFreqType BoosterFreq PD_Data_limit_c PD_Data_error_coeff PD_Data_error_rate_coeff
+ 0 BOOTUP_DEFAULT :
+                    0(       GFXCLK)       0       1       0       4     800 4587520  -65536       0
+                    1(         FCLK)       0       3       0       1       0 5898240   -6553   -6553
+ 1 3D_FULL_SCREEN :
+                    0(       GFXCLK)       0       1       0       1       0 5570560    -655   -6553
+                    1(         FCLK)       0       1       0       1       0 5898240   -6553   -6553
+ 2   POWER_SAVING*:
+                    0(       GFXCLK)       0       1       0       3       0 5898240  -65536       0
+                    1(         FCLK)       0       1       0       1       0 5898240  -65536   -6553
+ 3          VIDEO :
+                    0(       GFXCLK)       0       1       0       4     500 4587520  -65536       0
+                    1(         FCLK)       0       1       0       1       0 5898240   -6553   -6553
+ 4             VR :
+                    0(       GFXCLK)       0       4     600       1       0 4587520  -16384       0
+                    1(         FCLK)       0       1       0       1       0 5898240   -6553   -6553
+ 5        COMPUTE :
+                    0(       GFXCLK)       0       4     600       1       0 4587520  -16384       0
+                    1(         FCLK)       0       1       0       1       0 5898240   -6553   -6553
+ 6         CUSTOM :
+                    0(       GFXCLK)       0       1       0       4     800 4587520  -65536       0
+                    1(         FCLK)       0       3       0       1       0 5898240   -6553   -6553
+ 7      WINDOW_3D :
+                    0(       GFXCLK)       0       1       0       1       0 5570560    -655   -6553
+                    1(         FCLK)       0       3       0       1       0 5898240   -6553   -6553
+### pp_od_clk_voltage
+OD_SCLK_OFFSET:
+0Mhz
+OD_MCLK:
+0: 97Mhz
+1: 1250MHz
+OD_RANGE:
+SCLK_OFFSET:    -500Mhz       1000Mhz
+MCLK:      97Mhz       1500Mhz
+VDDGFX_OFFSET:    -200mv          0mv
+OD_VDDGFX_OFFSET:
+-80mV
+### pp_dpm_mclk
+0: 96Mhz *
+1: 456Mhz 
+2: 772Mhz 
+3: 875Mhz 
+4: 1124Mhz 
+5: 1258Mhz 
+### pp_dpm_sclk
+S: 0Mhz *
+1: 500Mhz 
+2: 2350Mhz 
+power1_cap=230000000
+power1_cap_max=330000000
+vram_used_mib=1058 gtt_used_mib=428
+vram_before_mib=1058 gtt_before_mib=428
+## after 2026-11-13T13:52:29+01:00
+card=/sys/class/drm/card1/device
+### power_dpm_force_performance_level
+manual
+### pp_power_profile_mode
+PROFILE_INDEX(NAME) CLOCK_TYPE(NAME) FPS MinActiveFreqType MinActiveFreq BoosterFreqType BoosterFreq PD_Data_limit_c PD_Data_error_coeff PD_Data_error_rate_coeff
+ 0 BOOTUP_DEFAULT :
+                    0(       GFXCLK)       0       1       0       4     800 4587520  -65536       0
+                    1(         FCLK)       0       3       0       1       0 5898240   -6553   -6553
+ 1 3D_FULL_SCREEN :
+                    0(       GFXCLK)       0       1       0       1       0 5570560    -655   -6553
+                    1(         FCLK)       0       1       0       1       0 5898240   -6553   -6553
+ 2   POWER_SAVING*:
+                    0(       GFXCLK)       0       1       0       3       0 5898240  -65536       0
+                    1(         FCLK)       0       1       0       1       0 5898240  -65536   -6553
+ 3          VIDEO :
+                    0(       GFXCLK)       0       1       0       4     500 4587520  -65536       0
+                    1(         FCLK)       0       1       0       1       0 5898240   -6553   -6553
+ 4             VR :
+                    0(       GFXCLK)       0       4     600       1       0 4587520  -16384       0
+                    1(         FCLK)       0       1       0       1       0 5898240   -6553   -6553
+ 5        COMPUTE :
+                    0(       GFXCLK)       0       4     600       1       0 4587520  -16384       0
+                    1(         FCLK)       0       1       0       1       0 5898240   -6553   -6553
+ 6         CUSTOM :
+                    0(       GFXCLK)       0       1       0       4     800 4587520  -65536       0
+                    1(         FCLK)       0       3       0       1       0 5898240   -6553   -6553
+ 7      WINDOW_3D :
+                    0(       GFXCLK)       0       1       0       1       0 5570560    -655   -6553
+                    1(         FCLK)       0       3       0       1       0 5898240   -6553   -6553
+### pp_od_clk_voltage
+OD_SCLK_OFFSET:
+0Mhz
+OD_MCLK:
+0: 97Mhz
+1: 1250MHz
+OD_RANGE:
+SCLK_OFFSET:    -500Mhz       1000Mhz
+MCLK:      97Mhz       1500Mhz
+VDDGFX_OFFSET:    -200mv          0mv
+OD_VDDGFX_OFFSET:
+-80mV
+### pp_dpm_mclk
+0: 96Mhz *
+1: 456Mhz 
+2: 772Mhz 
+3: 875Mhz 
+4: 1124Mhz 
+5: 1258Mhz 
+### pp_dpm_sclk
+S: 0Mhz *
+1: 500Mhz 
+2: 2350Mhz 
+power1_cap=230000000
+power1_cap_max=330000000
+vram_used_mib=662 gtt_used_mib=331
