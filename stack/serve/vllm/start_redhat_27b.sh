@@ -2,7 +2,8 @@
 # stack/serve/vllm/start_redhat_27b.sh — start/stop the RedHatAI/Qwen3.8-27B-MXFP4 + DFlash2 vLLM server
 # (profile sly-redhat/redhat-mxfp4-dflash, served as qwen38-27b-redhat-mxfp4-dflash) that
 # local_vllm_direct/settings-redhat.json talks to (no llama-swap).
-#   start_redhat_27b.sh start|stop|status|logs|print    then: claude --settings ~/.config/claude/local_vllm_direct/settings-redhat.json
+#   start_redhat_27b.sh start|serve|stop|status|logs|print    then: claude --settings ~/.config/claude/local_vllm_direct/settings-redhat.json
+#   serve = start without the Claude session (scripts and agents boot the server headless)
 # (was vllm.sh in ~/.config/claude/local_vllm_direct/, renamed into the amd repo 2026-11-08; that path is now a symlink)
 # The Swift-1.5 heretic server is start_heretic_27b.sh (settings.json); both use port 8000, so only one runs at a time.
 # Single source of truth = settings-redhat.json (a copy of settings.json with only the four model names changed):
@@ -34,7 +35,7 @@ if read -r MAXLEN PORT MODEL < <(read_settings_file "$SETTINGS" 2>/dev/null); th
 else
   case "${1:-start}" in
     status|logs) echo "warning: $SETTINGS missing, unreadable or without a valid URL port -- $1 uses PORT=$FALLBACK_PORT" >&2; PORT=$FALLBACK_PORT;;
-    start|stop|print) echo "$SETTINGS: missing, unreadable or without a valid URL port -- ${1:-start} needs it" >&2; exit 2;;
+    start|serve|stop|print) echo "$SETTINGS: missing, unreadable or without a valid URL port -- ${1:-start} needs it" >&2; exit 2;;
   esac
 fi
 
@@ -45,15 +46,15 @@ serve_env() {
 }
 
 case "${1:-start}" in
-  start)
+  start|serve)
     # check the profile's served name before booting (~5 min) rather than after
     served=$(PROFILE=$PROFILE PORT=$PORT MAXLEN=$MAXLEN "$SERVE" print | grep -oP '(?<=--served-model-name )\S+')
     [ "$served" = "$MODEL" ] || {
       echo "profile $PROFILE serves '$served' but $(basename "$SETTINGS") ANTHROPIC_MODEL is '$MODEL' -- fix one of them" >&2; exit 2; }
     ( serve_env; "$SERVE" start )   # subshell: the serve exports stay out of the shell that execs claude below
     echo "ready: claude --settings $SETTINGS"
-    claude --settings "$SETTINGS" --verbose;;
+    [ "${1:-start}" = serve ] || claude --settings "$SETTINGS" --verbose;;
   stop|status|logs) PORT=$PORT "$SERVE" "$1";;
   print) serve_env; "$SERVE" print;;
-  *) echo "usage: $0 start|stop|status|logs|print" >&2; exit 2;;
+  *) echo "usage: $0 start|serve|stop|status|logs|print" >&2; exit 2;;
 esac
