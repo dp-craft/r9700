@@ -18,6 +18,10 @@
 #      d0f    d0 again (fresh boot), KLD only                     -> vLLM boot noise floor (2026-11-12)
 #      bf     b again (fresh boot), KLD only                      -> radiance boot noise floor (2026-11-12)
 #      d181   d on the OLD sly 1.8.1 image (IMG_SLY_E), KLD only  -> engine effect, de-confounds e vs d (round 2)
+#      q6kf16 q6k with f16 KV, ctx 32768, 1 seq (the reference's KV/ctx), KLD only -> weights-only Q6 (round 3)
+#      q4kxlf16 q4kxl the same way, KLD only                      -> weights-only Q4_K_XL; vs q4kxl = q8_0-KV cost
+#      q8i    q8 greedy WITH prompt ids (KLD_PROMPT_IDS=1) into kld-q8i.jsonl: an id-carrying reference for
+#             later batches (KLD_REF=$RES/kld-q8i.jsonl); not mixed with the published q8 reference
 #      a b c c0 q4kxl q6k   as in run-compare.sh                 + depth cells
 #      q4mtp  q4kxl with MTP=1, KLD only: a GREEDY fetch of the first DIAG_N prompts
 #    DIAG_ARMS (d d0 c c0 q4kxl) also get a greedy fetch of the first DIAG_N prompts (kld-<arm>-greedy.jsonl):
@@ -32,8 +36,8 @@ set -uo pipefail
 HERE="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 ARMS="${ARMS:-q8 q8f d d0 dfh a b c c0 q4kxl q4mtp q6k e}"
 for _a in $ARMS; do
-  case "$_a" in q8|q8f|d|d0|d0f|d181|dfh|a|b|bf|c|c0|q4kxl|q4mtp|q6k|e) ;;
-    *) echo "unknown arm '$_a' (only: q8 q8f d d0 d0f d181 dfh a b bf c c0 q4kxl q4mtp q6k e)" >&2; exit 1 ;; esac
+  case "$_a" in q8|q8i|q8f|d|d0|d0f|d181|dfh|a|b|bf|c|c0|q4kxl|q4kxlf16|q4mtp|q6k|q6kf16|e) ;;
+    *) echo "unknown arm '$_a' (only: q8 q8i q8f d d0 d0f d181 dfh a b bf c c0 q4kxl q4kxlf16 q4mtp q6k q6kf16 e)" >&2; exit 1 ;; esac
 done
 RUN_TAG="${RUN_TAG:-forced-$(date +%Y%m%d-%H%M%S)}"; export RUN_TAG
 export KLD_N="${KLD_N:-128}" REPS="${REPS:-2}" DEPTH=1
@@ -42,7 +46,7 @@ export KLD_CAL="${KLD_CAL:-$HERE/inputs/calibration-v2-prompts.jsonl}"
 if [ -z "${ONLY:-}" ]; then
   _o=""; for _a in $ARMS; do
     case "$_a" in
-      q8f|d0f|d181|dfh|bf|q4mtp|e) ;;                                             # KLD only
+      q8f|q8i|d0f|d181|dfh|bf|q4mtp|q6kf16|q4kxlf16|e) ;;                         # KLD only
       q8) _o="$_o,q8-10k-tg512-n1,q8-20k-tg512-n1" ;;                        # ctx 32768
       *)  _o="$_o,$_a-10k-tg512-n1,$_a-20k-tg512-n1,$_a-50k-tg512-n1,$_a-100k-tg512-n1" ;;
     esac; done
@@ -52,7 +56,7 @@ export ONLY
 WS_NO_MAIN=1
 # shellcheck source=run.sh
 source "$HERE/run.sh"
-REF="$RES/kld-q8.jsonl"
+REF="${KLD_REF:-$RES/kld-q8.jsonl}"   # KLD_REF: force on another reference (e.g. kld-q8i.jsonl, with ids)
 
 arm_sly_kld () {  # arm boot_name ctx np served [cells: 1|0] — a sly arm outside arm_d
   local arm=$1 name=$2 ctx=$3 np=$4 served=$5 cells=${6:-0}
@@ -99,9 +103,10 @@ echo "    unique dir: $RUN_DIR  (results: $RES)"
 for _a in $ARMS; do
   echo; echo "=================== arm $_a ($(date +%H:%M:%S)) ==================="
   # the reference is greedy; every other arm is forced on it
-  if [ "$_a" = q8 ]; then KLD_FORCED_REF=''; else KLD_FORCED_REF="$REF"; fi
+  if [ "$_a" = q8 ] || [ "$_a" = q8i ]; then KLD_FORCED_REF=''; else KLD_FORCED_REF="$REF"; fi
   case "$_a" in
     q8)    LLAMA_KV=f16 LLAMA_CTX=32768 LLAMA_NP=1 arm_llama q8 "$GGUF_Q8" qwen38-27b-q8 ;;
+    q8i)   KLD_ONLY=1 KLD_PROMPT_IDS=1 LLAMA_KV=f16 LLAMA_CTX=32768 LLAMA_NP=1 arm_llama q8i "$GGUF_Q8" qwen38-27b-q8 ;;
     q8f)   KLD_ONLY=1 LLAMA_KV=f16 LLAMA_CTX=32768 LLAMA_NP=1 arm_llama q8f "$GGUF_Q8" qwen38-27b-q8 ;;
     d)     arm_d ;;
     d0)    arm_sly_kld d0 d0-redhat-sly1100 110000 2 qwen38-27b-redhat-mxfp4-sly 1 ;;
@@ -115,6 +120,8 @@ for _a in $ARMS; do
     q4kxl) arm_llama q4kxl "$GGUF_Q4KXL" qwen38-27b-ud-q4kxl ;;
     q4mtp) KLD_FORCED_REF='' KLD_N=$DIAG_N KLD_ONLY=1 LLAMA_MTP=1 arm_llama q4mtp "$GGUF_Q4KXL" qwen38-27b-ud-q4kxl-mtp ;;
     q6k)   arm_llama q6k "$GGUF_Q6K" qwen38-27b-ud-q6k ;;
+    q6kf16)   KLD_ONLY=1 LLAMA_KV=f16 LLAMA_CTX=32768 LLAMA_NP=1 arm_llama q6kf16 "$GGUF_Q6K" qwen38-27b-ud-q6k ;;
+    q4kxlf16) KLD_ONLY=1 LLAMA_KV=f16 LLAMA_CTX=32768 LLAMA_NP=1 arm_llama q4kxlf16 "$GGUF_Q4KXL" qwen38-27b-ud-q4kxl ;;
     d181)  IMAGE="$IMG_SLY_E" arm_sly_kld d181 d-redhat-sly1100 "$D_CTX" 2 qwen38-27b-redhat-mxfp4-dflash ;;  # d @ sly 1.8.1
     e)     arm_e ;;
   esac || echo "  arm $_a did not complete (see $RES/failures.txt) — continuing with the next arm"
@@ -122,7 +129,7 @@ done
 KLD_FORCED_REF=''
 
 echo; echo "=================== KLD scores ==================="
-_f=""; for _a in $ARMS; do case "$_a" in q8|q4mtp) ;; *) _f="$_f $_a" ;; esac; done
+_f=""; for _a in $ARMS; do case "$_a" in q8|q8i|q4mtp) ;; *) _f="$_f $_a" ;; esac; done
 # shellcheck disable=SC2086  # $_f is the arm list
 kld_score_forced q8 "$REF" $_f
 DIAG_DIR=""

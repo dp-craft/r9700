@@ -16,6 +16,18 @@
    "floor": true
   },
   {
+   "id": "q6kf16",
+   "family": "llama.cpp",
+   "label": "q6kf16 · UD-Q6_K, f16 KV · llama.cpp b11448",
+   "score": "results/forced-r3-20261113-090142/kld-forced-final.d/kldf2-q6kf16.json"
+  },
+  {
+   "id": "q6k",
+   "family": "llama.cpp",
+   "label": "q6k · UD-Q6_K · llama.cpp b11448",
+   "score": "results/forced-r3-20261113-090142/kld-forced-final.d/kldf2-q6k.json"
+  },
+  {
    "id": "c",
    "family": "radiance",
    "label": "c · IQ4R-L-V4 · Radiance 1.17",
@@ -26,6 +38,12 @@
    "family": "llama.cpp",
    "label": "q4kxl · UD-Q4_K_XL · llama.cpp b11448",
    "score": "results/forced-20261112-093746/kld-forced-final.d/kldf2-q4kxl.json"
+  },
+  {
+   "id": "q4kxlf16",
+   "family": "llama.cpp",
+   "label": "q4kxlf16 · UD-Q4_K_XL, f16 KV · llama.cpp b11448",
+   "score": "results/forced-r3-20261113-090142/kld-forced-final.d/kldf2-q4kxlf16.json"
   },
   {
    "id": "dfh",
@@ -147,6 +165,34 @@
    "a": "c",
    "b": "q4kxl",
    "diff": "results/forced-20261112-093746/kld-diffs.d/diff2-c-q4kxl.json"
+  },
+  {
+   "group": "KV cache (llama.cpp)",
+   "label": "f16 − q8_0 KV at Q6 (q6kf16 − q6k)",
+   "a": "q6kf16",
+   "b": "q6k",
+   "diff": "results/forced-r3-20261113-090142/kld-diffs.d/diff2-q6kf16-q6k.json"
+  },
+  {
+   "group": "KV cache (llama.cpp)",
+   "label": "f16 − q8_0 KV at Q4_K_XL (q4kxlf16 − q4kxl)",
+   "a": "q4kxlf16",
+   "b": "q4kxl",
+   "diff": "results/forced-r3-20261113-090142/kld-diffs.d/diff2-q4kxlf16-q4kxl.json"
+  },
+  {
+   "group": "Weights (llama.cpp, f16 KV)",
+   "label": "Q4_K_XL − Q6_K (q4kxlf16 − q6kf16)",
+   "a": "q4kxlf16",
+   "b": "q6kf16",
+   "diff": "results/forced-r3-20261113-090142/kld-diffs.d/diff2-q4kxlf16-q6kf16.json"
+  },
+  {
+   "group": "Q4-class quant + engine",
+   "label": "IQ4/Radiance − Q6_K/llama.cpp (c − q6k)",
+   "a": "c",
+   "b": "q6k",
+   "diff": "results/forced-r3-20261113-090142/kld-diffs.d/diff2-c-q6k.json"
   }
  ]
 }

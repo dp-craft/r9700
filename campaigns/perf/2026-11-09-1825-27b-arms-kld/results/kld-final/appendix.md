@@ -11,8 +11,11 @@ Table twin. Rows are sorted by KL ascending (ties keep spec order). Floor rows (
 | Arm | Family | Floor | KL nats/tok | CI95 low | CI95 high | top-1 agreement | Top-1 disagreement % | Source file |
 |---|---|---|--:|--:|--:|--:|--:|---|
 | q8f · Q8_0 re-run | llama.cpp | yes | 0.001759 | 0.000724 | 0.003269 | 0.99463 | 0.54 | `results/forced-20261112-093746/kld-forced-final.d/kldf2-q8f.json` |
+| q6kf16 · UD-Q6_K, f16 KV · llama.cpp b11448 | llama.cpp |  | 0.004449 | 0.002869 | 0.006274 | 0.99048 | 0.95 | `results/forced-r3-20261113-090142/kld-forced-final.d/kldf2-q6kf16.json` |
+| q6k · UD-Q6_K · llama.cpp b11448 | llama.cpp |  | 0.004477 | 0.00295 | 0.006279 | 0.98975 | 1.02 | `results/forced-r3-20261113-090142/kld-forced-final.d/kldf2-q6k.json` |
 | c · IQ4R-L-V4 · Radiance 1.17 | radiance |  | 0.007944 | 0.005538 | 0.0107 | 0.9873 | 1.27 | `results/forced-20261112-093746/kld-forced-final.d/kldf2-c.json` |
 | q4kxl · UD-Q4_K_XL · llama.cpp b11448 | llama.cpp |  | 0.016355 | 0.009481 | 0.025051 | 0.9812 | 1.88 | `results/forced-20261112-093746/kld-forced-final.d/kldf2-q4kxl.json` |
+| q4kxlf16 · UD-Q4_K_XL, f16 KV · llama.cpp b11448 | llama.cpp |  | 0.017222 | 0.009838 | 0.026574 | 0.98096 | 1.90 | `results/forced-r3-20261113-090142/kld-forced-final.d/kldf2-q4kxlf16.json` |
 | dfh · RedHat MXFP4, full lm head · Sly 1.11 | sly vLLM |  | 0.056154 | 0.038873 | 0.075664 | 0.96118 | 3.88 | `results/forced-20261112-093746/kld-forced-final.d/kldf2-dfh.json` |
 | b · Quark MXFP4 · Radiance 1.17 | radiance |  | 0.057516 | 0.042422 | 0.074469 | 0.95508 | 4.49 | `results/forced-20261112-093746/kld-forced-final.d/kldf2-b.json` |
 | bf · re-boot of b | radiance | yes | 0.057516 | 0.042422 | 0.074469 | 0.95508 | 4.49 | `results/forced-20261112-093746/kld-forced-final.d/kldf2-bf.json` |
@@ -40,6 +43,10 @@ Table twin. Δ KL = KL(ref‖A) − KL(ref‖B). Fields: `diff_nats_per_tok`, `c
 | lm head | full-precision head (dfh − d0) | dfh | d0 | -0.004508 | -0.005782 | -0.003245 | resolved | dfh lower | `results/forced-20261112-093746/kld-diffs.d/diff2-dfh-d0.json` |
 | Model | heretic − RedHat, same Sly 1.8.1 (e − d181) | e | d181 | 0.022484 | 0.005483 | 0.03881 | resolved | d181 lower | `results/forced-r2-20261112-200238/kld-diffs.d/diff2-e-d181.json` |
 | Q4-class quant + engine | IQ4/Radiance − Q4_K_XL/llama.cpp (c − q4kxl) | c | q4kxl | -0.008411 | -0.016088 | -0.002517 | resolved | c lower | `results/forced-20261112-093746/kld-diffs.d/diff2-c-q4kxl.json` |
+| KV cache (llama.cpp) | f16 − q8_0 KV at Q6 (q6kf16 − q6k) | q6kf16 | q6k | -2.8e-05 | -0.000308 | 0.000314 | within noise | not resolved | `results/forced-r3-20261113-090142/kld-diffs.d/diff2-q6kf16-q6k.json` |
+| KV cache (llama.cpp) | f16 − q8_0 KV at Q4_K_XL (q4kxlf16 − q4kxl) | q4kxlf16 | q4kxl | 0.000867 | 0.000151 | 0.001757 | resolved | q4kxl lower | `results/forced-r3-20261113-090142/kld-diffs.d/diff2-q4kxlf16-q4kxl.json` |
+| Weights (llama.cpp, f16 KV) | Q4_K_XL − Q6_K (q4kxlf16 − q6kf16) | q4kxlf16 | q6kf16 | 0.012773 | 0.00612 | 0.021497 | resolved | q6kf16 lower | `results/forced-r3-20261113-090142/kld-diffs.d/diff2-q4kxlf16-q6kf16.json` |
+| Q4-class quant + engine | IQ4/Radiance − Q6_K/llama.cpp (c − q6k) | c | q6k | 0.003467 | 0.001916 | 0.005356 | resolved | q6k lower | `results/forced-r3-20261113-090142/kld-diffs.d/diff2-c-q6k.json` |
 
 ### K3. Typical position vs the mean
 
@@ -50,8 +57,11 @@ Table twin. Rows in the K1 order. Fields: `kl_per_position.median`, `kl_per_posi
 | Arm | Median / position | p90 / position | Mean (score) | Mean ÷ median | Source file |
 |---|--:|--:|--:|--:|---|
 | q8f · Q8_0 re-run | 2e-06 | 0.000549 | 0.001759 | 880× | `results/forced-20261112-093746/kld-forced-final.d/kldf2-q8f.json` |
+| q6kf16 · UD-Q6_K, f16 KV · llama.cpp b11448 | 1.5e-05 | 0.003274 | 0.004449 | 297× | `results/forced-r3-20261113-090142/kld-forced-final.d/kldf2-q6kf16.json` |
+| q6k · UD-Q6_K · llama.cpp b11448 | 1.4e-05 | 0.003218 | 0.004477 | 320× | `results/forced-r3-20261113-090142/kld-forced-final.d/kldf2-q6k.json` |
 | c · IQ4R-L-V4 · Radiance 1.17 | 3.5e-05 | 0.007642 | 0.007944 | 227× | `results/forced-20261112-093746/kld-forced-final.d/kldf2-c.json` |
 | q4kxl · UD-Q4_K_XL · llama.cpp b11448 | 4.5e-05 | 0.010473 | 0.016355 | 363× | `results/forced-20261112-093746/kld-forced-final.d/kldf2-q4kxl.json` |
+| q4kxlf16 · UD-Q4_K_XL, f16 KV · llama.cpp b11448 | 4.4e-05 | 0.010647 | 0.017222 | 391× | `results/forced-r3-20261113-090142/kld-forced-final.d/kldf2-q4kxlf16.json` |
 | dfh · RedHat MXFP4, full lm head · Sly 1.11 | 0.000296 | 0.066764 | 0.056154 | 190× | `results/forced-20261112-093746/kld-forced-final.d/kldf2-dfh.json` |
 | b · Quark MXFP4 · Radiance 1.17 | 0.000394 | 0.087431 | 0.057516 | 146× | `results/forced-20261112-093746/kld-forced-final.d/kldf2-b.json` |
 | bf · re-boot of b | 0.000394 | 0.087431 | 0.057516 | 146× | `results/forced-20261112-093746/kld-forced-final.d/kldf2-bf.json` |

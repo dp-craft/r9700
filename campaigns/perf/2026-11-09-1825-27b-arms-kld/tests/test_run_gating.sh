@@ -1455,8 +1455,9 @@ body_t59 () {
   mk_kld_ok "$RES/kld-q8.jsonl" qwen38-27b-q8 /fake/llama-server
   mk_kld_ok "$RES/kld-a.jsonl" qwen38-27b-mxfp4 "$IMG_RAD_A"      # greedy cache: must NOT count
   KLD_FORCED_REF="$RES/kld-q8.jsonl"
+  CURRENT=radiance   # as start_rad leaves it: kld_engine pins --engine from the server that is up (2026-11-13)
   real_kld_fetch qwen38-27b-mxfp4 "$RES/kld-a.jsonl" "$IMG_RAD_A"
-  assert_count "$CALLS" "^kld-forced --url $KLD_URL --model qwen38-27b-mxfp4 --calibration $KLD_CAL --ref $RES/kld-q8.jsonl --positions 32 --repo-root $ROOT --out $RES/kld-a.jsonl --limit 1 --image $IMG_RAD_A\$" 1 "T59 forced fetch shape"
+  assert_count "$CALLS" "^kld-forced --url $KLD_URL --model qwen38-27b-mxfp4 --engine radiance --calibration $KLD_CAL --ref $RES/kld-q8.jsonl --positions 32 --repo-root $ROOT --out $RES/kld-a.jsonl --limit 1 --image $IMG_RAD_A\$" 1 "T59 forced fetch shape"
   assert_count "$CALLS" '^kld-fetch ' 0 "T59 no greedy fetch in forced mode"
 }
 # t59b (-): the reference is incomplete (absent) -> refused loudly, no forced call.

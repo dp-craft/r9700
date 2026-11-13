@@ -1,0 +1,4 @@
+# residency check, arm q6k (iron rule 15b). INFERRED weights-only floor ~16.4 GiB # (27B MXFP4/IQ4R on the 32 GB card). A reading BELOW the floor means paging/contention # — do not trust this arm's numbers (rule 15). WARNING only, never aborts.
+GPU: 0
+    PROCESS_INFO: No running processes detected
+
