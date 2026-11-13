@@ -1,0 +1,18 @@
+# residency (rule 15): expected working set 18728 MiB; less = paging/contention -> do not trust this boot's rows (WARN only)
+GPU: 0
+    PROCESS_INFO:
+        NAME: /opt/radiance/bin/radiance
+        PID: 879509
+        MEMORY_USAGE:
+            GTT_MEM: 7.9 MB
+            CPU_MEM: 0.0 B
+            VRAM_MEM: 29.4 GB
+        MEM_USAGE: 30.2 GB
+        USAGE:
+            GFX: 0 ns
+            ENC: 0 ns
+        SDMA_USAGE: 0 us
+        CU_OCCUPANCY: N/A
+        EVICTED_TIME: 4202 ms
+
+residency_mib=30105 source=amd-smi expected_mib=18728

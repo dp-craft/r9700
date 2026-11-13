@@ -1,0 +1,10 @@
+date=2026-11-13T13:47:14+01:00
+campaign=27b-iq5r-s-v4-speed-gate (multi-engine throughput, gen_campaign G1)
+order=iq5rs
+kernel=7.0.0-38-generic
+mesa=26.2.4~kisak1~r26.2.4~kisak1~r
+rocm=unknown
+api=completions prefix_mode=unique first_warmup=0 min_gen=0 conv_min_gen=none
+server[iq5rs]=engine=radiance arm=iq5rs pass=A tier=minimal served=qwen38-27b-iq5r-s-v4 ctx=260000 np=2 kv=fp8 port=8001 floor_mib=30000 working_set_mib=18728 rad_file=/mnt/Lin1/work/radiance/models/StillDeadcode__qwen3.8-27b-iqr-v4@e5f1b3ef/qwen3.8-27b-iq5r-s-v4.rad image=stilldeadcode/radiance:1.17.0 spec_tokens=7 extra_args=--gpu-headroom-mib 596
+sampling[iq5rs]={"temperature":0.2}
+invocation=2026-11-13T13:47:14+01:00 run_tag=none only=iq5rs-d64000-n1,iq5rs-d80000-n1,iq5rs-d100000-n1 reps_override=none max_tokens_override=none min_gen_override=none retry_incomplete=0

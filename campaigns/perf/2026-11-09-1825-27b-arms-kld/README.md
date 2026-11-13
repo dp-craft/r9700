@@ -48,7 +48,7 @@ arm. The plan's earlier "45–70 min" covered cells + boots only (the KLD design
 The final write-up is [`docs/findings/quality/2026-11-09-1825-27b-arms-kld.md`](../../../docs/findings/quality/2026-11-09-1825-27b-arms-kld.md).
 Every number below comes from it or from the score files it cites. Which arm to pick for which goal is its
 [§2.2](../../../docs/findings/quality/2026-11-09-1825-27b-arms-kld.md#22-decision-guide); per-arm pins, boot times and VRAM are its [§12.4](../../../docs/findings/quality/2026-11-09-1825-27b-arms-kld.md#124-per-arm-reproducibility-record-pins-boot-memory). "F1" is short for
-`results/forced-20261112-093746/` (the main batch) and "F2" for `results/forced-r2-20261112-200238/` (round 2).
+`results/forced-20261112-093746/` (the main batch) and "F2" for `results/forced-r2-20261112-200238/` (round 2) and "F3" for `results/forced-r3-20261113-090142/` (round 3: Q6 and the f16-KV arms).
 
 ### What KLD is, in plain words
 
@@ -91,11 +91,11 @@ more different. The unit is "nats per token", averaged over many steps.
 
 ### What was measured, and how
 
-- **12 arms** (quant × engine × setting): Q8_0 again, UD-Q4_K_XL on llama.cpp, IQ4R-L-V4 and Quark-MXFP4 on
+- **15 arms** (quant × engine × setting): Q8_0 again, UD-Q6_K and UD-Q4_K_XL on llama.cpp (each also with an uncompressed f16 KV cache), IQ4R-L-V4 and Quark-MXFP4 on
   radiance, RedHat-MXFP4 on Sly vLLM (with and without DFlash, with a full-precision output layer, and on the
   older Sly 1.8.1), and the heretic fine-tune. The per-arm table is §2 of the report.
 - **128 prompts × 32 points = 4096 scored points per arm**, the same points for every arm, with 0 failed
-  prompts in every arm (MEASURED, `kldf2-*.json` in F1 and F2).
+  prompts in every arm (MEASURED, `kldf2-*.json` in F1, F2 and F3).
 - **Noise floors from re-runs:** the reference was run a second time on llama.cpp, and the vLLM and radiance
   servers were each re-booted once and measured again. That shows how much of a number is just noise.
 
@@ -103,7 +103,7 @@ more different. The unit is "nats per token", averaged over many steps.
 
 - **Choosing a quant, engine or setting without a slow quality campaign.** A forced KLD fetch is minutes per
   arm (about 12–30 min for the vLLM arms: MEASURED, raw local file, not committed, the fetch-file mtimes in `tmp/runs/*/results/`, report §12.6), not a multi-task generation
-  run. It rules out clearly lossy options early: here it separated the two near-Q8 quants from the MXFP4 family.
+  run. It rules out clearly lossy options early: here it separated the near-Q8 quants (Q6, IQ4R-L-V4, Q4_K_XL) from the MXFP4 family.
 - **Catching silent quality loss from upgrades.** An engine upgrade can change outputs without any error. KLD
   checks it directly: old minus new was +0.0023 for radiance 1.11.0 vs 1.17.0 and +0.0024 for Sly 1.8.1 vs 1.11.0
   (the newer version is nominally closer to Q8_0), and neither is resolved from noise, while a single setting, the int4 output layer, showed a resolved cost of 0.0045
@@ -132,32 +132,41 @@ more different. The unit is "nats per token", averaged over many steps.
   reference, KLD stops predicting task scores (CLAIMED, arXiv 2606.19558). The test texts are also short
   (246–4681 tokens, MEASURED, raw local file, not committed: `tmp/runs/forced-20261112-093746/results/kld-q8.jsonl`); long-context behaviour
   is not covered.
+- **The test set is small and narrow.** 128 prompts: Python (the Rich library) and TypeScript (the Agentic Code
+  Runner, copied from a separate project) source files, English technical reports and English coding-agent chats. Nothing in other
+  programming languages, other languages or long contexts was tested, and the ranking was not split by prompt kind,
+  so it is shown for this mostly TS/Python coding mix only. The report's decision guide (§2.2) lists the broader tests that would give a more precise picture.
 - **Compared with published numbers.** Unsloth publishes KLD for the same quant types against the original
   BF16 weights (CLAIMED, https://unsloth.ai/docs/basics/dynamic-3.0-ggufs, read off charts). Our values have the
-  same size and the same ranking, but our UD-Q4_K_XL is about 2× theirs (0.0164 vs ≈0.0075). The main reason
-  (INFERRED): we measure the setup as it runs in production, so the compressed KV cache counts too, while
-  Unsloth measures the weights alone. Three additional arms (Q6 with q8_0 KV, Q6 with f16 KV, Q4_K_XL with f16 KV)
-  would split the two and answer "is arm c as close as a Q6?" (report §7.9 and §10 item 11).
+  same size and the same ranking, but ours are about 2× theirs: UD-Q4_K_XL 0.0172 vs ≈0.0075 and UD-Q6_K 0.0044
+  vs ≈0.0025, both measured with the uncompressed KV cache like theirs (MEASURED, F3 `kldf2-q4kxlf16.json`,
+  `kldf2-q6kf16.json`). So the compressed KV cache is not the reason; the different test texts most likely are
+  (INFERRED, report §7.9).
 
 ### How to read the numbers (this campaign)
 
 | KL nats/token | What it means here | Example in this campaign |
 |--:|---|---|
 | about 0.002 | measurement noise: the same model run twice | Q8_0 re-run, 0.0018 (MEASURED, F1 `kldf2-q8f.json`) |
-| about 0.008 | very close to the reference | IQ4R-L-V4 on radiance, arm c, 0.0079 (MEASURED, F1 `kldf2-c.json`) |
+| about 0.0045 | closest production-config arm | UD-Q6_K on llama.cpp, 0.0045, with either KV cache (MEASURED, F3 `kldf2-q6k.json`, `kldf2-q6kf16.json`) |
+| about 0.008 | very close to the reference, but measurably further than Q6 | IQ4R-L-V4 on radiance, arm c, 0.0079 (MEASURED, F1 `kldf2-c.json`; F3 `diff2-c-q6k.json`) |
 | about 0.016 | close; a good 4-bit copy | UD-Q4_K_XL on llama.cpp, 0.0164 (MEASURED, F1 `kldf2-q4kxl.json`) |
-| 0.056–0.066 | clearly further away, about 7× arm c | every MXFP4 arm, on radiance and on both Sly versions (MEASURED, F1 `kldf2-{a,b,d,d0,dfh}.json`, F2 `kldf2-d181.json`) |
+| 0.056–0.066 | clearly further away, about 7–8× arm c | every MXFP4 arm, on radiance and on both Sly versions (MEASURED, F1 `kldf2-{a,b,d,d0,dfh}.json`, F2 `kldf2-d181.json`) |
 | about 0.089 | a different model, not just a different copy | heretic fine-tune, arm e, 0.0887 (MEASURED, F1 `kldf2-e.json`) |
 
 ![How far each arm is from Q8_0: KL and top-1 disagreement](results/kld-final/charts/kld-scorecard.svg)
 
-*All 12 arms on one chart, closest to Q8_0 at the top. Left: the dot is the score (mean KL), the shaded band its 95% range. Right: how often the top choice differs. Hollow dots and outlined bars are re-runs that show the noise floor. Details and the other charts are in the [report](../../../docs/findings/quality/2026-11-09-1825-27b-arms-kld.md).*
+*All 15 arms on one chart, closest to Q8_0 at the top. Left: the dot is the score (mean KL), the shaded band its 95% range. Right: how often the top choice differs. Hollow dots and outlined bars are re-runs that show the noise floor. Details and the other charts are in the [report](../../../docs/findings/quality/2026-11-09-1825-27b-arms-kld.md).*
 
 Rules of thumb (INFERRED from the table above, valid for this test set only):
 - Below about 0.02, a quant behaves very much like Q8_0 here; task benchmarks decide between such options.
 - Around 0.06, the quant is measurably different; check task scores before relying on it.
-- Whether a *difference* between two arms is real depends on its paired range, not its size. Here +0.002 to
-  +0.003 changes were not resolved, while the 0.0045 output-layer cost was (MEASURED, F1 and F2 `kld-diffs.d/`).
+- Whether a *difference* between two arms is real depends on its paired range, not its size. The engine-version
+  changes of +0.002 were not resolved, while the 0.0045 output-layer cost and even Q6's +0.0027 above the Q8_0
+  re-run were (MEASURED, F1, F2 and F3 `kld-diffs.d/`).
+- **The compressed (q8_0) KV cache shows no cost** on llama.cpp: swapping it for f16 changed Q6 by
+  −0.00003 (not resolved) and Q4_K_XL by +0.0009 (resolved, but f16 is the *further* one, the opposite of a KV cost) (MEASURED, F3
+  `diff2-q6kf16-q6k.json`, `diff2-q4kxlf16-q4kxl.json`).
 - Top-1 agreement is the easier companion number: how often both models pick the same next token. Arm c agrees
   98.7% of the time (a different pick about once every 80 tokens); the MXFP4 arms 95.3–96.1% (about once every
   21–26 tokens) (MEASURED, `kldf2-*.json`; "once every N" INFERRED as 1 / (1 − agreement)).
@@ -214,13 +223,15 @@ locked by `research/ws3-kld-r1.md` / `r2.md`; the 2026-11-12 forced batch change
   to the same rows (`normalize_logprobs`). A failed selftest aborts **the KLD pass only**, not the campaign;
   logprobs-refusing arms fall out of the KLD pass with the reason recorded.
 - **How to run:** `ARMS="…" bash run-forced.sh` (q8 first; `RUN_TAG=forced-<stamp>` to resume). Round 2 was
-  `ARMS=d181` (arm d's boot with `IMAGE=$IMG_SLY_E`, the 1.8.1 image; its boot name stays `d-redhat-sly1100`).
+  `ARMS=d181` (arm d's boot with `IMAGE=$IMG_SLY_E`, the 1.8.1 image; its boot name stays `d-redhat-sly1100`). Round 3 was
+  `RUN_TAG=forced-r3-<stamp> ARMS="q6k q6kf16 q4kxlf16" ONLY=none KLD_ONLY=1 DIAG_ARMS="" ./run-forced.sh` against a copy
+  of the main batch's q8 reference (`REFERENCE.txt`).
 - **Where results land:** raw fetches + cache keys → `tmp/runs/<tag>/results/kld-<arm>.jsonl(.key.json)`; the
   driver's own scores → `kld-forced-<stamp>.d/kld-forced-<arm>-vs-q8.json` and `kld-diag-<stamp>.d/`. The
   committed, authoritative scores are under `results/forced-<tag>/`: `kld-forced-final.d/kldf2-<arm>.json`
   (per arm, fixed scorer) and `kld-diffs.d/diff2-<A>-<B>.json` (paired differences), made with
   `kld_probe.py score-forced` / `score-forced-diff`. Main batch: `results/forced-20261112-093746/`; round 2:
-  `results/forced-r2-20261112-200238/`.
+  `results/forced-r2-20261112-200238/`; round 3: `results/forced-r3-20261113-090142/`.
 
 ## WS7 prologue (sly 1.11.0 first boot)
 
@@ -274,7 +285,7 @@ RUN_TAG=compare-<stamp> bash campaigns/perf/2026-11-09-1825-27b-arms-kld/run-com
 
 - **Arms, in order** (`ARMS`, default `d a b c c0 q4kxl e`): the five campaign arms, plus the
   llama.cpp GGUF arm `q4kxl` = unsloth UD-Q4_K_XL (`q6k` = UD-Q6_K exists but is opt-in only — user
-  2026-11-11), on `latest-vulkan` (resolved build recorded), **KV q8_0** (llama.cpp has no fp8
+  2026-11-11; it was scored later in KLD round 3, F3), on `latest-vulkan` (resolved build recorded), **KV q8_0** (llama.cpp has no fp8
   KV — a documented asymmetry), MTP off — and arm `e` (heretic, KLD only).
 - Per arm: boot gate → boot → residency → KLD selftest → KLD fetch (`KLD_N`, default 16) → cells
   (`<arm>-10k-tg512-n1`, `<arm>-100k-tg512-n1`, `REPS` default 2) → stop. A failed arm is recorded
@@ -383,7 +394,7 @@ Model dirs / images / `.rad` files verified by `run.sh` preflight; confirmed pin
 | arm E | `/mnt/Lin1/work/vllm/sly-radiance/models/slybase__Swift-1.5-Qwen3.8-27B-heretic-MXFP4-GPTQ@3bb379dc` (+ drafter `syvai__Qwen3.8-27B-DFlash2-W4A16@4d30ec73`) |
 | KLD ref | `/mnt/Lin1/work/vllm/sly-radiance/models/Qwen__Qwen3.8-27B-FP8@017b9c7a` |
 | images | `stilldeadcode/radiance:1.11.0` (616 MB), `stilldeadcode/radiance:1.17.0` (858 MB), `ghcr.io/slybase/vllm-sly-radiance:1.11.0-rocm10.1` (8.71 GB, pulled 2026-11-10, id `22baa741ab04`), `ghcr.io/slybase/vllm-sly-radiance:1.8.1-rocm10.1` (9.99 GB) |
-| calibration | `inputs/calibration-prompts.jsonl` sha256 `91dfac5adf69f393a5277bd0fc0f5c3b8727cfa10f9474765978a904e31b019a` |
+| calibration | `inputs/calibration-prompts.jsonl` sha256 `91dfac5adf69f393a5277bd0fc0f5c3b8727cfa10f9474765978a904e31b019a` (v1, compare batch only; the forced batches use v2, `inputs/calibration-v2-prompts.jsonl`, sha256 `1cbf84f1…`, see the KLD section) |
 
 **WS7 cache pre-check (MEASURED, 2026-11-09, re-verified 2026-11-10 for 1.11.0, session-1 CPU):** under
 `/mnt/Lin1/work/vllm/sly-radiance/cache/` there are dirs `vllm-radiance@0.9.3` (525 M, unrelated),

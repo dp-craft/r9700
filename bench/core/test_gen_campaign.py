@@ -13,6 +13,7 @@ import io
 import glob
 import json
 import os
+import re
 import shutil
 import signal
 import socket
@@ -1672,6 +1673,1235 @@ class EngineBenchScripts(unittest.TestCase):
         self.assertIn("rows NOT added", r.stderr)
         self.assertEqual(res, [])                                   # a failed run adds nothing to results/
         self.assertIn("bad", [d.get("engine") for d in raw])        # its partial rows stay raw
+
+
+def eb_sandbox(testcase, capture_body=None):
+    """A temp git repo holding a copy of engine-bench/run.sh and stub capture_engine / spec_metrics /
+    phase_power (each records its argv to ARGV_LOG), plus a tiny http.server answering /health on a free
+    port (never 8000). Returns (sandbox, url, run) where run(camp, **env) -> (proc, raw_rows, res_rows)."""
+    sb = tempfile.mkdtemp(prefix="ebpass-")
+    testcase.addCleanup(shutil.rmtree, sb, True)
+    subprocess.run(["git", "init", "-q", sb], check=True)
+    rec = ("import json, os, sys\n"
+           "open(os.environ['ARGV_LOG'], 'a').write(json.dumps([os.path.basename(sys.argv[0])] + sys.argv[1:]) + '\\n')\n")
+    stubs = {
+        "bench/core/capture_engine.py": rec + (capture_body or
+            "a = sys.argv\ne, l = a[a.index('--engine') + 1], a[a.index('--label') + 1]\n"
+            "mode = a[1]\n"
+            "rows = [{'kind': 'turn', 'engine': e, 'label': l, 'gen_tokens': g} for g in "
+            "json.loads(os.environ.get('TURN_GEN', '[600, 600]'))] if mode == 'conversation' else "
+            "[{'kind': 'aggregate', 'engine': e, 'label': l, 'n_short': int(os.environ.get('N_SHORT', '0')), 'n_ok': 3}]\n"
+            "for r in rows: print(json.dumps(r))\n"
+            "sys.exit(int(os.environ.get('CE_RC', '0')))\n"),
+        "stack/gpu/spec_metrics.py": rec + (
+            "if sys.argv[1] == 'snap': print('{}')\n"
+            "elif sys.argv[1] == 'rows': print(json.dumps({'kind': 'spec', 'source': 'llamacpp_timings', 'label': sys.argv[3]}))\n"
+            "elif sys.argv[1] == 'diff': print(json.dumps({'kind': 'spec', 'source': 'diff', 'label': sys.argv[4]}))\n"),
+        "stack/gpu/phase_power.py": "",
+        "stack/gpu/vram_sampler.py": "",
+    }
+    for rel, body in stubs.items():
+        write(os.path.join(sb, rel), body)
+    eb = os.path.join(sb, "bench/perf/engine-bench/run.sh")
+    os.makedirs(os.path.dirname(eb))
+    shutil.copy(os.path.join(HERE, os.pardir, "perf", "engine-bench", "run.sh"), eb)
+    www = os.path.join(sb, "www"); os.makedirs(www)
+    write(os.path.join(www, "health"), "ok")
+    port = free_port()
+    assert port != 8000
+    srv = subprocess.Popen([sys.executable, "-m", "http.server", str(port), "--bind", "127.0.0.1", "--directory", www],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    testcase.addCleanup(srv.kill)
+    for _ in range(50):
+        with socket.socket() as so:
+            if so.connect_ex(("127.0.0.1", port)) == 0:
+                break
+        time.sleep(0.1)
+    prompt = write(os.path.join(sb, "prompt.txt"), "hi")
+    url = f"http://127.0.0.1:{port}/v1"
+    drop = ("SAMPLING", "MIN_GEN", "TAGS", "SPEC_ROWS", "STATUS_OUT", "MODE", "CAMPAIGN_DIR", "ENGINES_LIST")
+
+    def run(camp, **extra):
+        log = os.path.join(sb, camp + ".argv")
+        env = {k: v for k, v in os.environ.items() if k not in drop}
+        env.update(CAMPAIGN_DIR=os.path.join(sb, camp), PROMPT_FILE=prompt, SLUG="t", ARGV_LOG=log,
+                   ENGINES_LIST=f"eng|{url}|m")
+        env.update(extra)
+        r = subprocess.run(["bash", eb], env=env, capture_output=True, text=True, timeout=60)
+        raw = glob.glob(os.path.join(sb, camp, "tmp", "*-engine-t", "results.jsonl"))
+        res = os.path.join(sb, camp, "results", "results.jsonl")
+        rows = lambda q: [json.loads(l) for l in open(q)] if os.path.exists(q) else []   # noqa: E731
+        argv = [json.loads(l) for l in open(log)] if os.path.exists(log) else []
+        return r, rows(raw[0]) if raw else [], rows(res), argv
+    return sb, eb, run
+
+
+class EngineBenchPassthrough(unittest.TestCase):
+    """engine-bench/run.sh: SAMPLING / MIN_GEN / TAGS / SPEC_ROWS / STATUS_OUT reach capture_engine and
+    spec_metrics only when set; unset = the pre-G1 argv and spec rows exactly (KLD + gating callers)."""
+
+    def setUp(self):
+        self.sb, self.eb, self.run = eb_sandbox(self)
+
+    @staticmethod
+    def ce(argv):
+        return [a for a in argv if a[0] == "capture_engine.py"]
+
+    @staticmethod
+    def sm(argv):
+        return [a[1] for a in argv if a[0] == "spec_metrics.py"]
+
+    def test_capabilities_line(self):
+        r = subprocess.run(["bash", self.eb, "--capabilities"], capture_output=True, text=True,
+                           env={k: v for k, v in os.environ.items() if k != "CAMPAIGN_DIR"})
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout.strip(), "engine-bench-capabilities: SAMPLING MIN_GEN TAGS SPEC_ROWS STATUS_OUT")
+
+    def test_unset_is_the_legacy_argv(self):
+        r, raw, res, argv = self.run("legacy")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        (ce,) = self.ce(argv)
+        for flag in ("--sampling", "--min-gen", "--tag"):
+            self.assertNotIn(flag, ce)
+        self.assertEqual(ce[ce.index("--warmup") + 1], "1")
+        self.assertEqual(self.sm(argv), ["snap", "diff"])           # legacy: snap/diff after every probe
+        self.assertEqual(raw, res)
+        r, raw, res, argv = self.run("legacy-conv", MODE="conversation", MAX_DEPTH="20000")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        (ce,) = self.ce(argv)
+        self.assertEqual(ce[1], "conversation")
+        for flag in ("--sampling", "--min-gen", "--tag"):
+            self.assertNotIn(flag, ce)
+        self.assertEqual(self.sm(argv), ["snap", "diff"])
+
+    def test_probe_passthrough(self):
+        smp = '{"temperature":1.0,"top_k":20}'
+        r, raw, res, argv = self.run("pass", SAMPLING=smp, MIN_GEN="900", TAGS="arm=a,depth=8000,n=1,tg=1024")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        (ce,) = self.ce(argv)
+        self.assertEqual(ce[ce.index("--sampling") + 1], smp)
+        self.assertEqual(ce[ce.index("--min-gen") + 1], "900")
+        self.assertEqual([ce[i + 1] for i, a in enumerate(ce) if a == "--tag"],
+                         ["arm=a", "depth=8000", "n=1", "tg=1024"])
+
+    def test_conversation_passthrough_and_turn_gate(self):
+        smp = '{"temperature":1.0}'
+        r, raw, res, argv = self.run("conv", MODE="conversation", MAX_DEPTH="20000", SAMPLING=smp, MIN_GEN="450",
+                                     TAGS="arm=a,n=1", TURN_GEN="[600, 500]")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        (ce,) = self.ce(argv)
+        self.assertEqual(ce[ce.index("--sampling") + 1], smp)
+        self.assertNotIn("--min-gen", ce)                           # capture_engine conversation has none:
+        self.assertEqual([ce[i + 1] for i, a in enumerate(ce) if a == "--tag"], ["arm=a", "n=1"])
+        st = os.path.join(self.sb, "st.json")                     # ... engine-bench gates the turns itself
+        r, raw, res, argv = self.run("conv-short", MODE="conversation", MAX_DEPTH="20000", MIN_GEN="450",
+                                     TURN_GEN="[600, 449, 10]", STATUS_OUT=st)
+        self.assertEqual(r.returncode, 3, r.stderr)
+        self.assertIn("SHORT", r.stderr)
+        self.assertEqual(res, [])                                   # rule 18: nothing reaches results/
+        status = json.load(open(st))
+        self.assertEqual((status["ok"], status["short"], status["n_short"], status["n_total"], status["min_gen"]),
+                         (False, True, 2, 3, 450))
+
+    def test_short_probe_fails_with_status(self):
+        st = os.path.join(self.sb, "st.json")
+        r, raw, res, argv = self.run("short", MIN_GEN="900", CE_RC="3", N_SHORT="2", STATUS_OUT=st)
+        self.assertEqual(r.returncode, 3, r.stderr)
+        self.assertIn("rows NOT added", r.stderr)
+        self.assertEqual(res, [])
+        status = json.load(open(st))
+        self.assertEqual((status["ok"], status["short"], status["n_short"]), (False, True, 2))
+        r, raw, res, argv = self.run("err", CE_RC="1", STATUS_OUT=st)   # a real failure stays exit 1
+        self.assertEqual(r.returncode, 1)
+        self.assertEqual((json.load(open(st))["ok"], json.load(open(st))["short"]), (False, False))
+        r, raw, res, argv = self.run("ok", STATUS_OUT=st)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertTrue(json.load(open(st))["ok"])
+
+    def test_spec_rows_modes(self):
+        r, raw, res, argv = self.run("rows", SPEC_ROWS="rows")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(self.sm(argv), ["rows"])
+        rows_call = [a for a in argv if a[0] == "spec_metrics.py"][0]
+        self.assertTrue(rows_call[2].endswith("/results.jsonl") and "/tmp/" in rows_call[2])   # the run's own rows
+        self.assertEqual(rows_call[3:5], ["t", "eng"])
+        self.assertTrue(rows_call[5].endswith("props_eng.json"))
+        self.assertEqual([d["source"] for d in res if d["kind"] == "spec"], ["llamacpp_timings"])
+        r, raw, res, argv = self.run("diff", SPEC_ROWS="diff")
+        self.assertEqual(self.sm(argv), ["snap", "diff"])
+        self.assertEqual([d["source"] for d in res if d["kind"] == "spec"], ["diff"])
+        r, raw, res, argv = self.run("off", SPEC_ROWS="off")
+        self.assertEqual(self.sm(argv), [])
+        self.assertEqual([d for d in res if d["kind"] == "spec"], [])
+        r, raw, res, argv = self.run("bad", SPEC_ROWS="yes")
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("SPEC_ROWS", r.stderr)
+        self.assertEqual(self.ce(argv), [])                         # refused before any probe
+
+# ======================================================================================
+# Part G1: multi-engine throughput (servers[].engine = llamacpp | vllm | radiance)
+# Emit + inspect + bash -n only: no emitted run.sh is executed, no server/docker/GPU tool is called.
+# ======================================================================================
+LLAMA_BIN = "/opt/llama/b11448-vulkan/bin/llama-server"
+GGUF = "/models/gguf/Qwen-27B-UD-Q4_K_XL.gguf"
+RAD = "/models/rad/StillDeadcode__q27-mxfp4@60bd4139/q27-mxfp4.rad"
+RAD_IMAGE = "stilldeadcode/radiance:1.17.0"
+VLLM_IMAGE = "ghcr.io/slybase/vllm-sly-radiance:1.11.0-rocm10.1"
+
+
+def multi_spec(**over):
+    s = {"slug": "multi", "date": "2026-11-13-1200", "port": 8000,
+         "sampling": {"temperature": 1.0, "top_p": 0.95, "top_k": 20, "min_p": 0, "presence_penalty": 0,
+                      "frequency_penalty": 0},
+         "workload": {"ladder": {"depths": [8000, 32000, 100000, 200000], "reps": 3, "spec_reps": 5,
+                                 "spec_depths": [32000, 100000, 200000]},
+                      "concurrency": {"n": 2, "depths": [32000], "reps": 3},
+                      "conversation": {"prompt": "codereview-270000.txt", "max_depth": 205000,
+                                       "turn_prompt": "codereview-large.task.md"},
+                      "sentinel": {"depth": 32000, "tol_pct": 5}, "smoke": {"depth": 8000}},
+         "servers": [
+             {"name": "q4kxl", "engine": "llamacpp", "served_model": "q27-q4kxl", "gguf": GGUF, "bin": LLAMA_BIN,
+              "ctx": 260000, "np": 2, "kv": "q8_0", "extra_args": "--kv-unified", "working_set_mib": 20000,
+              "free_mib_floor": 26000},
+             {"name": "b", "engine": "radiance", "served_model": "q27-mxfp4", "rad_file": RAD, "image": RAD_IMAGE,
+              "spec_tokens": 7, "ctx": 260000, "np": 2, "kv": "fp8", "working_set_mib": 16794},
+             {"name": "d", "engine": "vllm", "served_model": SERVED, "profile": PROFILE, "image": VLLM_IMAGE,
+              "spec": True, "ctx": 260000, "np": 2, "kv": "fp8", "working_set_mib": 16794,
+              "env": {"WATCHDOG_MIB": "32", "CACTUS_DELTA": "0"}}]}
+    s.update(over)
+    return s
+
+
+def quiet(fn, *a, **kw):
+    """Call fn with stderr (emit-time notes/warnings) swallowed."""
+    with contextlib.redirect_stderr(io.StringIO()):
+        return fn(*a, **kw)
+
+
+def srv(spec, name):
+    return next(x for x in spec["servers"] if x["name"] == name)
+
+
+class MultiValidation(unittest.TestCase):
+    def ok(self, spec):
+        self.assertEqual(quiet(gc.validate_spec, spec), "README.md")
+
+    def bad(self, spec, *needles):
+        msg = quiet(exits, self, gc.validate_spec, spec)
+        for n in needles:
+            self.assertIn(n, msg)
+        return msg
+
+    def test_valid_spec_and_example_pass(self):
+        self.ok(multi_spec())
+        self.ok(copy.deepcopy(gc.EXAMPLE_MULTI))
+
+    def test_dispatch_needs_engine_on_every_server(self):
+        self.assertTrue(gc.is_multi(multi_spec()))
+        self.assertFalse(gc.is_multi(throughput_spec()))
+        s = multi_spec()
+        del s["servers"][1]["engine"]
+        self.bad(s, "every server needs an `engine`")
+
+    def test_unknown_engine(self):
+        s = multi_spec()
+        s["servers"][0]["engine"] = "hipfire"
+        self.bad(s, "unknown engine 'hipfire'", "llamacpp | vllm | radiance")
+
+    def test_missing_per_engine_fields(self):
+        for name, key in (("b", "rad_file"), ("b", "image"), ("b", "spec_tokens"), ("q4kxl", "gguf"),
+                          ("q4kxl", "bin"), ("d", "profile"), ("d", "spec"), ("d", "image")):
+            with self.subTest(server=name, key=key):
+                s = multi_spec()
+                del srv(s, name)[key]
+                self.bad(s, f"missing required field '{key}'")
+        for key in ("served_model", "ctx", "np", "kv", "working_set_mib"):
+            with self.subTest(key=key):
+                s = multi_spec()
+                del s["servers"][0][key]
+                self.bad(s, f"missing required field '{key}'")
+
+    def test_foreign_engine_fields_rejected(self):
+        s = multi_spec()
+        srv(s, "d")["gguf"] = GGUF
+        self.bad(s, "'gguf' is a llamacpp-only field")
+        s = multi_spec()
+        srv(s, "b")["mtp"] = 1
+        self.bad(s, "mtp is not a multi-engine radiance field")
+        s = multi_spec()
+        srv(s, "q4kxl")["probes"] = []
+        self.bad(s, "probes is not a multi-engine")
+        s = multi_spec()
+        srv(s, "q4kxl")["bogus"] = 1
+        self.bad(s, "'bogus' is not a server field")
+
+    def test_single_engine_top_keys_rejected(self):
+        for k, v in (("model", "/m.gguf"), ("engine", "vllm"), ("profile", PROFILE), ("vram", {})):
+            with self.subTest(key=k):
+                self.bad(multi_spec(**{k: v}), f"top-level {k!r} is single-engine only")
+        self.bad(multi_spec(extra=1), "unknown top-level key 'extra'")
+
+    def test_duplicate_names_and_arm_pass(self):
+        s = multi_spec()
+        s["servers"][1]["name"] = "q4kxl"
+        self.bad(s, "duplicate server name 'q4kxl'")
+        s = multi_spec()
+        srv(s, "b")["arm"] = "q4kxl"
+        self.bad(s, "arm 'q4kxl' already has a server in pass 'A'")
+        s = multi_spec()                                  # the same arm in pass B is a legit second server
+        srv(s, "b")["arm"] = "q4kxl"
+        srv(s, "b")["pass"] = "B"
+        self.ok(s)
+
+    def test_ports(self):
+        s = multi_spec()
+        srv(s, "b")["port"] = 9292
+        self.bad(s, "not 9292")
+        s = multi_spec()
+        srv(s, "b")["port"] = 80
+        self.bad(s, "port must be 1024..65535")
+        self.ok(multi_spec())                             # one shared port: servers run one at a time
+
+    def test_working_set_above_floor_and_floor_above_vram(self):
+        s = multi_spec()
+        srv(s, "q4kxl")["working_set_mib"] = 26001
+        self.bad(s, "working_set_mib 26001 > free_mib_floor 26000")
+        s = multi_spec()
+        srv(s, "b")["working_set_mib"] = 30001            # default floor 30000
+        self.bad(s, "> free_mib_floor 30000")
+        s = multi_spec()
+        srv(s, "b")["free_mib_floor"] = 40000
+        self.bad(s, "physical VRAM")
+
+    def test_sampling_rules(self):
+        self.bad(multi_spec(sampling={"top_p": 0.95}), "must set temperature")
+        s = multi_spec()
+        del s["sampling"]
+        self.bad(s, "`sampling` is required")
+        self.bad(multi_spec(sampling={"temperature": 1.0, "repetition_penalty": 1.0}), "engine-specific")
+        self.bad(multi_spec(sampling={"temperature": 1.0, "typical_p": 1.0}), "not a capture_engine sampler key")
+        self.bad(multi_spec(sampling={"temperature": 1.0, "top_k": 20.5}), "top_k must be an integer")
+        self.bad(multi_spec(sampling={"temperature": "1"}), "temperature must be a number")
+
+    def test_rep_penalty_key(self):
+        s = multi_spec()
+        srv(s, "b")["rep_penalty_key"] = "rep_pen"
+        self.bad(s, "rep_penalty_key must be")
+        # M3: the key is fixed per engine -- a wrong name silently drops the penalty to the engine default
+        s = multi_spec()
+        srv(s, "d")["rep_penalty_key"] = "repeat_penalty"
+        self.bad(s, "rep_penalty_key on vllm must be 'repetition_penalty'")
+        s = multi_spec()
+        srv(s, "q4kxl")["rep_penalty_key"] = "repetition_penalty"
+        self.bad(s, "rep_penalty_key on llamacpp must be 'repeat_penalty'")
+        for eng in ("q4kxl", "d"):
+            with self.subTest(null_on=eng):
+                s = multi_spec()
+                srv(s, eng)["rep_penalty_key"] = None
+                self.bad(s, "must be")
+        for key in (None, "repetition_penalty", "repeat_penalty"):   # radiance: unverified, any key or none
+            with self.subTest(radiance=key):
+                s = multi_spec()
+                srv(s, "b")["rep_penalty_key"] = key
+                self.ok(s)
+        s = multi_spec()                                           # the defaults pass explicitly too
+        srv(s, "q4kxl")["rep_penalty_key"] = "repeat_penalty"
+        srv(s, "d")["rep_penalty_key"] = "repetition_penalty"
+        self.ok(s)
+
+    def test_radiance_without_key_warns_and_readme_says_so(self):
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            gc.validate_spec(multi_spec())
+        self.assertIn("radiance server 'b': penalty UNVERIFIED until the smoke confirms radiance's key", err.getvalue())
+        self.assertIn("penalty UNVERIFIED until the smoke confirms radiance's key", gc.emit_readme(multi_spec()))
+        s = multi_spec()
+        srv(s, "b")["rep_penalty_key"] = "repetition_penalty"
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            gc.validate_spec(s)
+        self.assertNotIn("UNVERIFIED", err.getvalue())
+        self.assertNotIn("UNVERIFIED until", gc.emit_readme(s))
+
+    def test_server_name_prefix_clash(self):
+        s = multi_spec()
+        srv(s, "b")["name"] = "q4kxl-f16"
+        self.bad(s, "share a '<name>-' prefix", "ONLY='q4kxl-*'")
+
+    def test_placeholder_pins_warn(self):
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            gc.validate_spec(copy.deepcopy(gc.EXAMPLE_MULTI))
+        self.assertIn("PLACEHOLDER pins (all zeros)", err.getvalue())
+        self.assertTrue(any("PLACEHOLDER" in n for n in gc.EXAMPLE_MULTI["notes"]))
+        d = next(x for x in gc.EXAMPLE_MULTI["servers"] if x["engine"] == "vllm")
+        self.assertTrue(d["env"]["CHAT_TEMPLATE"].endswith("dp-sharp-chat_template.jinja"))   # m14d, plan §1
+
+    def test_fixtures_sha256_format_documented(self):
+        msg = self.bad(multi_spec(pins={"fixtures_sha256": "/abs/x.sha256"}), "campaign-relative")
+        self.assertIn("sha256sum", msg)
+        self.assertIn("bench/workloads/tmp", gc.emit_readme(multi_spec()))
+        self.assertIn("bare", gc.__doc__.lower())
+
+    def test_depth_rules(self):
+        s = multi_spec()
+        s["workload"]["ladder"]["depths"] = [8000, 32000, 100000]
+        self.bad(s, ">= 4 depths", "rule 16")
+        s = multi_spec()
+        s["workload"]["ladder"]["depths"] = [32000, 8000, 100000, 200000]
+        self.bad(s, "strictly ascending")
+        s = multi_spec()
+        srv(s, "b")["depths"] = [8000, 16000, 64000, 128000]
+        self.bad(s, "sentinel depth 32000 is not in its ladder")
+        s = multi_spec()
+        srv(s, "b")["depths"] = [8000, 32000, 64000, 128000]
+        self.ok(s)
+
+    def test_context_windows(self):
+        s = multi_spec()
+        srv(s, "b")["ctx"] = 200000                       # 200000 + 1024 does not fit
+        self.bad(s, "b-d200000-n1 needs 201024 tokens > the per-request window 200000")
+        s = multi_spec()
+        del srv(s, "q4kxl")["extra_args"]                 # -np 2 without --kv-unified: ctx/2 per slot
+        self.bad(s, "per-request window 130000", "--kv-unified")
+        s = multi_spec()                                  # unified pool: 2 x (32000 + 1024) must fit
+        srv(s, "q4kxl")["ctx"] = 205000
+        srv(s, "q4kxl")["depths"] = [8000, 32000, 64000, 128000]
+        self.ok(s)
+        s = multi_spec()
+        srv(s, "q4kxl")["ctx"] = 60000
+        srv(s, "q4kxl")["depths"] = [1000, 2000, 32000, 40000]
+        srv(s, "q4kxl")["conv_max_depth"] = 50000
+        self.bad(s, "q4kxl-d32000-n2 needs 2 x 33024 tokens > the unified pool 60000")
+        s = multi_spec()
+        srv(s, "d")["ctx"] = 201024                       # ladder fits, the 205000 conversation does not ...
+        self.bad(s, "d-conv needs 205000")
+        srv(s, "d")["conv_max_depth"] = 200000            # ... unless the server caps it
+        self.ok(s)
+
+    def test_paths_and_bins(self):
+        s = multi_spec()
+        srv(s, "q4kxl")["bin"] = "/x/stack/llamacpp/var/builds/latest-vulkan/bin/llama-server"
+        self.bad(s, "latest-* symlink")
+        s = multi_spec()
+        srv(s, "q4kxl")["gguf"] = "models/x.gguf"
+        self.bad(s, "gguf must be an absolute path")
+        s = multi_spec()
+        srv(s, "b")["rad_file"] = "/models/x.gguf"
+        self.bad(s, "rad_file must end in .rad")
+        s = multi_spec()
+        srv(s, "q4kxl")["gguf"] = "/models/x y.gguf"
+        self.bad(s, "absolute path of")
+
+    def test_extra_args_and_env(self):
+        s = multi_spec()
+        srv(s, "q4kxl")["extra_args"] = "--kv-unified --alias other"
+        self.bad(s, "may not set --alias")
+        s = multi_spec()
+        srv(s, "b")["extra_args"] = "--num-speculative-tokens=3"
+        self.bad(s, "may not set --num-speculative-tokens")
+        s = multi_spec()
+        srv(s, "d")["extra_args"] = "--foo 'a b'"
+        self.bad(s, "extra_args token")
+        for k in ("SERVED_NAME", "FREE_MIB_FLOOR", "EXTRA_ARGS", "PROFILE"):
+            with self.subTest(env=k):
+                s = multi_spec()
+                srv(s, "d")["env"] = {k: "x"}
+                self.bad(s)
+
+    def test_spec_flag_consistency_and_vllm_profile(self):
+        s = multi_spec()
+        srv(s, "b")["spec_tokens"] = 0
+        srv(s, "b")["spec"] = True
+        self.bad(s, "contradicts")
+        s = multi_spec()
+        srv(s, "d")["served_model"] = "other-name"
+        self.bad(s, "!= the profile's SERVED_NAME")
+        s = multi_spec()
+        srv(s, "d")["profile"] = "no/such-profile"
+        self.bad(s, "vllm profile not found")
+
+    def test_workload_and_pins_rules(self):
+        s = multi_spec()
+        s["workload"]["fixture"] = "codereview.txt"
+        self.bad(s, "{depth}")
+        s = multi_spec()
+        s["workload"]["min_gen"] = 2000
+        self.bad(s, "min_gen an int in 0..max_tokens")
+        s = multi_spec()
+        s["workload"]["conversation"]["turn_prompt"] = "no-such.task.md"
+        self.bad(s, "not a file in bench/workloads/tasks/")
+        self.bad(multi_spec(pins={"files": {GGUF: "abc"}}), "sha256 must be 64")
+        self.bad(multi_spec(pins={"images": {RAD_IMAGE: "latest"}}), "digest must be")
+        self.bad(multi_spec(pins={"fixtures_sha256": "/abs/x.sha256"}), "campaign-relative")
+        self.bad(multi_spec(pins={"bogus": 1}), "pins must be an object")
+
+    def test_unpinned_weights_warn(self):
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            gc.validate_spec(multi_spec())
+        self.assertIn("not pinned", err.getvalue())
+        self.assertIn(GGUF, err.getvalue())
+        self.assertIn("SAMPLING, MIN_GEN, TAGS, SPEC_ROWS, STATUS_OUT", err.getvalue())
+
+
+class MultiCells(unittest.TestCase):
+    def test_order_slugs_and_tags(self):
+        s = multi_spec()
+        cells = gc.multi_cells(s, srv(s, "q4kxl"))
+        # m3: ladder ascending, n=2@32k right after the 32k ladder cell, sentinel right after the ladder, then conv
+        self.assertEqual([c["slug"] for c in cells],
+                         ["q4kxl-smoke-d8000", "q4kxl-smoke-conv", "q4kxl-d8000-n1", "q4kxl-d32000-n1",
+                          "q4kxl-d32000-n2", "q4kxl-d100000-n1", "q4kxl-d200000-n1", "q4kxl-sentinel-d32000",
+                          "q4kxl-conv"])
+        lad = cells[3]
+        self.assertEqual(lad["tags"], {"arm": "q4kxl", "depth": 32000, "n": 1, "workload": "codereview",
+                                       "pass": "A", "tier": "minimal", "cell": "ladder", "rep_key": "repeat_penalty"})
+        self.assertEqual(lad["fixture"], "codereview-32000.txt")
+        self.assertEqual(cells[0]["tags"]["tier"], "smoke")
+        self.assertEqual(cells[1]["max_depth"], 10000)          # smoke conversation = turn 0 only
+        self.assertEqual(cells[8]["max_depth"], 205000)
+        self.assertEqual(cells[4]["n"], 2)
+
+    def test_conc_depth_between_ladder_depths_and_rep_key_tags(self):
+        s = multi_spec()
+        s["workload"]["concurrency"]["depths"] = [50000]
+        slugs = [c["slug"] for c in gc.multi_cells(s, srv(s, "q4kxl"))]
+        self.assertLess(slugs.index("q4kxl-d32000-n1"), slugs.index("q4kxl-d50000-n2"))
+        self.assertLess(slugs.index("q4kxl-d50000-n2"), slugs.index("q4kxl-d100000-n1"))
+        self.assertEqual({c["tags"]["rep_key"] for c in gc.multi_cells(s, srv(s, "b"))}, {"UNVERIFIED"})
+        self.assertEqual({c["tags"]["rep_key"] for c in gc.multi_cells(s, srv(s, "d"))}, {"repetition_penalty"})
+
+    def test_min_gen_per_cell_and_conversation_gate(self):
+        s = multi_spec()
+        cells = gc.multi_cells(s, srv(s, "q4kxl"))
+        self.assertEqual({c["min_gen"] for c in cells if c["mode"] == "probe"}, {900})
+        self.assertEqual({c["min_gen"] for c in cells if c["mode"] == "conv"}, {0})      # off unless set (user 2026-11-13)
+        s["workload"]["conversation"]["min_gen"] = 300
+        self.assertEqual({c["min_gen"] for c in gc.multi_cells(s, srv(s, "q4kxl")) if c["mode"] == "conv"}, {300})
+        s["workload"]["conversation"]["min_gen"] = 600
+        msg = quiet(exits, self, gc.validate_spec, s)
+        self.assertIn("conversation.min_gen must be <=", msg)
+
+    def test_spec_reps_only_on_spec_servers_and_spec_depths(self):
+        s = multi_spec()
+        reps = lambda name: {c["depth"]: c["reps"] for c in gc.multi_cells(s, srv(s, name)) if c["cell"] == "ladder"}
+        self.assertEqual(reps("q4kxl"), {8000: 3, 32000: 3, 100000: 3, 200000: 3})     # mtp 0 -> no spec
+        self.assertEqual(reps("b"), {8000: 3, 32000: 5, 100000: 5, 200000: 5})         # spec_tokens 7
+        self.assertEqual(reps("d"), {8000: 3, 32000: 5, 100000: 5, 200000: 5})         # spec true
+
+    def test_concurrency_skipped_when_np_below_n(self):
+        s = multi_spec()
+        srv(s, "b")["np"] = 1
+        self.assertNotIn("b-d32000-n2", [c["slug"] for c in gc.multi_cells(s, srv(s, "b"))])
+
+    def test_sampling_rep_key_per_engine(self):
+        s = multi_spec()
+        smp = {n: json.loads(gc.multi_sampling(s, srv(s, n))) for n in ("q4kxl", "b", "d")}
+        self.assertEqual(smp["q4kxl"]["repeat_penalty"], 1.0)
+        self.assertNotIn("repetition_penalty", smp["q4kxl"])
+        self.assertEqual(smp["d"]["repetition_penalty"], 1.0)
+        self.assertNotIn("repeat_penalty", smp["d"])
+        self.assertFalse({"repeat_penalty", "repetition_penalty"} & set(smp["b"]))   # radiance key UNVERIFIED
+        for v in smp.values():
+            self.assertEqual({k: v[k] for k in ("temperature", "top_p", "top_k", "min_p", "presence_penalty",
+                                                "frequency_penalty")},
+                             {"temperature": 1.0, "top_p": 0.95, "top_k": 20, "min_p": 0, "presence_penalty": 0,
+                              "frequency_penalty": 0})
+        srv(s, "b")["rep_penalty_key"] = "repetition_penalty"
+        self.assertEqual(json.loads(gc.multi_sampling(s, srv(s, "b")))["repetition_penalty"], 1.0)
+
+
+class MultiEmit(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.spec = multi_spec(pins={"files": {GGUF: "a" * 64}, "images": {RAD_IMAGE: "sha256:" + "b" * 12},
+                                    "binaries": [LLAMA_BIN], "single": ["/models/rad/StillDeadcode__q27-mxfp4@*/q27-mxfp4.rad"],
+                                    "fixtures_sha256": "inputs/fixtures.sha256"})
+        quiet(gc.validate_spec, cls.spec)
+        cls.sh = gc.emit_runsh(cls.spec)
+
+    def block(self, name):
+        """The emitted block of one server (from its header to the next)."""
+        start = self.sh.index(f"# ===== server ")
+        parts = self.sh[start:].split("# ===== server ")
+        return next(p for p in parts if p.split(": ", 1)[-1].startswith(name + " ("))
+
+    def test_bash_n(self):
+        bash_n(self, self.sh)
+        bash_n(self, gc.emit_runsh(copy.deepcopy(gc.EXAMPLE_MULTI)))
+
+    def test_shellcheck_if_available(self):
+        sc = shutil.which("shellcheck")
+        if not sc:
+            self.skipTest("shellcheck not installed")
+        r = subprocess.run([sc, "-s", "bash", "-S", "warning", "-"], input=self.sh, capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+
+    def test_no_placeholders_and_two_roots(self):
+        self.assertNotIn("@@", self.sh)
+        self.assertNotIn(gc.REPO, self.sh)
+        self.assertIn('RAW="$CAMPAIGN_DIR/tmp"', self.sh)
+        self.assertIn('RES="$CAMPAIGN_DIR/results"', self.sh)
+        self.assertIn('RUN_DIR="$CAMPAIGN_DIR/tmp/runs/$RUN_TAG"', self.sh)     # rule 19 short-run isolation
+        self.assertIn('RUN_LOCK="$CAMPAIGN_DIR/tmp/run.lock"', self.sh)
+
+    def test_identity_gate_per_server_never_inherited(self):
+        self.assertNotIn("${ENGINES_LIST", self.sh)
+        for name, arm_url in (("q4kxl", "q4kxl|http://localhost:8000/v1|q27-q4kxl"),
+                              ("b", "b|http://localhost:8000/v1|q27-mxfp4"),
+                              ("d", f"d|http://localhost:8000/v1|{SERVED}")):
+            with self.subTest(server=name):
+                blk = self.block(name)
+                self.assertIn(f"export ENGINES_LIST='{arm_url}'", blk)
+                self.assertLess(blk.index("export ENGINES_LIST"), blk.index("boot_server"))
+                self.assertLess(blk.index("boot_server"), blk.index("identity_gate"))
+                self.assertLess(blk.index("identity_gate"), blk.index("residency_check"))
+                self.assertLess(blk.index("residency_check"), blk.index("run_probe_cell"))
+                self.assertLess(blk.index("-sentinel-d32000' "), blk.index("run_conv_cell '" + name + "-conv'"))
+                self.assertLess(blk.index("stop_current"), blk.index("\nsentinel_check "))   # m2: outside the boot
+        self.assertIn(f"identity_gate 8000 'q27-q4kxl' '{LLAMA_BIN}' '{GGUF}' '--alias q27-q4kxl'", self.sh)
+        self.assertIn("identity_gate 8000 'q27-mxfp4' 'stilldeadcode/radiance:1.17.0' "
+                      "'/models/rad/StillDeadcode__q27-mxfp4@60bd4139:/models:ro' '/models/q27-mxfp4.rad' "
+                      "'--served-model-name q27-mxfp4'", self.sh)
+        self.assertIn(f"'--served-model-name {SERVED}' '# profile={PROFILE} '", self.sh)
+
+    def test_launcher_env(self):
+        b = self.block("q4kxl")
+        for kv in (f"'MODEL={GGUF}'", f"'LLAMA_SERVER={LLAMA_BIN}'", "'BACKEND=vulkan'", "'CTX=260000'", "'NP=2'",
+                   "'KV=q8_0'", "'MTP=0'", "'UB=2048'", "'B=8192'", "'FA=on'", "'PORT=8000'",
+                   "'EXTRA_ARGS=--alias q27-q4kxl --kv-unified'"):
+            self.assertIn(kv, b)
+        b = self.block("b")
+        for kv in (f"'RAD_FILE={RAD}'", f"'IMAGE={RAD_IMAGE}'", "'SERVED_NAME=q27-mxfp4'", "'FREE_MIB_FLOOR=30000'",
+                   "'CONTAINER_NAME=radiance-8000'", "'EXTRA_ARGS=--num-speculative-tokens 7'", "'TP=1'"):
+            self.assertIn(kv, b)
+        b = self.block("d")
+        for kv in (f"'PROFILE={PROFILE}'", f"'IMAGE={VLLM_IMAGE}'", "'MAXLEN=260000'", "'MAXSEQS=2'",
+                   "'KV_DTYPE=fp8'", "'WATCHDOG_MIB=32'", "'CACTUS_DELTA=0'"):
+            self.assertIn(kv, b)
+        self.assertNotIn("EXTRA_ARGS", b)
+
+    def test_boot_sequence_functions(self):
+        for want in ('gx=$("$GPU_EXCLUSIVE" "$floor" 2>&1)', 'boot_gate "$slug" "$port" "$floor" || return 1',
+                     '$BOOT_VRAM_SAMPLER --out "$csv" & sampler_pid=$!', 'python3 "$BOOT_DIAG" record',
+                     'BOOT_DIAG="${BOOT_DIAG:-$ROOT/bench/perf/boot_diag.py}"', 'power_snapshot "$slug" before',
+                     'power_snapshot "$slug" after', 'trap stop_current EXIT', 'PORT=$port "$serve" stop',
+                     'container_gone=$gone port_free=$portfree vram_idle=$idle',
+                     '"$AMD_SMI" process -g 0', 'src=vram_delta',
+                     "FAULT_RE='Memory Fault|ErrorDeviceLost|DeviceLostError'",
+                     '"$DOCKER" logs --since "$CELL_T0"', 'tail -c "+$((CELL_OFF + 1))"',
+                     'quarantine_rows "$1"; stop_current; exit 1', 'touch "$RAW/done/$slug"',
+                     'fault_seen && fault_abort "$slug" "at the end of"'):
+            self.assertIn(want, self.sh)
+        # every cell runs under the watcher
+        self.assertEqual(self.sh.count('watched "$slug" env '), 2)
+        # gpu_exclusive before the gate, sampler only after the gate passed
+        bs = self.sh[self.sh.index("boot_server () {"):]
+        self.assertLess(bs.index('"$GPU_EXCLUSIVE"'), bs.index('boot_gate "$slug"'))
+        self.assertLess(bs.index('boot_gate "$slug"'), bs.index("$BOOT_VRAM_SAMPLER"))
+
+    def test_spec_rows_mode_per_engine(self):
+        import re
+        for name, want in (("q4kxl", {"rows"}), ("b", {"diff"}), ("d", {"diff"})):
+            with self.subTest(server=name):
+                got = [re.search(r"rep_key=\w+' '(\w+)' 'codereview-", l).group(1) for l in self.block(name).splitlines()
+                       if l.strip().startswith(("run_probe_cell '", "run_conv_cell '"))]
+                self.assertEqual(len(got), 9)
+                self.assertEqual(set(got), want)
+        self.assertIn('SPEC_ROWS="$srows"', self.sh)
+        self.assertIn('STATUS_OUT="$RAW/status-$slug.json"', self.sh)
+        self.assertIn('TAGS="$tags,tg=$C_MAXT,residency=$RESIDENCY"', self.sh)
+
+    def test_sampling_per_server(self):
+        self.assertIn('"repeat_penalty":1.0}', self.block("q4kxl"))
+        self.assertIn('"repetition_penalty":1.0}', self.block("d"))
+        self.assertNotIn("penalty\":1.0}", self.block("b").split("SMP=")[1].split("\n")[0].replace(
+            '"frequency_penalty":0', "").replace('"presence_penalty":0', ""))
+
+    def test_preflight_pins(self):
+        pf = self.sh[self.sh.index("preflight () {"):self.sh.index("# ================================ execution")]
+        for want in (f"pin_sha '{GGUF}' '{'a' * 64}' || fail=1",
+                     "pin_single '/models/rad/StillDeadcode__q27-mxfp4@*/q27-mxfp4.rad' || fail=1",
+                     f"[ -f '{RAD}' ]", f"[ -x '{LLAMA_BIN}' ]",
+                     f"pin_image '{RAD_IMAGE}' 'sha256:{'b' * 12}' || fail=1",
+                     f"pin_image '{VLLM_IMAGE}' '' || fail=1",
+                     "if gate_port_held 8000", "for v in SAMPLING MIN_GEN TAGS SPEC_ROWS STATUS_OUT; do",
+                     '"$EB/run.sh" --capabilities',
+                     '"$SERVE_LLAMA"', '"$SERVE_RAD"', '"$SERVE_VLLM"'):
+            self.assertIn(want, pf)
+        ex = self.sh[self.sh.index("# ================================ execution"):]
+        self.assertLess(ex.index("preflight"), ex.index("ensure_fixtures"))
+        self.assertLess(ex.index("ensure_fixtures"), ex.index("sha256sum -c --quiet \"$CAMPAIGN_DIR/inputs/fixtures.sha256\""))
+        self.assertLess(ex.index("sha256sum -c"), ex.index("boot_server"))
+
+    def test_knobs(self):
+        for want in ('ONLY="${ONLY:-}"', 'REPS_OVERRIDE="${REPS:-}"', 'MAXTOK_OVERRIDE="${MAX_TOKENS:-}"',
+                     'MINGEN_OVERRIDE="${MIN_GEN:-}"', "*-smoke-*) smoke=1;;", "FIRST_WARMUP=2 API=chat",
+                     'RETRY_INCOMPLETE="${RETRY_INCOMPLETE:-0}"', 'FLOOR_WAIT="${FLOOR_WAIT-90}"',
+                     'STOP_WAIT="${STOP_WAIT-30}"', 'IDLE_WAIT="${IDLE_WAIT-60}"', "check_only",
+                     ">> \"$RES/meta.txt\"", "min_gen=900 conv_min_gen=0"):
+            self.assertIn(want, self.sh)
+
+    def test_readme_and_cmd_emit(self):
+        md = gc.emit_readme(self.spec)
+        self.assertIn("| q4kxl | llamacpp | q4kxl | A |", md)
+        self.assertIn("SAMPLING`, `MIN_GEN`, `TAGS`, `SPEC_ROWS`, `STATUS_OUT", md)
+        self.assertIn("conversation turns are not gated", md)                         # m1: off by default
+        self.assertIn("INCOMPLETE", md)                                                 # m5
+        camp = os.path.realpath(tempfile.mkdtemp(prefix="gc-multi-"))
+        self.addCleanup(shutil.rmtree, camp, True)
+        old = gc.REPO
+        gc.REPO = camp
+        self.addCleanup(setattr, gc, "REPO", old)
+        quiet(cmd_emit_in, camp, multi_spec())
+        d = os.path.join(camp, "campaigns", "perf", "2026-11-13-1200-multi")
+        self.assertTrue(os.access(os.path.join(d, "run.sh"), os.X_OK))
+        self.assertTrue(os.path.exists(os.path.join(d, "README.md")))
+
+
+class MultiPythonSnippets(unittest.TestCase):
+    """The identity / sentinel heredoc bodies, run directly as python on temp files (not via run.sh)."""
+
+    def setUp(self):
+        self.d = tempfile.mkdtemp(prefix="gc-snip-")
+        self.addCleanup(shutil.rmtree, self.d, True)
+
+    def py(self, src, *args):
+        return subprocess.run([sys.executable, "-", *args], input=src, capture_output=True, text=True)
+
+    def test_identity(self):
+        f = write(os.path.join(self.d, "m.json"), json.dumps({"data": [{"id": "x"}]}))
+        self.assertEqual(self.py(gc.IDENTITY_PY, f, "x").stdout, "")
+        self.assertIn("expected exactly", self.py(gc.IDENTITY_PY, f, "y").stdout)
+        write(f, json.dumps({"data": [{"id": "x"}, {"id": "z"}]}))
+        self.assertIn("expected exactly", self.py(gc.IDENTITY_PY, f, "x").stdout)
+        write(f, "not json")
+        self.assertIn("unparseable", self.py(gc.IDENTITY_PY, f, "x").stdout)
+
+    def sentinel(self, lad, sen, spec):
+        rows = os.path.join(self.d, "results.jsonl")
+        out = os.path.join(self.d, "drift.jsonl")
+        agg = lambda label, dec, lo, hi: {"kind": "aggregate", "engine": "a", "label": label,   # noqa: E731
+                                          "decode_tok_s_wall_p50": dec, "decode_tok_s_wall_min": lo,
+                                          "decode_tok_s_wall_max": hi, "prefill_tok_s_wall_p50": 1000.0,
+                                          "prefill_tok_s_wall_min": 990.0, "prefill_tok_s_wall_max": 1010.0}
+        write(rows, json.dumps(agg("a-d32000-n1", *lad)) + "\n" + json.dumps(agg("a-sentinel-d32000", *sen)) + "\n")
+        r = self.py(gc.SENTINEL_PY, rows, out, "a", "a-d32000-n1", "a-sentinel-d32000", spec, "5")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        return r.stdout, json.loads(open(out).read().splitlines()[-1])
+
+    def test_sentinel_non_spec_tolerance(self):
+        out, rec = self.sentinel((50.0, 49, 51), (48.0, 48, 48), "0")      # -4 %: inside 5 %
+        self.assertEqual(out, "")
+        self.assertFalse(rec["decode_tok_s_wall"]["drift"])
+        out, rec = self.sentinel((50.0, 49, 51), (46.0, 46, 46), "0")      # -8 %: drift
+        self.assertIn("DRIFT a-sentinel-d32000: decode_tok_s_wall_p50", out)
+        self.assertTrue(rec["decode_tok_s_wall"]["drift"])
+
+    def test_sentinel_missing_rows_exit_2(self):
+        rows = write(os.path.join(self.d, "results.jsonl"), json.dumps({"kind": "aggregate", "engine": "a",
+                                                                          "label": "a-d32000-n1"}) + "\n")
+        r = self.py(gc.SENTINEL_PY, rows, os.path.join(self.d, "drift.jsonl"), "a", "a-d32000-n1",
+                    "a-sentinel-d32000", "0", "5")
+        self.assertEqual(r.returncode, 2)                          # m2: the caller keeps the check pending
+        self.assertFalse(os.path.exists(os.path.join(self.d, "drift.jsonl")))
+
+    def test_sentinel_spec_uses_min_max(self):
+        out, _ = self.sentinel((50.0, 40, 60), (42.0, 42, 42), "1")        # -16 % but inside min-max
+        self.assertEqual(out, "")
+        out, _ = self.sentinel((50.0, 40, 60), (39.0, 39, 39), "1")
+        self.assertIn("outside the ladder cell's min-max", out)
+
+
+class MultiFaultSeen(unittest.TestCase):
+    """N2: fault_seen must see a fault early in a large log under pipefail (grep -q + SIGPIPE on the writer)."""
+
+    def test_early_fault_in_large_log(self):
+        m = re.search(r"^FAULT_RE=.*$", gc.MULTI_RUNSH_HEAD, re.M)
+        f = re.search(r"^fault_seen \(\) \{.*?; \}$", gc.MULTI_RUNSH_HEAD, re.M | re.S)
+        d = tempfile.mkdtemp(prefix="gc-fault-")
+        self.addCleanup(shutil.rmtree, d, True)
+        with open(os.path.join(d, "9999.log"), "w") as fh:
+            fh.write("boot\nMemory Fault at 0x0\n" + "filler line after the fault\n" * 400000)
+        sh = "set -uo pipefail\n%s\n%s\nCUR_CONTAINER=; CELL_OFF=0; SERVER_STATE_DIR=%s; CUR_PORT=9999\n" \
+             "fault_seen && echo SEEN || echo MISSED\n" % (m.group(0), f.group(0), d)
+        for _ in range(3):
+            self.assertEqual(subprocess.run(["bash", "-c", sh], capture_output=True, text=True).stdout.strip(), "SEEN")
+
+
+class MultiExample(unittest.TestCase):
+    def test_example_flag_prints_valid_multi_spec(self):
+        r = subprocess.run([sys.executable, os.path.join(HERE, "gen_campaign.py"), "example", "--multi-engine"],
+                           capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        spec = json.loads(r.stdout)
+        self.assertEqual({s["engine"] for s in spec["servers"]}, {"llamacpp", "vllm", "radiance"})
+        self.assertEqual(quiet(gc.validate_spec, spec), "README.md")
+        bash_n(self, gc.emit_runsh(spec))
+
+
+class GoldenSingleEngine(unittest.TestCase):
+    """Additivity: every tracked throughput spec emits a byte-identical run.sh + README with the pre-G1
+    generator (git 5e7c10b, exec'd in memory -- nothing written)."""
+    BASE = "5e7c10b"
+
+    @staticmethod
+    def outcome(fn, spec):
+        """fn's result, or how it failed: a spec the old generator already cannot handle (the hand-driven
+        muse-glimmer llama-swap spec, rule 6 exception) must fail identically in the new one."""
+        try:
+            return fn(copy.deepcopy(spec))
+        except SystemExit as e:
+            return ("exit", e.code)
+        except Exception as e:   # noqa: BLE001
+            return ("raise", type(e).__name__, e.args)
+
+    def test_tracked_throughput_specs_unchanged(self):
+        import types
+        root = gc.REPO
+        try:
+            src = subprocess.run(["git", "-C", root, "show", f"{self.BASE}:bench/core/gen_campaign.py"],
+                                 capture_output=True, text=True, check=True).stdout
+            files = subprocess.run(["git", "-C", root, "ls-files", "campaigns/**/spec.json"],
+                                   capture_output=True, text=True, check=True).stdout.split()
+        except (OSError, subprocess.CalledProcessError) as e:
+            self.skipTest(f"git unavailable: {e}")
+        old = types.ModuleType("gen_campaign_pre_g1")
+        old.__file__ = gc.__file__
+        exec(compile(src, gc.__file__, "exec"), old.__dict__)
+        n = 0
+        for rel in files:
+            path = os.path.join(root, rel)
+            with open(path) as fh:
+                spec = json.load(fh)
+            if spec.get("kind", "throughput") != "throughput":
+                continue
+            if not spec.get("date"):   # as cmd_emit resolves it
+                m = __import__("re").fullmatch(r"(\d{4}-\d{2}-\d{2}-\d{4})-" + __import__("re").escape(spec["slug"]),
+                                               os.path.basename(os.path.dirname(path)))
+                spec["date"] = m.group(1) if m else "2026-01-01-0000"
+            with self.subTest(spec=rel):
+                with contextlib.redirect_stderr(io.StringIO()):
+                    self.assertEqual(self.outcome(gc.validate_spec, spec), self.outcome(old.validate_spec, spec))
+                    for fn in ("emit_runsh", "emit_readme"):
+                        self.assertEqual(self.outcome(getattr(gc, fn), spec), self.outcome(getattr(old, fn), spec), fn)
+                n += 1
+        self.assertGreaterEqual(n, 19, "expected every tracked throughput spec to be compared")
+
+
+# ======================================================================================
+# G1 fix round (M5): the emitted multi-engine run.sh EXECUTED against stubs -- fake DRM sysfs, ss, curl,
+# docker, amd-smi, gpu_exclusive, VRAM sampler, serve launchers and engine-bench. The real boot_diag.py
+# records boots (CPU-only). Temp dirs and free high ports only: nothing reaches a GPU, docker or port 8000.
+# ======================================================================================
+MULTI_STUB_SERVE = r'''#!/usr/bin/env bash
+# stub serve_{llamacpp,radiance}.sh: start/stop/print/logs against the fake world $W
+set -u
+verb=$1; P=$PORT; SD=$SERVER_STATE_DIR; mkdir -p "$SD"
+mib () { echo $(( $(cat "$W/drm/card0/device/mem_info_vram_used") / 1048576 )); }
+setmib () { echo $(( $1 * 1048576 )) > "$W/drm/card0/device/mem_info_vram_used"; }
+case "$verb" in
+  print) echo "# stub print engine=${RAD_FILE:+radiance}${LLAMA_SERVER:+llamacpp} port=$P"; exit 0;;
+  logs) cat "$W/log-radiance-$P" 2>/dev/null; exit 0;;
+  start)
+    [ -f "$W/start_fail" ] && { echo "stub start failed" >&2; exit 1; }
+    if [ -n "${LLAMA_SERVER:-}" ]; then
+      echo llamacpp > "$W/engine-$P"
+      served=$(sed -nE 's/.*--alias ([^ ]+).*/\1/p' <<<"$EXTRA_ARGS")
+      echo "$LLAMA_SERVER -m $MODEL -c $CTX -np $NP -ctk $KV -ctv $KV $EXTRA_ARGS" > "$SD/$P.cmdline"
+      echo "llama-server starting" > "$SD/$P.log"
+    else
+      echo radiance > "$W/engine-$P"
+      served=$SERVED_NAME
+      echo "docker run --name $CONTAINER_NAME -v $(dirname "$RAD_FILE"):/models:ro $IMAGE --model /models/$(basename "$RAD_FILE") --served-model-name $SERVED_NAME $EXTRA_ARGS" > "$SD/$P.cmdline"
+      echo "$CONTAINER_NAME" >> "$W/containers"; echo "radiance starting" > "$W/log-$CONTAINER_NAME"
+    fi
+    [ -f "$W/wrong_model" ] && served=someone-else
+    printf '{"data":[{"id":"%s"}]}' "$served" > "$W/models-$P.json"
+    echo "$P" >> "$W/ports"
+    echo "$(mib)" > "$W/vram-before-$P"; setmib $(( $(mib) + $(cat "$W/load_mib") ))
+    echo "up"; exit 0;;
+  stop)
+    [ -f "$W/stop_keep_port" ] || { grep -vx "$P" "$W/ports" > "$W/ports.n"; mv "$W/ports.n" "$W/ports"; }
+    [ -f "$W/stop_keep_vram" ] || { [ -f "$W/vram-before-$P" ] && setmib "$(cat "$W/vram-before-$P")"; }
+    grep -vx "radiance-$P" "$W/containers" > "$W/c.n"; mv "$W/c.n" "$W/containers"
+    echo "stopped $P"; exit 0;;
+esac
+exit 2
+'''
+
+MULTI_STUB_EB = r'''#!/usr/bin/env python3
+# stub engine-bench/run.sh: records its env, then behaves per $W/eb-<SLUG> (ok | fault | fault-late | short | fail)
+import json, os, re, sys, time
+W = os.environ["W"]
+if sys.argv[1:] == ["--capabilities"]:
+    if not os.path.exists(os.path.join(W, "eb_nocaps")):
+        print("engine-bench-capabilities: SAMPLING MIN_GEN TAGS SPEC_ROWS STATUS_OUT")
+    sys.exit(0)
+e = os.environ
+slug = e["SLUG"]
+arm, url, served = e["ENGINES_LIST"].split("|")
+port = re.search(r":(\d+)/", url).group(1)
+keep = ("SLUG", "ENGINES_LIST", "TAGS", "SAMPLING", "MIN_GEN", "SPEC_ROWS", "MODE", "REPS", "WARMUP", "MAX_TOKENS",
+        "STATUS_OUT", "MAX_DEPTH")
+with open(os.path.join(W, "eb.log"), "a") as fh:
+    fh.write(json.dumps({k: e.get(k) for k in keep}) + "\n")
+mode = open(os.path.join(W, "eb-" + slug)).read().strip() if os.path.exists(os.path.join(W, "eb-" + slug)) else "ok"
+
+
+def fault():
+    log = os.path.join(e["SERVER_STATE_DIR"], port + ".log")
+    if open(os.path.join(W, "engine-" + port)).read().strip() == "radiance":
+        log = os.path.join(W, "log-radiance-" + port)
+    with open(log, "a") as fh:
+        fh.write("HW Exception by GPU node-1: Memory Fault\n")
+
+
+if mode == "fault":
+    fault()
+    time.sleep(60)
+    sys.exit(0)
+if mode == "fail":
+    sys.exit(1)
+if mode == "short":
+    with open(e["STATUS_OUT"], "w") as fh:
+        fh.write(json.dumps({"slug": slug, "ok": False, "short": True, "n_short": 2, "n_total": 3,
+                             "min_gen": int(e.get("MIN_GEN") or 0), "failed": [arm]}) + "\n")
+    sys.exit(3)
+tags = dict(t.split("=", 1) for t in e.get("TAGS", "").split(",") if t)
+row = {"kind": "aggregate", "label": slug, "engine": arm, **tags,
+       "decode_tok_s_wall_p50": 50.0, "decode_tok_s_wall_min": 49.0, "decode_tok_s_wall_max": 51.0,
+       "prefill_tok_s_wall_p50": 1000.0, "prefill_tok_s_wall_min": 990.0, "prefill_tok_s_wall_max": 1010.0}
+os.makedirs(os.path.join(e["CAMPAIGN_DIR"], "results"), exist_ok=True)
+with open(os.path.join(e["CAMPAIGN_DIR"], "results", "results.jsonl"), "a") as fh:
+    fh.write(json.dumps(row) + "\n")
+if mode == "fault-late":
+    fault()
+sys.exit(0)
+'''
+
+MULTI_STUB_TOOLS = {
+    "ss": '#!/usr/bin/env bash\n[ -f "$W/ss_fail" ] && exit 1\necho "State Recv-Q Send-Q Local Address:Port Peer Address:Port"\n'
+          'while read -r p; do [ -n "$p" ] && echo "LISTEN 0 128 0.0.0.0:$p 0.0.0.0:*"; done < "$W/ports"\nexit 0\n',
+    "curl": '#!/usr/bin/env bash\nurl="${*: -1}"; p=$(sed -nE \'s#.*:([0-9]+)/v1/models#\\1#p\' <<<"$url")\n'
+            '[ -n "$p" ] && [ -f "$W/models-$p.json" ] && grep -qx "$p" "$W/ports" && { cat "$W/models-$p.json"; exit 0; }\nexit 22\n',
+    "docker": '#!/usr/bin/env bash\ncase "$1 $2" in\n'
+              '  "image inspect") [ -f "$W/img_missing" ] && exit 1; echo "sha256:abcdef1234567890 "; exit 0;;\n'
+              '  "ps -q") [ -f "$W/docker_ps_fail" ] && exit 1; n="${4#name=^}"; n="${n%\\$}"; '
+              'grep -qx "$n" "$W/containers" && echo 0123456789ab; exit 0;;\n'
+              '  "logs --since") cat "$W/log-$4" 2>/dev/null; exit 0;;\n'
+              '  "logs "*) cat "$W/log-$2" 2>/dev/null; exit 0;;\nesac\nexit 0\n',
+    "amd-smi": '#!/usr/bin/env bash\n[ -s "$W/containers" ] && { echo "GPU: 0"; echo "    VRAM_MEM: 17000 MB"; }\nexit 0\n',
+    "gpu_exclusive": '#!/usr/bin/env bash\necho "stub gpu_exclusive floor=$1"\n[ -f "$W/gx_fail" ] && { echo "holder: pid 42" >&2; exit 1; }\nexit 0\n',
+    "sampler.sh": '#!/usr/bin/env bash\nprintf "t,vram_used_mib\\n" > "$2"\nexec sleep 300\n',
+}
+
+
+class MultiStubRun(unittest.TestCase):
+    """Runs the emitted run.sh for a llamacpp + a radiance server against stubs (no GPU / docker / port 8000)."""
+
+    def setUp(self):
+        sigint_default()
+        self.sb = os.path.realpath(tempfile.mkdtemp(prefix="gc-stubrun-"))
+        self.addCleanup(shutil.rmtree, self.sb, True)
+        self.W = os.path.join(self.sb, "world")
+        dev = os.path.join(self.W, "drm", "card0", "device")
+        write(os.path.join(dev, "mem_info_vram_total"), str(32768 * 1048576))
+        write(os.path.join(dev, "mem_info_vram_used"), str(1024 * 1048576))
+        write(os.path.join(dev, "mem_info_gtt_used"), "0")
+        for f in ("ports", "containers"):
+            write(os.path.join(self.W, f), "")
+        write(os.path.join(self.W, "load_mib"), "20000")
+        st = os.path.join(self.sb, "stub")
+        for name, body in MULTI_STUB_TOOLS.items():
+            write(os.path.join(st, name), body, 0o755)
+        write(os.path.join(st, "serve.sh"), MULTI_STUB_SERVE, 0o755)
+        write(os.path.join(st, "eb", "run.sh"), MULTI_STUB_EB, 0o755)
+        self.bin = write(os.path.join(self.sb, "builds", "b1-vulkan", "bin", "llama-server"), "#!/bin/sh\n", 0o755)
+        self.gguf = write(os.path.join(self.sb, "models", "m.gguf"), "gguf weights\n")
+        self.rad = write(os.path.join(self.sb, "models", "R@60bd4139", "m.rad"), "rad weights\n")
+        for fx in ("fx-1000.txt", "fx-2000.txt", "fx-3000.txt", "fx-4000.txt", "conv.txt"):
+            write(os.path.join(self.sb, "bench", "workloads", "tmp", fx), "x\n")
+        self.p1, self.p2 = free_port(), free_port()
+        while self.p2 == self.p1:
+            self.p2 = free_port()
+        assert 8000 not in (self.p1, self.p2)
+        self.old = gc.REPO
+        gc.REPO = self.sb
+        self.addCleanup(setattr, gc, "REPO", self.old)
+
+    def sha(self, path):
+        import hashlib
+        return hashlib.sha256(open(path, "rb").read()).hexdigest()
+
+    def spec(self, pins=True, **over):
+        s = {"slug": "stub", "date": "2026-11-13-1300",
+             "sampling": {"temperature": 1.0, "top_p": 0.95, "top_k": 20, "min_p": 0, "seed": 7},
+             "workload": {"max_tokens": 16, "min_gen": 8, "fixture": "fx-{depth}.txt", "first_warmup": 1,
+                          "ladder": {"depths": [1000, 2000, 3000, 4000], "reps": 1},
+                          "conversation": {"prompt": "conv.txt", "start_tokens": 1000, "step_tokens": 1000,
+                                           "max_depth": 3000, "max_tokens": 16},
+                          "sentinel": {"depth": 1000, "tol_pct": 5}, "smoke": {"depth": 1000}},
+             "servers": [
+                 {"name": "ll", "engine": "llamacpp", "served_model": "m-ll", "gguf": self.gguf, "bin": self.bin,
+                  "ctx": 8000, "np": 1, "kv": "q8_0", "port": self.p1, "working_set_mib": 15000,
+                  "free_mib_floor": 20000},
+                 {"name": "rd", "engine": "radiance", "served_model": "m-rd", "rad_file": self.rad,
+                  "image": "stub/radiance:1.0", "spec_tokens": 0, "ctx": 8000, "np": 1, "kv": "fp8",
+                  "port": self.p2, "working_set_mib": 16000, "free_mib_floor": 20000}]}
+        if pins:
+            s["pins"] = {"files": {self.gguf: self.sha(self.gguf), self.rad: self.sha(self.rad)},
+                         "binaries": [self.bin], "images": {"stub/radiance:1.0": "sha256:abcdef123456"}}
+        s.update(over)
+        return s
+
+    def emit(self, spec):
+        quiet(cmd_emit_in, os.path.join(self.sb, "spec"), spec)
+        self.camp = os.path.join(self.sb, "campaigns", "perf", f"{spec['date']}-{spec['slug']}")
+        self.runsh = os.path.join(self.camp, "run.sh")
+        return self.runsh
+
+    def touch(self, name, text=""):
+        write(os.path.join(self.W, name), text)
+
+    def run_sh(self, timeout=120, **extra):
+        st = os.path.join(self.sb, "stub")
+        env = {k: v for k, v in os.environ.items()
+               if k not in ("ONLY", "REPS", "MAX_TOKENS", "MIN_GEN", "RUN_TAG", "CAMPAIGN_DIR", "ENGINES_LIST")}
+        env.update(W=self.W, ROOT=self.sb, EB=os.path.join(st, "eb"), SERVE_LLAMA=os.path.join(st, "serve.sh"),
+                   SERVE_RAD=os.path.join(st, "serve.sh"), SERVE_VLLM=os.path.join(st, "serve.sh"),
+                   GPU_EXCLUSIVE=os.path.join(st, "gpu_exclusive"),
+                   BOOT_DIAG=os.path.join(HERE, os.pardir, "perf", "boot_diag.py"),
+                   BOOT_VRAM_SAMPLER="bash " + os.path.join(st, "sampler.sh"),
+                   SERVER_STATE_DIR=os.path.join(self.W, "state"), DRM_ROOT=os.path.join(self.W, "drm"),
+                   DOCKER=os.path.join(st, "docker"), AMD_SMI=os.path.join(st, "amd-smi"),
+                   CURL=os.path.join(st, "curl"), SS=os.path.join(st, "ss"), VLLM_CACHE_ROOT=os.path.join(self.W, "vc"),
+                   FLOOR_WAIT="1", STOP_WAIT="1", IDLE_WAIT="1", WATCH_S="1")
+        env.update(extra)
+        return subprocess.run(["bash", self.runsh], env=env, capture_output=True, text=True, timeout=timeout)
+
+    def res(self, name):
+        p = os.path.join(self.camp, "results", name)
+        return open(p).read() if os.path.exists(p) else ""
+
+    def rows(self, name="results.jsonl"):
+        return [json.loads(l) for l in self.res(name).splitlines() if l.strip()]
+
+    def done(self):
+        d = os.path.join(self.camp, "tmp", "done")
+        return sorted(os.listdir(d)) if os.path.isdir(d) else []
+
+    def eb_calls(self):
+        p = os.path.join(self.W, "eb.log")
+        return [json.loads(l) for l in open(p)] if os.path.exists(p) else []
+
+    # ------------------------------------------------------------------ tests
+    def test_full_run_then_resume(self):
+        self.emit(self.spec())
+        r = self.run_sh()
+        out = r.stdout + r.stderr
+        self.assertEqual(r.returncode, 0, out)
+        self.assertIn("preflight OK", out)
+        cells = ["ll-d1000-n1", "ll-d2000-n1", "ll-d3000-n1", "ll-d4000-n1", "ll-sentinel-d1000", "ll-conv",
+                 "rd-d1000-n1", "rd-d2000-n1", "rd-d3000-n1", "rd-d4000-n1", "rd-sentinel-d1000", "rd-conv"]
+        self.assertEqual([c["SLUG"] for c in self.eb_calls()], cells)                 # m3 order, no smoke
+        for c in self.eb_calls():
+            arm = c["SLUG"].split("-")[0]
+            port = self.p1 if arm == "ll" else self.p2
+            self.assertEqual(c["ENGINES_LIST"], f"{arm}|http://localhost:{port}/v1|m-{arm}")   # set, never inherited
+            self.assertIn("residency=ok", c["TAGS"])
+            self.assertEqual(c["SPEC_ROWS"], "rows" if arm == "ll" else "diff")
+            self.assertEqual(c["MIN_GEN"], "0" if c["SLUG"].endswith("-conv") else "8")   # conv gate off by default
+            self.assertIn(f"rep_key={'repeat_penalty' if arm == 'll' else 'UNVERIFIED'}", c["TAGS"])
+            self.assertEqual(c["WARMUP"], "1" if c["SLUG"].endswith("d1000-n1") else ("0" if c["MODE"] is None else None))
+        self.assertIn('"repeat_penalty":1.0', self.eb_calls()[0]["SAMPLING"])
+        self.assertNotIn("penalty", self.eb_calls()[-1]["SAMPLING"])                # radiance: UNVERIFIED, none sent
+        self.assertEqual(self.done(), sorted(cells + ["ll-sentinel-d1000.drift", "rd-sentinel-d1000.drift"]))
+        boots = self.rows("boots.jsonl")
+        self.assertEqual([(b["slug"], b["engine"]) for b in boots], [("ll", "llamacpp"), ("rd", "radiance")])
+        resid = {d["arm"]: d for d in self.rows("residency.jsonl")}
+        self.assertEqual((resid["ll"]["source"], resid["ll"]["residency_mib"], resid["ll"]["status"]),
+                         ("vram_delta", 20000, "ok"))                                    # Vulkan llama: no amd-smi row
+        self.assertEqual((resid["rd"]["source"], resid["rd"]["residency_mib"]), ("amd-smi", 17000))
+        self.assertEqual([d["drift"] if "drift" in d else d["decode_tok_s_wall"]["drift"] for d in self.rows("drift.jsonl")],
+                         [False, False])
+        for slug in ("ll", "rd"):
+            stop = open(os.path.join(self.camp, "tmp", f"stop-{slug}.txt")).read()
+            self.assertIn("port_free=yes vram_idle=yes", stop)
+            self.assertIn("## before", self.res(f"power-{slug}.txt"))
+            self.assertIn("## after", self.res(f"power-{slug}.txt"))
+        self.assertEqual(self.res("failures.txt"), "")
+        self.assertEqual(open(os.path.join(self.W, "ports")).read().strip(), "")       # everything stopped
+        # resume: nothing pending -> no boot, no probe, one more invocation line in meta.txt
+        n_eb, n_boot = len(self.eb_calls()), len(boots)
+        r = self.run_sh()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual((len(self.eb_calls()), len(self.rows("boots.jsonl"))), (n_eb, n_boot))
+        self.assertIn("skip: server ll", r.stdout)
+        self.assertEqual(self.res("meta.txt").count("invocation="), 2)              # m10
+
+    def test_resume_reboots_only_for_pending_cells_and_runs_pending_drift(self):
+        self.emit(self.spec())
+        self.touch("eb-ll-d3000-n1", "fail")
+        r = self.run_sh(ONLY="ll-*")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertNotIn("ll-smoke-d1000", [c["SLUG"] for c in self.eb_calls()])   # 'll-*' does not say smoke
+        self.assertIn("FAILED: ll-d3000-n1", self.res("failures.txt"))
+        self.assertNotIn("ll-d3000-n1", self.done())
+        os.remove(os.path.join(self.W, "eb-ll-d3000-n1"))
+        os.remove(os.path.join(self.camp, "tmp", "done", "ll-sentinel-d1000.drift"))   # a crash before the check
+        n = len(self.eb_calls())
+        r = self.run_sh(ONLY="ll-*")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual([c["SLUG"] for c in self.eb_calls()[n:]], ["ll-d3000-n1"])   # only the pending cell
+        self.assertIn("ll-sentinel-d1000.drift", self.done())                          # m2: the check ran on resume
+
+    def test_boot_gate_refusal(self):
+        self.emit(self.spec())
+        write(os.path.join(self.W, "drm", "card0", "device", "mem_info_vram_used"), str(30000 * 1048576))
+        r = self.run_sh(ONLY="ll-d1000-n1")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        f = self.res("failures.txt")
+        self.assertIn("BOOT REFUSED ll:", f)
+        self.assertIn("free_mib=2768; floor_mib=20000", f)
+        self.assertEqual(self.eb_calls(), [])
+        self.assertEqual(self.rows("boots.jsonl"), [])                                 # no boot attempted
+        self.assertFalse(os.path.exists(os.path.join(self.W, "state", f"{self.p1}.cmdline")))
+        # gpu_exclusive refusing is a refusal too
+        write(os.path.join(self.W, "drm", "card0", "device", "mem_info_vram_used"), str(1024 * 1048576))
+        self.touch("gx_fail")
+        r = self.run_sh(ONLY="ll-d1000-n1")
+        self.assertIn("gpu_exclusive.sh refused", self.res("failures.txt"))
+        self.assertEqual(self.eb_calls(), [])
+
+    def test_preflight_refusals(self):
+        self.emit(self.spec())
+        self.touch("ports", f"{self.p1}\n")                                             # someone holds the port
+        r = self.run_sh()
+        self.assertEqual(r.returncode, 1)
+        self.assertIn(f"RUN REFUSED: port {self.p1} is held", r.stderr)
+        self.touch("ports", "")
+        self.touch("ss_fail")                                                           # m8: ss failing = held
+        r = self.run_sh()
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("is held", r.stderr)
+        os.remove(os.path.join(self.W, "ss_fail"))
+        self.touch("eb_nocaps")                                                         # M1: real capability check
+        r = self.run_sh()
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("--capabilities lacks SAMPLING", r.stderr)
+        os.remove(os.path.join(self.W, "eb_nocaps"))
+        r = self.run_sh(FLOOR_WAIT="")                                                  # m10
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("FLOOR_WAIT='' must be a non-negative integer", r.stderr)
+        r = self.run_sh(ONLY="nosuch-*")                                                # m4: a typo selects nothing
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("ONLY glob 'nosuch-*' matches no cell", r.stderr)
+        self.assertEqual(self.eb_calls(), [])
+
+    def test_unpinned_refused_unless_smoke_only(self):
+        self.emit(self.spec(pins=False))
+        r = self.run_sh(ONLY="ll-d1000-n1")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("PIN-FAIL: unpinned", r.stderr)
+        r = self.run_sh(ONLY="*-smoke-*")                                               # m12: smoke may run unpinned
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual([c["SLUG"] for c in self.eb_calls()],
+                         ["ll-smoke-d1000", "ll-smoke-conv", "rd-smoke-d1000", "rd-smoke-conv"])
+        self.assertIn("tier=smoke", self.eb_calls()[0]["TAGS"])
+        self.assertEqual(self.eb_calls()[1]["MAX_DEPTH"], "1000")                      # one-turn conversation
+
+    def test_fault_during_cell_aborts(self):
+        self.emit(self.spec())
+        self.touch("eb-ll-d2000-n1", "fault")
+        r = self.run_sh()
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn("MEMORY-FAULT on llamacpp server ll during cell ll-d2000-n1", self.res("failures.txt"))
+        self.assertEqual(self.done(), ["ll-d1000-n1"])
+        self.assertEqual([c["SLUG"] for c in self.eb_calls()], ["ll-d1000-n1", "ll-d2000-n1"])   # run aborted
+        self.assertEqual(open(os.path.join(self.W, "ports")).read().strip(), "")       # server stopped
+        self.assertEqual([b["slug"] for b in self.rows("boots.jsonl")], ["ll"])       # rd never booted
+
+    def test_fault_at_cell_end_quarantines_rows(self):
+        self.emit(self.spec())
+        self.touch("eb-rd-d1000-n1", "fault-late")                                     # m7: the container path
+        r = self.run_sh(ONLY="rd-*")
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn("MEMORY-FAULT on radiance server rd at the end of cell rd-d1000-n1", self.res("failures.txt"))
+        self.assertEqual([d["label"] for d in self.rows()], [])
+        self.assertEqual([d["label"] for d in self.rows("quarantine.jsonl")], ["rd-d1000-n1"])
+        self.assertEqual(self.done(), [])
+        self.assertEqual(open(os.path.join(self.W, "containers")).read().strip(), "")
+
+    def test_stop_verify_failure_blocks_the_next_boot(self):
+        self.emit(self.spec())
+        self.touch("stop_keep_port")
+        self.touch("stop_keep_vram")
+        r = self.run_sh(ONLY="ll-d1000-n1,rd-d1000-n1")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        f = self.res("failures.txt")
+        self.assertIn(f"WARN: port {self.p1} still held (or ss failed) after stopping ll", f)
+        self.assertIn("WARN: VRAM not idle after stopping ll (21024 MiB > pre-boot 1024 + 1024)", f)
+        self.assertIn("BOOT REFUSED rd:", f)                                            # VRAM still held by ll
+        self.assertEqual([c["SLUG"] for c in self.eb_calls()], ["ll-d1000-n1"])
+        stop = open(os.path.join(self.camp, "tmp", "stop-ll.txt")).read()
+        self.assertIn("port_free=no vram_idle=no", stop)
+
+    def test_docker_ps_failure_is_unknown_not_gone(self):
+        self.emit(self.spec())
+        self.touch("docker_ps_fail")
+        r = self.run_sh(ONLY="rd-d1000-n1")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("container radiance-%d state unknown after stopping rd (docker ps failed)" % self.p2,
+                      self.res("failures.txt"))
+        self.assertIn("container_gone=unknown", open(os.path.join(self.camp, "tmp", "stop-rd.txt")).read())
+
+    def test_low_residency_is_stamped_on_rows(self):
+        self.emit(self.spec())
+        self.touch("load_mib", "5000")
+        r = self.run_sh(ONLY="ll-d1000-n1")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("ll residency 5000 MiB (vram_delta) < expected working set 15000 MiB", self.res("failures.txt"))
+        self.assertEqual(self.rows()[0]["residency"], "low")                            # m6: the row says so
+        self.assertEqual(self.rows("residency.jsonl")[0]["status"], "low")
+
+    def test_identity_mismatch_skips_the_server(self):
+        self.emit(self.spec())
+        self.touch("wrong_model")
+        r = self.run_sh(ONLY="ll-d1000-n1,rd-d1000-n1")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        f = self.res("failures.txt")
+        self.assertIn("IDENTITY-FAILED ll: /v1/models lists ['someone-else'], expected exactly ['m-ll']", f)
+        self.assertIn("IDENTITY-FAILED rd:", f)
+        self.assertEqual(self.eb_calls(), [])
+        self.assertEqual(open(os.path.join(self.W, "ports")).read().strip(), "")       # both stopped again
+        os.remove(os.path.join(self.W, "wrong_model"))                                  # a cmdline needle missing
+        self.emit(self.spec())
+        with open(os.path.join(self.sb, "stub", "serve.sh")) as fh:
+            body = fh.read()
+        write(os.path.join(self.sb, "stub", "serve.sh"), body.replace("-m $MODEL", "-m /elsewhere.gguf"), 0o755)
+        r = self.run_sh(ONLY="ll-d1000-n1")
+        self.assertIn(f"lacks '{self.gguf}'", self.res("failures.txt"))
+        self.assertEqual(self.eb_calls(), [])
+
+    def test_short_cell_stops_incomplete_without_retry(self):
+        self.emit(self.spec())
+        self.touch("eb-ll-d2000-n1", "short")
+        r = self.run_sh(ONLY="ll-d1000-n1,ll-d2000-n1")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        f = self.res("failures.txt")
+        self.assertIn("INCOMPLETE ll-d2000-n1: n_short=2 of 3 below min_gen 8", f)
+        self.assertIn("NOT retried", f)
+        self.assertEqual(self.done(), ["ll-d1000-n1", "ll-d2000-n1.incomplete"])
+        n = len(self.eb_calls())
+        r = self.run_sh(ONLY="ll-d1000-n1,ll-d2000-n1")                                # no silent retry, no boot
+        self.assertEqual(len(self.eb_calls()), n)
+        self.assertIn("skip: server ll", r.stdout)
+        os.remove(os.path.join(self.W, "eb-ll-d2000-n1"))
+        r = self.run_sh(ONLY="ll-d2000-n1", RETRY_INCOMPLETE="1")                       # deliberate retry
+        self.assertEqual([c["SLUG"] for c in self.eb_calls()[n:]], ["ll-d2000-n1"])
+        self.assertEqual(self.done(), ["ll-d1000-n1", "ll-d2000-n1"])
 
 
 if __name__ == "__main__":

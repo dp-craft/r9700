@@ -252,6 +252,44 @@ class LabelDepth(unittest.TestCase):
         for lab in ("thinking", "agentic-c4", "q8-10k", None, 7):
             self.assertIsNone(report.label_depth(lab), lab)
 
+    def test_g1_cell_labels(self):
+        # gen_campaign G1 multi-engine slugs: <name>-d<D>-n<N>
+        self.assertEqual(report.label_depth("q4kxl-d8000-n1"), 8000)
+        self.assertEqual(report.label_depth("q4kxl-d32000-n2"), 32000)
+
+    def test_row_depth_prefers_the_tag_and_only_ladder_cells_form_curves(self):
+        rd = report.row_depth
+        self.assertEqual(rd({"label": "x-d8000-n1", "depth": 8000, "cell": "ladder"}), 8000)
+        self.assertEqual(rd({"label": "weird", "depth": 16000}), 16000)              # tag wins over the label
+        for cell in ("sentinel", "smoke", "conc", "conv"):
+            self.assertIsNone(rd({"label": "x-sentinel-d32000", "depth": 32000, "cell": cell}), cell)
+        self.assertIsNone(rd({"label": "x-d32000-n2", "depth": 32000, "n": 2}))      # n>1 is not the cold curve
+        self.assertEqual(rd({"label": "llamacpp-d16384"}), 16384)                    # untagged legacy rows
+
+    def test_g1_campaign_curve_ignores_sentinel_and_smoke(self):
+        root = tempfile.mkdtemp(prefix="rpt-g1-")
+        self.addCleanup(shutil.rmtree, root, True)
+        rows = []
+        for d, pre in ((8000, 1000.0), (32000, 700.0), (100000, 400.0), (200000, 250.0)):
+            rows.append({"kind": "aggregate", "engine": "a", "label": f"a-d{d}-n1", "depth": d, "n": 1,
+                         "cell": "ladder", "prefill_tok_s_p50": pre, "decode_tok_s_per_stream_p50": 50.0})
+        rows.append({"kind": "aggregate", "engine": "a", "label": "a-sentinel-d32000", "depth": 32000, "n": 1,
+                     "cell": "sentinel", "prefill_tok_s_p50": 1.0, "decode_tok_s_per_stream_p50": 1.0})
+        rows.append({"kind": "aggregate", "engine": "a", "label": "a-smoke-d8000", "depth": 8000, "n": 1,
+                     "cell": "smoke", "prefill_tok_s_p50": 1.0, "decode_tok_s_per_stream_p50": 1.0})
+        rows.append({"kind": "aggregate", "engine": "a", "label": "a-d32000-n2", "depth": 32000, "n": 2,
+                     "cell": "conc", "prefill_tok_s_p50": 1.0, "decode_tok_s_per_stream_p50": 1.0})
+        _write(os.path.join(root, "results", "results.jsonl"), "".join(json.dumps(r) + "\n" for r in rows))
+        files, md = report.render_throughput(root)
+        self.assertIn("depth_prefill.svg", files)
+        svg = files["depth_prefill.svg"]
+        self.assertIn("200K", svg)
+        text = "\n".join(md)
+        self.assertIn("cold `a`", text)                      # one series per arm: a-d<D>-n1 -> a
+        fit = [l for l in md if "cold `a`" in l and "prefill_tok_s_p50" in l]
+        self.assertEqual(len(fit), 1, md)
+        self.assertIn("| 4 | 8000–200000 |", fit[0])        # 4 ladder points; sentinel/smoke/n=2 left out
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -21,7 +21,8 @@ Pure functions:
 CLI (used by run.sh):
   boot_diag.py tail   --out FILE --section 'LABEL=PATH' ... [--meta k=v ...] [--lines 300]   (appends)
   boot_diag.py cache  --dir DIR [--budget-s 20]                                         (JSON on stdout)
-  boot_diag.py record --out boots.jsonl --name N --arm A --kind vllm|radiance ...       (appends one line)
+  boot_diag.py record --out boots.jsonl --name N --arm A --kind vllm|radiance|llamacpp ... (appends one line;
+                     --kind is stored verbatim: gen_campaign's multi-engine run.sh passes llamacpp too)
 """
 import argparse
 import json

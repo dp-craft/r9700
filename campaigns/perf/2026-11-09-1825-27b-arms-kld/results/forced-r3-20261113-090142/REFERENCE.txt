@@ -1,0 +1,5 @@
+q8 reference: identical copy (sha256 a804da5863b10251…) of results/forced-20261112-093746 run's kld-q8.jsonl; scores use that reference.
+c, q4kxl, q8f arm files for the paired diffs: the forced-20261112-093746 run's raw kld-c.jsonl, kld-q4kxl.jsonl, kld-q8f.jsonl (unchanged).
+Residency: the WARN 0.00 GiB lines in failures.txt are an amd-smi attribution gap (it does not list the Vulkan llama-server process).
+VRAM sampler peaks during each boot+fetch (MEASURED, run tmp/boot-<arm>-vram.csv, not committed): q6k 31001 MiB (GTT peak 833 MiB),
+q6kf16 23971 MiB (GTT 455), q4kxlf16 20073 MiB (GTT 441); baseline before boot 1211-1441 MiB.

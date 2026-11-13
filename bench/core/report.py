@@ -494,18 +494,36 @@ def loglog_fit(xs, ys):
 
 
 def label_depth(lab):
-    """Prompt depth encoded in a throughput row label, or None.
+    """Prompt depth encoded in a throughput row label, or None (fallback for rows without a `depth` tag).
 
-    "cr8192" (code-review fixture), "<engine>-d8192" (campaign depth rows), or
-    "<arm>-10k-tg512-n1" (engine-bench cell labels: depth in k tokens).
+    "cr8192" (code-review fixture), "<engine>-d8192" (campaign depth rows), "<name>-d8192-n1"
+    (gen_campaign multi-engine cells), or "<arm>-10k-tg512[-n1]" (engine-bench cell labels: depth in k tokens).
     """
     if not isinstance(lab, str):
         return None
-    m = re.fullmatch(r"cr(\d+)|.+[-_](?:cr|d)(\d+)", lab)
+    m = re.fullmatch(r"cr(\d+)|.+[-_](?:cr|d)(\d+)(?:-n\d+)?", lab)
     if m:
         return int(m.group(1) or m.group(2))
     m = re.fullmatch(r".+?-(\d+)k-tg\d+(?:-.*)?", lab)
     return int(m.group(1)) * 1000 if m else None
+
+
+def row_depth(r):
+    """Depth of an aggregate row for the cold depth CURVE, or None when the row is not a curve point.
+
+    A `depth` tag (capture_engine --tag, stored as int) wins over the label. Rows carrying a `cell` tag
+    (gen_campaign multi-engine) form a curve only when cell == "ladder": sentinel / smoke / conc / conv
+    rows repeat or bracket a ladder depth and must never become a curve point. A row tagged n > 1 is a
+    concurrency cell, not the cold single-stream curve. Untagged rows fall back to label_depth().
+    """
+    if "cell" in r and r.get("cell") != "ladder":
+        return None
+    if isinstance(r.get("n"), int) and r["n"] > 1:
+        return None
+    d = r.get("depth")
+    if isinstance(d, int) and not isinstance(d, bool):
+        return d
+    return label_depth(r.get("label"))
 
 
 def render_throughput(d):
@@ -527,7 +545,7 @@ def render_throughput(d):
     files = OrderedDict()
 
     def depth_of(r):
-        return label_depth(r.get("label"))
+        return row_depth(r)
 
     cr = [r for r in ag if depth_of(r) is not None]
     depths = sorted(d for d in {depth_of(r) for r in cr} if d is not None)
@@ -604,7 +622,7 @@ def render_throughput(d):
                                  min(r.get("context_tokens") or 0 for r in et), max(r.get("context_tokens") or 0 for r in et)))
     # one fit per (engine, probe series): the label minus its depth suffix (deep-mtp0-cr8000 ->
     # deep-mtp0), so configs sharing an engine name (MTP on/off, KV types) are never fitted together
-    series_of = lambda r: re.sub(r"[-_](?:cr|d)\d+$", "", r["label"])
+    series_of = lambda r: re.sub(r"[-_](?:cr|d)\d+(?:-n\d+)?$", "", r["label"])
     for key in OrderedDict(((r.get("engine"), series_of(r)), 1) for r in cr):
         ea = [r for r in cr if (r.get("engine"), series_of(r)) == key]
         for field in ("prefill_tok_s_p50", "decode_tok_s_per_stream_p50"):

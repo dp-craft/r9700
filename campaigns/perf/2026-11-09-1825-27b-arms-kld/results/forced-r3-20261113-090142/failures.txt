@@ -1,0 +1,3 @@
+  WARN (rule 15b): arm q6k residency 0.00 GiB < INFERRED floor 16.4 GiB — see /home/dev/work/dp-craft/amd/campaigns/perf/2026-11-09-1825-27b-arms-kld/tmp/runs/forced-r3-20261113-090142/results/residency-q6k.txt
+  WARN (rule 15b): arm q6kf16 residency 0.00 GiB < INFERRED floor 16.4 GiB — see /home/dev/work/dp-craft/amd/campaigns/perf/2026-11-09-1825-27b-arms-kld/tmp/runs/forced-r3-20261113-090142/results/residency-q6kf16.txt
+  WARN (rule 15b): arm q4kxlf16 residency 0.00 GiB < INFERRED floor 16.4 GiB — see /home/dev/work/dp-craft/amd/campaigns/perf/2026-11-09-1825-27b-arms-kld/tmp/runs/forced-r3-20261113-090142/results/residency-q4kxlf16.txt

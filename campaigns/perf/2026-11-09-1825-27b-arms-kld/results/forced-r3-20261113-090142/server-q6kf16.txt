@@ -1,0 +1,4 @@
+gguf=/mnt/LinBackup/models/gguf/unsloth/Qwen3.8-27B-UD-Q6_K.gguf bytes=21983677344 llama_server=/home/dev/work/dp-craft/amd/stack/llamacpp/var/builds/b11448-vulkan-1.4.363.0/bin/llama-server
+starting on :8000 (pid 317068) — log: /home/dev/work/dp-craft/amd/stack/serve/var/servers/8000.log
+up after 69s — model: Qwen3.8-27B-UD-Q6_K.gguf — build: b11448-ab09ea4
+cmdline: /home/dev/work/dp-craft/amd/stack/llamacpp/var/builds/b11448-vulkan-1.4.363.0/bin/llama-server -m /home/dev/models/gguf/unsloth/Qwen3.8-27B-UD-Q6_K.gguf -c 32768 -np 1 -ngl 99 -fa on -ub 2048 -b 8192 -ctk f16 -ctv f16 --host 127.0.0.1 --port 8000 --alias qwen38-27b-ud-q6k

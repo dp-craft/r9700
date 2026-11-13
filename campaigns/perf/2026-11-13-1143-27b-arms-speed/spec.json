@@ -1,0 +1,265 @@
+{
+ "slug": "27b-arms-speed",
+ "date": "2026-11-13-1143",
+ "type": "perf",
+ "title": "Qwen3.8-27B arms: speed vs depth, n=2 and a growing conversation (minimal tier)",
+ "port": 8000,
+ "tuning": {
+  "ub": 2048,
+  "b": 8192,
+  "fa": "on"
+ },
+ "notes": [
+  "Plan: notes/plans/2026-11-12-1200-27b-arms-speed-campaign-plan.md (v2, APPROVED 2026-11-12; Q1-Q13 as recommended; minimal tier first)",
+  "Same arm = same KLD arm (docs/findings/quality/2026-11-09-1825-27b-arms-kld.md), ctx/np set to production 260000/2 (D1)",
+  "Arm order interleaves engine families (plan 2.5): q4kxl, b, d, q6k, c, d0, q4mtp, a, c0, q8",
+  "q8: 65536 / q8_0 / np 1 (Q3): predicted ~29.1 GiB from the MEASURED KLD boot (f16 @32768 ready 29790 MiB, KV 2048 vs 2176 MiB), 4 depths to 60k, conversation to 60k",
+  "llama.cpp arms: dp-sharp template via --jinja --chat-template-file (Q4); the smoke must show it renders, else drop those two flags (GGUF template) and record the asymmetry",
+  "q6k at 260000/2 q8_0 sat at 31008 MiB at ready with an 833 MiB GTT boot peak in KLD round 3 (MEASURED): watch its boot GTT; floor 31300 MiB needs an idle desktop",
+  "repetition penalty 1.0 under each engine's own key (user 2026-11-13); radiance key UNVERIFIED until the smoke",
+  "Conversation min-gen gate off by default; a min-gen-short probe cell stops as INCOMPLETE and is rerun only with RETRY_INCOMPLETE=1 (user 2026-11-13)"
+ ],
+ "sampling": {
+  "temperature": 1.0,
+  "top_p": 0.95,
+  "top_k": 20,
+  "min_p": 0,
+  "presence_penalty": 0,
+  "frequency_penalty": 0,
+  "seed": 1234
+ },
+ "workload": {
+  "tier": "minimal",
+  "pass": "A",
+  "api": "chat",
+  "max_tokens": 1024,
+  "min_gen": 900,
+  "prefix_mode": "unique",
+  "fixture": "codereview-{depth}.txt",
+  "first_warmup": 2,
+  "repetition_penalty": 1.0,
+  "ladder": {
+   "depths": [
+    8000,
+    32000,
+    100000,
+    200000
+   ],
+   "reps": 3,
+   "spec_reps": 5,
+   "spec_depths": [
+    32000,
+    100000,
+    200000
+   ]
+  },
+  "concurrency": {
+   "n": 2,
+   "depths": [
+    32000
+   ],
+   "reps": 3
+  },
+  "conversation": {
+   "prompt": "codereview-270000.txt",
+   "start_tokens": 10000,
+   "step_tokens": 20000,
+   "max_depth": 205000,
+   "max_tokens": 512,
+   "reps": 1,
+   "turn_prompt": "codereview-large.task.md"
+  },
+  "sentinel": {
+   "depth": 32000,
+   "reps": 1,
+   "tol_pct": 5
+  },
+  "smoke": {
+   "depth": 8000
+  }
+ },
+ "pins": {
+  "files": {
+   "/home/dev/models/gguf/unsloth/Qwen3.8-27B-Q8_0.gguf": "a680f44a06920e5d689774823782006aa3acc8db95750323373b24139b67e348",
+   "/home/dev/models/gguf/unsloth/Qwen3.8-27B-UD-Q4_K_XL.gguf": "3f227079003add2511437e5b1e94812e363385225bf6a9b47b0054a72bc8b01e",
+   "/home/dev/models/gguf/unsloth/Qwen3.8-27B-UD-Q6_K.gguf": "c9c206812fbe4ac7b76a729e25928b63f2ae89d37f69da7a71c20aec763cd436",
+   "/home/dev/work/dp-craft/amd/stack/llamacpp/var/builds/b11448-vulkan-1.4.363.0/bin/llama-server": "03edcf802d50ac9b969ada6545beeb25c6745af580f8879867dc6207c5fd452f",
+   "/mnt/Lin1/work/radiance/models/StillDeadcode__qwen3.8-27b-mxfp4@60bd4139/qwen3.8-27b-mxfp4.rad": "a4908940c568f5f9dd24e88f46aefe9ac2ae07dfec023a2eaa1d14dcaa3df4f8",
+   "/mnt/Lin1/work/radiance/models/StillDeadcode__qwen3.8-27b-iqr-v4@e5f1b3ef/qwen3.8-27b-iq4r-l-v4.rad": "d57d1428218e20a4cd578c3e286f30a2e566e589c832bf5004f49e164cb48ae4"
+  },
+  "images": {
+   "stilldeadcode/radiance:1.11.0": "sha256:44f2fe5fe8be318c34f30d66795c4059c398df474d9b806313d87e3c48d582e2",
+   "stilldeadcode/radiance:1.17.0": "sha256:c2acbaa373c89272ec47a22befa1cf04d2ddf1de51c2baf534f5273e517f7100",
+   "ghcr.io/slybase/vllm-sly-radiance:1.11.0-rocm10.1": "sha256:22baa741ab049d33886024ce29120272fdae6403bb2696e3fccd1894618e7ea1"
+  },
+  "single": [
+   "/mnt/Lin1/work/radiance/models/StillDeadcode__qwen3.8-27b-mxfp4@*/qwen3.8-27b-mxfp4.rad",
+   "/mnt/Lin1/work/radiance/models/StillDeadcode__qwen3.8-27b-iqr-v4@*/qwen3.8-27b-iq4r-l-v4.rad",
+   "/mnt/Lin1/work/vllm/sly-radiance/models/RedHatAI__Qwen3.8-27B-MXFP4@*",
+   "/mnt/Lin1/work/vllm/sly-radiance/models/syvai__Qwen3.8-27B-DFlash2-W4A16@*"
+  ]
+ },
+ "servers": [
+  {
+   "name": "q4kxl",
+   "engine": "llamacpp",
+   "served_model": "qwen38-27b-ud-q4kxl",
+   "gguf": "/home/dev/models/gguf/unsloth/Qwen3.8-27B-UD-Q4_K_XL.gguf",
+   "bin": "/home/dev/work/dp-craft/amd/stack/llamacpp/var/builds/b11448-vulkan-1.4.363.0/bin/llama-server",
+   "backend": "vulkan",
+   "mtp": 0,
+   "ctx": 260000,
+   "np": 2,
+   "kv": "q8_0",
+   "extra_args": "--kv-unified --jinja --chat-template-file /home/dev/work/dp-craft/amd/stack/serve/vllm/templates/dp-sharp-chat_template.jinja",
+   "working_set_mib": 16745,
+   "free_mib_floor": 27300
+  },
+  {
+   "name": "b",
+   "engine": "radiance",
+   "served_model": "qwen38-27b-mxfp4",
+   "rad_file": "/mnt/Lin1/work/radiance/models/StillDeadcode__qwen3.8-27b-mxfp4@60bd4139/qwen3.8-27b-mxfp4.rad",
+   "image": "stilldeadcode/radiance:1.17.0",
+   "spec_tokens": 7,
+   "ctx": 260000,
+   "np": 2,
+   "kv": "fp8",
+   "extra_args": "--gpu-headroom-mib 596",
+   "working_set_mib": 18479,
+   "free_mib_floor": 30000
+  },
+  {
+   "name": "d",
+   "engine": "vllm",
+   "served_model": "qwen38-27b-redhat-mxfp4-dflash",
+   "profile": "sly-redhat/redhat-mxfp4-dflash",
+   "image": "ghcr.io/slybase/vllm-sly-radiance:1.11.0-rocm10.1",
+   "spec": true,
+   "ctx": 260000,
+   "np": 2,
+   "kv": "fp8",
+   "working_set_mib": 15186,
+   "free_mib_floor": 30000,
+   "env": {
+    "WATCHDOG_MIB": "32",
+    "GPU_UTIL": "0.93",
+    "CACTUS_DELTA": "0",
+    "CHAT_TEMPLATE": "/home/dev/work/dp-craft/amd/stack/serve/vllm/templates/dp-sharp-chat_template.jinja"
+   }
+  },
+  {
+   "name": "q6k",
+   "engine": "llamacpp",
+   "served_model": "qwen38-27b-ud-q6k",
+   "gguf": "/home/dev/models/gguf/unsloth/Qwen3.8-27B-UD-Q6_K.gguf",
+   "bin": "/home/dev/work/dp-craft/amd/stack/llamacpp/var/builds/b11448-vulkan-1.4.363.0/bin/llama-server",
+   "backend": "vulkan",
+   "mtp": 0,
+   "ctx": 260000,
+   "np": 2,
+   "kv": "q8_0",
+   "extra_args": "--kv-unified --jinja --chat-template-file /home/dev/work/dp-craft/amd/stack/serve/vllm/templates/dp-sharp-chat_template.jinja",
+   "working_set_mib": 20965,
+   "free_mib_floor": 31300
+  },
+  {
+   "name": "c",
+   "engine": "radiance",
+   "served_model": "qwen38-27b-iq4r-l-v4",
+   "rad_file": "/mnt/Lin1/work/radiance/models/StillDeadcode__qwen3.8-27b-iqr-v4@e5f1b3ef/qwen3.8-27b-iq4r-l-v4.rad",
+   "image": "stilldeadcode/radiance:1.17.0",
+   "spec_tokens": 7,
+   "ctx": 260000,
+   "np": 2,
+   "kv": "fp8",
+   "extra_args": "--gpu-headroom-mib 596",
+   "working_set_mib": 17834,
+   "free_mib_floor": 30000
+  },
+  {
+   "name": "d0",
+   "engine": "vllm",
+   "served_model": "qwen38-27b-redhat-mxfp4-sly",
+   "profile": "sly-redhat/redhat-mxfp4",
+   "image": "ghcr.io/slybase/vllm-sly-radiance:1.11.0-rocm10.1",
+   "spec": false,
+   "ctx": 260000,
+   "np": 2,
+   "kv": "fp8",
+   "working_set_mib": 13957,
+   "free_mib_floor": 30000,
+   "env": {
+    "WATCHDOG_MIB": "32",
+    "GPU_UTIL": "0.93",
+    "CACTUS_DELTA": "0",
+    "CHAT_TEMPLATE": "/home/dev/work/dp-craft/amd/stack/serve/vllm/templates/dp-sharp-chat_template.jinja"
+   }
+  },
+  {
+   "name": "q4mtp",
+   "engine": "llamacpp",
+   "served_model": "qwen38-27b-ud-q4kxl-mtp",
+   "gguf": "/home/dev/models/gguf/unsloth/Qwen3.8-27B-UD-Q4_K_XL.gguf",
+   "bin": "/home/dev/work/dp-craft/amd/stack/llamacpp/var/builds/b11448-vulkan-1.4.363.0/bin/llama-server",
+   "backend": "vulkan",
+   "mtp": 1,
+   "ctx": 260000,
+   "np": 2,
+   "kv": "q8_0",
+   "extra_args": "--kv-unified --jinja --chat-template-file /home/dev/work/dp-craft/amd/stack/serve/vllm/templates/dp-sharp-chat_template.jinja",
+   "working_set_mib": 16745,
+   "free_mib_floor": 27800
+  },
+  {
+   "name": "a",
+   "engine": "radiance",
+   "served_model": "qwen38-27b-mxfp4",
+   "rad_file": "/mnt/Lin1/work/radiance/models/StillDeadcode__qwen3.8-27b-mxfp4@60bd4139/qwen3.8-27b-mxfp4.rad",
+   "image": "stilldeadcode/radiance:1.11.0",
+   "spec_tokens": 7,
+   "ctx": 260000,
+   "np": 2,
+   "kv": "fp8",
+   "extra_args": "--gpu-headroom-mib 596",
+   "working_set_mib": 18479,
+   "free_mib_floor": 30000
+  },
+  {
+   "name": "c0",
+   "engine": "radiance",
+   "served_model": "qwen38-27b-iq4r-l-v4",
+   "rad_file": "/mnt/Lin1/work/radiance/models/StillDeadcode__qwen3.8-27b-iqr-v4@e5f1b3ef/qwen3.8-27b-iq4r-l-v4.rad",
+   "image": "stilldeadcode/radiance:1.17.0",
+   "spec_tokens": 0,
+   "ctx": 260000,
+   "np": 2,
+   "kv": "fp8",
+   "extra_args": "--gpu-headroom-mib 596",
+   "working_set_mib": 17834,
+   "free_mib_floor": 30000
+  },
+  {
+   "name": "q8",
+   "engine": "llamacpp",
+   "served_model": "qwen38-27b-q8",
+   "gguf": "/home/dev/models/gguf/unsloth/Qwen3.8-27B-Q8_0.gguf",
+   "bin": "/home/dev/work/dp-craft/amd/stack/llamacpp/var/builds/b11448-vulkan-1.4.363.0/bin/llama-server",
+   "backend": "vulkan",
+   "mtp": 0,
+   "ctx": 65536,
+   "np": 1,
+   "kv": "q8_0",
+   "extra_args": "--jinja --chat-template-file /home/dev/work/dp-craft/amd/stack/serve/vllm/templates/dp-sharp-chat_template.jinja",
+   "working_set_mib": 27701,
+   "free_mib_floor": 30600,
+   "depths": [
+    8000,
+    16000,
+    32000,
+    60000
+   ],
+   "conv_max_depth": 60000
+  }
+ ]
+}

@@ -563,6 +563,11 @@ KLD_POSITIONS="${KLD_POSITIONS:-32}"
 # the REAL kld_probe.py, for cache checks even when $KLD is a test fake (item C, 2026-11-11)
 KLD_LIB="${KLD_LIB:-$ROOT/bench/perf/kld_probe.py}"
 
+kld_engine () {  # -> the engine family of the server that is up now: llamacpp | radiance | vllm (sly).
+  # Passed as kld_probe.py --engine so the probe never depends on /v1/models detection (fix round 1 made
+  # a failed detection under 'auto' a hard refusal; 2026-11-13).
+  case "$CURRENT" in llamacpp) echo llamacpp;; radiance) echo radiance;; *) echo vllm;; esac; }
+
 kld_selftest () {  # family served — marker-gated once per family key (radiance | radiance-spec<N> | sly);
   # arm_rad passes radiance-spec<N> for a non-default spec_tokens so a passed spec-on selftest never
   # skips the spec-off one (item A, 2026-11-11)
@@ -570,7 +575,7 @@ kld_selftest () {  # family served — marker-gated once per family key (radianc
   local mk="$RAW/done/kld-selftest-$family"
   [ -f "$mk" ] && return 0
   echo "  KLD selftest ($family, served=$served)"
-  if python3 "$KLD" selftest --url "$KLD_URL" --model "$served" --out "$(fresh_file "$RES/kld-selftest-$family.json")"; then
+  if python3 "$KLD" selftest --url "$KLD_URL" --model "$served" --engine "$(kld_engine)" --out "$(fresh_file "$RES/kld-selftest-$family.json")"; then
     touch "$mk"; echo "  KLD selftest OK ($family)"
   else
     echo "KLD SELFTEST FAILED: $family ($served) — KLD pass aborted for this family (campaign continues)" \
@@ -622,15 +627,17 @@ kld_fetch () {  # served out [image] - cached only when COMPLETE with a matching
       echo "KLD FORCED REFUSED: $served — reference $(basename "$KLD_FORCED_REF") incomplete (errored/missing rows or key mismatch)" \
         | tee -a "$RES/failures.txt"; return 0; fi
     # shellcheck disable=SC2086  # $lim is intentionally word-split (empty or --limit N)
-    python3 "$KLD" forced --url "$KLD_URL" --model "$served" --calibration "$KLD_CAL" \
+    python3 "$KLD" forced --url "$KLD_URL" --model "$served" --engine "$(kld_engine)" --calibration "$KLD_CAL" \
       --ref "$KLD_FORCED_REF" --positions "$KLD_POSITIONS" --repo-root "$ROOT" --out "$out" $lim \
       ${image:+--image "$image"} \
       || echo "KLD FORCED FETCH FAILED: $served (KLD pass only; campaign continues)" | tee -a "$RES/failures.txt"
     return 0
   fi
   # shellcheck disable=SC2086  # $lim is intentionally word-split (empty or --limit N)
-  python3 "$KLD" fetch --url "$KLD_URL" --model "$served" \
-    --calibration "$KLD_CAL" --repo-root "$ROOT" --out "$out" $lim \
+  # KLD_PROMPT_IDS=1: also store the prompt token ids (the id check of every later forced arm needs them in
+  # the reference). Use a NEW output file: a complete pre-id cache is refused, never upgraded in place.
+  python3 "$KLD" fetch --url "$KLD_URL" --model "$served" --engine "$(kld_engine)" \
+    --calibration "$KLD_CAL" --repo-root "$ROOT" --out "$out" $lim ${KLD_PROMPT_IDS:+--prompt-ids} \
     ${image:+--image "$image"} --window-out "$RES/kld-fetch-windows.jsonl" \
     || echo "KLD FETCH FAILED: $served (KLD pass only; campaign continues)" | tee -a "$RES/failures.txt"
 }
