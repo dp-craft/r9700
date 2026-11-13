@@ -22,10 +22,18 @@ Subcommands
               See `example --quality` for the schema (configs[], tasks, ctx/kv, models_dir).
           "agentic" — real Claude Code sessions against a vllm server or a llama-swap row, one FRESH
               server + git worktree per (rep, arm); emits README.md. See "Agentic specs" below / `example --agentic`.
+          throughput with servers[].engine (llamacpp | vllm | radiance) — MULTI-ENGINE: one engine at a
+              time, cells from a campaign-wide `workload` (depth ladder >= 4, n=2, conversation, drift
+              sentinel, opt-in smoke), per-server gpu_exclusive + boot gate + boot_diag + identity gate +
+              residency + Memory-Fault watcher + verified stop, pins preflight. Schema: validate_multi()
+              and `example --multi-engine`. Needs `engine-bench/run.sh --capabilities` to list SAMPLING
+              MIN_GEN TAGS SPEC_ROWS STATUS_OUT (the emitted preflight refuses otherwise).
+              pins.fixtures_sha256 (optional) = `sha256sum` output for BARE fixture names, checked from
+              bench/workloads/tmp/: (cd bench/workloads/tmp && sha256sum codereview-*.txt) > inputs/fixtures.sha256
   vram-ctx --weights-gib G --kv-kib-per-tok K --budget-mib M [--np N]
         Deterministic VRAM→max-context helper (the math behind the deep-context campaign).
-  example [--quality | --agentic]
-        Print a minimal example spec (throughput, quality, or agentic) to stdout.
+  example [--quality | --agentic | --multi-engine]
+        Print a minimal example spec (throughput, quality, agentic or multi-engine) to stdout.
 
 Spec schema (JSON)
 ------------------
@@ -248,11 +256,47 @@ def predict_vram_mib(spec, srv):
     return int(round(weights_mib + overhead_mib + kv_mib))
 
 
+# ensure_fixtures (bash): shared by the single-engine and the multi-engine throughput emitters (one recipe).
+ENSURE_FIXTURES_SH = (
+    'ensure_fixtures () {  # auto-build any missing prompt fixture from its canonical recipe',
+    '  local WL="$ROOT/bench/workloads" name n k',
+    '  for name in "$@"; do',
+    '    [ -f "$GEN/$name" ] && continue',
+    '    echo ">>> building missing fixture: $name"',
+    '    case "$name" in',
+    '      codereview-*.txt)',
+    '        n="${name#codereview-}"; n="${n%.txt}"',
+    '        python3 "$WL/build_prompt.py" --task "$WL/tasks/codereview-large.task.md" \\',
+    '          --src "$WL/corpus/ts-agentic-code-runner" --src "$WL/corpus/py-rich" \\',
+    '          --target-tokens "$n" --out "$GEN/$name" ;;',
+    '      thinking-hard.txt)',
+    '        python3 "$WL/build_prompt.py" --task "$WL/tasks/thinking-hard.prompt.txt" \\',
+    '          --target-tokens 0 --out "$GEN/thinking-hard.txt" ;;',
+    '      agentic-*-v*.txt)  # variant set: build the base with enough --variants (writes v1..vK)',
+    '        n="${name#agentic-}"; n="${n%%-v*}"; k="${name##*-v}"; k="${k%.txt}"',
+    '        python3 "$WL/build_prompt.py" --task "$WL/tasks/agentic-implement.task.md" \\',
+    '          --src "$WL/corpus/ts-agentic-code-runner" --target-tokens "$n" \\',
+    '          --variants "$k" --out "$GEN/agentic-$n.txt" ;;',
+    '      agentic-*.txt)',
+    '        n="${name#agentic-}"; n="${n%.txt}"',
+    '        python3 "$WL/build_prompt.py" --task "$WL/tasks/agentic-implement.task.md" \\',
+    '          --src "$WL/corpus/ts-agentic-code-runner" --target-tokens "$n" --out "$GEN/$name" ;;',
+    '      *)',
+    '        echo "FIXTURE-UNKNOWN: no build recipe for \'$name\' — build it by hand (see" \\',
+    '             "bench/workloads/README.md) and re-run" >&2; exit 1 ;;',
+    '    esac',
+    '    [ -f "$GEN/$name" ] || { echo "FIXTURE-BUILD-FAILED: $name" >&2; exit 1; }',
+    '  done; }',
+)
+
+
 def emit_runsh(spec):
     if spec.get("kind") == "quality":
         return emit_quality_runsh(spec)
     if spec.get("kind") == "agentic":
         return emit_agentic_runsh(spec)
+    if is_multi(spec):
+        return emit_multi_runsh(spec)
     slug = spec["slug"]
     backend = spec.get("backend", "vulkan")
     port = spec.get("port") or BACKEND_PORT.get(backend, 8080)
@@ -328,35 +372,8 @@ def emit_runsh(spec):
     ad('      | tee -a "$RES/skipped.txt"; return 1; fi')
     ad('  return 0; }')
     ad("")
-    ad("ensure_fixtures () {  # auto-build any missing prompt fixture from its canonical recipe")
-    ad('  local WL="$ROOT/bench/workloads" name n k')
-    ad('  for name in "$@"; do')
-    ad('    [ -f "$GEN/$name" ] && continue')
-    ad('    echo ">>> building missing fixture: $name"')
-    ad('    case "$name" in')
-    ad('      codereview-*.txt)')
-    ad('        n="${name#codereview-}"; n="${n%.txt}"')
-    ad('        python3 "$WL/build_prompt.py" --task "$WL/tasks/codereview-large.task.md" \\')
-    ad('          --src "$WL/corpus/ts-agentic-code-runner" --src "$WL/corpus/py-rich" \\')
-    ad('          --target-tokens "$n" --out "$GEN/$name" ;;')
-    ad('      thinking-hard.txt)')
-    ad('        python3 "$WL/build_prompt.py" --task "$WL/tasks/thinking-hard.prompt.txt" \\')
-    ad('          --target-tokens 0 --out "$GEN/thinking-hard.txt" ;;')
-    ad('      agentic-*-v*.txt)  # variant set: build the base with enough --variants (writes v1..vK)')
-    ad('        n="${name#agentic-}"; n="${n%%-v*}"; k="${name##*-v}"; k="${k%.txt}"')
-    ad('        python3 "$WL/build_prompt.py" --task "$WL/tasks/agentic-implement.task.md" \\')
-    ad('          --src "$WL/corpus/ts-agentic-code-runner" --target-tokens "$n" \\')
-    ad('          --variants "$k" --out "$GEN/agentic-$n.txt" ;;')
-    ad('      agentic-*.txt)')
-    ad('        n="${name#agentic-}"; n="${n%.txt}"')
-    ad('        python3 "$WL/build_prompt.py" --task "$WL/tasks/agentic-implement.task.md" \\')
-    ad('          --src "$WL/corpus/ts-agentic-code-runner" --target-tokens "$n" --out "$GEN/$name" ;;')
-    ad('      *)')
-    ad('        echo "FIXTURE-UNKNOWN: no build recipe for \'$name\' — build it by hand (see" \\')
-    ad('             "bench/workloads/README.md) and re-run" >&2; exit 1 ;;')
-    ad('    esac')
-    ad('    [ -f "$GEN/$name" ] || { echo "FIXTURE-BUILD-FAILED: $name" >&2; exit 1; }')
-    ad('  done; }')
+    for line in ENSURE_FIXTURES_SH:
+        ad(line)
     ad("")
     ad("run_probe () {  # slug conc reps max_tokens api prefix prompt_files...")
     ad("  local slug=$1 conc=$2 reps=$3 maxt=$4 api=$5 prefix=$6; shift 6")
@@ -478,6 +495,8 @@ def emit_readme(spec):
         return emit_quality_plan(spec)
     if spec.get("kind") == "agentic":
         return emit_agentic_readme(spec)
+    if is_multi(spec):
+        return emit_multi_readme(spec)
     slug = spec["slug"]
     date = campaign_date(spec)
     cd = campaign_rel(spec)
@@ -1909,6 +1928,1261 @@ re-collect by hand use the commands `run.sh` prints (worktree status/diff, the s
 """
 
 
+# ======================================================================================
+# Multi-engine throughput (G1, 27B-arms speed plan §4): servers[].engine in {llamacpp, vllm, radiance}
+# in ONE campaign, one engine at a time. The probe cells come from a campaign-wide `workload` block
+# (cold depth ladder, n=2 concurrency, growing conversation, drift sentinel, opt-in smoke cells).
+# The single-engine throughput path above is untouched (a spec whose servers carry no `engine`).
+# ======================================================================================
+MULTI_ENGINES = ("llamacpp", "vllm", "radiance")
+PHYS_VRAM_MIB = 32624                    # R9700 physical VRAM (MiB): a free-VRAM floor above it never passes
+LLAMASWAP_PORT = 9292                    # gpu_exclusive.sh's SWAP_PORT: the persistent llama-swap router
+TASKS_DIR = os.path.join(REPO, "bench", "workloads", "tasks")
+MULTI_TOP_KEYS = ("kind", "type", "slug", "date", "title", "notes", "port", "tuning", "workload", "sampling",
+                  "pins", "servers")
+SINGLE_ONLY_TOP = ("model", "engine", "profile", "served_model", "image", "backend", "env", "vram")
+MULTI_COMMON_KEYS = ("name", "engine", "arm", "pass", "tier", "served_model", "ctx", "np", "kv", "port", "env",
+                     "extra_args", "free_mib_floor", "working_set_mib", "rep_penalty_key", "spec", "depths",
+                     "conv_max_depth")
+MULTI_ENGINE_KEYS = {   # per-engine fields: required, optional (any other engine's field is rejected)
+    "llamacpp": (("gguf", "bin"), ("backend", "mtp")),
+    "vllm": (("profile", "image", "spec"), ("model",)),
+    "radiance": (("rad_file", "image", "spec_tokens"), ()),
+}
+REP_KEYS = ("repeat_penalty", "repetition_penalty")
+DEFAULT_REP_KEY = {"llamacpp": "repeat_penalty", "vllm": "repetition_penalty", "radiance": None}  # radiance: UNVERIFIED
+MULTI_RESERVED_ENV = RESERVED_ENV + ("SERVED_NAME", "FREE_MIB_FLOOR", "EXTRA_ARGS", "RAD_FILE", "CONTAINER_NAME",
+                                     "TP", "WAIT", "MODEL", "LLAMA_SERVER", "BACKEND", "CTX", "NP", "KV", "MTP",
+                                     "UB", "B", "FA")
+OWN_FLAGS = {   # extra_args may not repeat a flag the server has its own field for
+    "llamacpp": ("--alias", "-m", "--model", "-c", "--ctx-size", "-np", "--parallel", "-ctk", "-ctv",
+                 "--cache-type-k", "--cache-type-v", "--port", "--host", "--spec-type", "-ub", "-b", "-fa", "-ngl"),
+    "vllm": ("--served-model-name", "--max-model-len", "--max-num-seqs", "--kv-cache-dtype", "--port", "--host",
+             "--model", "--gpu-memory-utilization"),
+    "radiance": ("--num-speculative-tokens", "--served-model-name", "--max-model-len", "--max-num-seqs",
+                 "--kv-cache-dtype", "--port", "--host", "--model", "--tp"),
+}
+EXTRA_TOKEN_RE = re.compile(r"[\w.:/@,+=-]+", re.ASCII)
+PATH_RE = re.compile(r"/[\w./@:+-]+", re.ASCII)       # shell-inert and printf-%q-stable (cmdline needles)
+GLOB_RE = re.compile(r"/[\w./@:+*?-]+", re.ASCII)
+TAG_VAL_RE = re.compile(r"[A-Za-z0-9._-]+")
+SERVED_RE = re.compile(r"[A-Za-z0-9._:/-]+")
+SHA256_RE = re.compile(r"[0-9a-f]{64}")
+DIGEST_RE = re.compile(r"(sha256:)?[0-9a-f]{12,64}")
+WORKLOAD_DEFAULTS = {"tier": "minimal", "pass": "A", "api": "chat", "max_tokens": 1024, "min_gen": 900,
+                     "prefix_mode": "unique", "fixture": "codereview-{depth}.txt", "first_warmup": 2,
+                     "repetition_penalty": 1.0}
+MULTI_TUNING_DEFAULTS = {"ub": 2048, "b": 8192, "fa": "on"}     # serve_llamacpp.sh's defaults, passed explicitly
+EB_CONTRACT = ("SAMPLING", "MIN_GEN", "TAGS", "SPEC_ROWS", "STATUS_OUT")   # `engine-bench/run.sh --capabilities`
+SPEC_ROWS_MODE = {"llamacpp": "rows", "vllm": "diff", "radiance": "diff"}    # G3 wiring: rows on llama.cpp only
+RADIANCE_REP_WARN = ("penalty UNVERIFIED until the smoke confirms radiance's key: no repetition penalty is sent, so "
+                     "the engine's own default applies")
+FIXTURES_SHA_FORMAT = ("`sha256sum` output for bare file names, checked from bench/workloads/tmp/: build it with "
+                       "`(cd bench/workloads/tmp && sha256sum codereview-8000.txt ...) > inputs/fixtures.sha256`")
+
+
+def is_multi(spec):
+    """A throughput spec is multi-engine when its servers carry `engine` (validate_multi: all or none)."""
+    srv = spec.get("servers")
+    return isinstance(srv, list) and any(isinstance(s, dict) and "engine" in s for s in srv)
+
+
+def _isint(v, lo=None):
+    return isinstance(v, int) and not isinstance(v, bool) and (lo is None or v >= lo)
+
+
+def _isnum(v):
+    return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+
+def multi_workload(spec):
+    w = dict(WORKLOAD_DEFAULTS)
+    w.update(spec.get("workload") or {})
+    return w
+
+
+def _workload_name(fixture):
+    """codereview-{depth}.txt -> codereview (the `workload` tag)."""
+    return fixture.split("{depth}")[0].rstrip("-_.") or "fixture"
+
+
+def multi_server(spec, s):
+    """Normalized view of one multi-engine server (defaults applied; validate_multi has run)."""
+    w = multi_workload(spec)
+    eng = s["engine"]
+    lad = w["ladder"]
+    if eng == "llamacpp":
+        derived = s.get("mtp", 0) == 1
+    elif eng == "radiance":
+        derived = _isint(s.get("spec_tokens")) and s["spec_tokens"] > 0
+    else:
+        derived = bool(s.get("spec"))
+    conv = w.get("conversation") or {}
+    return {
+        "name": s["name"], "engine": eng, "arm": s.get("arm", s["name"]),
+        "pass": s.get("pass", w["pass"]), "tier": s.get("tier", w["tier"]),
+        "port": s.get("port", spec.get("port", 8000)),
+        "floor": s.get("free_mib_floor", 30000), "ws": s["working_set_mib"],
+        "rep_key": s.get("rep_penalty_key", DEFAULT_REP_KEY[eng]),
+        "spec": bool(s.get("spec", derived)),
+        "depths": list(s.get("depths", lad["depths"])),
+        "conv_max_depth": s.get("conv_max_depth", conv.get("max_depth")),
+        "kv_unified": "--kv-unified" in (s.get("extra_args") or "").split(),
+        "rep_tag": s.get("rep_penalty_key", DEFAULT_REP_KEY[eng]) or "UNVERIFIED",
+    }
+
+
+def conv_min_gen(w):
+    """The conversation min-gen gate: explicit `conversation.min_gen`, else 0 (off; user decision
+    2026-11-13: natural agent turns end early, a short turn is real behaviour, not an interrupted run)."""
+    return (w.get("conversation") or {}).get("min_gen", 0)
+
+
+def multi_sampling(spec, s):
+    """The compact --sampling JSON for one server: campaign sampling + the repetition penalty under the
+    engine's own key (llama.cpp repeat_penalty, vLLM repetition_penalty, radiance: none unless set)."""
+    smp = dict(spec["sampling"])
+    rp = multi_workload(spec).get("repetition_penalty")
+    key = multi_server(spec, s)["rep_key"]
+    if key and rp is not None:
+        smp[key] = rp
+    return json.dumps(smp, separators=(",", ":"))
+
+
+def multi_cells(spec, s):
+    """Probe cells of one server, in run order (plan §2.5): smoke (opt-in) -> ladder ascending, each n=N cell
+    right after the ladder cell of its depth -> drift sentinel right after the ladder -> conversation.
+    Tags exclude tg and residency (run.sh appends tg=<effective max_tokens>, residency=<this boot's check>)."""
+    w = multi_workload(spec)
+    m = multi_server(spec, s)
+    lad, wl = w["ladder"], _workload_name(w["fixture"])
+    base = {"arm": m["arm"]}
+    tail = {"pass": m["pass"], "tier": m["tier"]}
+    cells = []
+    cmg = conv_min_gen(w) if w.get("conversation") else 0
+
+    def probe(slug, cell, depth, n, reps, tier=None):
+        tags = dict(base, depth=depth, n=n, workload=wl, **tail)
+        if tier:
+            tags["tier"] = tier
+        tags["cell"] = cell
+        tags["rep_key"] = m["rep_tag"]
+        cells.append({"slug": slug, "mode": "probe", "cell": cell, "depth": depth, "n": n, "reps": reps,
+                      "max_tokens": w["max_tokens"], "min_gen": w["min_gen"],
+                      "fixture": w["fixture"].replace("{depth}", str(depth)), "tags": tags})
+
+    def conv(slug, cell, max_depth, reps, tier=None):
+        c = w["conversation"]
+        tags = dict(base, n=1, workload="conversation", **tail)
+        if tier:
+            tags["tier"] = tier
+        tags["cell"] = cell
+        tags["rep_key"] = m["rep_tag"]
+        cells.append({"slug": slug, "mode": "conv", "cell": cell, "n": 1, "reps": reps,
+                      "max_tokens": c.get("max_tokens", 512), "min_gen": cmg, "fixture": c["prompt"],
+                      "start": c.get("start_tokens", 10000), "step": c.get("step_tokens", 20000),
+                      "max_depth": max_depth, "turn_prompt": c.get("turn_prompt", ""),
+                      "kwargs": json.dumps(c["chat_template_kwargs"], separators=(",", ":"))
+                      if c.get("chat_template_kwargs") else "", "tags": tags})
+
+    sm = w.get("smoke")
+    if sm:
+        probe(f"{m['name']}-smoke-d{sm['depth']}", "smoke", sm["depth"], 1, 1, tier="smoke")
+        if w.get("conversation"):   # one turn: max_depth = start_tokens stops after turn 0
+            conv(f"{m['name']}-smoke-conv", "smoke", w["conversation"].get("start_tokens", 10000), 1, tier="smoke")
+    spec_depths = set(lad.get("spec_depths", []))
+    cc = w.get("concurrency")
+    conc_d = list(cc["depths"]) if cc and int(s["np"]) >= cc["n"] else []
+    order = sorted([(d, 0) for d in m["depths"]] + [(d, 1) for d in conc_d])   # (depth, ladder before n=N)
+    for d, k in order:
+        if k == 0:
+            reps = lad.get("spec_reps", lad.get("reps", 3)) if m["spec"] and d in spec_depths else lad.get("reps", 3)
+            probe(f"{m['name']}-d{d}-n1", "ladder", d, 1, reps)
+        else:
+            probe(f"{m['name']}-d{d}-n{cc['n']}", "conc", d, cc["n"], cc.get("reps", 3))
+    se = w.get("sentinel")
+    if se:
+        probe(f"{m['name']}-sentinel-d{se['depth']}", "sentinel", se["depth"], 1, se.get("reps", 1))
+    if w.get("conversation"):
+        conv(f"{m['name']}-conv", "conv", m["conv_max_depth"], w["conversation"].get("reps", 1))
+    return cells
+
+
+def _profile_served(profile):
+    """The SERVED_NAME a vllm profile defines itself (first definition; ${SERVED_NAME:-x} -> x), else None."""
+    try:
+        with open(os.path.join(VLLM_PROFILES, profile + ".env"), encoding="utf-8") as fh:
+            for line in fh:
+                mm = re.match(r"\s*SERVED_NAME=(?:\$\{SERVED_NAME:-([^}]*)\}|(\S+))", line)
+                if mm:
+                    return (mm.group(1) or mm.group(2)).strip("'\"")
+    except OSError:
+        pass
+    return None
+
+
+def _check_extra(eng, xa, where):
+    if not isinstance(xa, str):
+        sys.exit(f"{where}: extra_args must be a string of flags, got {xa!r}")
+    for tok in xa.split():
+        if not EXTRA_TOKEN_RE.fullmatch(tok):
+            sys.exit(f"{where}: extra_args token {tok!r} must match ^[\\w.:/@,+=-]+$ (the launchers split on "
+                     "whitespace and honour no quotes)")
+        if tok.split("=")[0] in OWN_FLAGS[eng]:
+            sys.exit(f"{where}: extra_args may not set {tok.split('=')[0]} (it has its own field on {eng})")
+
+
+def _check_path(p, where, key, suffix=None):
+    if not isinstance(p, str) or not PATH_RE.fullmatch(p):
+        sys.exit(f"{where}: {key} must be an absolute path of [\\w./@:+-] characters, got {p!r}")
+    if suffix and not p.endswith(suffix):
+        sys.exit(f"{where}: {key} must end in {suffix}: {p!r}")
+
+
+def _validate_sampling(spec):
+    smp = spec.get("sampling")
+    if not isinstance(smp, dict) or "temperature" not in smp:
+        sys.exit("multi-engine spec: `sampling` is required and must set temperature explicitly (every engine "
+                 "otherwise fills in its own defaults: a hidden asymmetry, plan §2.1)")
+    import capture_engine   # one owner of the allowed sampler keys (same dir)
+    for k, v in smp.items():
+        if k in REP_KEYS:
+            sys.exit(f"sampling: {k} is engine-specific -- set workload.repetition_penalty and each server's "
+                     "rep_penalty_key instead")
+        if k not in capture_engine.SAMPLER_KEYS:
+            sys.exit(f"sampling: {k!r} is not a capture_engine sampler key {sorted(capture_engine.SAMPLER_KEYS)}")
+        if not _isnum(v) or (k in capture_engine.SAMPLER_INT and not _isint(v)):
+            sys.exit(f"sampling: {k} must be a{'n integer' if k in capture_engine.SAMPLER_INT else ' number'}, "
+                     f"got {v!r}")
+
+
+def _validate_workload(spec):
+    w = multi_workload(spec)
+    for k in ("tier", "pass"):
+        if not isinstance(w[k], str) or not TAG_VAL_RE.fullmatch(w[k]):
+            sys.exit(f"workload.{k} must match ^[A-Za-z0-9._-]+$ (a --tag value), got {w[k]!r}")
+    if w["api"] not in ("chat", "completions"):
+        sys.exit(f"workload.api must be chat|completions, got {w['api']!r}")
+    if w["prefix_mode"] not in ("none", "unique", "shared"):
+        sys.exit(f"workload.prefix_mode must be none|unique|shared, got {w['prefix_mode']!r}")
+    if not _isint(w["max_tokens"], 1) or not _isint(w["min_gen"], 0) or w["min_gen"] > w["max_tokens"]:
+        sys.exit("workload: max_tokens must be an int >= 1 and min_gen an int in 0..max_tokens")
+    if not _isint(w["first_warmup"], 0):
+        sys.exit("workload.first_warmup must be an int >= 0")
+    if w["repetition_penalty"] is not None and not _isnum(w["repetition_penalty"]):
+        sys.exit("workload.repetition_penalty must be a number or null")
+    fx = w["fixture"]
+    if not (isinstance(fx, str) and "{depth}" in fx and re.fullmatch(r"[\w.{}-]+", fx)
+            and TAG_VAL_RE.fullmatch(_workload_name(fx))):
+        sys.exit(f"workload.fixture must be a bench/workloads/tmp file name containing {{depth}}, got {fx!r}")
+    lad = w.get("ladder")
+    if not isinstance(lad, dict) or "depths" not in lad:
+        sys.exit("workload.ladder.depths is required (the cold depth ladder)")
+    _check_depths(lad["depths"], "workload.ladder.depths")
+    for k in ("reps", "spec_reps"):
+        if k in lad and not _isint(lad[k], 1):
+            sys.exit(f"workload.ladder.{k} must be an int >= 1")
+    if not isinstance(lad.get("spec_depths", []), list) or not all(_isint(d, 1) for d in lad.get("spec_depths", [])):
+        sys.exit("workload.ladder.spec_depths must be a list of depths")
+    cc = w.get("concurrency")
+    if cc is not None:
+        if not isinstance(cc, dict) or not _isint(cc.get("n"), 2) or not isinstance(cc.get("depths"), list) \
+                or not cc["depths"] or not all(_isint(d, 1) for d in cc["depths"]) \
+                or not _isint(cc.get("reps", 3), 1):
+            sys.exit("workload.concurrency needs n (int >= 2), depths (non-empty list of ints), optional reps")
+    cv = w.get("conversation")
+    if cv is not None:
+        if not isinstance(cv, dict) or not isinstance(cv.get("prompt"), str) \
+                or not re.fullmatch(r"[\w.-]+", cv["prompt"]):
+            sys.exit("workload.conversation.prompt (a bench/workloads/tmp file name) is required")
+        for k in ("start_tokens", "step_tokens", "max_depth", "max_tokens", "reps", "min_gen"):
+            if k in cv and not _isint(cv[k], 0 if k in ("step_tokens", "min_gen") else 1):
+                sys.exit(f"workload.conversation.{k} must be a positive int")
+        if conv_min_gen(w) > cv.get("max_tokens", 512):
+            sys.exit("workload.conversation.min_gen must be <= the conversation's max_tokens")
+        if cv.get("turn_prompt") and (not re.fullmatch(r"[\w.-]+", cv["turn_prompt"])
+                                      or not os.path.isfile(os.path.join(TASKS_DIR, cv["turn_prompt"]))):
+            sys.exit(f"workload.conversation.turn_prompt {cv['turn_prompt']!r}: not a file in bench/workloads/tasks/")
+        if "chat_template_kwargs" in cv and cv["chat_template_kwargs"] is not None \
+                and not isinstance(cv["chat_template_kwargs"], dict):
+            sys.exit("workload.conversation.chat_template_kwargs must be an object or null")
+    for blk in ("sentinel", "smoke"):
+        b = w.get(blk)
+        if b is not None and (not isinstance(b, dict) or not _isint(b.get("depth"), 1)
+                              or not _isint(b.get("reps", 1), 1)):
+            sys.exit(f"workload.{blk} needs depth (int), optional reps")
+    if w.get("sentinel") and not _isnum(w["sentinel"].get("tol_pct", 5)):
+        sys.exit("workload.sentinel.tol_pct must be a number")
+
+
+def _check_depths(ds, where):
+    if not isinstance(ds, list) or not all(_isint(d, 1) for d in ds) or ds != sorted(set(ds)):
+        sys.exit(f"{where} must be a strictly ascending list of int depths, got {ds!r}")
+    if len(ds) < 4:
+        sys.exit(f"{where}: >= 4 depths are required (iron rule 16: fit the log-log exponent), got {len(ds)}")
+
+
+def _validate_pins(spec):
+    pins = spec.get("pins") or {}
+    if not isinstance(pins, dict) or set(pins) - {"files", "images", "binaries", "single", "fixtures_sha256"}:
+        sys.exit("pins must be an object with files / images / binaries / single / fixtures_sha256")
+    for p, h in (pins.get("files") or {}).items():
+        _check_path(p, "pins.files", "path")
+        if not isinstance(h, str) or not SHA256_RE.fullmatch(h):
+            sys.exit(f"pins.files[{p}]: sha256 must be 64 lowercase hex chars, got {h!r}")
+    for ref, dg in (pins.get("images") or {}).items():
+        validate_image(ref, "pins.images")
+        if not isinstance(dg, str) or not DIGEST_RE.fullmatch(dg):
+            sys.exit(f"pins.images[{ref}]: digest must be [sha256:]<12-64 hex> (image id or repo digest), got {dg!r}")
+    for p in pins.get("binaries") or []:
+        _check_path(p, "pins.binaries", "path")
+    for g in pins.get("single") or []:
+        if not isinstance(g, str) or not GLOB_RE.fullmatch(g):
+            sys.exit(f"pins.single: {g!r} must be an absolute glob of [\\w./@:+*?-] characters")
+    fs = pins.get("fixtures_sha256")
+    if fs is not None and (not isinstance(fs, str) or os.path.isabs(fs) or ".." in fs.split("/")
+                           or not re.fullmatch(r"[\w./-]+", fs)):
+        sys.exit(f"pins.fixtures_sha256 must be a campaign-relative path (e.g. inputs/fixtures.sha256: "
+                 f"{FIXTURES_SHA_FORMAT}), got {fs!r}")
+
+
+def validate_multi(spec):
+    """Emit-time validation of a multi-engine throughput spec (sys.exit with a clear message)."""
+    if "slug" not in spec:
+        sys.exit("spec missing required key: slug")
+    srvs = spec["servers"]
+    if not all(isinstance(s, dict) and "engine" in s for s in srvs):
+        sys.exit("multi-engine spec: every server needs an `engine` (llamacpp | vllm | radiance), or none does")
+    for k in spec:
+        if k in SINGLE_ONLY_TOP:
+            sys.exit(f"multi-engine spec: top-level {k!r} is single-engine only -- set it per server")
+        if k not in MULTI_TOP_KEYS:
+            sys.exit(f"multi-engine spec: unknown top-level key {k!r} (allowed: {', '.join(MULTI_TOP_KEYS)})")
+    tune = spec.get("tuning") or {}
+    if set(tune) - {"ub", "b", "fa"} or not all(_isint(tune[k], 1) for k in ("ub", "b") if k in tune) \
+            or tune.get("fa", "on") not in ("on", "off", "auto"):
+        sys.exit("tuning takes ub, b (ints) and fa (on|off|auto) -- llama.cpp servers only")
+    _validate_sampling(spec)
+    _validate_workload(spec)
+    _validate_pins(spec)
+    w = multi_workload(spec)
+    names, arm_pass = set(), set()
+    for i, s in enumerate(srvs):
+        where = f"server #{i + 1} ({s.get('name', '?')!r})"
+        eng = s["engine"]
+        if eng not in MULTI_ENGINES:
+            sys.exit(f"{where}: unknown engine {eng!r} (one of {' | '.join(MULTI_ENGINES)})")
+        if "probes" in s or "mtp" in s and eng != "llamacpp":
+            sys.exit(f"{where}: {'probes' if 'probes' in s else 'mtp'} is not a multi-engine {eng} field "
+                     "(cells come from `workload`; spec decoding: llamacpp mtp, radiance spec_tokens, vllm profile)")
+        req, opt = MULTI_ENGINE_KEYS[eng]
+        for k in s:
+            if k in MULTI_COMMON_KEYS or k in req or k in opt:
+                continue
+            owner = [e for e, (r, o) in MULTI_ENGINE_KEYS.items() if k in r or k in o]
+            sys.exit(f"{where}: {k!r} is " + (f"a {'/'.join(owner)}-only field" if owner else "not a server field"))
+        for k in ("name", "served_model", "ctx", "np", "kv", "working_set_mib") + req:
+            if k not in s:
+                sys.exit(f"{where}: {eng} server missing required field {k!r}")
+        if not isinstance(s["name"], str) or not ARM_RE.fullmatch(s["name"]) or "smoke" in s["name"]:
+            sys.exit(f"{where}: name must match ^[a-z0-9][a-z0-9._-]*$ and not contain 'smoke'")
+        if s["name"] in names:
+            sys.exit(f"{where}: duplicate server name {s['name']!r} (it prefixes every cell slug)")
+        clash = [n for n in names if s["name"].startswith(n + "-") or n.startswith(s["name"] + "-")]
+        if clash:
+            sys.exit(f"{where}: server name {s['name']!r} and {clash[0]!r} share a '<name>-' prefix, so "
+                     f"ONLY='{min(clash[0], s['name'], key=len)}-*' would select both servers' cells -- rename one")
+        names.add(s["name"])
+        m = multi_server(spec, s)
+        for k in ("arm", "pass", "tier"):
+            if not isinstance(m[k], str) or not TAG_VAL_RE.fullmatch(m[k]) or (k == "arm" and not ARM_RE.fullmatch(m[k])):
+                sys.exit(f"{where}: {k} must be a tag-safe id ([a-z0-9._-]), got {m[k]!r}")
+        if (m["arm"], m["pass"]) in arm_pass:
+            sys.exit(f"{where}: arm {m['arm']!r} already has a server in pass {m['pass']!r}")
+        arm_pass.add((m["arm"], m["pass"]))
+        if not isinstance(s["served_model"], str) or not SERVED_RE.fullmatch(s["served_model"]):
+            sys.exit(f"{where}: served_model must match ^[A-Za-z0-9._:/-]+$")
+        if not _isint(s["ctx"], 1) or not _isint(s["np"], 1):
+            sys.exit(f"{where}: ctx and np must be positive ints")
+        if not isinstance(s["kv"], str) or not re.fullmatch(r"[\w.]+", s["kv"]):
+            sys.exit(f"{where}: kv must be a KV type (f16, q8_0, fp8, auto, ...)")
+        if not _isint(m["port"], 1024) or m["port"] > 65535 or m["port"] == LLAMASWAP_PORT:
+            sys.exit(f"{where}: port must be 1024..65535 and not {LLAMASWAP_PORT} (the llama-swap router "
+                     "gpu_exclusive.sh unloads), got {m['port']!r}")
+        if not _isint(m["ws"], 1) or not _isint(m["floor"], 1):
+            sys.exit(f"{where}: working_set_mib and free_mib_floor must be positive ints (MiB)")
+        if m["ws"] > m["floor"]:
+            sys.exit(f"{where}: working_set_mib {m['ws']} > free_mib_floor {m['floor']}: the boot gate would admit a "
+                     "boot whose expected working set cannot fit (raise the floor or fix the working set)")
+        if m["floor"] > PHYS_VRAM_MIB:
+            sys.exit(f"{where}: free_mib_floor {m['floor']} > physical VRAM {PHYS_VRAM_MIB} MiB: the gate never passes")
+        if m["rep_key"] not in REP_KEYS + (None,):
+            sys.exit(f"{where}: rep_penalty_key must be repeat_penalty | repetition_penalty | null, got {m['rep_key']!r}")
+        if eng != "radiance" and m["rep_key"] != DEFAULT_REP_KEY[eng]:
+            sys.exit(f"{where}: rep_penalty_key on {eng} must be {DEFAULT_REP_KEY[eng]!r} (the only key {eng} reads; "
+                     f"any other name drops the penalty to the engine default), got {m['rep_key']!r}")
+        if "env" in s:
+            validate_env(s["env"], where, reserved=MULTI_RESERVED_ENV)
+        if "extra_args" in s:
+            _check_extra(eng, s["extra_args"], where)
+        if "spec" in s and not isinstance(s["spec"], bool):
+            sys.exit(f"{where}: spec must be true|false")
+        if eng == "llamacpp":
+            _check_path(s["gguf"], where, "gguf", ".gguf")
+            _check_path(s["bin"], where, "bin")
+            if "/latest-" in s["bin"]:
+                sys.exit(f"{where}: bin {s['bin']!r} goes through a latest-* symlink, which moves on promote -- pin "
+                         "the resolved build dir (rule 2)")
+            if s.get("backend", "vulkan") not in BACKEND_PORT:
+                sys.exit(f"{where}: backend must be vulkan|rocm")
+            if s.get("mtp", 0) not in (0, 1):
+                sys.exit(f"{where}: mtp must be 0|1")
+            derived = s.get("mtp", 0) == 1
+        elif eng == "radiance":
+            _check_path(s["rad_file"], where, "rad_file", ".rad")
+            validate_image(s["image"], where)
+            if not _isint(s["spec_tokens"], 0):
+                sys.exit(f"{where}: spec_tokens must be an int >= 0 (0 = spec decoding off)")
+            derived = s["spec_tokens"] > 0
+        else:
+            prof = os.path.join(VLLM_PROFILES, str(s["profile"]) + ".env")
+            if not os.path.exists(prof):
+                sys.exit(f"{where}: vllm profile not found: {prof}")
+            validate_image(s["image"], where)
+            if not isinstance(s["spec"], bool):
+                sys.exit(f"{where}: vllm spec must be true|false (speculative decoding lives in the profile)")
+            ps = _profile_served(s["profile"])
+            if ps and ps != s["served_model"]:
+                sys.exit(f"{where}: served_model {s['served_model']!r} != the profile's SERVED_NAME {ps!r}")
+            if "model" in s:
+                _check_path(s["model"], where, "model")
+            derived = s["spec"]
+        if "spec" in s and s["spec"] != derived:
+            sys.exit(f"{where}: spec={s['spec']} contradicts the server's own spec setting ({eng})")
+        if "depths" in s:
+            _check_depths(s["depths"], f"{where}: depths")
+        se = w.get("sentinel")
+        if se and se["depth"] not in m["depths"]:
+            sys.exit(f"{where}: sentinel depth {se['depth']} is not in its ladder {m['depths']} (it repeats a ladder cell)")
+        if w.get("conversation") and not _isint(m["conv_max_depth"], 1):
+            sys.exit(f"{where}: workload.conversation.max_depth (or the server's conv_max_depth) is required")
+        _check_ctx(s, m, w, where)
+    print(f"note: multi-engine run.sh needs `bench/perf/engine-bench/run.sh --capabilities` to list "
+          f"{', '.join(EB_CONTRACT)} (its preflight refuses otherwise).", file=sys.stderr)
+    unpinned = multi_unpinned(spec)
+    if unpinned:
+        print("⚠️  WARNING: not pinned (pins.files sha256 / pins.images digest / pins.binaries): "
+              + ", ".join(unpinned) + " -- run.sh refuses every non-smoke cell until they are", file=sys.stderr)
+    for s in srvs:
+        if s["engine"] == "radiance" and s.get("rep_penalty_key") is None:
+            print(f"⚠️  WARNING: radiance server {s['name']!r}: {RADIANCE_REP_WARN}; its rows carry "
+                  "rep_key=UNVERIFIED", file=sys.stderr)
+    pins = spec.get("pins") or {}
+    ph = [k for k, v in list((pins.get("files") or {}).items()) + list((pins.get("images") or {}).items())
+          if set(v.replace("sha256:", "")) == {"0"}]
+    if ph:
+        print("⚠️  WARNING: PLACEHOLDER pins (all zeros) for " + ", ".join(ph)
+              + " -- replace them with the real sha256 / image digest (the preflight fails on them)", file=sys.stderr)
+
+
+def multi_unpinned(spec):
+    """Weights / builds / images the spec does not pin (gguf, rad_file and bin by sha256 or as a binary,
+    image by digest). run.sh refuses non-smoke cells while this list is non-empty (m12)."""
+    pins = spec.get("pins") or {}
+    pinned = set(pins.get("files") or {}) | set(pins.get("images") or {}) | set(pins.get("binaries") or [])
+    out = []
+    for s in spec["servers"]:
+        for k in ("gguf", "rad_file", "bin", "image"):
+            v = s.get(k)
+            if not v or v in pinned or v in out:
+                continue
+            out.append(v)
+    return out
+
+
+def _check_ctx(s, m, w, where):
+    """Every cell must fit the server's window: depth + max_tokens <= ctx; llama.cpp -np N without
+    --kv-unified splits -c into N slots (ctx/np each); an n=N cell on a unified pool needs N windows."""
+    ctx, np_, llama = int(s["ctx"]), int(s["np"]), s["engine"] == "llamacpp"
+    win = ctx // np_ if llama and np_ > 1 and not m["kv_unified"] else ctx
+    hint = " (add --kv-unified to extra_args for one shared pool)" if win < ctx else ""
+    for c in multi_cells_raw(s, m, w):
+        need = (c["depth"] + c["max_tokens"]) if c["mode"] == "probe" else c["max_depth"]
+        if need > win:
+            sys.exit(f"{where}: cell {c['slug']} needs {need} tokens > the per-request window {win}{hint}")
+        if llama and m["kv_unified"] and c["n"] > 1 and c["n"] * need > ctx:
+            sys.exit(f"{where}: cell {c['slug']} needs {c['n']} x {need} tokens > the unified pool {ctx}")
+
+
+def multi_cells_raw(s, m, w):
+    """multi_cells without the spec wrapper (used by _check_ctx during validation)."""
+    return multi_cells({"workload": w, "sampling": {}, "servers": [s], "port": m["port"]}, s)
+
+
+# --------------------------------------------------------------------------- multi-engine run.sh
+MULTI_RUNSH_HEAD = r'''#!/usr/bin/env bash
+# GENERATED by bench/core/gen_campaign.py -- MULTI-ENGINE throughput campaign '@@SLUG@@' (servers[].engine =
+# llamacpp | vllm | radiance; one engine at a time). Resumable: rerun to continue (per-cell markers in
+# <campaign>/tmp/done/). Edit the spec and regenerate -- never hand-edit this file.
+# Per server, in spec order:
+#   power snapshot -> gpu_exclusive.sh <floor> -> boot gate (port free AND free VRAM >= floor, rule 14)
+#   -> VRAM sampler across the boot -> serve_<engine>.sh print + start -> boot_diag.py record (boots.jsonl)
+#   -> identity gate (/v1/models lists exactly the served name; the state-dir cmdline names the pinned
+#      image/build + model; ENGINES_LIST set from the spec, never inherited) -> residency vs the expected
+#      working set (amd-smi; VRAM-delta fallback for Vulkan llama-server, rule 15) -> cells, each under a
+#      Memory-Fault watcher over the cell's own log window (a fault aborts the run and quarantines the
+#      cell's rows, rule 15) -> stop by pidfile/container + port-free + VRAM-idle verify -> power snapshot.
+#   Cell order per boot: smoke (opt-in) -> ladder ascending (n=N right after its depth) -> drift sentinel
+#   -> conversation. The drift check runs after the server block, so a resumed run still performs it.
+#   Preflight (once, before any GPU work): tools, `engine-bench/run.sh --capabilities` (@@EBC@@),
+#   pins (files sha256, images digest, binaries, single-revision globs; an unpinned weight/build/image
+#   is refused unless only smoke cells are selected), fixtures, the ports free.
+# Knobs: ONLY='glob,..' (cell slugs; *-smoke-* cells run only when a glob naming "smoke" selects them; a glob
+#   matching no cell is refused) REPS= MAX_TOKENS= MIN_GEN= RETRY_INCOMPLETE=1 (rerun cells stopped as INCOMPLETE)
+#   RUN_TAG=<tag> (short run isolated in tmp/runs/<tag>/, rule 19) FLOOR_WAIT=<s> STOP_WAIT=<s> IDLE_WAIT=<s>
+#   VRAM_IDLE_SLACK_MIB=<MiB> WATCH_S=<s> (all integers; anything else is refused)
+#   Tool paths (stub testing): EB SERVE_LLAMA SERVE_VLLM SERVE_RAD GPU_EXCLUSIVE BOOT_DIAG BOOT_VRAM_SAMPLER
+#   SERVER_STATE_DIR DRM_ROOT DOCKER AMD_SMI CURL SS
+# Two roots: raw (per-probe run dirs, boot logs/CSVs, done/ markers) -> <campaign>/tmp/; results
+#   (results.jsonl, boots.jsonl, residency.jsonl, drift.jsonl, quarantine.jsonl, meta/failures,
+#   server-/models-/residency-/power-<slug>.txt) -> <campaign>/results/.
+@@NOTES@@set -uo pipefail
+@@ROOTS@@
+RUN_LOCK="$CAMPAIGN_DIR/tmp/run.lock"   # one run of this campaign at a time (a pid file, not flock: a server
+_lock_pid=$(cat "$RUN_LOCK" 2>/dev/null || true)   # launched from here would inherit a lock fd)
+if [ -n "$_lock_pid" ] && [ "$_lock_pid" != "$$" ] && kill -0 "$_lock_pid" 2>/dev/null; then
+  echo "RUN REFUSED: pid $_lock_pid already runs this campaign ($RUN_LOCK)" >&2; exit 1
+fi
+echo "$$" > "$RUN_LOCK"
+RUN_TAG="${RUN_TAG:-}"
+if [ -n "$RUN_TAG" ]; then   # short run: every output in a unique dir under the git-ignored tmp/ (rule 19)
+  RUN_DIR="$CAMPAIGN_DIR/tmp/runs/$RUN_TAG"; RAW="$RUN_DIR/tmp"; RES="$RUN_DIR/results"; PROBE_CAMPAIGN="$RUN_DIR"
+else
+  RUN_DIR=""; PROBE_CAMPAIGN="$CAMPAIGN_DIR"
+fi
+mkdir -p "$RAW/done" "$RES"
+EB="${EB:-$ROOT/bench/perf/engine-bench}"
+GEN="$ROOT/bench/workloads/tmp"
+SERVE_LLAMA="${SERVE_LLAMA:-$ROOT/stack/serve/llamacpp/serve_llamacpp.sh}"
+SERVE_VLLM="${SERVE_VLLM:-$ROOT/stack/serve/vllm/serve_vllm.sh}"
+SERVE_RAD="${SERVE_RAD:-$ROOT/stack/serve/radiance/serve_radiance.sh}"
+GPU_EXCLUSIVE="${GPU_EXCLUSIVE:-$ROOT/stack/gpu/gpu_exclusive.sh}"
+BOOT_DIAG="${BOOT_DIAG:-$ROOT/bench/perf/boot_diag.py}"
+BOOT_VRAM_SAMPLER="${BOOT_VRAM_SAMPLER:-python3 $ROOT/stack/gpu/vram_sampler.py}"
+SERVER_STATE_DIR="${SERVER_STATE_DIR:-$ROOT/stack/serve/var/servers}"
+DRM_ROOT="${DRM_ROOT:-/sys/class/drm}"
+VLLM_CACHE_ROOT="${VLLM_CACHE_ROOT:-${VLLM_ROOT:-/mnt/Lin1/work/vllm/sly-radiance}/cache}"   # serve_vllm.sh CACHE_DIR
+DOCKER="${DOCKER:-docker}"; AMD_SMI="${AMD_SMI:-amd-smi}"; CURL="${CURL:-curl}"; SS="${SS:-ss}"
+# --- run-time knobs ---
+ONLY="${ONLY:-}"                     # comma-separated cell-slug globs; empty = every non-smoke cell
+REPS_OVERRIDE="${REPS:-}"            # override every cell's reps (quick pass)
+MAXTOK_OVERRIDE="${MAX_TOKENS:-}"    # override every cell's max_tokens (the min-gen gate then defaults to off)
+MINGEN_OVERRIDE="${MIN_GEN:-}"       # override the min-gen gate (0 = off)
+RETRY_INCOMPLETE="${RETRY_INCOMPLETE:-0}"   # 1 = rerun cells an earlier run stopped as INCOMPLETE (short replies)
+FLOOR_WAIT="${FLOOR_WAIT-90}"        # boot gate: seconds to wait for port free + VRAM floor
+STOP_WAIT="${STOP_WAIT-30}"          # stop verify: seconds for the container to go + the port to free
+IDLE_WAIT="${IDLE_WAIT-60}"          # stop verify: seconds for VRAM to fall back to the pre-boot level
+VRAM_IDLE_SLACK_MIB="${VRAM_IDLE_SLACK_MIB-1024}"   # stop verify: used <= pre-boot used + slack = idle
+WATCH_S="${WATCH_S-5}"               # Memory-Fault watcher poll (s)
+for _k in FLOOR_WAIT STOP_WAIT IDLE_WAIT VRAM_IDLE_SLACK_MIB WATCH_S; do   # an empty/non-numeric knob is refused
+  case "${!_k}" in ''|*[!0-9]*) echo "RUN REFUSED: $_k='${!_k}' must be a non-negative integer" >&2; exit 1;; esac; done
+for _k in REPS_OVERRIDE MAXTOK_OVERRIDE MINGEN_OVERRIDE; do
+  case "${!_k}" in *[!0-9]*) echo "RUN REFUSED: ${_k%_OVERRIDE}='${!_k}' must be an integer" >&2; exit 1;; esac; done
+[ "$WATCH_S" -ge 1 ] || { echo "RUN REFUSED: WATCH_S must be >= 1" >&2; exit 1; }
+FIRST_WARMUP=@@WARMUP@@ API=@@API@@ PREFIX_MODE=@@PREFIX@@
+ALL_CELLS=(@@ALL_CELLS@@)
+UNPINNED=(@@UNPINNED@@)
+if [ ! -f "$RES/meta.txt" ]; then
+  { echo "date=$(date -Iseconds)"; echo "campaign=@@SLUG@@ (multi-engine throughput, gen_campaign G1)"
+    echo "order=@@ORDER@@"
+    echo "kernel=$(uname -r)"
+    echo "mesa=$(dpkg-query -W -f='${Version}' mesa-vulkan-drivers 2>/dev/null || echo unknown)"
+    echo "rocm=$(cat /opt/rocm/.info/version 2>/dev/null || echo unknown)"
+    echo "api=$API prefix_mode=$PREFIX_MODE first_warmup=$FIRST_WARMUP min_gen=@@MINGEN@@ conv_min_gen=@@CONV_MINGEN@@"
+@@META@@  } > "$RES/meta.txt"
+fi
+echo "invocation=$(date -Iseconds) run_tag=${RUN_TAG:-none} only=${ONLY:-all} reps_override=${REPS_OVERRIDE:-none} max_tokens_override=${MAXTOK_OVERRIDE:-none} min_gen_override=${MINGEN_OVERRIDE:-none} retry_incomplete=$RETRY_INCOMPLETE" >> "$RES/meta.txt"
+
+want_cell () {  # slug -> 0 if selected by ONLY; *-smoke-* cells are opt-in: only a glob that says "smoke" selects
+  # them (ONLY='q4kxl-*' = q4kxl's measured cells; ONLY='*-smoke-*' or 'q4kxl-smoke-*' = smoke)
+  local g smoke=0; case "$1" in *-smoke-*) smoke=1;; esac
+  if [ -z "$ONLY" ]; then [ "$smoke" = 0 ]; return; fi
+  IFS="," read -ra _globs <<<"$ONLY"
+  for g in "${_globs[@]}"; do
+    case "$1" in $g) if [ "$smoke" = 0 ]; then return 0; fi; case "$g" in *smoke*) return 0;; esac;; esac
+  done; return 1; }
+cell_open () {  # slug -> 0 when selected, not done, and not stopped INCOMPLETE (unless RETRY_INCOMPLETE=1)
+  want_cell "$1" && [ ! -f "$RAW/done/$1" ] && { [ ! -f "$RAW/done/$1.incomplete" ] || [ "$RETRY_INCOMPLETE" = 1 ]; }; }
+cells_pending () {  # slug... -> 0 if >=1 selected cell is still open (a server boots only then)
+  local s; for s in "$@"; do cell_open "$s" && return 0; done; return 1; }
+check_only () {  # every ONLY glob must select >= 1 cell (a typo would otherwise silently run nothing)
+  local g c hit; [ -n "$ONLY" ] || return 0
+  IFS="," read -ra _globs <<<"$ONLY"
+  for g in "${_globs[@]}"; do hit=0
+    for c in "${ALL_CELLS[@]}"; do case "$c" in $g) hit=1; break;; esac; done
+    [ "$hit" = 1 ] || { echo "RUN REFUSED: ONLY glob '$g' matches no cell (cells: ${ALL_CELLS[*]})" >&2; exit 1; }
+  done; }
+check_only
+
+@@ENSURE@@
+
+# --- sysfs + gate helpers (ported from the KLD campaign's run.sh: boot_gate / gate_clear / boot_gate_refuse) ---
+vram_used_mib () { local d; for d in "$DRM_ROOT"/card*/device; do
+  [ -r "$d/mem_info_vram_used" ] && { echo $(( $(cat "$d/mem_info_vram_used") / 1048576 )); return; }; done; }
+gtt_used_mib () { local d; for d in "$DRM_ROOT"/card*/device; do
+  [ -r "$d/mem_info_gtt_used" ] && { echo $(( $(cat "$d/mem_info_gtt_used") / 1048576 )); return; }; done; }
+gate_port_held () {  # port -> 0 when held OR unknown (ss failed / printed nothing: it always prints a header)
+  local l; l=$("$SS" -ltn 2>/dev/null) || return 0; [ -n "$l" ] || return 0
+  case "$l" in *":$1 "*) return 0;; esac; return 1; }
+gate_free_mib () { local d; for d in "$DRM_ROOT"/card*/device; do
+  [ -r "$d/mem_info_vram_total" ] || continue
+  echo $(( ($(cat "$d/mem_info_vram_total") - $(cat "$d/mem_info_vram_used")) / 1048576 )); return; done
+  echo unreadable; }
+gate_clear () { local free; free=$(gate_free_mib)   # port floor -> 0 when the port is free AND free VRAM >= floor
+  ! gate_port_held "$1" && [ "$free" != unreadable ] && [ "$free" -ge "$2" ]; }
+boot_gate_refuse () {  # slug port floor waited [note] -> ONE "BOOT REFUSED" line; no boot attempted, no boots.jsonl row
+  local slug=$1 port=$2 floor=$3 waited=$4 note=${5:-} free port_line line holder
+  free=$(gate_free_mib)
+  if ! "$SS" -ltn >/dev/null 2>&1; then port_line="port=$port state unknown (ss failed: fail-closed)"
+  elif gate_port_held "$port"; then
+    holder=$("$SS" -ltnp 2>/dev/null | grep ":$port " | sed -nE 's/.*users:\(\("([^"]*)",pid=([0-9]+).*/\1 pid=\2/p' | sort -u | head -3 | tr '\n' ' ') || true
+    port_line="port=$port held by ${holder:-unknown}"
+  else port_line="port=$port free"; fi
+  line="BOOT REFUSED $slug:"; [ -n "$note" ] && line="$line $note;"
+  echo "$line $port_line; free_mib=$free; floor_mib=$floor; waited_s=$waited" | tee -a "$RES/failures.txt"
+  { echo "free_mib=$free"; echo "floor_mib=$floor"; echo "$port_line"; echo "waited_s=$waited"; } > "$RAW/boot-$slug.txt"; }
+boot_gate () {  # slug port floor -> 0 once the port is free AND free VRAM >= floor at the same check (FLOOR_WAIT s)
+  local slug=$1 port=$2 floor=$3 t0 waited
+  case "$FLOOR_WAIT" in ''|*[!0-9]*) boot_gate_refuse "$slug" "$port" "$floor" 0 "FLOOR_WAIT=$FLOOR_WAIT invalid"; return 1;; esac
+  t0=$(date +%s)
+  gate_clear "$port" "$floor" && return 0
+  for _ in $(seq "$FLOOR_WAIT"); do sleep 1; gate_clear "$port" "$floor" && return 0; done
+  waited=$(( $(date +%s) - t0 )); boot_gate_refuse "$slug" "$port" "$floor" "$waited"; return 1; }
+power_snapshot () {  # slug before|after -> the card's power state + VRAM/GTT into $RES/power-<slug>.txt (plan §2.5)
+  local d f
+  { echo "## $2 $(date -Iseconds)"
+    for d in "$DRM_ROOT"/card*/device; do
+      [ -r "$d/mem_info_vram_used" ] || continue
+      echo "card=$d"
+      for f in power_dpm_force_performance_level pp_power_profile_mode pp_od_clk_voltage pp_dpm_mclk pp_dpm_sclk; do
+        [ -r "$d/$f" ] && { echo "### $f"; cat "$d/$f" 2>/dev/null; }; done
+      for f in "$d"/hwmon/hwmon*/power1_cap "$d"/hwmon/hwmon*/power1_cap_max; do
+        [ -r "$f" ] && echo "${f##*/}=$(cat "$f" 2>/dev/null)"; done
+      echo "vram_used_mib=$(vram_used_mib) gtt_used_mib=$(gtt_used_mib)"
+      break
+    done; } >> "$RES/power-$1.txt" 2>/dev/null || true; }
+
+# --- boot provenance (ported from the KLD run.sh: record_boot / fresh_slug / fresh_file / image_id_of) ---
+image_id_of () { "$DOCKER" image inspect --format '{{.Id}}' "$1" 2>/dev/null || true; }
+vllm_cache_dir () { local tag=${1##*/}; echo "$VLLM_CACHE_ROOT/${tag/:/@}"; }
+state_log_sig () { stat -c '%i:%s:%.9Y' "$SERVER_STATE_DIR/$1.log" 2>/dev/null || echo absent; }
+fresh_slug () {  # name -> name, or name-boot2, -boot3 ... when an earlier boot left records (never overwrite)
+  local s=$1 c=$1 n=1
+  while [ -e "$RES/server-$c.txt" ] || [ -e "$RAW/boot-$c.txt" ] || [ -e "$RAW/boot-$c-vram.csv" ]; do
+    n=$((n+1)); c="$s-boot$n"; done
+  echo "$c"; }
+fresh_file () { local p=$1 n=1 c=$1; while [ -e "$c" ]; do n=$((n+1)); c="${p%.*}-$n.${p##*.}"; done; echo "$c"; }
+record_boot () {  # kind slug arm image served server_txt t0 t1 rc vram_before vram_csv rad cache_json engine_log boot_tail
+  local kind=$1 slug=$2 arm=$3 image=$4 served=$5 server_txt=$6 t0=$7 t1=$8 rc=$9
+  local vbefore=${10:-} vcsv=${11:-} rad=${12:-} cjson=${13:-} elog=${14:-} btail=${15:-} iid vready
+  iid=$(image_id_of "$image"); vready=$(vram_used_mib)
+  # shellcheck disable=SC2086  # ${...:+...} are intentional word splits (empty => arg omitted)
+  python3 "$BOOT_DIAG" record --out "$RES/boots.jsonl" --name "$slug" --arm "$arm" --kind "$kind" \
+    --served "$served" --image "$image" --image-id "${iid:-}" --server-txt "$server_txt" \
+    --t0 "$t0" --t1 "$t1" --rc "$rc" --vram-before "${vbefore:-}" --vram-ready "${vready:-}" \
+    ${vcsv:+--vram-csv "$vcsv"} ${rad:+--rad "$rad"} ${cjson:+--cache-json "$cjson"} \
+    ${elog:+--log "$elog"} ${btail:+--boot-tail "$btail"} || echo "WARN: boots.jsonl record failed for $slug" >&2; }
+
+# --- the current server (one at a time); stop_current is the EXIT/INT/TERM trap ---
+CUR_ENGINE=""; CUR_PORT=""; CUR_SLUG=""; CUR_CONTAINER=""; CUR_VBEFORE=""; WARM_DONE=0
+serve_of () { case "$1" in llamacpp) echo "$SERVE_LLAMA";; vllm) echo "$SERVE_VLLM";; radiance) echo "$SERVE_RAD";; esac; }
+container_of () { case "$1" in vllm) echo "vllm-$2";; radiance) echo "radiance-$2";; *) echo "";; esac; }
+stop_current () {  # stop by pidfile (llama.cpp) / container (vllm, radiance), then verify port free + VRAM idle
+  [ -n "$CUR_ENGINE" ] || return 0
+  local engine=$CUR_ENGINE port=$CUR_PORT slug=$CUR_SLUG container=$CUR_CONTAINER vb=$CUR_VBEFORE
+  local serve i gone=n/a portfree=no idle=unknown now="" ps
+  CUR_ENGINE=""; CUR_CONTAINER=""   # idempotent: the EXIT trap may call it again
+  serve=$(serve_of "$engine")
+  PORT=$port "$serve" stop > "$RAW/stop-$slug.txt" 2>&1 \
+    || echo "WARN: $engine stop of $slug returned nonzero (see $RAW/stop-$slug.txt)" | tee -a "$RES/failures.txt"
+  if [ -n "$container" ]; then gone=no
+    for i in $(seq 0 "$STOP_WAIT"); do   # a failing docker is "unknown", never "gone"
+      ps=$("$DOCKER" ps -q --filter "name=^${container}\$" 2>/dev/null) || { gone=unknown; break; }
+      [ -n "$ps" ] || { gone=yes; break; }; [ "$i" -lt "$STOP_WAIT" ] && sleep 1; done; fi
+  for i in $(seq 0 "$STOP_WAIT"); do gate_port_held "$port" || { portfree=yes; break; }; [ "$i" -lt "$STOP_WAIT" ] && sleep 1; done
+  if [ -n "$vb" ]; then idle=no
+    for i in $(seq 0 "$IDLE_WAIT"); do now=$(vram_used_mib)
+      [ -n "$now" ] || { idle=unknown; break; }
+      [ "$now" -le $((vb + VRAM_IDLE_SLACK_MIB)) ] && { idle=yes; break; }; [ "$i" -lt "$IDLE_WAIT" ] && sleep 1; done; fi
+  { echo "container_gone=$gone port_free=$portfree vram_idle=$idle vram_used_mib=${now:-?} vram_before_mib=${vb:-?} slack_mib=$VRAM_IDLE_SLACK_MIB"; } >> "$RAW/stop-$slug.txt"
+  case "$gone" in no) echo "WARN: container $container still present after stopping $slug" | tee -a "$RES/failures.txt";;
+    unknown) echo "WARN: container $container state unknown after stopping $slug (docker ps failed)" | tee -a "$RES/failures.txt";; esac
+  [ "$portfree" = yes ] || echo "WARN: port $port still held (or ss failed) after stopping $slug" | tee -a "$RES/failures.txt"
+  case "$idle" in no) echo "WARN: VRAM not idle after stopping $slug (${now} MiB > pre-boot ${vb} + ${VRAM_IDLE_SLACK_MIB}); the next boot gate refuses below its floor" | tee -a "$RES/failures.txt";;
+    unknown) echo "WARN: VRAM idle unknown after stopping $slug (no pre-boot or current VRAM reading)" | tee -a "$RES/failures.txt";; esac
+  power_snapshot "$slug" after
+  return 0; }
+trap stop_current EXIT
+trap 'exit 130' INT TERM
+
+boot_server () {  # engine name arm port floor image served model_ref KEY=VAL... -> 0 up (CUR_* set), 1 refused/failed
+  # (ported from the KLD run.sh start_llama / start_server / start_rad: one function, engine-specific bits by case)
+  local engine=$1 name=$2 arm=$3 port=$4 floor=$5 image=$6 served=$7 mref=$8; shift 8
+  local srv_env=("$@") serve slug container gx
+  serve=$(serve_of "$engine"); container=$(container_of "$engine" "$port")
+  slug=$(fresh_slug "$name")
+  echo ">>> starting $engine server $slug (arm=$arm port=$port floor=${floor}MiB served=$served image=$image model=$mref)"
+  power_snapshot "$slug" before
+  # rule 14: make the GPU exclusive (llama-swap unload, hipfire shape) and assert the floor BEFORE any GPU second
+  if ! gx=$("$GPU_EXCLUSIVE" "$floor" 2>&1); then
+    printf '%s\n' "$gx" > "$RAW/gpu-exclusive-$slug.txt"
+    boot_gate_refuse "$slug" "$port" "$floor" 0 "gpu_exclusive.sh refused (see $RAW/gpu-exclusive-$slug.txt)"; return 1; fi
+  printf '%s\n' "$gx" > "$RAW/gpu-exclusive-$slug.txt"
+  boot_gate "$slug" "$port" "$floor" || return 1
+  local t0 t1 rc sampler_pid csv eng slog start_err cjson="" waited sig_before sig_after elog state_sec vbefore rad=""
+  csv="$RAW/boot-$slug-vram.csv"; eng="$RAW/boot-$slug-engine.log"; slog="$RAW/serve-logs-$slug.txt"
+  start_err="$RAW/start-err-$slug.txt"; [ "$engine" = radiance ] && rad=$mref
+  vbefore=$(vram_used_mib)
+  echo "vram_before_mib=${vbefore:-} gtt_before_mib=$(gtt_used_mib)" >> "$RES/power-$slug.txt"
+  t0=$(date +%s.%N)
+  # shellcheck disable=SC2086  # $BOOT_VRAM_SAMPLER is intentionally word-split (python3 + path)
+  $BOOT_VRAM_SAMPLER --out "$csv" & sampler_pid=$!
+  sig_before=$(state_log_sig "$port")
+  if [ "$engine" = llamacpp ]; then   # provenance: the resolved gguf + size and the build; start's stdout is appended
+    echo "gguf=$(readlink -f "$mref") bytes=$(stat -L -c %s "$mref" 2>/dev/null) llama_server=$(readlink -f "$image")" > "$RES/server-$slug.txt"
+    if env "${srv_env[@]}" "$serve" start >> "$RES/server-$slug.txt" 2>"$start_err"; then rc=0; else rc=$?; fi
+  else
+    env "${srv_env[@]}" "$serve" print > "$RES/server-$slug.txt" 2>&1
+    if env "${srv_env[@]}" "$serve" start > "$RAW/start-out-$slug.txt" 2>"$start_err"; then rc=0; else rc=$?; fi
+  fi
+  t1=$(date +%s.%N)
+  kill "$sampler_pid" 2>/dev/null; wait "$sampler_pid" 2>/dev/null
+  if [ "$engine" = vllm ]; then cjson="$RAW/boot-$slug-cache.json"
+    python3 "$BOOT_DIAG" cache --dir "$(vllm_cache_dir "$image")" > "$cjson" 2>/dev/null || echo '{}' > "$cjson"; fi
+  CUR_ENGINE=$engine; CUR_PORT=$port; CUR_SLUG=$slug; CUR_CONTAINER=$container; CUR_VBEFORE=$vbefore; WARM_DONE=0
+  if [ "$rc" -eq 0 ]; then
+    if [ -n "$container" ]; then "$DOCKER" logs "$container" > "$eng" 2>&1 || true
+    else cp "$SERVER_STATE_DIR/$port.log" "$eng" 2>/dev/null || true; fi
+    record_boot "$engine" "$slug" "$arm" "$image" "$served" "$RES/server-$slug.txt" "$t0" "$t1" "$rc" "$vbefore" "$csv" "$rad" "$cjson" "$eng" ""
+    return 0
+  fi
+  [ -n "$container" ] && { PORT=$port "$serve" logs > "$slog" 2>&1 || true; }
+  waited=$(awk -v a="$t0" -v b="$t1" 'BEGIN{printf "%d", b-a}')
+  sig_after=$(state_log_sig "$port"); elog=""; state_sec=""
+  if [ "$sig_before" != "$sig_after" ]; then   # the state-dir log counts only when THIS boot wrote it
+    elog="$SERVER_STATE_DIR/$port.log"; state_sec="state-dir engine log=$elog"; fi
+  # shellcheck disable=SC2086  # ${...:+...} are intentional word splits (empty => section omitted)
+  python3 "$BOOT_DIAG" tail --out "$RAW/boot-$slug.txt" --meta "start_rc=$rc" --meta "waited_s=$waited" \
+    --section "start stderr=$start_err" ${state_sec:+--section "$state_sec"} \
+    ${container:+--section "serve logs=$slog"} || echo "WARN: boot tail assembly failed for $slug" >&2
+  [ -n "$elog" ] || echo "state-dir engine log: not written by this boot (signature unchanged across the start)" >> "$RAW/boot-$slug.txt"
+  record_boot "$engine" "$slug" "$arm" "$image" "$served" "$RES/server-$slug.txt" "$t0" "$t1" "$rc" "$vbefore" "$csv" "$rad" "$cjson" "$elog" "$RAW/boot-$slug.txt"
+  echo "SERVER-FAILED: $engine $slug (image=$image model=$mref) start_rc=$rc waited_s=$waited boot tail: $RAW/boot-$slug.txt" \
+    | tee -a "$RES/failures.txt"
+  stop_current; return 1; }
+
+identity_gate () {  # port served needle... -> 0 when /v1/models lists exactly [served] AND the state-dir cmdline
+  # names every needle (pinned image/build + model); else IDENTITY-FAILED and the server's cells are skipped
+  local port=$1 served=$2 slug=$CUR_SLUG why="" n cmd="$SERVER_STATE_DIR/$1.cmdline"; shift 2
+  "$CURL" -sf -m 10 "http://localhost:$port/v1/models" > "$RES/models-$slug.json" 2>/dev/null || why="GET /v1/models failed"
+  [ -n "$why" ] || why=$(python3 - "$RES/models-$slug.json" "$served" <<'PY'
+@@IDENTITY_PY@@PY
+)
+  if [ -z "$why" ]; then
+    if [ ! -f "$cmd" ]; then why="no state-dir cmdline $cmd"
+    else for n in "$@"; do grep -qF -- "$n" "$cmd" || { why="cmdline $cmd lacks '$n'"; break; }; done; fi
+  fi
+  [ -z "$why" ] && { echo "  identity OK: $slug serves $served"; return 0; }
+  echo "IDENTITY-FAILED $slug: $why -- its cells are skipped" | tee -a "$RES/failures.txt"; return 1; }
+
+RESIDENCY=unknown
+residency_check () {  # arm working_set_mib -> RESIDENCY=ok|low|unknown: stamped on every cell row of this boot as a
+  # `residency` tag and in results/residency.jsonl; low/unknown also WARN in failures.txt (rule 15)
+  local arm=$1 ws=$2 slug=$CUR_SLUG out used src=amd-smi now
+  out=$(fresh_file "$RES/residency-$slug.txt")
+  { echo "# residency (rule 15): expected working set ${ws} MiB; less = paging/contention -> do not trust this boot's rows (WARN only)"
+    "$AMD_SMI" process -g 0 2>&1; } > "$out"
+  used=$("$AMD_SMI" process -g 0 2>/dev/null | awk '/VRAM_MEM:/ {v=$2; u=$3; m=0
+      if (u=="B") m=v/1048576; else if (u=="KB") m=v/1024; else if (u=="MB") m=v; else if (u=="GB") m=v*1024
+      t+=m} END {printf "%d", t+0}')
+  if [ -z "$used" ] || [ "$used" -eq 0 ]; then   # Vulkan llama-server: amd-smi lists no process (MEASURED, KLD runs)
+    now=$(vram_used_mib)
+    if [ -n "$now" ] && [ -n "$CUR_VBEFORE" ]; then used=$((now - CUR_VBEFORE)); src=vram_delta; else used=""; src=unreadable; fi
+  fi
+  echo "residency_mib=${used:-unknown} source=$src expected_mib=$ws" >> "$out"
+  if [ -z "$used" ]; then RESIDENCY=unknown; echo "  WARN (rule 15): $slug residency unreadable -- see $out" | tee -a "$RES/failures.txt"
+  elif [ "$used" -lt "$ws" ]; then RESIDENCY=low
+    echo "  WARN (rule 15): $slug residency ${used} MiB ($src) < expected working set ${ws} MiB -- its rows carry residency=low; see $out" | tee -a "$RES/failures.txt"
+  else RESIDENCY=ok; echo "  residency OK: $slug ${used} MiB ($src) >= ${ws} MiB"; fi
+  printf '{"kind":"residency","boot":"%s","arm":"%s","residency_mib":%s,"source":"%s","expected_mib":%s,"status":"%s"}\n' \
+    "$slug" "$arm" "${used:-null}" "$src" "$ws" "$RESIDENCY" >> "$RES/residency.jsonl"; }
+
+FAULT_RE='Memory Fault|ErrorDeviceLost|DeviceLostError'
+fault_seen () {  # since CELL_T0 / CELL_OFF: the whole log window of THIS cell (no fixed tail: m11)
+  local n   # grep -c reads to EOF: grep -q would exit at the match, SIGPIPE the writer and fail under pipefail
+  if [ -n "$CUR_CONTAINER" ]; then n=$("$DOCKER" logs --since "$CELL_T0" "$CUR_CONTAINER" 2>&1 | grep -cE "$FAULT_RE")
+  else n=$(tail -c "+$((CELL_OFF + 1))" "$SERVER_STATE_DIR/$CUR_PORT.log" 2>/dev/null | grep -cE "$FAULT_RE"); fi
+  [ "${n:-0}" -gt 0 ]; }
+quarantine_rows () {  # slug -> move the slug's rows out of results.jsonl into quarantine.jsonl (rule 18)
+  [ -f "$RES/results.jsonl" ] || return 0
+  python3 - "$RES/results.jsonl" "$RES/quarantine.jsonl" "$1" <<'PY'
+import json, os, sys
+src, dst, slug = sys.argv[1:4]
+keep, moved = [], []
+for line in open(src, encoding="utf-8"):
+    try:
+        lab = json.loads(line).get("label")
+    except ValueError:
+        lab = None
+    (moved if lab == slug else keep).append(line)
+if moved:
+    with open(dst, "a", encoding="utf-8") as fh:
+        fh.writelines(moved)
+    with open(src + ".tmp", "w", encoding="utf-8") as fh:
+        fh.writelines(keep)
+    os.replace(src + ".tmp", src)
+print(f"  quarantined {len(moved)} row(s) of {slug} -> {dst}")
+PY
+}
+fault_abort () {  # slug when -> the GPU faulted during a cell: no marker, rows quarantined, server stopped, run aborted
+  echo "MEMORY-FAULT on $CUR_ENGINE server $CUR_SLUG $2 cell $1 -- cell rows quarantined, server stopped, run aborted (rule 15)" \
+    | tee -a "$RES/failures.txt"
+  quarantine_rows "$1"; stop_current; exit 1; }
+watched () {  # slug cmd... -> run it under the Memory-Fault watcher (ported from the KLD run_probe_watched, rule 15):
+  # polled every WATCH_S while it runs AND once after it exits (a fault in the last poll window still counts)
+  local slug=$1 pid rc; shift
+  CELL_T0=$(date +%s); CELL_OFF=$(stat -c %s "$SERVER_STATE_DIR/$CUR_PORT.log" 2>/dev/null || echo 0)
+  "$@" & pid=$!
+  while kill -0 "$pid" 2>/dev/null; do
+    sleep "$WATCH_S"
+    kill -0 "$pid" 2>/dev/null || break   # exited meanwhile: the check after `wait` covers it
+    if fault_seen; then
+      pkill -TERM -P "$pid" 2>/dev/null; kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
+      fault_abort "$slug" during
+    fi
+  done
+  wait "$pid"; rc=$?
+  fault_seen && fault_abort "$slug" "at the end of"
+  return "$rc"; }
+
+cell_args () {  # slug reps maxt min_gen -> sets C_REPS C_MAXT C_MG from the knobs; 1 when done/filtered/INCOMPLETE
+  C_REPS=$2; C_MAXT=$3; C_MG=$4
+  if [ -f "$RAW/done/$1" ]; then echo "  skip (done): $1"; return 1; fi
+  want_cell "$1" || { echo "  skip (ONLY filter): $1"; return 1; }
+  if [ -f "$RAW/done/$1.incomplete" ] && [ "$RETRY_INCOMPLETE" != 1 ]; then
+    echo "  skip (INCOMPLETE earlier: $(cat "$RAW/done/$1.incomplete"); RETRY_INCOMPLETE=1 reruns it): $1"; return 1; fi
+  [ -n "$REPS_OVERRIDE" ] && C_REPS=$REPS_OVERRIDE
+  if [ -n "$MAXTOK_OVERRIDE" ]; then C_MAXT=$MAXTOK_OVERRIDE; C_MG=0; fi
+  [ -n "$MINGEN_OVERRIDE" ] && C_MG=$MINGEN_OVERRIDE
+  return 0; }
+finish_cell () {  # slug rc -> done marker (0) | INCOMPLETE stop with n_short (3) | FAILED (other)
+  local slug=$1 rc=$2 st="$RAW/status-$1.json" info
+  if [ "$rc" -eq 0 ]; then   # engine-bench appended its rows to results.jsonl (complete probes only, rule 18)
+    touch "$RAW/done/$slug"; rm -f "$RAW/done/$slug.incomplete"; return 0; fi
+  if [ "$rc" -eq 3 ]; then   # min-gen short: no rows, no marker; not retried silently (seeds are deterministic)
+    info=$(python3 -c 'import json, sys; d = json.load(open(sys.argv[1]))
+print("n_short=%s of %s below min_gen %s" % (d["n_short"], d["n_total"], d["min_gen"]))' "$st" 2>/dev/null) \
+      || info="n_short unknown (no engine-bench status in $st)"
+    echo "$info" > "$RAW/done/$slug.incomplete"
+    echo "INCOMPLETE $slug: $info -- cell stopped, NOT retried (the seeds repeat the same short replies on a rerun);" \
+      "rerun it deliberately with RETRY_INCOMPLETE=1 ONLY='$slug' (optionally a lower MIN_GEN)" | tee -a "$RES/failures.txt"
+    return 0; fi
+  echo "  FAILED: $slug (engine-bench exit $rc)" | tee -a "$RES/failures.txt"; }
+run_probe_cell () {  # slug conc reps maxt min_gen sampling tags spec_rows fixture -> engine-bench probe
+  local slug=$1 conc=$2 smp=$6 tags=$7 srows=$8 pf=$9 wu=0 rc
+  cell_args "$slug" "$3" "$4" "$5" || return 0
+  [ "$WARM_DONE" = 0 ] && wu=$FIRST_WARMUP   # the first probe of a boot warms up (JIT/graph capture), later ones don't
+  WARM_DONE=1
+  watched "$slug" env CAMPAIGN_DIR="$PROBE_CAMPAIGN" PROMPT_FILE="$GEN/$pf" SLUG="$slug" MAX_TOKENS="$C_MAXT" \
+       CONCURRENCY="$conc" REPS="$C_REPS" WARMUP="$wu" API="$API" PREFIX_MODE="$PREFIX_MODE" SAMPLING="$smp" \
+       MIN_GEN="$C_MG" TAGS="$tags,tg=$C_MAXT,residency=$RESIDENCY" SPEC_ROWS="$srows" STATUS_OUT="$RAW/status-$slug.json" \
+       SAMPLE_VRAM=1 "$EB/run.sh"; rc=$?
+  finish_cell "$slug" "$rc"; }
+run_conv_cell () {  # slug reps maxt min_gen start step max_depth sampling tags spec_rows prompt turn_prompt kwargs
+  local slug=$1 start=$5 step=$6 depth=$7 smp=$8 tags=$9 srows=${10} pf=${11} tp=${12} kw=${13} tpa=() rc
+  cell_args "$slug" "$2" "$3" "$4" || return 0
+  WARM_DONE=1   # no warm-up on conversation cells (engine-bench takes none); a resumed run may start cold here
+  [ -n "$tp" ] && tpa=("TURN_PROMPT=$ROOT/bench/workloads/tasks/$tp")
+  watched "$slug" env CAMPAIGN_DIR="$PROBE_CAMPAIGN" MODE=conversation PROMPT_FILE="$GEN/$pf" SLUG="$slug" \
+       MAX_TOKENS="$C_MAXT" REPS="$C_REPS" START_TOKENS="$start" STEP_TOKENS="$step" MAX_DEPTH="$depth" \
+       CHAT_KWARGS="$kw" "${tpa[@]}" SAMPLING="$smp" MIN_GEN="$C_MG" STATUS_OUT="$RAW/status-$slug.json" \
+       TAGS="$tags,tg=$C_MAXT,residency=$RESIDENCY" SPEC_ROWS="$srows" SAMPLE_VRAM=1 "$EB/run.sh"; rc=$?
+  finish_cell "$slug" "$rc"; }
+sentinel_check () {  # arm ladder_slug sentinel_slug spec(0|1) tol_pct -> DRIFT line(s) in failures.txt (plan §2.5)
+  # runs after the server block (also on a resume that boots nothing); the .drift marker is written only when a
+  # drift record was written, so a missing ladder/sentinel row leaves the check pending, never consumed
+  [ -f "$RAW/done/$3" ] && [ ! -f "$RAW/done/$3.drift" ] && [ -f "$RES/results.jsonl" ] || return 0
+  if python3 - "$RES/results.jsonl" "$RES/drift.jsonl" "$@" <<'PY' | tee -a "$RES/failures.txt"; then
+@@SENTINEL_PY@@PY
+    touch "$RAW/done/$3.drift"
+  else echo "  drift check $3: ladder or sentinel row missing -- still pending" >&2; fi; }
+
+# --- pins preflight (ported from the KLD preflight; rule 2): refuse before any GPU work ---
+pin_sha () {  # path sha256 -> 0 when it matches (cached per path+size+mtime: a 30 GB GGUF hashes once)
+  local p=$1 want=$2 st key cache got
+  [ -f "$p" ] || { echo "PIN-FAIL: missing $p" >&2; return 1; }
+  st=$(stat -L -c '%s:%Y' "$p"); key=$(printf '%s' "$p" | sha256sum | cut -c1-16); cache="$CAMPAIGN_DIR/tmp/pins/$key"
+  if [ -f "$cache" ] && [ "$(sed -n 1p "$cache")" = "$st" ]; then got=$(sed -n 2p "$cache")
+  else echo "  hashing $p (once per size+mtime) ..."; got=$(sha256sum "$p" | cut -d' ' -f1)
+    mkdir -p "${cache%/*}"; printf '%s\n%s\n' "$st" "$got" > "$cache"; fi
+  [ "$got" = "$want" ] || { echo "PIN-FAIL: sha256 drift $p: $got != pinned $want" >&2; return 1; }; }
+pin_image () {  # ref [digest] -> present, and its image id / a repo digest contains the pinned digest
+  local info
+  info=$("$DOCKER" image inspect --format '{{.Id}} {{range .RepoDigests}}{{.}} {{end}}' "$1" 2>/dev/null) \
+    || { echo "PIN-FAIL: image $1 not present" >&2; return 1; }
+  [ -z "${2:-}" ] || [[ "$info" == *"$2"* ]] || { echo "PIN-FAIL: image $1 drift: have '$info', pinned '$2'" >&2; return 1; }; }
+pin_single () {  # glob -> exactly one match (one revision dir per model, as in the KLD preflight)
+  local n; n=$(compgen -G "$1" | wc -l)
+  [ "$n" -eq 1 ] || { echo "PIN-FAIL: expected exactly 1 match of $1, got $n" >&2; return 1; }; }
+preflight () {
+  local fail=0 t v c caps
+  for t in "$EB/run.sh" "$GPU_EXCLUSIVE" "$BOOT_DIAG"@@TOOLS@@; do
+    [ -e "$t" ] || { echo "PIN-FAIL: tool missing: $t" >&2; fail=1; }; done
+  caps=$("$EB/run.sh" --capabilities 2>/dev/null | sed -n 's/^engine-bench-capabilities: //p')
+  for v in @@EBC@@; do   # the engine-bench passthrough these cells need (silently dropped tags/sampling = rule 2 breach)
+    case " $caps " in *" $v "*) ;;
+      *) echo "PIN-FAIL: $EB/run.sh --capabilities lacks $v (engine-bench passthrough for gen_campaign G1 not installed)" >&2; fail=1;; esac
+  done
+  if [ "${#UNPINNED[@]}" -gt 0 ]; then   # rule 2: a measured cell needs pinned weights/build/image; smoke may run unpinned
+    for c in "${ALL_CELLS[@]}"; do
+      case "$c" in *-smoke-*) continue;; esac
+      cell_open "$c" || continue
+      echo "PIN-FAIL: unpinned ${UNPINNED[*]} -- pin them (pins.files / pins.images / pins.binaries) or select only smoke cells (ONLY='*-smoke-*')" >&2
+      fail=1; break
+    done
+  fi
+@@PINS@@  [ "$fail" -eq 0 ] || { echo "PREFLIGHT FAILED -- fix the pins above; no GPU work started" >&2; exit 1; }
+  echo "preflight OK"; }
+'''
+
+
+# python bodies of the run.sh heredocs: module constants so the tests can exercise them directly
+IDENTITY_PY = r'''import json, sys
+try:
+    ids = [m.get("id") for m in json.load(open(sys.argv[1])).get("data", [])]
+except Exception as e:
+    print(f"unparseable /v1/models ({e})"); sys.exit()
+if ids != [sys.argv[2]]:
+    print(f"/v1/models lists {ids}, expected exactly [{sys.argv[2]!r}]")
+'''
+
+SENTINEL_PY = r'''import json, sys
+rows_f, out_f, arm, lad, sen, spec, tol = sys.argv[1:8]
+last = {}
+for line in open(rows_f, encoding="utf-8"):
+    try:
+        r = json.loads(line)
+    except ValueError:
+        continue
+    if r.get("kind") == "aggregate" and r.get("engine") == arm and r.get("label") in (lad, sen) and "error" not in r:
+        last[r["label"]] = r
+L, S = last.get(lad), last.get(sen)
+if not (L and S):
+    sys.exit(2)   # nothing to compare yet: the caller keeps the check pending
+res = {"kind": "drift", "arm": arm, "ladder": lad, "sentinel": sen, "spec": spec == "1", "tol_pct": float(tol)}
+for m in ("decode_tok_s_wall", "prefill_tok_s_wall"):
+    l, s, lo, hi = L.get(m + "_p50"), S.get(m + "_p50"), L.get(m + "_min"), L.get(m + "_max")
+    if l is None or s is None or l == 0:
+        continue
+    if spec == "1" and lo is not None and hi is not None:
+        drift, rule = not (lo <= s <= hi), f"outside the ladder cell's min-max [{lo}, {hi}]"
+    else:
+        drift, rule = abs(s - l) / l * 100 > float(tol), f"|delta| > {tol}%"
+    res[m] = {"ladder_p50": l, "sentinel_p50": s, "drift": drift}
+    if drift:
+        print(f"DRIFT {sen}: {m}_p50 ladder={l} sentinel={s} ({rule})")
+with open(out_f, "a", encoding="utf-8") as fh:
+    fh.write(json.dumps(res) + "\n")
+'''
+
+
+def _sq(*parts):
+    return " ".join(sh_quote(p) for p in parts)
+
+
+def multi_srv_env(spec, s):
+    """The launcher env (KEY=VAL list) of one server, passed via env "${srv_env[@]}" (never word-expanded)."""
+    m = multi_server(spec, s)
+    eng, port, xa = s["engine"], m["port"], (s.get("extra_args") or "").split()
+    if eng == "llamacpp":
+        t = dict(MULTI_TUNING_DEFAULTS, **(spec.get("tuning") or {}))
+        e = [f"MODEL={s['gguf']}", f"LLAMA_SERVER={s['bin']}", f"BACKEND={s.get('backend', 'vulkan')}",
+             f"CTX={s['ctx']}", f"NP={s['np']}", f"KV={s['kv']}", f"MTP={s.get('mtp', 0)}", f"UB={t['ub']}",
+             f"B={t['b']}", f"FA={t['fa']}", f"PORT={port}", "WAIT=900",
+             "EXTRA_ARGS=" + " ".join(["--alias", s["served_model"]] + xa)]
+    elif eng == "vllm":
+        e = [f"PROFILE={s['profile']}", f"IMAGE={s['image']}", f"MAXLEN={s['ctx']}", f"MAXSEQS={s['np']}",
+             f"KV_DTYPE={s['kv']}", f"FREE_MIB_FLOOR={m['floor']}", f"PORT={port}"]
+        if xa:
+            e.append("EXTRA_ARGS=" + " ".join(xa))
+    else:
+        e = [f"RAD_FILE={s['rad_file']}", f"IMAGE={s['image']}", f"PORT={port}", f"MAXLEN={s['ctx']}",
+             f"MAXSEQS={s['np']}", f"KV_DTYPE={s['kv']}", "TP=1", f"SERVED_NAME={s['served_model']}", "WAIT=900",
+             f"FREE_MIB_FLOOR={m['floor']}", f"CONTAINER_NAME=radiance-{port}",
+             "EXTRA_ARGS=" + " ".join(xa + ["--num-speculative-tokens", str(s["spec_tokens"])])]
+    return e + [f"{k}={v}" for k, v in (s.get("env") or {}).items()]
+
+
+def multi_needles(s):
+    """Strings the state-dir cmdline must contain after the boot (identity gate)."""
+    if s["engine"] == "llamacpp":
+        return [s["bin"], s["gguf"], f"--alias {s['served_model']}"]
+    if s["engine"] == "vllm":
+        return [s["image"], f"--served-model-name {s['served_model']}", f"# profile={s['profile']} "]
+    rad = s["rad_file"]
+    return [s["image"], os.path.dirname(rad) + ":/models:ro", "/models/" + os.path.basename(rad),
+            f"--served-model-name {s['served_model']}"]
+
+
+def _multi_pins_sh(spec):
+    pins = spec.get("pins") or {}
+    L = []
+    for p, h in (pins.get("files") or {}).items():
+        L.append(f"  pin_sha {_sq(p, h)} || fail=1")
+    for g in pins.get("single") or []:
+        L.append(f"  pin_single {sh_quote(g)} || fail=1")
+    weights = []
+    for s in spec["servers"]:
+        for k in ("gguf", "rad_file"):
+            if s.get(k) and s[k] not in weights:
+                weights.append(s[k])
+    for p in weights:
+        L.append(f"  [ -f {sh_quote(p)} ] || {{ echo {sh_quote('PIN-FAIL: missing ' + p)} >&2; fail=1; }}")
+    for s in spec["servers"]:
+        if s.get("model"):
+            L.append(f"  [ -e {sh_quote(s['model'])} ] || {{ echo {sh_quote('PIN-FAIL: missing ' + s['model'])} >&2; fail=1; }}")
+    bins = list(dict.fromkeys([s["bin"] for s in spec["servers"] if s.get("bin")] + list(pins.get("binaries") or [])))
+    for b in bins:
+        L.append(f"  [ -x {sh_quote(b)} ] || {{ echo {sh_quote('PIN-FAIL: not executable: ' + b)} >&2; fail=1; }}")
+    imgs = pins.get("images") or {}
+    for ref in dict.fromkeys([s["image"] for s in spec["servers"] if s.get("image")] + list(imgs)):
+        L.append(f"  pin_image {_sq(ref, imgs.get(ref, ''))} || fail=1")
+    for port in sorted({multi_server(spec, s)["port"] for s in spec["servers"]}):
+        L.append(f"  if gate_port_held {port}; then echo 'RUN REFUSED: port {port} is held (another server/run) -- "
+                 f"free it first' >&2; fail=1; fi")
+    return "".join(l + "\n" for l in L)
+
+
+def emit_multi_runsh(spec):
+    w = multi_workload(spec)
+    srvs = spec["servers"]
+    ms = [multi_server(spec, s) for s in srvs]
+    notes = spec.get("notes")
+    notes_sh = "".join(f"# NOTE: {n}\n" for n in ([notes] if isinstance(notes, str) else notes or []))
+    meta_lines = []
+    for s, m in zip(srvs, ms):
+        ident = {"llamacpp": f"gguf={s.get('gguf')} bin={s.get('bin')} backend={s.get('backend', 'vulkan')} mtp={s.get('mtp', 0)}",
+                 "vllm": f"profile={s.get('profile')} image={s.get('image')}",
+                 "radiance": f"rad_file={s.get('rad_file')} image={s.get('image')} spec_tokens={s.get('spec_tokens')}"}[s["engine"]]
+        meta_lines.append(f"server[{m['name']}]=engine={s['engine']} arm={m['arm']} pass={m['pass']} tier={m['tier']} "
+                          f"served={s['served_model']} ctx={s['ctx']} np={s['np']} kv={s['kv']} port={m['port']} "
+                          f"floor_mib={m['floor']} working_set_mib={m['ws']} {ident}"
+                          + (f" extra_args={s['extra_args']}" if s.get("extra_args") else "")
+                          + (f" env={env_assign(s['env'])}" if s.get("env") else ""))
+        meta_lines.append(f"sampling[{m['name']}]={multi_sampling(spec, s)}")
+    meta = "".join(f"    echo {sh_quote(l)}\n" for l in meta_lines)
+    tools = sorted({{"llamacpp": ' "$SERVE_LLAMA"', "vllm": ' "$SERVE_VLLM"', "radiance": ' "$SERVE_RAD"'}[s["engine"]]
+                    for s in srvs})
+    head = (MULTI_RUNSH_HEAD
+            .replace("@@SLUG@@", spec["slug"])
+            .replace("@@NOTES@@", ("#\n" + notes_sh) if notes_sh else "")
+            .replace("@@ROOTS@@", RUNSH_ROOTS)
+            .replace("@@WARMUP@@", str(w["first_warmup"]))
+            .replace("@@MINGEN@@", str(w["min_gen"]))
+            .replace("@@CONV_MINGEN@@", str(conv_min_gen(w)) if w.get("conversation") else "none")
+            .replace("@@ALL_CELLS@@", _sq(*[c["slug"] for s in srvs for c in multi_cells(spec, s)]))
+            .replace("@@UNPINNED@@", _sq(*multi_unpinned(spec)) if multi_unpinned(spec) else "")
+            .replace("@@API@@", w["api"])
+            .replace("@@PREFIX@@", w["prefix_mode"])
+            .replace("@@ORDER@@", " ".join(m["name"] for m in ms))
+            .replace("@@META@@", meta)
+            .replace("@@ENSURE@@", "\n".join(ENSURE_FIXTURES_SH))
+            .replace("@@TOOLS@@", "".join(tools))
+            .replace("@@EBC@@", " ".join(EB_CONTRACT))
+            .replace("@@PINS@@", _multi_pins_sh(spec))
+            .replace("@@IDENTITY_PY@@", IDENTITY_PY)
+            .replace("@@SENTINEL_PY@@", SENTINEL_PY))
+    L = [head.rstrip("\n"), ""]
+    ad = L.append
+    ad("# ================================ execution ================================")
+    ad("preflight")
+    fixtures = sorted({c["fixture"] for s in srvs for c in multi_cells(spec, s)})
+    ad("ensure_fixtures " + " ".join(sh_quote(f) for f in fixtures))
+    fs = (spec.get("pins") or {}).get("fixtures_sha256")
+    if fs:
+        ad(f'( cd "$GEN" && sha256sum -c --quiet "$CAMPAIGN_DIR/{fs}" ) '
+           f'|| {{ echo "PIN-FAIL: fixtures drift vs {fs} -- no GPU work started" >&2; exit 1; }}')
+    ad("")
+    se = w.get("sentinel")
+    for i, (s, m) in enumerate(zip(srvs, ms), 1):
+        cells = multi_cells(spec, s)
+        smp = multi_sampling(spec, s)
+        srows = SPEC_ROWS_MODE[s["engine"]]   # spec_metrics `rows` on llama.cpp, snap/diff on vllm/radiance (G3)
+        ad(f"# ===== server {i}/{len(srvs)}: {m['name']} ({s['engine']} · arm {m['arm']} · pass {m['pass']} · "
+           f"tier {m['tier']} · served {s['served_model']} · ctx {s['ctx']} np {s['np']} kv {s['kv']} · "
+           f"spec {'on' if m['spec'] else 'off'}) =====")
+        ad(f"CELLS=({_sq(*[c['slug'] for c in cells])})")
+        ad('if ! cells_pending "${CELLS[@]}"; then')
+        ad(f'  echo "  skip: server {m["name"]} -- no selected cell pending (done or ONLY-filtered)"')
+        ad("else")
+        ad(f"  export ENGINES_LIST={sh_quote(m['arm'] + '|http://localhost:' + str(m['port']) + '/v1|' + s['served_model'])}"
+           "   # set from the spec, never inherited")
+        ad(f"  SMP={sh_quote(smp)}")
+        mref = {"llamacpp": s.get("gguf"), "vllm": s.get("profile"), "radiance": s.get("rad_file")}[s["engine"]]
+        image = s.get("bin") if s["engine"] == "llamacpp" else s["image"]
+        ad(f"  if boot_server {_sq(s['engine'], m['name'], m['arm'], m['port'], m['floor'], image, s['served_model'], mref)} \\")
+        env = multi_srv_env(spec, s)
+        for j, e in enumerate(env):
+            ad(f"       {sh_quote(e)}" + ("; then" if j == len(env) - 1 else " \\"))
+        ad(f"    if identity_gate {m['port']} {_sq(s['served_model'], *multi_needles(s))}; then")
+        ad(f"      residency_check {_sq(m['arm'], m['ws'])}")
+        for c in cells:
+            tags = ",".join(f"{k}={v}" for k, v in c["tags"].items())
+            if c["mode"] == "probe":
+                ad(f"      run_probe_cell {_sq(c['slug'], c['n'], c['reps'], c['max_tokens'], c['min_gen'])} \"$SMP\" "
+                   f"{_sq(tags, srows, c['fixture'])}")
+            else:
+                ad(f"      run_conv_cell {_sq(c['slug'], c['reps'], c['max_tokens'], c['min_gen'], c['start'], c['step'], c['max_depth'])} "
+                   f"\"$SMP\" {_sq(tags, srows, c['fixture'], c['turn_prompt'], c['kwargs'])}")
+        ad("    fi")
+        ad("    stop_current")
+        ad("  fi")
+        ad("fi")
+        if se:   # outside the boot block: a resume that boots nothing still runs a pending drift check
+            lad_slug = "%s-d%d-n1" % (m["name"], se["depth"])
+            sen_slug = "%s-sentinel-d%d" % (m["name"], se["depth"])
+            ad("sentinel_check " + _sq(m["arm"], lad_slug, sen_slug, 1 if m["spec"] else 0, se.get("tol_pct", 5)))
+        ad("")
+    ad("# ===== report (last step): theme-aware SVG charts + appendix.md =====")
+    ad('if [ -f "$RES/results.jsonl" ]; then')
+    ad('  python3 "$ROOT/bench/core/report.py" "${RUN_DIR:-$CAMPAIGN_DIR}" \\')
+    ad('    && echo "charts: $RES/charts/  ·  appendix: $RES/appendix.md"')
+    ad("fi")
+    ad('echo "campaign done. results: $RES/results.jsonl  boots: $RES/boots.jsonl  (raw: $RAW/)"')
+    ad('[ -f "$RES/failures.txt" ] && { echo "--- failures / warnings ---"; cat "$RES/failures.txt"; } || true')
+    return "\n".join(L) + "\n"
+
+
+def emit_multi_readme(spec):
+    slug, date, cd = spec["slug"], campaign_date(spec), campaign_rel(spec)
+    w = multi_workload(spec)
+    title = spec.get("title", f"{slug} campaign")
+    rows = []
+    for s in spec["servers"]:
+        m = multi_server(spec, s)
+        what = {"llamacpp": f"`{os.path.basename(s.get('gguf', ''))}` · build `{s.get('bin')}`",
+                "vllm": f"profile `{s.get('profile')}` · `{s.get('image')}`",
+                "radiance": f"`{os.path.basename(s.get('rad_file', ''))}` · `{s.get('image')}` · k={s.get('spec_tokens')}"}
+        cells = multi_cells(spec, s)
+        rows.append(f"| {m['name']} | {s['engine']} | {m['arm']} | {m['pass']} | {what[s['engine']]} | "
+                    f"`{s['served_model']}` | {s['ctx']}/{s['np']}/{s['kv']} | {'on' if m['spec'] else 'off'} | "
+                    f"{m['floor']}/{m['ws']} | {len(cells)} |")
+    rad = [s["name"] for s in spec["servers"] if s["engine"] == "radiance" and s.get("rep_penalty_key") is None]
+    rad_note = (f"\n> ⚠️ **Radiance ({', '.join(rad)}): {RADIANCE_REP_WARN}.** Its rows carry `rep_key=UNVERIFIED`; "
+                "do not compare a repetition-sensitive number against the other engines until the smoke settles it.\n"
+                if rad else "")
+    conv_gate = ("there is no conversation cell." if not w.get("conversation") else
+                 f"every conversation turn must generate >= {conv_min_gen(w)} tokens (gated by engine-bench)."
+                 if conv_min_gen(w) else "conversation turns are not gated (`conversation.min_gen` unset = 0).")
+    cells = "\n".join(f"- `{c['slug']}` ({c['cell']}, n={c['n']}, reps {c['reps']}, "
+                      + (f"{c['fixture']})" if c["mode"] == "probe" else f"conversation to {c['max_depth']})")
+                      for c in multi_cells(spec, spec["servers"][0]))
+    return f"""# {title} (R9700, {date})
+
+Scaffolded by `bench/core/gen_campaign.py` (multi-engine throughput, G1). The executable driver is
+**`run.sh`** in this folder: resumable (per-cell markers in `tmp/done/`), one engine at a time, in the
+server order below. Fill in the prose (goal, decisions, out of scope).
+
+## Servers (run order)
+| server | engine | arm | pass | weights · runtime | served | ctx/np/kv | spec | floor/ws MiB | cells |
+|---|---|---|---|---|---|---|---|---|---|
+{chr(10).join(rows)}
+
+Sampling (every request, explicit): `{json.dumps(spec['sampling'], separators=(',', ':'))}` plus
+`repetition_penalty {w.get('repetition_penalty')}` under each server's own key (llama.cpp `repeat_penalty`,
+vLLM `repetition_penalty`, radiance: only if the server sets `rep_penalty_key`). API `{w['api']}`,
+max_tokens {w['max_tokens']}, prefix `{w['prefix_mode']}`, first-probe warm-up {w['first_warmup']}.
+Every row carries `--tag arm,depth,n,tg,workload,pass,tier,cell,rep_key,residency` (conversation rows: no depth).
+{rad_note}
+**Min-gen gate:** a probe cell needs every request to generate >= {w['min_gen']} tokens; {conv_gate}
+A short cell writes no rows and no done marker: run.sh stops it as **INCOMPLETE** with its `n_short` in
+`results/failures.txt` and does not retry it (the seeds are deterministic, a rerun repeats the same short replies);
+`RETRY_INCOMPLETE=1 ONLY='<slug>'` reruns it deliberately.
+
+## Cells (first server shown; every server gets the same shape, depth/np permitting)
+{cells}
+
+## Run
+```bash
+bash {cd}/run.sh                                     # resume: same command
+RUN_TAG=smoke-1 ONLY='*-smoke-*' bash {cd}/run.sh    # smoke (opt-in cells), isolated in tmp/runs/smoke-1/
+ONLY='q4kxl-*' REPS=1 bash {cd}/run.sh               # one server, quick pass
+```
+**Requires** `bench/perf/engine-bench/run.sh --capabilities` to list `{'`, `'.join(EB_CONTRACT)}` (preflight refuses otherwise).
+Fixtures pin (`pins.fixtures_sha256`, optional): {FIXTURES_SHA_FORMAT}.
+
+## Per server, run.sh does
+power snapshot → `gpu_exclusive.sh <floor>` → boot gate (port free AND free VRAM ≥ floor) → VRAM sampler
+across the boot → `serve_<engine>.sh` print + start → `boot_diag.py record` (`results/boots.jsonl`) →
+identity gate (`/v1/models` = served name; state-dir cmdline names the pinned image/build + model) →
+residency vs the expected working set (stamped on every row as `residency=ok|low|unknown`) → cells under a
+Memory-Fault watcher (a fault aborts the run and moves the cell's rows to `results/quarantine.jsonl`) → stop by
+pidfile/container + port-free + VRAM-idle verify → power snapshot; then the drift check (sentinel vs ladder).
+Cell order per boot: smoke (opt-in) → ladder ascending (n=N right after its depth) → sentinel → conversation.
+
+## Layout
+- `results/` (committed): `results.jsonl`, `boots.jsonl`, `drift.jsonl`, `residency.jsonl`, `quarantine.jsonl`, `meta.txt`, `failures.txt`,
+  `server-<slug>.txt`, `models-<slug>.json`, `residency-<slug>.txt`, `power-<slug>.txt`, `charts/`, `appendix.md`.
+- `tmp/` (git-ignored raw): `done/` markers, per-probe `<stamp>-engine-<cell>/` dirs, boot logs/CSVs, stop records.
+
+## Write-up
+**benchmark-results** skill → `docs/findings/<topic>/{date}-{slug}.md` with `campaign: {cd}` in its meta block.
+"""
+
+
+EXAMPLE_MULTI = {
+    "slug": "example-multi", "port": 8000, "tuning": {"ub": 2048, "b": 8192, "fa": "on"},
+    "notes": ["arm order interleaves engine families (plan §2.5)",
+              "PLACEHOLDER pins: every all-zero sha256 / digest below is a stand-in -- replace it with the real value "
+              "(sha256sum <file>; docker image inspect --format '{{.Id}}' <image>) before the first non-smoke run",
+              "the bin/gguf/rad paths are this box's; adjust them for another machine"],
+    "sampling": {"temperature": 1.0, "top_p": 0.95, "top_k": 20, "min_p": 0, "presence_penalty": 0,
+                 "frequency_penalty": 0, "seed": 1234},
+    "workload": {
+        "tier": "minimal", "pass": "A", "api": "chat", "max_tokens": 1024, "min_gen": 900, "prefix_mode": "unique",
+        "fixture": "codereview-{depth}.txt", "first_warmup": 2, "repetition_penalty": 1.0,
+        "ladder": {"depths": [8000, 32000, 100000, 200000], "reps": 3, "spec_reps": 5,
+                   "spec_depths": [32000, 100000, 200000]},
+        "concurrency": {"n": 2, "depths": [32000], "reps": 3},
+        "conversation": {"prompt": "codereview-270000.txt", "start_tokens": 10000, "step_tokens": 20000,
+                         "max_depth": 205000, "max_tokens": 512, "reps": 1, "turn_prompt": "codereview-large.task.md"},
+        "sentinel": {"depth": 32000, "reps": 1, "tol_pct": 5},
+        "smoke": {"depth": 8000}},
+    "pins": {
+        "files": {"/home/dev/models/gguf/unsloth/Qwen3.8-27B-UD-Q4_K_XL.gguf": "0" * 64,
+                  "/home/dev/work/dp-craft/amd/stack/llamacpp/var/builds/b11448-vulkan-1.4.363.0/bin/llama-server": "0" * 64,
+                  "/mnt/Lin1/work/radiance/models/StillDeadcode__qwen3.8-27b-mxfp4@60bd4139/qwen3.8-27b-mxfp4.rad": "0" * 64},
+        "images": {"stilldeadcode/radiance:1.17.0": "sha256:" + "0" * 12,
+                   "ghcr.io/slybase/vllm-sly-radiance:1.11.0-rocm10.1": "22baa741ab04"},
+        "single": ["/mnt/Lin1/work/radiance/models/StillDeadcode__qwen3.8-27b-mxfp4@*/qwen3.8-27b-mxfp4.rad"]},
+    "servers": [
+        {"name": "q4kxl", "engine": "llamacpp", "served_model": "qwen38-27b-ud-q4kxl",
+         "gguf": "/home/dev/models/gguf/unsloth/Qwen3.8-27B-UD-Q4_K_XL.gguf",
+         "bin": "/home/dev/work/dp-craft/amd/stack/llamacpp/var/builds/b11448-vulkan-1.4.363.0/bin/llama-server",
+         "backend": "vulkan", "mtp": 0, "ctx": 260000, "np": 2, "kv": "q8_0", "extra_args": "--kv-unified",
+         "working_set_mib": 20000, "free_mib_floor": 26000},
+        {"name": "b", "engine": "radiance", "served_model": "qwen38-27b-mxfp4",
+         "rad_file": "/mnt/Lin1/work/radiance/models/StillDeadcode__qwen3.8-27b-mxfp4@60bd4139/qwen3.8-27b-mxfp4.rad",
+         "image": "stilldeadcode/radiance:1.17.0", "spec_tokens": 7, "ctx": 260000, "np": 2, "kv": "fp8",
+         "extra_args": "--gpu-headroom-mib 596", "working_set_mib": 16794, "free_mib_floor": 30000},
+        {"name": "d", "engine": "vllm", "served_model": "qwen38-27b-redhat-mxfp4-dflash",
+         "profile": "sly-redhat/redhat-mxfp4-dflash", "image": "ghcr.io/slybase/vllm-sly-radiance:1.11.0-rocm10.1",
+         "spec": True, "ctx": 260000, "np": 2, "kv": "fp8", "working_set_mib": 16794, "free_mib_floor": 30000,
+         "env": {"WATCHDOG_MIB": "32", "GPU_UTIL": "0.93", "CACTUS_DELTA": "0",
+                 "CHAT_TEMPLATE": "/home/dev/work/dp-craft/amd/stack/serve/vllm/templates/dp-sharp-chat_template.jinja"}},
+    ]}
+
+
 def validate_spec(spec):
     """Emit-time validation (sys.exit with a clear message). Returns the doc name the kind emits."""
     kind = spec.get("kind", "throughput")
@@ -1929,6 +3203,9 @@ def validate_spec(spec):
             print("⚠️  WARNING: no vram.kv_kib_per_tok — the pre-flight VRAM guard is DISABLED "
                   "(configs launch regardless of budget). Add vram.kv_kib_per_tok to enable it.", file=sys.stderr)
         return "plan.md"
+    if is_multi(spec):
+        validate_multi(spec)
+        return "README.md"
     for k in ("slug", "model", "servers"):
         if k not in spec:
             sys.exit(f"spec missing required key: {k}")
@@ -2086,8 +3363,11 @@ def main():
     x = sub.add_parser("example", help="print a minimal example spec")
     x.add_argument("--quality", action="store_true", help="print a quality (model-shootout) spec instead")
     x.add_argument("--agentic", action="store_true", help="print an agentic (real Claude Code sessions) spec instead")
+    x.add_argument("--multi-engine", action="store_true",
+                   help="print a multi-engine throughput spec (servers[].engine = llamacpp | vllm | radiance)")
     x.set_defaults(func=lambda a: print(json.dumps(
-        EXAMPLE_AGENTIC if a.agentic else EXAMPLE_QUALITY if a.quality else EXAMPLE, indent=2)))
+        EXAMPLE_MULTI if a.multi_engine else EXAMPLE_AGENTIC if a.agentic else EXAMPLE_QUALITY if a.quality
+        else EXAMPLE, indent=2)))
     args = ap.parse_args()
     args.func(args)
 

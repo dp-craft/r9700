@@ -413,7 +413,7 @@ def run_probe(a):
     n_total = a.concurrency * a.reps
     if not all_reqs:
         print(json.dumps(_tagged(_error_aggregate(a, n_short, n_total), a)))
-        sys.exit(2)
+        sys.exit(3 if a.min_gen and n_short == n_total else 2)   # all short = INCOMPLETE, like a partial short
     agg = _aggregate(a, all_reqs, waves, n_short, n_total)
     print(json.dumps(_tagged(agg, a)))
     if a.min_gen and len(all_reqs) < n_total:     # rule 18: an incomplete cell is re-collected, not kept

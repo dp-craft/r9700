@@ -348,6 +348,12 @@ class TestMinGenG2c(_ServerCase):
         self.assertIn("error", agg)
         self.assertEqual(agg["n_short"], 2)
         self.assertEqual(agg["n_err"], 0)
+        self.assertEqual(code, 3)                             # N1: shorts only = INCOMPLETE (3), not an error (2)
+
+    def test_all_errored_with_min_gen_exits_2(self):
+        self.fs.responder = lambda n, b: sse()                # no tokens at all: errors, not shorts
+        rows, code = self.probe("--min-gen", "1", reps=2)
+        self.assertEqual(code, 2)
 
     def test_all_pass_exit_zero(self):
         rows, code = self.probe("--min-gen", "10", reps=2)   # chat_sse default: 10 tokens == N passes
