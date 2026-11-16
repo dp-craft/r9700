@@ -742,7 +742,7 @@ Grouped by doc; `→` names the affected candidates. Sources: `notes/tmp/2026-11
 - **[fixed in CLAUDE.md 2026-11-16]** Iron rule 16: "hipfire leads by 2.3x at 18k and loses by ~10x at 160k" — hipfire-final-analysis §3.2
   shows hipfire behind at 18k on prefill (469 vs 901 tok/s); "~10x at 160k" is the proj. @164k column
   (`INFERRED`, 2.2x past 73k). "2.3x" likely = coding-turn decode 150.30/63.50 (rocm713 doc). *spot check* → C7
-- **[kept 2026-11-16: "no swap" in CLAUDE.md is a recommendation, not a box fact]** "No swap" vs 1746 (box has 4.7 GiB swap): quote the box as 1746 measured it. → C3, C13
+- **[fixed in CLAUDE.md 2026-11-16: worded as a recommendation]** "No swap" vs 1746 (box has 4.7 GiB swap): quote the box as 1746 measured it. → C3, C13
 - **[fixed in CLAUDE.md 2026-11-16]** Model list (Qwen3.6/Ornith-1.0) vs vLLM/worker docs (Qwen3.8, Qwen3.5, Ornith 1.5). → C3, C5, C6, C8, C10, C11, C15
 
 **docs/articles/** (published)

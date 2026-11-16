@@ -13,7 +13,7 @@ Dependency direction: `stack/` ← `bench/` ← `campaigns/` ← `docs/`; nothin
 ## Hardware / software fixpoints (cite these, don't re-derive)
 
 - **GPU:** AMD Radeon AI PRO R9700 — RDNA4, **gfx1201**, 32 GB (~31.86 GiB usable)
-- **Override:** `HSA_OVERRIDE_GFX_VERSION=12.0.1` · ROCm 10.1 (clang 24) · Mesa/RADV 26.2.4 · Ubuntu 24.04 · kernel 7.0.0-38-generic (HWE; -34 kept for the FA-fault attribution test) · Ryzen 5 3600, 31 GB RAM, no swap
+- **Override:** `HSA_OVERRIDE_GFX_VERSION=12.0.1` · ROCm 10.1 (clang 24) · Mesa/RADV 26.2.4 · Ubuntu 24.04 · kernel 7.0.0-38-generic (HWE; -34 kept for the FA-fault attribution test) · Ryzen 5 3600, 31 GB RAM, swap: recommended off (the box has a 4.7 GiB partition)
 - **Runtimes:** llama.cpp (`latest-vulkan` = b11448 · SDK 1.4.363.0; `latest-rocm` = stew675-patched, ROCm-10.0-linked), ollama, vLLM, transformers/HF
 - **Models under test:** current (docs from 2026-09) — `Qwen3.8-27B` (most docs; GGUF `UD-Q4_K_XL` on
   llama.cpp, MXFP4 on vLLM: RedHatAI, amd Quark AWQ, Swift-1.5 heretic) · `Qwen3.5-35B-A3B` (MoE, amd
