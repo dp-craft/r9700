@@ -15,9 +15,9 @@ can write it **without re-reading the source docs**: open only the cited section
 - Every number is tagged per iron rule 1: `MEASURED` (campaign row behind the doc), `CLAIMED` (external),
   `INFERRED` (arithmetic or reasoning). Keep the tag when you quote it.
 - Before quoting, check §5 *Errata* for the docs you use, and the candidate's own *Gaps* list.
-- Naming: many vLLM/worker docs say `Qwen3.8-27B`, `Qwen3.5-35B-A3B`, `Ornith 1.5`; CLAUDE.md lists
-  `Qwen3.6-27B`, `Qwen3.6-35B-A3B`, `Ornith-1.0-35B`. Use the name the cited doc used, with its exact
-  checkpoint (the cards' `versions:` line), and do not merge the families.
+- Naming: the families are distinct checkpoints (`Qwen3.6-27B` vs `Qwen3.8-27B`, `Ornith-1.0-35B` vs
+  `Ornith 1.5`, plus `Qwen3.5-35B-A3B` / `Qwen3.6-35B-A3B`; CLAUDE.md lists them since 2026-11-16).
+  Use the name the cited doc used, with its exact checkpoint (the cards' `versions:` line), and do not merge the families.
 
 Already published (do not duplicate): `docs/articles/2026-07-16-27b-coding-model-on-one-amd-card.md`,
 `…-assumptions-vs-reality.md`, `…-reasoning-budget-free-lunch.md`, `…-reasoning-budget-and-how-we-know.md`
@@ -199,7 +199,7 @@ reps=1 sweep of Qwen3.6-27B (MTP 2.25x; thinking cap 512–2048 = free lunch; ru
   - triton_unfused correctness and MTP on it are untested; short replies only; three depths (rule 16: fits
     from 1746 are indicative only). Ornith (Radiance) vs Sly arms change model and engine at once.
   - 1535 §2 MTP-off row (36,864 ctx, pool 197,973) not marked superseded by the c3 rerun (184,320).
-  - 1746 says CLAUDE.md "no swap" is stale (box has 4.7 GiB swap); check before printing the box line.
+  - 1746 says CLAUDE.md "no swap" is stale (box has 4.7 GiB swap); CLAUDE.md's line is a recommendation, so print the box as 1746 measured it.
 
 ### C4 — When the ruler is broken
 
@@ -742,8 +742,8 @@ Grouped by doc; `→` names the affected candidates. Sources: `notes/tmp/2026-11
 - **[fixed in CLAUDE.md 2026-11-16]** Iron rule 16: "hipfire leads by 2.3x at 18k and loses by ~10x at 160k" — hipfire-final-analysis §3.2
   shows hipfire behind at 18k on prefill (469 vs 901 tok/s); "~10x at 160k" is the proj. @164k column
   (`INFERRED`, 2.2x past 73k). "2.3x" likely = coding-turn decode 150.30/63.50 (rocm713 doc). *spot check* → C7
-- "No swap" may be stale (1746 reports 4.7 GiB swap). → C3, C13
-- Model list (Qwen3.6/Ornith-1.0) vs vLLM/worker docs (Qwen3.8, Qwen3.5, Ornith 1.5). → C3, C5, C6, C8, C10, C11, C15
+- **[kept 2026-11-16: "no swap" in CLAUDE.md is a recommendation, not a box fact]** "No swap" vs 1746 (box has 4.7 GiB swap): quote the box as 1746 measured it. → C3, C13
+- **[fixed in CLAUDE.md 2026-11-16]** Model list (Qwen3.6/Ornith-1.0) vs vLLM/worker docs (Qwen3.8, Qwen3.5, Ornith 1.5). → C3, C5, C6, C8, C10, C11, C15
 
 **docs/articles/** (published)
 - `2026-07-16-27b-coding-model-on-one-amd-card.md`: kernel 6.17 vs fixpoint 7.0.0-38. → C9 (when citing)

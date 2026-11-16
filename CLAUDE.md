@@ -15,9 +15,14 @@ Dependency direction: `stack/` ← `bench/` ← `campaigns/` ← `docs/`; nothin
 - **GPU:** AMD Radeon AI PRO R9700 — RDNA4, **gfx1201**, 32 GB (~31.86 GiB usable)
 - **Override:** `HSA_OVERRIDE_GFX_VERSION=12.0.1` · ROCm 10.1 (clang 24) · Mesa/RADV 26.2.4 · Ubuntu 24.04 · kernel 7.0.0-38-generic (HWE; -34 kept for the FA-fault attribution test) · Ryzen 5 3600, 31 GB RAM, no swap
 - **Runtimes:** llama.cpp (`latest-vulkan` = b11448 · SDK 1.4.363.0; `latest-rocm` = stew675-patched, ROCm-10.0-linked), ollama, vLLM, transformers/HF
-- **Models under test:** `Qwen3.6-35B-A3B` (MoE, ~3B active) · `Qwen3.6-27B` · `Ornith-1.0-35B`
-  (qwen35moe hybrid) · `Gemma-4-31B-it-qat` (gemma4 dense) · GGUF Q4 / AWQ. New models may live
-  in the **HF cache**, not `/home/dev/models/gguf` — see "New-model benchmarking" below for paths.
+- **Models under test:** current (docs from 2026-09) — `Qwen3.8-27B` (most docs; GGUF `UD-Q4_K_XL` on
+  llama.cpp, MXFP4 on vLLM: RedHatAI, amd Quark AWQ, Swift-1.5 heretic) · `Qwen3.5-35B-A3B` (MoE, amd
+  MXFP4, vLLM) · `Ornith-1.5-35B-A3B` (keptn W4A8, Radiance) · `Qwen3.6-35B-A3B` (MoE, ~3B active, GGUF
+  Q4_K_M, llama-swap). Earlier campaigns: `Qwen3.6-27B` · `Ornith-1.0-35B` (qwen35moe hybrid) ·
+  `Gemma-4-31B-it-qat` (gemma4 dense). Qwen3.6 vs 3.8 and Ornith 1.0 vs 1.5 are **different checkpoints**:
+  cite the one the doc names, never merge them. Weights: llama-swap `path` in `stack/llama-swap/models.yaml`,
+  vLLM/Radiance `MODEL_DIR` in `stack/serve/vllm/profiles/*/*.env` and `stack/serve/radiance/*.sh`, or the
+  **HF cache** (not `/home/dev/models/gguf`) — see "New-model benchmarking" below for those paths.
 - **Native support:** FP8 (E4M3) yes, FP4 no WMMA. 32 GB is memory-bound at long context → Q4_K_M is optimal, not a compromise.
 
 ## Repo map — what goes where
