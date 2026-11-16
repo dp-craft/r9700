@@ -14,7 +14,7 @@ can write it **without re-reading the source docs**: open only the cited section
   that section, not the whole doc.
 - Every number is tagged per iron rule 1: `MEASURED` (campaign row behind the doc), `CLAIMED` (external),
   `INFERRED` (arithmetic or reasoning). Keep the tag when you quote it.
-- Before quoting, check §5 *Errata* for the docs you use, and the candidate's own *Gaps* list.
+- Before quoting, check §4 *Errata* for the docs you use, and the candidate's own *Gaps* list.
 - Naming: the families are distinct checkpoints (`Qwen3.6-27B` vs `Qwen3.8-27B`, `Ornith-1.0-35B` vs
   `Ornith 1.5`, plus `Qwen3.5-35B-A3B` / `Qwen3.6-35B-A3B`; CLAUDE.md lists them since 2026-11-16).
   Use the name the cited doc used, with its exact checkpoint (the cards' `versions:` line), and do not merge the families.
@@ -22,8 +22,8 @@ can write it **without re-reading the source docs**: open only the cited section
 Already published (do not duplicate): `docs/articles/2026-07-16-27b-coding-model-on-one-amd-card.md`,
 `…-assumptions-vs-reality.md`, `…-reasoning-budget-free-lunch.md`, `…-reasoning-budget-and-how-we-know.md`
 and their four LinkedIn derivatives in `docs/articles/linkedin/`. All four rest on one shallow-prompt,
-reps=1 sweep of Qwen3.6-27B (MTP 2.25x; thinking cap 512–2048 = free lunch; runaways 7.1% → 0%;
-`--reasoning-budget 0` is uncapped). Their own stated gap is "depth untested". C10 is that follow-up.
+reps=1 sweep of Qwen3.6-27B (MTP 2.25x, an MTP file vs a no-MTP file; thinking cap 512–2048 = free lunch; runaways 7.1% → 0%;
+`--reasoning-budget 0` is uncapped). Their own stated gap is "depth untested". C9 is that follow-up.
 
 ---
 
@@ -31,16 +31,16 @@ reps=1 sweep of Qwen3.6-27B (MTP 2.25x; thinking cap 512–2048 = free lunch; ru
 
 | # | Working title | One-line thesis | Evidence | Readiness | Effort | Overlap with published |
 |---|---|---|---|---|---|---|
-| 1 | A sampler setting that changes no tokens still costs 29% of decode | Any penalty sampler adds a fixed ~2 ms/token host cost, which hurts most on the fastest (MTP) step; the other draft knobs (p_min, n_max) trade speed for nothing | strong | ready (one confirm on current build advised) | S | follow-up to *assumptions-vs-reality* (p_min test) |
-| 2 | Prefix reuse, not raw prefill, decides agentic latency | The "slow prefill" was a small-prompt artifact; a warm prefix cuts TTFT 13.7–17.4x on three engines, and one engine's cache is zero under two agents | strong | ready | S | none |
-| 3 | One flag, 6.6x: where vLLM's MoE decode gap on RDNA4 came from | The default EMULATION MoE backend, not the GPU, held a 35B-A3B at 16.6 tok/s; our own "no 35B reaches 200 tok/s" verdict then fell to a 219.8 tok/s measurement | strong | ready | M | none |
-| 4 | When the ruler is broken | Six times our instrument lied (grader that never ran, string-keyed scorer, cache answering for the engine, flags and gates that read green); the rules that catch it | strong | ready | M | partial: *assumptions-vs-reality* (truncated flag) — cite, don't retell |
+| 1 | A sampler setting that changes no tokens still costs 29% of decode | Any penalty sampler adds a fixed ~2 ms/token host cost, which hurts most on the fastest (MTP) step; the other draft knobs (p_min, n_max) trade speed for nothing | strong | ready after a b11448 confirm pair (~30 min GPU; headline is a b9950 per-build rate) | S | follow-up to *assumptions-vs-reality* (p_min test) |
+| 2 | Prefix reuse, not raw prefill, decides agentic latency | The "slow prefill" was a small-prompt artifact; a warm prefix cuts TTFT 13.7–17.4x on two engines and turns a 135k-token Sly turn into 15 s, and one engine's cache is zero under two agents | strong | ready (text fixes: MRCR 13.9x; only 1055's prefix rows) | S | none |
+| 3 | One flag, 6.6x: where vLLM's MoE decode gap on RDNA4 came from | The default EMULATION MoE backend, not the GPU, held a 35B-A3B at 16.6 tok/s; our own "no 35B reaches 200 tok/s" verdict then fell to a 219.8 tok/s measurement | strong | ready (text fixes: one source per number; drop the quarantined ROCM_ATTN row; say correctness untested) | M | none |
+| 4 | When the ruler is broken | Six times our instrument lied (grader that never ran, string-keyed scorer, cache answering for the engine, flags and gates that read green); the rules that catch it | strong | ready (text fixes: 29.0 GiB unsampled; runner rows recomputed) | M | partial: *assumptions-vs-reality* (truncated flag) — cite, don't retell |
 | 5 | Quant fidelity on one card: Q6_K, IQ4R, and MXFP4 at 7–8x on every engine | Teacher-forced KL over 4096 positions: the 4-bit format, not the engine, sets distance; q8_0 KV and DFlash show no resolved cost | strong | needs fixes (count errata) | M | none |
-| 6 | What to hand a free local model, and what not to | Ornith is trustworthy where a script can check the output (extraction, JSON, splitting) and not for judgement, completeness or retyping; the effort knob does nothing | mixed | ready | M | none |
+| 6 | What to hand a free local model, and what not to | Ornith is trustworthy where a script can check the output (extraction, JSON, splitting) and not for judgement, completeness or retyping; the effort knob does nothing | mixed | ready (text fixes: the manual's dp-prompt rule; 16, 16, 21 of 21) | M | none |
 | 7 | Depth is a variable: rankings that flip between 8k and 160k | Prefill decays as a power law with engine-specific exponents; three engine rankings invert with depth or workload; speed-ups shrink or grow with depth | mixed–strong | needs fixes | M | none |
 | 8 | Faster per token, slower per task: lossy acceptance traps an agent in loops | Cactus δ 0.5 decodes 65% faster yet takes 2.4x the wall; on 1.8.1 a drafted token with p ≥ 0.5 is accepted with certainty, so loops have no exit | mixed | needs fixes | M | none |
 | 9 | The free lunch at 128k: what survives at depth | Follow-up to the published sweep: at ~133k a 4x thinking budget buys +0.3 pts on the 27B, the vendor coding sampler wins, the quant ladder is a null, and the wall is lint/types | mixed | needs fixes | M | direct follow-up to all four published articles |
-| 10 | A random GPU memory fault, a cleared bit 44, and one environment variable | An investigation narrative: wrong suspects, a pointer log, `HIP_FORCE_DEV_KERNARG=0`, and why `/health` lied the whole time | mixed | ready | M | none |
+| 10 | A random GPU memory fault, a cleared bit 44, and one environment variable | An investigation narrative: wrong suspects, a pointer log, `HIP_FORCE_DEV_KERNARG=0`, and why `/health` lied the whole time | mixed | ready (text fixes: three cross-note wordings in 1745, 1506, 0023) | M | none |
 | 11 | MRCR v2 at 131K on one 32 GB card: 0.85, and the failures are counting errors | A local 27B Q6_K matches the published frontier band on the hardest bucket; failures are wrong-instance picks, not context loss | mixed | needs fixes | S | none |
 | 12 | q8_0 KV on RDNA4: free in quality, not in speed, and the answer moved with the build | Quality cost is unresolved/near zero; the prefill penalty grew with depth on b9950 (−11.8% at 32K, −39.8% at 200K) but tied on b10909 to 18.4k | mixed | needs new data | M | none |
 | 13 | The GPU is not yours: silent contention on a desktop-shared card | Orphans, resident llama-swap models, paging allocators and thin headroom turn contention into fake findings or a crashed desktop; gate on free VRAM first | mixed | needs fixes (incidents not in a findings doc) | M | none |
@@ -60,7 +60,7 @@ reps=1 sweep of Qwen3.6-27B (MTP 2.25x; thinking cap 512–2048 = free lunch; ru
 - **Hook.** `presence_penalty 0.01`, too small to change a token, cut 35B-A3B decode from 161.1 to 115.1
   tok/s (−28.6%) with an identical reply sha1 and identical draft acceptance 69.06% (`MEASURED`, b9950).
 - **Audience / format.** llama.cpp operators tuning speculative decoding; long-form blog (1,500–2,000
-  words) + LinkedIn teaser. Part 1 of series A.
+  words) + LinkedIn teaser. Part 2 of series A.
 - **Outline.**
   1. The anomaly: a no-op setting that costs 29%.
   2. Isolating it: byte-identical pairs, same acceptance, three configs, same ~2 ms.
@@ -94,8 +94,8 @@ reps=1 sweep of Qwen3.6-27B (MTP 2.25x; thinking cap 512–2048 = free lunch; ru
 - **Gaps before publishing.**
   - Scouting probe: ctx 4096, ~24-token prompt, n=1 on most cells; the depth confirm is n=2 on one prompt.
     Say "scouting" in the text.
-  - The ~2 ms is a Ryzen 5 3600 number on b9950; latest-vulkan is b11448. One confirmation pair
-    (pp 0 vs 0.01, MTP on) on b11448 before publishing is cheap and protects the headline.
+  - The ~2 ms is a Ryzen 5 3600 number on b9950; latest-vulkan is b11448. Run one confirmation pair
+    (pp 0 vs 0.01, MTP on) on b11448 before publishing (~30 min GPU, `INFERRED`); it protects the headline.
   - Errata: the hardest-tasks doc gives acceptance 81.5% → 77.4% (campaign cells) where the sampler-tax depth
     confirm gives 83 → 66 (pp 1.5 pair); they are different measurements — name which one you quote.
   - The hardest-tasks "Δ host CPU" column does not match its step-time columns (errata p03): quote host cost
@@ -108,7 +108,7 @@ reps=1 sweep of Qwen3.6-27B (MTP 2.25x; thinking cap 512–2048 = free lunch; ru
   the engines where the cache silently is not there.
 - **Hook.** A warm 32K prefix cut time-to-first-token from 42.66 s to 3.12 s (13.7x), and the earlier
   "~200 tok/s prefill" was a per-request floor on 51–99-token prompts (`MEASURED`, llama.cpp b9950).
-- **Audience / format.** Agent builders on local GPUs; medium blog post (1,200–1,500 words). Series A part 2.
+- **Audience / format.** Agent builders on local GPUs; medium blog post (1,200–1,500 words). Series A part 1.
 - **Outline.**
   1. The artifact: why tiny prompts made prefill look 4x slower.
   2. The real curve at 8K/32K/64K, and the warm-prefix number.
@@ -122,8 +122,8 @@ reps=1 sweep of Qwen3.6-27B (MTP 2.25x; thinking cap 512–2048 = free lunch; ru
   - §3a: `docs/findings/vllm/2026-10-22-1324-vllm-sly-mxfp4-depth.md` §Consequences & root causes (L102):
     turn-8 TTFT 15.1 s for 15,084 new tokens vs 90.2 s for a cold 135,689-token prompt (`MEASURED`).
   - §3b: `docs/findings/radiance/2026-09-12-1055-vllm-radiance-r9700-evaluation.md` §Findings (L102):
-    32,294-token prompt 43.93 s → 2.53 s (17.4x); divergent-tail partial hits match full hits (2.41 vs
-    44.31 s) (`MEASURED`).
+    32,294-token prompt 43.93 s → 2.53 s (17.4x); with the last ~25 tokens changed, partial hits match full
+    hits on both engines (radiance 2.526 vs 2.428 s, llama.cpp 3.341 vs 3.357 s; cold 44.312 / 38.167 s) (`MEASURED`).
   - §3c: `docs/findings/quality/2026-09-02-1437-mrcr-v2-qwen38-27b-q6k.md` §Throughput, and why the bench
     figures were wrong here (L220): sample 1 551 s (132,997 tokens prefilled), samples 2+ ~40 s (median
     39.5, range 27.6–65.5) with 2,052 tokens prefilled; 35 samples in 1928 s (`MEASURED`).
@@ -137,10 +137,12 @@ reps=1 sweep of Qwen3.6-27B (MTP 2.25x; thinking cap 512–2048 = free lunch; ru
   - §5: CLAUDE.md iron rule 17; `docs/guides/GUIDE.md` §Measurement rules (L218): without
     `PREFIX_MODE=unique` repeat-2 prefill read 2.4x high (`MEASURED` per the guide).
 - **Gaps before publishing.**
-  - The 0733 warm probe used an identical prompt, so it cannot show a prefix-plus-changed-tail turn; the
-    1055 partial-hit result covers that, on a different engine.
+  - The 0733 warm probe used an identical prompt. The 1055 partial-hit rows change only the last ~25 tokens
+    (partial ≈ full on llama.cpp and radiance); a turn that appends thousands of tokens is unmeasured on llama.cpp.
+  - The 1324 pair (15,084 new tokens vs a cold 135,689) is not size-matched; present it as an illustration.
   - MRCR speed-up: the doc says 12.5x, its own numbers give ~13.9x (551/39.5) — errata p03; recompute.
-  - 1055 carries many internal conflicts (see §5); quote only the prefix-caching rows.
+  - 1055 carries many internal conflicts (see §4); quote only the prefix-caching rows, and no warm-TTFT winner
+    (its findings 19 and 23 disagree).
   - 1324 and 1406 ran on Sly 1.6.0 before the kernarg fix; fine for TTFT, say so.
 
 ### C3 — One flag, 6.6x: where vLLM's MoE decode gap on RDNA4 came from
@@ -157,7 +159,8 @@ reps=1 sweep of Qwen3.6-27B (MTP 2.25x; thinking cap 512–2048 = free lunch; ru
   2. Diagnosis by arithmetic: ~96 GB of traffic per step under EMULATION.
   3. The flag and what it costs (prefill −14–21%, KV pool up).
   4. The verdict we got wrong: native Radiance + Ornith 1.5 at 219.8 tok/s.
-  5. The other defaults: ROCM_ATTN decode collapse, fp8 KV as an exact null on a hybrid, KV group size.
+  5. The other defaults: ROCM_ATTN decode collapse (only after a rerun: its row is quarantined), fp8 KV as an
+     exact null on a hybrid, KV group size.
   6. The price of fast: 96 MiB default headroom crashed the desktop.
 - **Evidence map.**
   - §1: `docs/research/vllm/2026-11-04-1630-qwen35-35b-a3b-vllm-rocm-decode-gap.md` §1. The 27B reference,
@@ -178,7 +181,7 @@ reps=1 sweep of Qwen3.6-27B (MTP 2.25x; thinking cap 512–2048 = free lunch; ru
     10k/50k/100k (`MEASURED`, mean of 3); Ornith MXFP4 on Sly: MTP fails to load, DFlash K=3 95.2 / 71.0 /
     66.5 (`MEASURED`).
   - §5a: `docs/findings/vllm/2026-09-11-2047-vllm-qwen38-27b-int4.md` §Results (L35): ROCM_ATTN 2.8–2.9
-    tok/s at 32k vs TRITON_ATTN 14.12 (`MEASURED`; ROCM_ATTN row quarantined, gauge-derived); TRITON_ATTN
+    tok/s at 32k is a quarantined, gauge-derived row, not a result (rule 18; rerun before quoting); TRITON_ATTN 14.12 (`MEASURED`); TRITON_ATTN
     prefill 222.4 vs ~470 (`MEASURED`, log-derived); §Kernel-level root causes (L62): 963 kernels/step,
     22.89 ms idle in a 59.0 ms step (`MEASURED`, torch profiler).
   - §5b: `docs/findings/vllm/2026-09-12-1535-vllm-window-budgets-and-rocm-knobs.md` §Finding A3 (L267): fp8 KV
@@ -199,7 +202,8 @@ reps=1 sweep of Qwen3.6-27B (MTP 2.25x; thinking cap 512–2048 = free lunch; ru
   - triton_unfused correctness and MTP on it are untested; short replies only; three depths (rule 16: fits
     from 1746 are indicative only). Ornith (Radiance) vs Sly arms change model and engine at once.
   - 1535 §2 MTP-off row (36,864 ctx, pool 197,973) not marked superseded by the c3 rerun (184,320).
-  - 1746 says CLAUDE.md "no swap" is stale (box has 4.7 GiB swap); CLAUDE.md's line is a recommendation, so print the box as 1746 measured it.
+  - [fixed in CLAUDE.md 2026-11-16] 1746 called CLAUDE.md's "no swap" stale (box has 4.7 GiB swap); CLAUDE.md now words it as a
+    recommendation, so print the box as 1746 measured it.
 
 ### C4 — When the ruler is broken
 
@@ -236,8 +240,8 @@ reps=1 sweep of Qwen3.6-27B (MTP 2.25x; thinking cap 512–2048 = free lunch; ru
     ThinkingCap-27B-Q6_K_L passed all runner gates and overwrote working `hu.ts` translations in 4 of 5
     samples; judge 3-4-2 (`MEASURED`).
   - §5: `docs/findings/llamacpp/2026-07-12-0006-27b-maxctx-f16.md` banner + §Ceiling vs formula (L64): the
-    27B is hybrid, f16 KV 64 KiB/tok not 260 (`INFERRED` from GGUF geometry); 200K f16 loaded in 31 s at
-    29.0 GiB (`MEASURED` per the banner); formula under-called the ceiling 8–11% (`MEASURED`).
+    27B is hybrid, f16 KV 64 KiB/tok not 260 (`INFERRED` from GGUF geometry); 200K f16 loaded in 31 s; the
+    banner's 29.0 GiB was never sampled (no gpu_samples), so tag it unsampled, not usage (rule 7); formula under-called the ceiling 8–11% (`MEASURED`).
     Also `docs/findings/llamacpp/2026-07-11-1844-campaign-combo35b.md` §Results — single stream (L29): the
     cr64000 fixture (~65,019 tokens) could not fit a 65,536 window, all 8 configs returned no tokens.
   - §6: runner doc §3.4 Variance (L143): Brian6145 27B T010 wall 318.3 s vs 566.5 s between blocks (+78%)
@@ -251,6 +255,7 @@ reps=1 sweep of Qwen3.6-27B (MTP 2.25x; thinking cap 512–2048 = free lunch; ru
     table; "q8_0 no spill" vs 1,431 MiB GTT. Quote only §4.5 and §3.4 rows, recomputed.
   - hipfire baseline errata (p01): headline vs per-run tables swap the two 27B models — §3 only needs the
     cache-vs-unique contrast, not the model attribution.
+  - maxctx-f16's banner calls its 29.0 GiB `MEASURED`, but no VRAM was sampled: quote it as unsampled (fix first).
   - Keep the truncated-flag section short (published).
 
 ### C5 — Quant fidelity on one card: Q6_K, IQ4R, and MXFP4 at 7–8x on every engine
@@ -334,7 +339,7 @@ reps=1 sweep of Qwen3.6-27B (MTP 2.25x; thinking cap 512–2048 = free lunch; ru
     tok/s total vs 174 alone (1.46x); reasoning 41–97% of output (`MEASURED`). 0814 §Ornith vs Haiku (L51):
     Haiku max took 1.1–12.7x as long, median 3.9x, 15 paired arms (`MEASURED`, remote wall time).
   - §6: `docs/findings/workers/2026-11-06-0930-haiku-manual.md` §Strengths (L26): 21/21 error classes in a
-    340k log vs Ornith 16/21; path recall .969/.941 vs .756/.569 (`MEASURED`); §As a grader (L67): verdict
+    340k log vs Ornith 16, 16 and 21 of 21 over three runs; path recall .969/.941 vs .756/.569 (`MEASURED`); §As a grader (L67): verdict
     exact on 26/40 notes vs Opus; of 6 Haiku-only critical flags 1 real (`MEASURED`).
 - **Gaps before publishing.**
   - Mostly n=1 per arm; differences < 0.05 are ties; repeats of one brief varied by up to .235.
@@ -371,15 +376,17 @@ reps=1 sweep of Qwen3.6-27B (MTP 2.25x; thinking cap 512–2048 = free lunch; ru
     hipfire decode 120.00 vs 66.32 tok/s; coding turn 150.30 vs 63.50; prefill 858.35 vs 497.10 at 6.4k
     (`MEASURED`); §Prefill degradation with context (L46): 70k 595.12 vs 292.90 (`MEASURED`, n=2).
   - §3: `docs/findings/vllm/2026-09-12-1535-vllm-window-budgets-and-rocm-knobs.md` §Finding B1 (L342): decode
-    67.40 vs 42.11 at 8k, 35.43 vs 44.32 at 98k; exponents −0.257 (R² 0.965) vs +0.035 (R² 0.208)
-    (`MEASURED`, 4 depths, 3 reps).
+    llama.cpp 67.40 → 35.43 tok/s (8k → 98k, exponent −0.257, R² 0.965), vllm-radiance 42.11 → 44.32 (+0.035,
+    R² 0.208) (`MEASURED`, 4 depths, 3 reps).
   - §4: `docs/findings/radiance/2026-09-12-1055-vllm-radiance-r9700-evaluation.md` §Findings (L102):
     agentic-8000 radiance 58.57/60.84 vs llama.cpp 45.77/48.33 (+26%); codereview-8000 llama.cpp 56.47 vs
     radiance 37.81 (+49%) (`MEASURED`, different runs → suggestive); the earlier depth-degradation claim was
     a fixture artifact (withdrawn).
   - §5a: `docs/findings/radiance/2026-10-30-0900-vllm-redhat-mxfp4-depth-transposed.md` §Summary (L15):
     DFlash2 vs no-spec 6.78x / 4.65x / 4.63x at 10k/50k/100k (`INFERRED` ratios of `MEASURED` p50);
-    acceptance 0.5494 / 0.3671 / 0.4231 (`MEASURED`). `docs/findings/vllm/2026-10-30-2232-vllm-redhat-sly191-d0-dflash-depth.md`
+    acceptance 0.5494 / 0.3671 / 0.4231 (`MEASURED`). Counter-example: `docs/findings/vllm/2026-10-22-1406-vllm-sly-mxfp4-dflash.md`
+    §What moved the needle (L118): 4.0x at 8k → 5.6x at 136k (136.6 vs 33.8, 100.5 vs 17.9 tok/s) (`MEASURED`) on
+    another checkpoint and Sly 1.6.0; the trend follows the no-spec baseline. `docs/findings/vllm/2026-10-30-2232-vllm-redhat-sly191-d0-dflash-depth.md`
     §What moved the needle (L70): DFlash2 step cost 36.8 → 44.4 ms 10k → 145k (exponent −0.068, R² 0.895),
     MTP flat 51–54 ms (`INFERRED`, 4 points).
   - §5b: `docs/findings/llamacpp/2026-07-11-2200-deep-context-35b.md` §Consequences & root causes (L99): MTP
@@ -390,13 +397,12 @@ reps=1 sweep of Qwen3.6-27B (MTP 2.25x; thinking cap 512–2048 = free lunch; ru
     depth curve (L33): prefill k −0.206 (R² 0.845), decode k −0.227 (R² 0.924), n=4 (`MEASURED`) as a
     "clean-ish" example.
 - **Gaps before publishing.**
-  - CLAUDE.md rule 16 says "hipfire leads by 2.3x at 18k and loses by ~10x at 160k". The hipfire findings
-    show hipfire *behind* on prefill at 18k (469 vs 901); "2.3x" matches no figure there (closest: the
-    coding-turn decode 150.30/63.50 = 2.37x at short context in the rocm713 doc). The "~10x at 160k" is the
-    164k projection (`INFERRED`). Rewrite the claim from the tables before quoting it.
+  - [fixed in CLAUDE.md 2026-11-16] Rule 16 now gives 901 vs 469 tok/s at 18k (1.9x) and 594 vs 80.5 at 73k
+    (7.4x); the 164k figure is the `INFERRED` projection. Quote the tables, as above.
+  - DFlash2: the speed-up shrinks with depth on 0900 but grows on 1406 — present both, do not generalise.
   - Errata (p01 #5): rocm713 verdict says 1.4x llama.cpp prefill lead at 6.4k, its table gives 1.7x.
   - 1535 is a deployment comparison (not window-, KV- or quant-matched); 2200 and 1746 have 3 depths
-    (no exponent); 1055 has the conflicts listed in §5.
+    (no exponent); 1055 has the conflicts listed in §4.
   - radiance/2026-10-30-0900 is a vLLM report filed under radiance, and its Limits says "no exponent quoted"
     while it quotes −0.068.
 
@@ -408,7 +414,7 @@ reps=1 sweep of Qwen3.6-27B (MTP 2.25x; thinking cap 512–2048 = free lunch; ru
 - **Hook.** At δ 0.5 the model decoded 65% faster per token but took 2.4x the wall and generated 4.1x the
   tokens on the same review step, 49% of them inside seven loop blocks (`MEASURED`, n=1 per arm).
 - **Audience / format.** Speculative-decoding operators, inference-engine developers, agentic-coding
-  users; long-form blog with one mechanism diagram. Series B part 2.
+  users; long-form blog with one mechanism diagram. Series B part 3.
 - **Outline.**
   1. The setting and why it looks free (decode tok/s).
   2. The incident: 72.8% of decode windows in loops, 0 of 3 briefs finished.
@@ -478,8 +484,8 @@ reps=1 sweep of Qwen3.6-27B (MTP 2.25x; thinking cap 512–2048 = free lunch; ru
     0.99 (`MEASURED`); detailed §4 (L264): lint 0.29, types 0.32 (`MEASURED`, earlier campaign).
   - §6: hardest-tasks §Fluctuation and rerun value (L386): rerun Δ +4.6 to +17.5 pts; hard@R 20% vs hard@1
     7% (`MEASURED`).
-  - §7: hardest-tasks §Health (L420): Q5_K_M f16 at 163840 fits at 31918 MiB, GTT spill 1551–2841 MiB in
-    every cell (`MEASURED`); §Recommended config (L436–444). Speed: 35B decode 115.7–120.2 vs 27B
+  - §7: hardest-tasks §Health (L420): Q5_K_M f16 at 163840 loads at 31918 MiB peak, GTT spill 1551–2841 MiB in
+    every cell, cause OPEN (`MEASURED`); §Recommended config (L436–444). Speed: 35B decode 115.7–120.2 vs 27B
     32.6–46.1 tok/s; full answer 60.9 s (35B rb4096) vs 156.9 s (27B Q4_K_M) (`MEASURED`, §Health).
     Reference ladder (haiku 81, sonnet 91, opus 94) is one-shot at ~550–620 tokens — never present as a
     capability gap.
@@ -507,7 +513,7 @@ reps=1 sweep of Qwen3.6-27B (MTP 2.25x; thinking cap 512–2048 = free lunch; ru
   stopped it. All along `/health` said OK. Then the fix, carried as a generic rule, had to be demoted.
 - **Hook.** A fault that hit about 12 of about 21 boots disappeared with `HIP_FORCE_DEV_KERNARG=0`: 3 of 3
   boots × 4 Claude Code turns clean (`MEASURED`, small n).
-- **Audience / format.** ROCm users and HIP engine developers; narrative long-form. Series B part 3.
+- **Audience / format.** ROCm users and HIP engine developers; narrative long-form. Series B part 2.
 - **Outline.**
   1. Symptom: a hang of 5–16 minutes while `/health` stays OK.
   2. Suspects that fell (A-tiled, RAM tier, kernel, ctx, image).
@@ -539,11 +545,13 @@ reps=1 sweep of Qwen3.6-27B (MTP 2.25x; thinking cap 512–2048 = free lunch; ru
     daemon: `docs/findings/hipfire/2026-09-10-0100-hipfire-final-analysis.md` §4.1 (L248): 7/19 boots
     faulted, `/health` ok (`MEASURED`); CLAUDE.md iron rule 15.
 - **Gaps before publishing.**
-  - n=3 clean boots (+1 via llama-swap); fix confirmed on kernel 7.0.0-34 only; root cause `INFERRED`;
+  - n=3 clean boots (+1 via llama-swap); fix confirmed on kernel 7.0.0-34 only, the 7.0.0-38 gate is still open
+    (0023 status), and the sly-official recipe no longer sets it (`docs/guides/vllm/settings.md`); root cause `INFERRED`;
     the llama.cpp ROCm link is untested — present §5 as a sibling, not the same bug.
   - Errata (p04): 1745 still names kernel 7.0.0-38 as first suspect though 0023 showed -34 also faulted
     (cross-note added); 0023 cites `docs/plans/…/claudetest.sh` (plans live in `notes/plans/`); 1506 still
-    says "Not safe for unattended long agent runs" though superseded.
+    says "Not safe for unattended long agent runs" though superseded. All three are wording outside the
+    article's numbers: fix them first (~30 min), then write.
   - Naming: Qwen3.8-27B (amd Quark AWQ MXFP4).
 
 ### C11 — MRCR v2 at 131K on one 32 GB card: 0.85, and the failures are counting errors
@@ -567,6 +575,8 @@ reps=1 sweep of Qwen3.6-27B (MTP 2.25x; thinking cap 512–2048 = free lunch; ru
     94% (L226, this run) — say which is which; speed-up 12.5x vs its own numbers ~13.9x; the Gemma row has
     the same subset problem the doc flags for other rows; the Q6 retrieval conclusion overreaches (only Q6
     was run); Qwen3.8 naming.
+  - The published 128K scores are cumulative up-to-128K aggregates, not this pointwise bucket; the doc calls
+    the comparison indicative, not decisive, and this run had no tools.
   - Single bucket, single run, temp 1.0; position-band differences not significant. A second bucket (e.g.
     64K) would make it a curve; optional.
 
@@ -610,8 +620,9 @@ reps=1 sweep of Qwen3.6-27B (MTP 2.25x; thinking cap 512–2048 = free lunch; ru
   and a sequential ROCm A/B leaks state into its second arm. The fix is a precondition gate, not a
   post-mortem.
 - **Hook.** An orphaned `llama-server` produced `invalid token`, 10x-slow prefill and a false "Q5 f16 @163840
-  is unstable" report (CLAUDE.md iron rule 14); the clean measurement later showed the same config fits at
-  31918 MiB with 0 failures (`MEASURED`, hardest-tasks §Health).
+  is unstable" report (CLAUDE.md iron rule 14); the clean measurement later loaded the same config at
+  31918 MiB peak with 0 failures (`MEASURED`, hardest-tasks §Health), with the 1551–2841 MiB GTT spill that doc
+  reports in every cell (2841 MiB in that cell, cause OPEN).
 - **Audience / format.** Workstation operators running local inference; practical blog. Series C part 2.
 - **Outline.** 1. The false finding; 2. Three shapes of contention (orphan, resident llama-swap, split
   process shape); 3. The allocator decides whether you notice; 4. Headroom and the desktop; 5. Sequential
@@ -635,8 +646,8 @@ reps=1 sweep of Qwen3.6-27B (MTP 2.25x; thinking cap 512–2048 = free lunch; ru
     same binary runs standalone (`MEASURED`).
   - §6: early precedent: `docs/research/rocm-driver/2026-07-09-0000-rdna4-r9700-llm-optimization.md` §4
     (L64): a "gfx1201 segfault" was several ollama instances on 32 GB (`INFERRED`, one observation).
-- **Gaps before publishing.** The two headline incidents (2026-07-15 orphan, 2026-09-10 hipfire residency)
-  exist only as CLAUDE.md prose; to tag them `MEASURED` a findings note citing the discarded campaign's
+- **Gaps before publishing.** Four incidents (2026-07-15 orphan, 2026-09-10 hipfire residency, 2026-07-15
+  interrupted reply graded 0.603, 2026-09-10 `/unload` POST 405) exist only as CLAUDE.md prose; to tag them `MEASURED` a findings note citing the discarded campaign's
   rows (or the CSV) is needed. Build-check 1555 errata: request metric t/s vs seconds; magnitude possibly
   biased by contention (its own caveat). 2026-07-09 doc: kernel 6.17 header, recommends MTP GGUFs its §9
   says cannot be downloaded.
@@ -720,16 +731,19 @@ reps=1 sweep of Qwen3.6-27B (MTP 2.25x; thinking cap 512–2048 = free lunch; ru
 
 | Series | Parts (in order) | Through-line |
 |---|---|---|
-| **A. Speed on one R9700** | C1 → C2 → C7 → C12 → C14 | What actually sets tokens per second and seconds per turn on one card: host costs, cache reuse, depth exponents, KV precision, backend/build |
-| **B. vLLM and Radiance on RDNA4** | C3 → C8 → C10 | The vLLM fork track: defaults that cost 5x, a lossy setting that loops, a fault that hid behind `/health` |
+| **A. Speed on one R9700** | C2 → C1 → C7 → C12 → C14 | What actually sets tokens per second and seconds per turn on one card: cache reuse, host costs, depth exponents, KV precision, backend/build |
+| **B. vLLM and Radiance on RDNA4** | C3 → C10 → C8 | The vLLM fork track: defaults that cost 5x, a fault that hid behind `/health`, a lossy setting that loops |
 | **C. Trusting your numbers** | C4 → C13 (C11 as a short case) | Instruments and environments that lie, and the rules that now catch them (iron rules 14–18) |
 | **D. Fidelity and recall** | C5 → C11 | What quantization and long context actually cost, measured directly |
 | **E. Local models in an agentic workflow** | C6 → C9 → C15 | Which work to give a local model, what survives at depth, what drives the token bill; C9 continues the four published July articles |
 
-**Suggested publishing order (quick wins first):** C1 (S, ready) → C2 (S, ready) → C3 (M, ready) → C4 (M,
-ready) → C6 (M, ready) → C5 (after the KLD count errata are fixed) → C10 (ready) → C7 (after the rule-16
-wording fix) → C9 (after the recommendation-doc errata) → C8 (after a second δ 0.5 rep or framed as a case
-study) → C11 → C13 (after a findings note for the two incidents) → C12 and C14 (after new runs) → C15.
+**Suggested publishing order (quick wins first; same as `docs/articles/TOPIC-MAP.md` §6):** C2 (S, ready after
+text fixes) → C1 (S, after the b11448 confirm pair) → C3 (M) → C4 (M) → C6 (M) → C10 (M; each after its text
+fixes in §1) → C5 (after the KLD count errata) → C9 (after the recommendation-doc errata) → C7 (after the
+rocm713 fix; better after the arms-speed campaign) → C8 (case study after the 0900 decode conflict, or a result
+after a second δ 0.5 rep) → C11 (after the MRCR errata) → C13 (after a findings note for the four incidents) →
+C12 and C14 (after new runs) → C15. C1 is ranked first in §1 on hook strength but publishes second: its
+headline is a b9950 per-build rate that needs the ~30-minute b11448 confirm first, while C2 needs no GPU.
 
 ---
 
@@ -746,7 +760,9 @@ Grouped by doc; `→` names the affected candidates. Sources: `notes/tmp/2026-11
 - **[fixed in CLAUDE.md 2026-11-16]** Model list (Qwen3.6/Ornith-1.0) vs vLLM/worker docs (Qwen3.8, Qwen3.5, Ornith 1.5). → C3, C5, C6, C8, C10, C11, C15
 
 **docs/articles/** (published)
-- `2026-07-16-27b-coding-model-on-one-amd-card.md`: kernel 6.17 vs fixpoint 7.0.0-38. → C9 (when citing)
+- `2026-07-16-27b-coding-model-on-one-amd-card.md`: kernel 6.17 vs fixpoint 7.0.0-38; the 2.25x compares an unsloth MTP
+  file with a jackrong no-MTP file (same-file MTP is 2.0x at 32K, 0733); "MTP is a pure win" though MTP is not
+  output-preserving (mtp-sampler-tax, seed 42) — say "no task-accuracy cost". → C1, C9 (when citing)
 - `linkedin/2026-07-16-assumptions-vs-reality.md`: "1,736 exceeds the 2048 cap" is wrong (compare with rb2048 at
   1,262). → C4, C9
 - `linkedin/2026-07-16-reasoning-budget-free-lunch.md`: "rb0 produced the most thinking (1,736)" contradicted
@@ -870,7 +886,7 @@ Grouped by doc; `→` names the affected candidates. Sources: `notes/tmp/2026-11
 - `research/rocm-driver/2026-10-08-0930-rocmtos-cachyos-ubuntu2604-rdna4.md` — desk research, unverified.
 - `findings/rocm-driver/2026-10-07-0749-rocm-10.1-vs-10.0-7.13.md` — a C14 sidebar (check the runtime a binary loads).
 - `findings/agentic/2026-11-01-0000-redhat191-dp-sharp-w208-blind.md` — V2 grade preliminary; a C15 section once graded.
-- All 12 `findings/llamacpp/build-checks/*` — bookkeeping; feed C14 (build drift) and C4/C13 (failed arms).
+- All 13 `findings/llamacpp/build-checks/*` — bookkeeping; feed C14 (build drift) and C4/C13 (failed arms).
 - `guides/vllm/{versions,settings,known-issues,workflows,sources,README,historical}.md` — evidence backbone cited by C3, C8, C10, C13.
 - `findings/llamacpp/2026-07-12-0006-27b-maxctx-f16.md` — superseded ceiling; its KV-arithmetic lesson is a C4 section.
 - `docs/articles/*` and `docs/articles/linkedin/*` — published; C9 is their follow-up.

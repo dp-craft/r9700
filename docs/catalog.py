@@ -32,7 +32,7 @@ SECTIONS = ("findings", "research", "articles", "guides")
 CATALOG = os.path.join(DOCS, "catalog.jsonl")
 VIEW = os.path.join(DOCS, "CATALOG.md")
 VIEW_PROBLEMS = os.path.join(DOCS, "CATALOG-problems.md")
-SKIP = {"docs/articles/CANDIDATES.md"}
+SKIP = {"docs/articles/CANDIDATES.md", "docs/articles/TOPIC-MAP.md"}
 
 DOMAINS = {
     "prefill": "prompt-processing throughput (pp tok/s, TTFT)",
@@ -227,6 +227,9 @@ def cmd_merge(a):
             warn.append(f"{rel}: no notes")
         if rec.get("models"):
             rec["models"] = sorted({norm_model(m) for m in rec["models"]})
+        for k in ("caveats", "versions", "tags"):     # notes sometimes give one string, not a list
+            if isinstance(rec.get(k), str):
+                rec[k] = [rec[k]]
         warn += check(rec)
         out.append(rec)
     warn += [f"{p}: notes for a doc that does not exist" for p in sorted(set(notes) - set(paths))]

@@ -72,7 +72,8 @@ docs/
   research/<topic>/    ← EXTERNAL synthesis: what the world knows, sourced (dated)
   guides/              ← GUIDE.md (operator how-to, both tracks) · driver-upgrade-runbook.md · vllm/ (vLLM
                          knowledge base: versions, settings, known issues, workflows, sources)
-  articles/            ← published write-ups · CANDIDATES.md (ranked article plans + errata, from the catalog)
+  articles/            ← published write-ups · CANDIDATES.md (ranked article plans + errata, from the catalog) ·
+                         TOPIC-MAP.md (topics → docs, status, gaps, ideas, what to write/fix/measure next)
 .claude/skills/        ← benchmark-new-campaign · benchmark-results · llamacpp-build · vllm-image ·
                          radiance-image (personal skills and commands are git-ignored symlinks)
 ```
@@ -322,6 +323,7 @@ REUSE a grader-fixed harness, don't reinvent). **Worked example scaffold: `campa
 - *"What did we already research?"* → `docs/INDEX.md`.
 - *"Which docs cover X / what could become an article?"* → `docs/CATALOG.md` (by domain/model/engine, with
   section + line), `python3 docs/catalog.py show --tag <domain>` (cards), `docs/CATALOG-problems.md`
-  (incidents + fixes), `docs/articles/CANDIDATES.md` (ranked article plans).
+  (incidents + fixes), `docs/articles/CANDIDATES.md` (ranked article plans), `docs/articles/TOPIC-MAP.md`
+  (topic status, gaps, ideas, decision shortlist).
 - *"What are the raw numbers?"* → the report's `campaign:` → `campaigns/<type>/<stamp>-<slug>/results/` (committed
   rows) and `tmp/` (raw, local only). The pre-campaign 2026-07-09/10 harness results are archived, not in this repo.
