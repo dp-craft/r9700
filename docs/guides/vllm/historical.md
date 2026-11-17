@@ -18,8 +18,8 @@ without polluting the generic rules.
 
 ## `HIP_FORCE_DEV_KERNARG=0` — ROCm kernel-argument fault (historical)
 
-- **Date:** 2026-10-22 evening → 2026-10-23 (fix verified); superseded on the current `sly-official`
-  recipe by 2026-10-25 (the recipe does not set it).
+- **Date:** 2026-10-22 evening → 2026-10-23 (fix verified); dropped from the `sly-official` recipe
+  2026-10-25, set again defensively 2026-11-17 (every Sly profile, via `sly-official/_engine.env`).
 - **Issue / goal:** random `HSA_STATUS_ERROR_MEMORY_FAULT` ("page not present"), then a 5–16 min hang
   and a dead engine. Hit the first request on ~12 of ~21 boots of Sly radiance 1.5.1/1.6.0 MXFP4 +
   DFlash, at any ctx, with or without llama-swap. Goal: find the root cause and a fix that kept full
@@ -40,8 +40,8 @@ without polluting the generic rules.
   `ghcr.io/slybase/vllm-sly-radiance:1.6.0-rocm10.1` (vLLM 0.31.0, AITER 0.1.23, transformers 5.17.0,
   torch 2.13.0+rocm10.1.0, triton 3.8.0); model `amd/Qwen3.8-27B-Quark-AWQ-MXFP4` + DFlash2 drafter.
 - **Why it's historical:** the fault is tied to a **specific driver + image window** (7.0.0-34/38
-  amdgpu + Sly 1.6.0/1.5.1), and the **current `sly-official` recipe does not set it** — the GEMM
-  fault is not a live issue on the current stack. It is a *diagnostic* for a bit-44 kernarg-pointer
+  amdgpu + Sly 1.6.0/1.5.1), and the GEMM fault has not been seen on the current images; the
+  recipe sets the fix defensively since 2026-11-17 (no measured speed cost; untested on -38, which faulted without it). It is a *diagnostic* for a bit-44 kernarg-pointer
   corruption, not a general rule. If a future image/driver reintroduces the `0x6…` fault address
   shape, this is the fix to reach for.
 - **Provenance:** `docs/findings/vllm/2026-10-23-0023-vllm-gpu-fault-solved-hip-kernarg.md` (MEASURED

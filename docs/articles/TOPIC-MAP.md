@@ -144,8 +144,8 @@ Doc counts = the appendix mappings (up to three topics per doc). A card's Docs l
   - A generated vLLM row (max-model-len 36864, max_tokens 24000) left 12,864 admissible prompt tokens against a 74,507-token first stage (`MEASURED`, 2026-09-12 vllm-window-budgets-and-rocm-knobs).
   - MTP-8 halves the KV pool per GiB at ctx 36864 (25,529 → 12,972); fp8 KV leaves the pool identical (`MEASURED`, same doc).
   - No VRAM creep as a 170k window fills; peak 30,259 MiB during the cold 150k prefill (`MEASURED`, 2026-10-22 vllm-sly-mxfp4-dflash-170k).
-  - Q5_K_M f16 at 163840 loaded with peak VRAM 31918 MiB and GTT 2841 MiB; a 1551–2841 MiB GTT spill shows in all 14 cells, even the 35B at 27081 MiB, OPEN in the doc (cause unexplained, freeze risk) (`MEASURED`, 2026-07-14 hardest-tasks-27b-vs-35b). Its budget-4096 Q5/Q6 cells used q8_0 KV because f16 was expected not to fit.
-- **Status and trust:** good scattered measurements; no single table. Ornith-1.0-35B's 20 KiB/tok is a calculation (`INFERRED`); Gemma's ~86 KiB/tok is `MEASURED` per CLAUDE.md only (no doc or campaign row), with `gguf_kv.py` unable to read gemma4's per-layer KV-head array.
+  - Q5_K_M f16 at 163840 loaded with peak VRAM 31918 MiB and GTT 2841 MiB; a 1551–2841 MiB GTT spill shows in all 14 cells, even the 35B at 27081 MiB, OPEN in the doc (cause unexplained, freeze risk) (`MEASURED`, 2026-07-14 hardest-tasks-27b-vs-35b). Its budget-4096 Q5/Q6 cells used q8_0 KV because f16 was expected not to fit. CLAUDE.md rule 13 now takes ~140000 as the pessimistic f16 bound for Q5_K_M (owner, 2026-11-17: "around 140–150k").
+- **Status and trust:** good scattered measurements; no single table. Ornith-1.0-35B's 20 KiB/tok is a calculation (`INFERRED`); Gemma's ~86 KiB/tok is not measured (owner, 2026-11-17: the Gemma GGUF always fails; CLAUDE.md now says so), with `gguf_kv.py` unable to read gemma4's per-layer KV-head array.
 - **Possibilities:** short how-to "sizing a context window on 32 GB" (formula error, hybrid geometry, max_tokens eats the window, MTP eats the pool); a C4 section.
 - **Gaps:** a measured-capacity table per model × engine × KV type from existing boot logs (boots.jsonl, gpu_peaks.json; versions.md VRAM rows; settings.md KV pools); gemma4 support in `bench/core/gguf_kv.py`; IQ6R is deferred and its single-card fit is `INFERRED`, unmeasured (2026-11-09 27b-arms-kld §10 item 12); the GTT spill cause (OPEN); mark `campaigns/perf/2026-07-12-1736-27b-maxctx-v2` dead in its README (premise wrong).
 - **Ideas:** a script that collects `gpu_peaks.json` across campaigns into one JSONL (tool, S); extend `gguf_kv.py` to reduce array `head_count_kv` and honor sliding-window layers (tool, S).
@@ -184,7 +184,7 @@ Doc counts = the appendix mappings (up to three topics per doc). A card's Docs l
   - Ornith 1.5 w4a8 on native Radiance: decode 219.8/205.0/174.5, prefill 13,059/8,029/5,301 tok/s (`MEASURED`, mean of 3, same doc).
   - At δ 0, DFlash2 k=7 beats the model's own MTP k=4 at 10k, 100k and 145k: 100.2 vs 62.8 tok/s at 10k (`MEASURED`, mean of 2, power-capped 210 W, 2026-10-30 vllm-redhat-sly191-d0-dflash-depth).
   - ROCM_ATTN decode at 32k (2.8–2.9 tok/s) is a quarantined row, not a result (rule 18): rerun before quoting. TRITON_ATTN 14.12 tok/s (`MEASURED`, one boot per arm, 2026-09-11 vllm-qwen38-27b-int4).
-  - Also set: Cactus δ 0 (default δ 0.5 loops, T11); sly-amd still defaults to EMULATION (versions.md); Radiance's default 96 MiB headroom left 113 MiB free at peak (`MEASURED`, known-issues; T23). `HIP_FORCE_DEV_KERNARG=0` is no longer in the sly-official recipe (settings.md; T12).
+  - Also set: Cactus δ 0 (default δ 0.5 loops, T11); sly-amd still defaults to EMULATION (versions.md); Radiance's default 96 MiB headroom left 113 MiB free at peak (`MEASURED`, known-issues; T23). `HIP_FORCE_DEV_KERNARG=0` is set again in every Sly profile since 2026-11-17 (defensive, `sly-official/_engine.env`; T12).
 - **Status and trust:** fast-moving (Sly 1.6.0 → 1.9.1, radiance 1.16 → 1.17 within weeks). Qwen3.8-27B RedHat MXFP4 DFlash2 decode at 10k (`MEASURED`): 122.3 (Sly 1.8.1, δ 0.5, ctx 110000, 0900), 100.2 (1.9.1, δ 0, ctx 262000, 2232), 86.9 (1.9.1, ctx 262000, 1746), unreconciled; ctx alone does not explain it. Ornith-on-Radiance vs Sly arms change model and engine together; 3 depths only there. 1055's recommended config matches no measured row.
 - **Possibilities:** C3 (M, ready, series B part 1); C10 and C8 complete series B. A versions-matrix explainer could come from `docs/guides/vllm/versions.md`.
 - **Gaps:** triton_unfused correctness and MTP on it; a ≥4-depth curve for Ornith 1.5 and Qwen3.5-35B-A3B; the 122.3 / 100.2 / 86.9 reconciliation; 1535 §2 MTP-off row not marked superseded.
@@ -224,7 +224,7 @@ Doc counts = the appendix mappings (up to three topics per doc). A card's Docs l
   - Ruled out by test: kernel version, ctx, Sly version, A-tiled path, padding, prefill split (`MEASURED`, same doc).
   - llama.cpp ROCm `-fa on` aborts with a permission fault (PERMISSION_FAULTS=0x3) on ROCm 10.0 and 10.1, absent with `-fa off` (`MEASURED`: the abort and the clean `-fa off` run; the permission-fault decode of the dmesg registers is `INFERRED`, 2026-10-07 rocm-fa-hsa-memory-fault).
   - In vLLM and hipfire the fault left /health answering ok: vLLM's EngineDeadError ~6.5 min after the hang (`MEASURED`, 2026-10-22 vllm-sly-mxfp4-depth; 5–16 min in the superseded 1643 log), hipfire's worker wedged (`MEASURED`, 2026-09-10 hipfire-final-analysis). llama.cpp `-fa on` aborts instead.
-- **Status and trust:** fix holds on n=3 (+1 via llama-swap), kernel 7.0.0-34 only; the -38 gate is open (0023 status) and the sly-official recipe no longer sets it (settings.md, historical.md); 1745 still names kernel -38 as first suspect; 1506 still says "not safe" though superseded; 0023 cites a plans path that does not exist (plans live in notes/plans).
+- **Status and trust:** fix holds on n=3 (+1 via llama-swap), kernel 7.0.0-34 only; the -38 gate is open (0023 status) the recipe dropped it 2026-10-25 and sets it again since 2026-11-17, defensively (settings.md, historical.md); 1745 still names kernel -38 as first suspect; 1506 still says "not safe" though superseded; 0023 cites a plans path that does not exist (plans live in notes/plans).
 - **Possibilities:** C10 (narrative, series B part 2), writable once the three cross-note wordings are fixed.
 - **Gaps:** does `HIP_FORCE_DEV_KERNARG=0` also clear the llama.cpp ROCm `-fa on` fault and the sequential-arm state leak? The kernel reboot attribution test (1745) is pending.
 - **Ideas:** a small investigation campaign: b11448-rocm `-fa on`, llama-bench pp2048/tg128, kernarg default vs 0, 10 boots each, count faults.
@@ -456,10 +456,10 @@ swallowed by a quiet curl (rule 14; the runbook documents the trap and a separat
 ### Track A — write now
 "Fix first" items are wording or quote choices outside the article's numbers (≤1 h each, §1).
 1. **C2, prefix reuse (T08). Recommended first.** S, no GPU. The most transferable lesson (rule 17), `MEASURED` on three engines: warm vs cold TTFT 13.7x (llama.cpp, identical prompt), 17.4x (radiance), and Sly's turn-8 15.1 s for 15,084 new tokens vs 90.2 s for a cold 135,689 (not size-matched). Fix first: MRCR as ~13.9x (`INFERRED`, 551 s / 39.5 s, not 12.5x); quote only 1055's prefix rows and no warm-TTFT winner (its findings 19 and 23 disagree). Say that 1055's changed tail is ~25 tokens; the arms-speed probe can add a v2 section.
-2. **C3, one flag 6.6x (T09).** M. Fix first: one source per number (1630 vs 1702), the 1630 step time as `INFERRED`, drop the quarantined ROCM_ATTN row, no single 27B reference number. Say "speed only; triton_unfused correctness untested; 3 depths; short replies" unless the optional correctness check (C, S) runs first.
-3. **C4, when the ruler is broken (T22).** M. Fix first: tag maxctx-f16's 29.0 GiB as unsampled; recompute the runner §3.4 and §4.5 rows before quoting.
+2. **C3, one flag 6.6x (T09).** M. Fix first: one source per number (1630 vs 1702), the 1630 step time as `INFERRED`, drop the quarantined ROCM_ATTN row, no single 27B reference number. Say "speed only; triton_unfused correctness untested; 3 depths; short replies" unless the optional correctness check (C, S) runs first — open question, see below.
+3. **C4, when the ruler is broken (T22).** M. Fix first: tag maxctx-f16's 29.0 GiB as unsampled (owner OK 2026-11-17: fix the doc's banner as part of C4); recompute the runner §3.4 and §4.5 rows before quoting.
 4. **C6, local worker vs Haiku (T19).** M. Fix first: use the manual's dp-prompt rule (0814 vs manual); give Ornith's log score as 16, 16 and 21 of 21. Say "mostly n=1".
-5. **C10, the bit-44 fault (T12).** M. Fix first: the three cross-note wordings (1745 kernel suspect, 1506 "not safe", 0023 plans path). Say "held on 3 boots, kernel -34 only; the -38 gate is open; the recipe no longer sets it".
+5. **C10, the bit-44 fault (T12).** M. Fix first: the three cross-note wordings (1745 kernel suspect, 1506 "not safe", 0023 plans path). Say "held on 3 boots, kernel -34 only; the -38 gate is open; the recipe sets it again defensively since 2026-11-17".
 
 ### Track B — fix docs, then write
 1. **C5, KLD fidelity (T14).** Count and label fixes in one doc (12 arms, 78/128 vs 77/87, IQ6R wording), 1–2 h; best-instrumented result in the repo (MXFP4 7–8x on every engine). Frame KL as closeness, not task quality.
@@ -486,6 +486,9 @@ widest audience; its open items are the text fixes above, and it needs no GPU, s
 campaign unblocks the most (C7's modern comparison, C3's depth gap, C2's v2 section, the first concurrency grid) and is
 already designed and approved. CANDIDATES ranks C1 first on hook strength; it publishes second because its headline is a
 b9950 per-build number that needs the 30-minute b11448 confirm first.
+
+### Open questions for the owner
+1. **C3:** publish as a speed-only piece ("triton_unfused correctness untested"), or run the short correctness check (C, S: greedy token agreement or a few TS tasks, triton_unfused vs EMULATION) first? (open, 2026-11-17)
 
 ---
 

@@ -910,7 +910,7 @@ _crashes, device-lost, memory faults, hangs, invalid output, flaky runs_
 - [historical](guides/vllm/historical.md) §Issue / goal; Root cause — random HSA memory fault on the first request, a 5-16 minute hang, then a dead engine
 - [known-issues](guides/vllm/known-issues.md) §`radiance_mxfp4_fp8_gemm_atiled` GEMM f… L6 — MXFP4 prefill GEMM memory fault, 2 faults in 84 requests; hang then dead engine; graduated
 - [known-issues](guides/vllm/known-issues.md) §Cactus lossy acceptance — Sly issue #16… L89 — lossy acceptance transform drives repetition loops on long outputs; reduced in 1.9.x, not removed
-- [settings](guides/vllm/settings.md) §`HIP_FORCE_DEV_KERNARG=0` — **not set b… L110 — diagnostic for bit-44 kernarg corruption; historical fix, not a general rule
+- [settings](guides/vllm/settings.md) §`HIP_FORCE_DEV_KERNARG=0` — **set in ev… L110 — diagnostic for bit-44 kernarg corruption; historical fix, not a general rule
 - [settings](guides/vllm/settings.md) §`RADIANCE_*` knobs (MXFP4 kernel family… L71 — A_TILED_MIN_M=513 selects the historical faulting kernel; CACTUS_DELTA 0.5 is lossy
 - [workflows](guides/vllm/workflows.md) §Debug a fault L80 — MEMORY_FAULT grep, residency and orphan checks; pkill and pgrep pitfalls
 

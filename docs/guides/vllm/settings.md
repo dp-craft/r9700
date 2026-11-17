@@ -1,8 +1,8 @@
 # vLLM track — settings (config knobs)
 
 One section per flag: **what-for / how-to-use / side-effect / version measured**. A flag that fixes
-an issue cross-links to `known-issues.md`. `HIP_FORCE_DEV_KERNARG=0` is **not** a current setting
-— it is historical (see `historical.md`); the current `sly-official` recipe does not set it.
+an issue cross-links to `known-issues.md`. `HIP_FORCE_DEV_KERNARG=0` is set again
+since 2026-11-17 in every Sly profile (defensive, via `sly-official/_engine.env`); background in `historical.md`.
 
 ## `--enforce-eager` (vs FULL_DECODE_ONLY CUDA graphs)
 - **what-for:** disable CUDA graphs (CompilationMode.NONE, CUDAGraphMode.NONE, capture sizes cleared).
@@ -107,10 +107,11 @@ an issue cross-links to `known-issues.md`. `HIP_FORCE_DEV_KERNARG=0` is **not** 
   the host (992/44 here, README assumes 109/44); containers run as root (cache files root-owned).
 - **version measured:** sly-radiance 1.6.0.
 
-## `HIP_FORCE_DEV_KERNARG=0` — **not set by `sly-official`**
-- The current `sly-official` recipe (heretic, redhat) does **not** set it (user decision 2026-10-24);
-  `serve_radiance.sh` (default 0) and the `sly-radiance` (amd) engine layer still do. The `radiance_mxfp4_fp8_gemm_atiled`
-  GEMM fault it fixed is **historical** (graduated to `historical.md`). It was the default in the
-  `sly-radiance`/`radiance` profiles during the 2026-10-22/23 fault window; it is a *diagnostic* for
-  a bit-44 kernarg-pointer corruption, not a general rule. If a future image/driver reintroduces the
-  `0x6…` fault-address shape, this is the fix to reach for. See `historical.md`.
+## `HIP_FORCE_DEV_KERNARG=0` — **set in every Sly profile again (defensive, 2026-11-17)**
+- `sly-official/_engine.env` sets it, so `sly-official` (heretic), `sly-redhat` and `sly-amd` (both source it) carry
+  it; `serve_radiance.sh` (default 0) and the `sly-radiance`/`radiance` layers always did. The recipe had dropped it on
+  2026-10-24 (user decision); it came back 2026-11-17 because the fault hit kernel -38 (the running one) without it,
+  the fix is verified on -34 only, and it showed no measured speed cost
+  (`docs/findings/vllm/2026-10-23-0023-vllm-gpu-fault-solved-hip-kernarg.md`). The `radiance_mxfp4_fp8_gemm_atiled`
+  GEMM fault itself is **historical** (not seen on 1.8.1/1.9.1; graduated to `historical.md`), where the
+  bit-44 kernarg-pointer diagnosis and the `0x6…` fault-address shape are described.

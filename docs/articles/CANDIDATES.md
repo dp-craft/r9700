@@ -192,6 +192,8 @@ reps=1 sweep of Qwen3.6-27B (MTP 2.25x, an MTP file vs a no-MTP file; thinking c
     232.52 MiB free at load, 113 MiB at peak; Chrome and GNOME Shell crashed ~7 min later (crash cause
     `INFERRED`); 1746 §Consequences & root causes (L104).
 - **Gaps before publishing.**
+  - **Open question (owner, 2026-11-17):** publish speed-only ("triton_unfused correctness untested"), or run the
+    short correctness check (greedy token agreement or a few TS tasks, triton_unfused vs EMULATION) first?
   - Errata (1630): its meta tags the ~180 ms step `MEASURED`, its body `INFERRED` — use `INFERRED`; its
     summary says no non-emulated MXFP4 MoE runs on gfx1201 while its table leaves triton_unfused untested —
     tell it as "the doc's prediction, then the test".
@@ -255,7 +257,7 @@ reps=1 sweep of Qwen3.6-27B (MTP 2.25x, an MTP file vs a no-MTP file; thinking c
     table; "q8_0 no spill" vs 1,431 MiB GTT. Quote only §4.5 and §3.4 rows, recomputed.
   - hipfire baseline errata (p01): headline vs per-run tables swap the two 27B models — §3 only needs the
     cache-vs-unique contrast, not the model attribution.
-  - maxctx-f16's banner calls its 29.0 GiB `MEASURED`, but no VRAM was sampled: quote it as unsampled (fix first).
+  - maxctx-f16's banner calls its 29.0 GiB `MEASURED`, but no VRAM was sampled: quote it as unsampled (fix first; owner OK 2026-11-17 to fix the banner as part of C4).
   - Keep the truncated-flag section short (published).
 
 ### C5 — Quant fidelity on one card: Q6_K, IQ4R, and MXFP4 at 7–8x on every engine
@@ -546,7 +548,7 @@ reps=1 sweep of Qwen3.6-27B (MTP 2.25x, an MTP file vs a no-MTP file; thinking c
     faulted, `/health` ok (`MEASURED`); CLAUDE.md iron rule 15.
 - **Gaps before publishing.**
   - n=3 clean boots (+1 via llama-swap); fix confirmed on kernel 7.0.0-34 only, the 7.0.0-38 gate is still open
-    (0023 status), and the sly-official recipe no longer sets it (`docs/guides/vllm/settings.md`); root cause `INFERRED`;
+    (0023 status); the recipe dropped it 2026-10-25 and sets it again defensively since 2026-11-17 (`docs/guides/vllm/settings.md`); root cause `INFERRED`;
     the llama.cpp ROCm link is untested — present §5 as a sibling, not the same bug.
   - Errata (p04): 1745 still names kernel 7.0.0-38 as first suspect though 0023 showed -34 also faulted
     (cross-note added); 0023 cites `docs/plans/…/claudetest.sh` (plans live in `notes/plans/`); 1506 still

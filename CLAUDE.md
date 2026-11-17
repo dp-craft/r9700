@@ -140,7 +140,10 @@ embedded via `results/appendix.md`.
     another is the classic one).
 12. **Be interactive.** Surface concerns as they arise, recommend concrete options (best first), and
     challenge ideas during brainstorming instead of just agreeing.
-13. **Q5_K_M at f16 KV / ctx 163840 fits into VRAM** so all lower values should be accepted without testing (lower model num like Q4, or lower context or Q6 with FP8).
+13. **Q5_K_M at f16 KV fits into VRAM up to ctx ~140000** (pessimistic bound, owner 2026-11-17: "around 140–150k";
+    at 163840 the 27B peaked at 31918 of 32624 MiB VRAM, and that campaign saw a 1551–2841 MiB GTT spill in all 14 cells,
+    cause open — `MEASURED` 2026-07-14 hardest-tasks-27b-vs-35b) so all lower values should be accepted without
+    testing (lower model num like Q4, or lower context or Q6 with FP8).
 14. **Long runs: edit before you launch, and kill by pidfile.** Never edit a script that is running —
     bash reads it lazily by byte offset, so a mid-run edit resumes at the wrong offset and executes
     garbage. Finish every edit first, then start. Stop a server via its pidfile/port
@@ -276,7 +279,7 @@ REUSE a grader-fixed harness, don't reinvent). **Worked example scaffold: `campa
   0.95/top_k 20/min_p 0, penalties 0. f16 KV **20 KiB/tok**, weights 20.6 GiB → **full 262K fits f16**.
   `<think>` split works. **MTP off — impossible** (no nextn tensors, no drafter, no unsloth guidance).
 - **Gemma** `gemma4` dense hybrid (sliding-window 1024 + global, 60 blk): temp **1.0**/top_p 0.95/top_k
-  64. **KV is heavy: MEASURED ~86 KiB/tok f16 (~5× Ornith)** — f16 @ctx 163840 loads at **32272 MiB + 2.5 GiB
+  64. **KV is heavy: ~86 KiB/tok f16 (~5× Ornith) — not measured** (owner 2026-11-17: the Gemma GGUF always fails) — f16 @ctx 163840 loads at **32272 MiB + 2.5 GiB
   GTT spill** (does NOT fit 32 GB), so **use `KV=q8_0` at deep ctx** (~25.8 GiB, fits; Ornith stays f16 →
   documented KV asymmetry, ≤5% rule). Weights ~16.1 GiB. **MEASURED: the model OUTPUTS `<think>…</think>`
   (capture.py splits it fine — no fix needed), despite the gguf template's `<|channel>` markers.** **MTP possible**
@@ -294,7 +297,7 @@ REUSE a grader-fixed harness, don't reinvent). **Worked example scaffold: `campa
   layers. Until then **hand-set Gemma's VRAM guard** and **MEASURE** usage with `vram_sampler.py`
   (iron rule 7 — never publish the calc).
 - **Gemma f16 KV spills at deep ctx** (VRAM full → CPU/GTT offload): MEASURED f16 @ctx 163840 = **32272 MiB
-  + 2529 MiB GTT** (gemma4 KV ~86 KiB/tok, ~5× Ornith). Symptom = `vram_used ≈ vram_total` + rising
+  + 2529 MiB GTT** (gemma4 KV ~86 KiB/tok, ~5× Ornith — not measured). Symptom = `vram_used ≈ vram_total` + rising
   `gtt_used` in `gpu_*.csv`, degraded decode. **Fix: `KV=q8_0`** → MEASURED **26872 MiB, no spill** (Ornith
   stays f16; asymmetry within the ≤5% rule). (Ornith f16 @163840 = 25748 MiB, fits native.)
 - **⚠ Gemma-4-31B deep prefill CRASHES on Vulkan/RADV but WORKS on ROCm/HIP — the crash is a RADV driver bug,

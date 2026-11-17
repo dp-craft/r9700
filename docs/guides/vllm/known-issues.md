@@ -11,8 +11,8 @@ an issue lives in `settings.md`; a fix that was version/env-specific lives in `h
   both in the 2nd deep conversation.
 - **status:** **resolved / not live** — graduated to `historical.md`. Root cause (INFERRED, strong): a
   corrupted kernel-argument pointer (bit 44 cleared); fixed by `HIP_FORCE_DEV_KERNARG=0` (kernargs in
-  host memory). The current `sly-official` recipe does not set it and the fault is not live on the
-  current stack.
+  host memory). Not seen on the current images (1.8.1/1.9.1); since 2026-11-17 every Sly profile sets
+  the fix again defensively (kernel -38 faulted without it; the fix is verified on -34 only).
 - **version seen:** sly-radiance 1.6.0 / 1.5.1 + kernel 7.0.0-34 / -38.
 - **workaround:** `HIP_FORCE_DEV_KERNARG=0` (historical fix); interim: client timeout < 387 s +
   restart between long sessions.
